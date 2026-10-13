@@ -2,6 +2,8 @@
 
 [DirectX-Graphics-Samples](https://github.com/microsoft/DirectX-Graphics-Samples) 의 MiniEngine 에 Dynamic Global Illumination 을 구현하는 프로젝트.
 
+진행 계획은 [docs/ROADMAP.md](docs/ROADMAP.md) 에 있다.
+
 ## 준비
 
 - Visual Studio 2022 (17.14 에서 확인), Desktop development with C++ workload, vcpkg 구성 요소
