@@ -1,0 +1,1183 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DDGI Ray Query 입문서</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: 좌측 sticky 목차 + 65ch 본문. 광선(ray)은 amber, 구조(AS)는 teal 로 일관되게 색을 나눈다. */
+:root {
+  --bg: #f4f6f8;
+  --surface: #ffffff;
+  --fg: #1a2230;
+  --muted: #5a6677;
+  --line: #d8dee6;
+  --accent: #0b6b75;
+  --accent-soft: #e2f1f2;
+  --ray: #b0561a;
+  --ray-soft: #fbeee3;
+  --warn: #9a3412;
+  --warn-soft: #fdecdf;
+  --code-bg: #eef1f5;
+  --font-body: "IBM Plex Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", Consolas, "D2Coding", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f141b; --surface: #161d26; --fg: #dde4ec; --muted: #94a1b2; --line: #2a3442;
+    --accent: #5cc4cd; --accent-soft: #15303a; --ray: #f0a35c; --ray-soft: #33251a;
+    --warn: #f4a37a; --warn-soft: #3a2218; --code-bg: #1b2430; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f141b; --surface: #161d26; --fg: #dde4ec; --muted: #94a1b2; --line: #2a3442;
+  --accent: #5cc4cd; --accent-soft: #15303a; --ray: #f0a35c; --ray-soft: #33251a;
+  --warn: #f4a37a; --warn-soft: #3a2218; --code-bg: #1b2430; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 16px; line-height: 1.75; word-break: keep-all; overflow-wrap: anywhere; }
+.wrap { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 48px; max-width: 1120px; margin: 0 auto; padding-inline: 24px; padding-block: 40px 96px; }
+nav.toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 24px); align-self: start; max-height: calc(100vh - 48px); overflow-y: auto; font-size: 13.5px; line-height: 1.5; }
+nav.toc .label { font-family: var(--font-mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+nav.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+nav.toc a { display: flex; gap: 8px; padding: 5px 8px; border-radius: 6px; color: var(--fg); text-decoration: none; }
+nav.toc a:hover, nav.toc a:focus-visible { background: var(--accent-soft); outline: none; }
+nav.toc a .n { font-family: var(--font-mono); color: var(--muted); min-width: 1.6em; }
+nav.toc a.done .t { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--line); }
+main { min-width: 0; max-width: 46rem; }
+header.hero { padding-bottom: 28px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: .1em; color: var(--accent); text-transform: uppercase; }
+h1 { font-size: clamp(28px, 4.2vw, 40px); line-height: 1.25; margin: 8px 0 14px; text-wrap: balance; font-weight: 700; }
+h2 { font-size: 24px; line-height: 1.35; margin: 0 0 6px; text-wrap: balance; }
+h3 { font-size: 18px; margin: 32px 0 6px; text-wrap: balance; }
+h4 { font-size: 15.5px; margin: 22px 0 4px; }
+p { margin: 10px 0; }
+.lede { color: var(--muted); font-size: 17px; }
+section.part { padding-top: 56px; scroll-margin-top: 16px; }
+.part-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.part-no { font-family: var(--font-mono); font-weight: 600; color: var(--accent); font-size: 15px; }
+.goal { color: var(--muted); font-size: 14.5px; margin-top: 2px; }
+.done-toggle { margin-left: auto; font-size: 13px; color: var(--muted); display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.done-toggle input { accent-color: var(--accent); width: 16px; height: 16px; }
+code { font-family: var(--font-mono); font-size: .88em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; overflow-x: auto; font-size: 13.5px; line-height: 1.6; margin: 14px 0; }
+pre code { background: none; padding: 0; font-size: inherit; }
+pre .c { color: var(--muted); }
+pre .k { color: var(--accent); font-weight: 600; }
+pre .r { color: var(--ray); }
+.table-wrap { overflow-x: auto; margin: 14px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; line-height: 1.55; }
+th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+th { font-weight: 600; background: var(--code-bg); white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td code { white-space: nowrap; }
+.note { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 10px 14px; border-radius: 0 8px 8px 0; margin: 16px 0; font-size: 15px; }
+.note.ray { border-left-color: var(--ray); background: var(--ray-soft); }
+.note.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+.note b.tag { font-family: var(--font-mono); font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; display: block; margin-bottom: 2px; }
+.dx11 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0; }
+.dx11 > div { min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; font-size: 14.5px; }
+.dx11 .h { font-family: var(--font-mono); font-size: 11.5px; letter-spacing: .1em; color: var(--muted); text-transform: uppercase; }
+details.quiz { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; margin: 10px 0; font-size: 15px; }
+details.quiz summary { cursor: pointer; font-weight: 500; }
+details.quiz summary::marker { color: var(--accent); }
+details.quiz[open] summary { margin-bottom: 6px; }
+figure { margin: 18px 0; }
+figure .fig { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+figcaption { font-size: 13px; color: var(--muted); margin-top: 6px; }
+svg text { font-family: var(--font-body); }
+.s-fg { fill: var(--fg); } .s-muted { fill: var(--muted); } .s-acc { fill: var(--accent); } .s-ray { fill: var(--ray); }
+.s-box { fill: var(--surface); stroke: var(--line); stroke-width: 1.2; }
+.s-tlas { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.4; }
+.s-blas { fill: var(--surface); stroke: var(--accent); stroke-width: 1.2; }
+.s-line { stroke: var(--muted); stroke-width: 1.2; fill: none; }
+.s-rayline { stroke: var(--ray); stroke-width: 1.6; fill: none; }
+.s-dot { fill: var(--ray); }
+.calc { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; margin: 14px 0; }
+.calc .inputs { display: flex; flex-wrap: wrap; gap: 10px 16px; }
+.calc label { display: grid; gap: 2px; font-size: 13px; color: var(--muted); }
+.calc input { width: 7.5em; font: 500 15px var(--font-mono); padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
+.calc input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.calc .out { margin-top: 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.calc .out div { min-width: 0; }
+.calc .out .v { font: 600 20px var(--font-mono); font-variant-numeric: tabular-nums; color: var(--ray); }
+.calc .out .k { font-size: 12.5px; color: var(--muted); }
+ul, ol.plain { padding-left: 1.3em; margin: 8px 0; }
+li { margin: 3px 0; }
+.check li { list-style: none; position: relative; padding-left: 4px; }
+.check { padding-left: 1.4em; }
+.check li::before { content: "□"; position: absolute; left: -1.3em; color: var(--accent); }
+a { color: var(--accent); }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 13.5px; color: var(--muted); margin-top: 14px; }
+.legend span b { font-family: var(--font-mono); font-size: 11px; padding: 1px 6px; border-radius: 4px; margin-right: 6px; }
+.b-fact { background: var(--accent-soft); color: var(--accent); }
+.b-judge { background: var(--ray-soft); color: var(--ray); }
+.b-guess { background: var(--warn-soft); color: var(--warn); }
+.mk { font-family: var(--font-mono); font-size: 10.5px; padding: 0 5px; border-radius: 4px; vertical-align: 1px; margin-right: 4px; }
+.dec { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 4px 16px 14px; margin: 14px 0; }
+.dec h4 { margin-top: 12px; }
+.dec ul { font-size: 15px; }
+.dec .crit { font-size: 14.5px; color: var(--muted); }
+.dec .rel { font-family: var(--font-mono); font-size: 12px; color: var(--accent); white-space: nowrap; }
+.dec textarea, .wb-out { width: 100%; min-height: 4.5em; resize: vertical; font: 14.5px/1.6 var(--font-body); padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
+.dec textarea:focus-visible, .wb-out:focus-visible, .wb-actions button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.wb-out { min-height: 16em; font-family: var(--font-mono); font-size: 13px; margin-top: 8px; }
+.wb-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 16px 0 4px; }
+.wb-actions button { font: 500 14.5px var(--font-body); padding: 7px 14px; border-radius: 6px; border: 1px solid var(--accent); background: var(--accent-soft); color: var(--accent); cursor: pointer; }
+#wb-status { font-size: 13.5px; color: var(--muted); }
+pre.mermaid { background: var(--surface); text-align: center; }
+math { font-family: "Cambria Math", "STIX Two Math", "Latin Modern Math", math; font-size: 1.08em; color: var(--fg); }
+.eq { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px 18px; margin: 14px 0; }
+.eq math { font-size: 1.3em; }
+.eq .where { font-size: 14px; color: var(--muted); margin-top: 10px; display: grid; grid-template-columns: max-content 1fr; gap: 2px 14px; }
+.eq .where math { font-size: 1.1em; }
+@media (max-width: 860px) {
+  .wrap { grid-template-columns: minmax(0, 1fr); gap: 16px; padding-inline: 16px; padding-block: 24px 72px; }
+  nav.toc { position: static; max-height: none; border: 1px solid var(--line); border-radius: 8px; padding: 12px; background: var(--surface); }
+  .dx11 { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+<nav class="toc" aria-label="목차">
+  <div class="label">학습 순서</div>
+  <ol id="toc"></ol>
+</nav>
+
+<main>
+<header class="hero">
+  <div class="eyebrow">MiniEngine-DynamicGI · 사전 학습</div>
+  <h1>DDGI Probe Update를 위한 Inline Ray Query 입문서</h1>
+  <p class="lede">DX11 엔진 경험을 출발점으로, DDGI가 ray에게 무엇을 묻는지부터 DXR 1.1 inline ray query로 그 질문에 답하는 구조까지 순서대로 쌓아 올립니다.</p>
+  <div class="note"><b class="tag">이 문서의 목표</b>
+  <ol class="plain" style="margin:4px 0">
+    <li><b>평가</b>: 누가 쓴 것이든 DDGI probe update용 ray query infra 설계안을 받았을 때, 각 결정이 왜 그런지, 무엇을 놓쳤는지 근거를 들어 판단할 수 있다.</li>
+    <li><b>설계</b>: 설계안 없이 이 repo(MiniEngine)에서 출발해, 스스로 결정 목록을 채우고 구현 순서와 검증 방법까지 정할 수 있다.</li>
+  </ol>
+  전제 지식은 DX11로 게임 엔진을 만들어 본 정도입니다. DX12, DXR, GI는 처음이라고 가정합니다.</div>
+  <div class="note"><b class="tag">사용법</b>
+  Part 00~09에서 개념을 배우고, Part 10에서 이 repo가 어떻게 생겼는지 익힙니다. Part 11 설계 워크북에서 결정을 직접 적어 설계안을 만들고, Part 12의 평가 기준으로 자기 설계안과 예시 설계안을 평가합니다. 예시 설계안은 직접 설계를 끝낸 뒤에 여는 것을 권합니다.</div>
+  <div class="legend">
+    <span><b class="b-fact">사실</b>D3D12/DXR spec, 논문, 이 repo 코드로 확인되는 내용</span>
+    <span><b class="b-judge">판단</b>설계상 권장이나 trade-off 의견</span>
+    <span><b class="b-guess">추측</b>확인하지 않은 추정</span>
+  </div>
+  <p style="font-size:14px;color:var(--muted)">표시가 없는 서술은 사실에 해당합니다. 각 Part 오른쪽의 체크박스로 진도를 표시하면 이 브라우저에만 저장됩니다.</p>
+</header>
+
+<!-- ============================================================ -->
+<section class="part" id="p0" data-title="큰 그림">
+  <div class="part-head"><span class="part-no">00</span><h2>큰 그림: 무엇을 만들려는가</h2></div>
+  <p class="goal">목표: "ray query infra"가 전체 GI 시스템에서 어느 층인지 머릿속에 지도를 그린다.</p>
+
+  <p>DDGI는 공간에 격자로 배치한 <b>probe</b>들이 매 프레임 주변으로 ray를 쏘고, 그 결과로 "이 지점에 사방에서 들어오는 간접광"을 갱신하는 기법입니다. 화면 pixel은 shading할 때 주변 probe 값을 보간해서 간접광으로 씁니다.</p>
+  <p>이 과정에서 ray가 하는 일은 단 하나입니다. <b>"이 점에서 이 방향으로 가면 무엇에 처음 부딪히는가?"</b>라는 질문에 답하는 것. 이 질문에 빠르고 정확하게 답해 주는 장치를 이 문서에서는 <b>ray query infra</b>라고 부릅니다.</p>
+
+<pre class="mermaid">
+flowchart TB
+  A["Scene 데이터<br/>(Model, Mesh, 행렬)"] --> B["Acceleration Structure<br/>BLAS / TLAS"]
+  B --> C["RayQuery helper (HLSL)<br/>closest hit / visibility"]
+  C --> D["DDGI Probe Trace<br/>hit 지점 shading"]
+  D --> E["Probe Blend<br/>irradiance / distance atlas"]
+  E --> F["화면 shading 시 간접광 sampling"]
+  style B stroke-width:2px
+  style C stroke-width:2px
+</pre>
+  <p>굵은 두 칸이 ray query infra의 범위입니다. 그 위(scene 데이터)는 이미 MiniEngine에 있고, 그 아래(DDGI 본체)는 이 infra를 사용하는 쪽입니다.</p>
+  <h3>Infra의 입력과 출력</h3>
+  <ul>
+    <li><b>입력</b>: CPU 쪽 scene 데이터(어떤 mesh가 어떤 transform으로 놓여 있는가)와, shader 쪽 ray 하나(출발점, 방향, 구간).</li>
+    <li><b>출력</b>: "맞았는가, 얼마나 멀리서, 어느 물체의 어느 삼각형의 어디에, 앞면인가 뒷면인가". 그 지점의 색과 법선 같은 표면 정보까지 infra가 돌려줄지는 설계에서 정할 경계입니다(Part 11, D1).</li>
+  </ul>
+  <p>infra를 따로 떼어 생각하는 이유는 사용처가 DDGI 하나가 아니기 때문입니다. 같은 질문을 shadow, AO, reflection도 합니다. 그래서 이 층은 DDGI를 몰라도 동작하고 검증할 수 있게 만드는 것이 좋습니다 <span class="mk b-judge">판단</span>.</p>
+
+  <div class="note"><b class="tag">학습 경로</b>
+  Part 1~2에서 GI와 DDGI가 ray에 요구하는 것을 이해하고, Part 3에서 DX12 기초를 메운 뒤, Part 4~8에서 DXR과 hit 처리를 배우고, Part 9에서 비용 감각을 잡습니다. Part 10에서 이 repo의 구조를 익히고, Part 11~12에서 직접 설계하고 평가합니다. DX12가 이미 익숙하다면 Part 3은 표만 훑고 넘어가도 됩니다.</div>
+</section>
+
+<!-- ============================================================ -->
+<section class="part" id="p1" data-title="GI 기초">
+  <div class="part-head"><span class="part-no">01</span><h2>Global Illumination 기초</h2></div>
+  <p class="goal">목표: direct와 indirect의 차이, irradiance라는 말, diffuse GI가 왜 저해상도로도 되는지 이해한다.</p>
+
+  <h3>Direct light와 indirect light</h3>
+  <p>DX11 엔진에서 구현해 본 Blinn-Phong이나 PBR shading은 대부분 <b>direct lighting</b>입니다. 광원에서 표면으로 바로 오는 빛만 계산하고, 그림자로 "광원이 보이는가"만 따집니다. 현실에서는 빛이 벽에 맞고 튕겨 다른 표면을 비춥니다. 붉은 벽 옆의 흰 바닥이 붉게 물드는 현상(color bleeding), 햇빛이 직접 닿지 않는 복도가 완전히 검지 않은 현상이 <b>indirect lighting</b>이고, 이것까지 포함한 조명을 <b>global illumination</b>이라고 부릅니다.</p>
+  <p>지금까지 엔진이 indirect를 흉내 낸 방법은 보통 셋입니다. 상수 ambient, 미리 구운 lightmap, 그리고 MiniEngine에도 있는 IBL(environment map)입니다. 앞의 것들은 장면이 바뀌면 틀리고, IBL은 "무한히 먼 환경"만 표현하므로 실내의 벽끼리 주고받는 빛을 표현하지 못합니다. <b>Dynamic GI</b>는 이것을 실행 중에 계산합니다.</p>
+
+  <h3>Rendering equation을 말로 풀면</h3>
+  <div class="eq">
+    <math display="block"><mrow>
+      <msub><mi>L</mi><mtext>out</mtext></msub><mo>(</mo><mi>x</mi><mo>,</mo><msub><mi>ω</mi><mi>o</mi></msub><mo>)</mo>
+      <mo>=</mo>
+      <msub><mi>L</mi><mtext>emit</mtext></msub><mo>(</mo><mi>x</mi><mo>,</mo><msub><mi>ω</mi><mi>o</mi></msub><mo>)</mo>
+      <mo>+</mo>
+      <msub><mo largeop="true">∫</mo><mi>Ω</mi></msub>
+      <mi>f</mi><mo>(</mo><mi>x</mi><mo>,</mo><msub><mi>ω</mi><mi>i</mi></msub><mo>,</mo><msub><mi>ω</mi><mi>o</mi></msub><mo>)</mo>
+      <mspace width="0.2em"/>
+      <msub><mi>L</mi><mtext>in</mtext></msub><mo>(</mo><mi>x</mi><mo>,</mo><msub><mi>ω</mi><mi>i</mi></msub><mo>)</mo>
+      <mspace width="0.2em"/>
+      <mi>cos</mi><mo>⁡</mo><msub><mi>θ</mi><mi>i</mi></msub>
+      <mspace width="0.2em"/>
+      <mi>d</mi><msub><mi>ω</mi><mi>i</mi></msub>
+    </mrow></math>
+    <div class="where">
+      <math><msub><mi>ω</mi><mi>o</mi></msub></math><span>나가는 방향 (보통 카메라 쪽)</span>
+      <math><msub><mi>ω</mi><mi>i</mi></msub></math><span>들어오는 방향. 반구 <math><mi>Ω</mi></math> 전체를 적분</span>
+      <math><mi>f</mi></math><span>BRDF. 표면 재질이 들어온 빛을 나가는 방향으로 얼마나 보내는지</span>
+      <math><msub><mi>θ</mi><mi>i</mi></msub></math><span>법선과 <math><msub><mi>ω</mi><mi>i</mi></msub></math> 사이 각도</span>
+    </div>
+  </div>
+  <p>표면의 점 <math><mi>x</mi></math>에서 나가는 빛은 "스스로 내는 빛"에 "반구의 모든 방향에서 들어온 빛을 BRDF로 걸러서 합한 것"을 더한 값입니다. 핵심은 <math><msub><mi>L</mi><mtext>in</mtext></msub><mo>(</mo><mi>x</mi><mo>,</mo><msub><mi>ω</mi><mi>i</mi></msub><mo>)</mo></math>입니다. 방향 <math><msub><mi>ω</mi><mi>i</mi></msub></math>에서 들어오는 빛은 <b>그 방향으로 ray를 쐈을 때 처음 부딪히는 표면이 내보내는 빛</b>과 같습니다. 그래서 GI는 본질적으로 ray 질문의 연쇄입니다.</p>
+
+  <h3>Irradiance와 diffuse</h3>
+  <p>Lambert diffuse 표면은 BRDF가 상수 <math><mfrac><mi>ρ</mi><mi>π</mi></mfrac></math> (<math><mi>ρ</mi></math>는 albedo)라서 적분 밖으로 나옵니다.</p>
+  <div class="eq">
+    <math display="block"><mrow>
+      <msub><mi>L</mi><mtext>out</mtext></msub>
+      <mo>=</mo>
+      <mfrac><mi>ρ</mi><mi>π</mi></mfrac>
+      <munder><munder><mrow><msub><mo largeop="true">∫</mo><mi>Ω</mi></msub><msub><mi>L</mi><mtext>in</mtext></msub><mo>(</mo><mi>x</mi><mo>,</mo><msub><mi>ω</mi><mi>i</mi></msub><mo>)</mo><mspace width="0.2em"/><mi>cos</mi><mo>⁡</mo><msub><mi>θ</mi><mi>i</mi></msub><mspace width="0.2em"/><mi>d</mi><msub><mi>ω</mi><mi>i</mi></msub></mrow><mo>⏟</mo></munder><mrow><mi>E</mi><mo>(</mo><mi>x</mi><mo>,</mo><mi>n</mi><mo>)</mo></mrow></munder>
+      <mo>=</mo>
+      <mfrac><mi>ρ</mi><mi>π</mi></mfrac><mi>E</mi><mo>(</mo><mi>x</mi><mo>,</mo><mi>n</mi><mo>)</mo>
+    </mrow></math>
+  </div>
+  <p>밑줄 묶음 부분을 <b>irradiance</b> <math><mi>E</mi><mo>(</mo><mi>x</mi><mo>,</mo><mi>n</mi><mo>)</mo></math>라고 부릅니다. 표면 법선 <math><mi>n</mi></math> 방향 반구에서 들어오는 빛의 cosine 가중 합입니다. 즉 diffuse 표면이 내보내는 빛은 albedo와 irradiance만 알면 계산됩니다.</p>
+  <p>이 식은 들어온 빛이 광원에서 바로 왔는지(직접광) 다른 표면에서 튕겨 왔는지(간접광)를 구분하지 않습니다. 적분은 더하기로 나눌 수 있으므로 <math><mi>E</mi><mo>=</mo><msub><mi>E</mi><mtext>direct</mtext></msub><mo>+</mo><msub><mi>E</mi><mtext>indirect</mtext></msub></math>로 나눠 따로 구해도 결과가 같습니다. 실제 renderer는 이 두 부분을 다른 방법으로 구합니다.</p>
+  <div class="table-wrap"><table>
+    <tr><th>부분</th><th>무엇인가</th><th>누가 구하나</th></tr>
+    <tr><td><math><msub><mi>E</mi><mtext>direct</mtext></msub></math></td><td>태양, 점광원에서 표면에 바로 온 빛</td><td>기존 lighting pass (광원 방향 + shadow map)</td></tr>
+    <tr><td><math><msub><mi>E</mi><mtext>indirect</mtext></msub></math></td><td>다른 표면에서 튕겨 온 빛</td><td>DDGI probe에 저장된 <math><mi>E</mi></math>를 보간</td></tr>
+  </table></div>
+  <p><b>DDGI probe가 저장하는 값은 간접광 쪽 <math><mi>E</mi></math>입니다.</b> probe는 ray를 쏴서 값을 모으는데, 태양이나 점광원은 geometry가 아니라서 ray가 광원 자체에 맞을 일이 없습니다. ray가 가져오는 것은 "맞은 표면이 내보내는 빛"이고, 그 표면이 광원에 비춰진 빛은 한 번 튕겨 온 것이므로 간접광입니다. 화면 pixel의 최종 색은 직접광과 <math><mfrac><mi>ρ</mi><mi>π</mi></mfrac><msub><mi>E</mi><mtext>probe</mtext></msub></math>를 더한 값입니다.</p>
+  <div class="note"><b class="tag">경계에 있는 경우</b>
+  <ul style="margin:4px 0">
+    <li><b>하늘(sky)</b>: probe ray가 아무것에도 맞지 않으면 sky radiance를 씁니다(Part 2). 하늘빛은 튕기지 않고 바로 온 빛이지만 probe 값에 들어갑니다. 그래서 정확히는 "probe = 튕겨 온 빛 + 하늘빛"입니다. 엔진이 이미 IBL로 하늘빛을 더하고 있다면 두 번 더해지지 않게 조정해야 합니다 <span class="mk b-judge">판단</span>.</li>
+    <li><b>Emissive 표면</b>: 스스로 빛나는 표면에 ray가 맞으면 그 빛도 probe에 들어갑니다. 면광원처럼 동작합니다.</li>
+  </ul></div>
+  <p>Irradiance는 방향에 대해 매우 부드럽게 변합니다. 법선이 조금 바뀌어도 반구 대부분이 겹치기 때문입니다. 그래서 <b>diffuse GI는 낮은 해상도로 저장해도 티가 덜 납니다.</b> DDGI가 probe 하나당 수 × 수 texel의 작은 map만 쓰는 이유가 여기 있습니다. 반대로 glossy 반사는 방향에 민감해서 같은 방식이 통하지 않고, DDGI 범위 밖입니다.</p>
+
+  <details class="quiz"><summary>확인 질문: IBL만으로 Sponza 회랑 안쪽이 어색해 보이는 이유는?</summary>
+  IBL은 "주변이 무한히 먼 하늘"이라고 가정해서 모든 지점에 같은 환경광을 줍니다. 회랑 안쪽은 실제로는 기둥과 천장에 가려 하늘이 거의 안 보이므로 어두워야 하고, 대신 햇빛 받은 바닥에서 튕긴 빛을 받아야 합니다. 이 차이는 가림(visibility)과 상호 반사를 알아야 계산되고, 그것이 ray가 필요한 이유입니다.</details>
+</section>
+
+<!-- ============================================================ -->
+<section class="part" id="p2" data-title="DDGI 알고리즘">
+  <div class="part-head"><span class="part-no">02</span><h2>DDGI 알고리즘과 ray에 대한 요구사항</h2></div>
+  <p class="goal">목표: probe update 한 프레임의 단계를 설명하고, 각 단계가 ray query에 무엇을 요구하는지 표로 정리할 수 있다.</p>
+
+  <p>DDGI는 Majercik 외, "Dynamic Diffuse Global Illumination with Ray-Traced Irradiance Fields" (JCGT 2019)에서 제안됐고, NVIDIA RTXGI SDK가 대표 구현입니다.</p>
+
+  <h3>자료 구조</h3>
+  <ul>
+    <li><b>Probe grid</b>: 장면을 덮는 3D 격자. 각 probe는 위치 하나를 갖습니다.</li>
+    <li><b>Irradiance map</b>: probe마다 작은 octahedral map(구를 정사각형에 펼친 것). 방향 n에 대한 irradiance E(n)를 저장합니다. 논문과 RTXGI 샘플은 border 제외 약 6×6 texel을 씁니다 <span class="mk b-guess">추측</span>. RTXGI SDK는 기본값을 정하지 않고 앱이 설정하게 되어 있어, 샘플 설정값은 확인하지 못했습니다.</li>
+    <li><b>Distance map</b>: 같은 방식의 map에 방향별 "가장 가까운 표면까지 거리의 평균"과 "거리 제곱의 평균"을 저장합니다. RTXGI 샘플은 border 제외 약 14×14 texel을 씁니다 <span class="mk b-guess">추측</span>.</li>
+    <li>모든 probe의 map을 큰 texture 하나(atlas)에 타일로 붙여 둡니다.</li>
+  </ul>
+
+  <h3>한 프레임의 update</h3>
+<pre class="mermaid">
+flowchart LR
+  T["1. Trace<br/>probe마다 N개 ray"] --> S["2. Shade hit<br/>direct + 이전 프레임 GI"]
+  S --> R["Ray buffer<br/>radiance, distance"]
+  R --> BI["3a. Blend irradiance"]
+  R --> BD["3b. Blend distance"]
+  BI --> B["4. Border 복사"]
+  BD --> B
+</pre>
+  <ol class="plain">
+    <li><b>Trace</b>: probe마다 N개(구현에 따라 수십에서 수백, RTXGI 기본값 256)의 ray를 구 전체에 고르게 쏩니다. 분포는 spherical Fibonacci 같은 고른 패턴이고, 매 프레임 무작위 회전을 줘서 시간에 따라 다른 방향을 sampling합니다.</li>
+    <li><b>Shade</b>: ray가 맞은 지점의 radiance를 계산합니다.
+      <ul>
+        <li>direct: 광원 방향으로 <b>shadow ray(visibility query)</b>를 하나 더 쏴서 그림자를 판단하고 albedo × 광원을 계산</li>
+        <li>indirect: hit 지점에서 <b>이전 프레임의 probe volume</b>을 sampling. 이것이 매 프레임 한 번씩 누적되며 무한 bounce가 됩니다.</li>
+        <li>miss: 하늘(sky) radiance</li>
+      </ul>
+      결과 radiance와 hit 거리를 ray buffer(probe × ray 크기의 texture)에 씁니다.</li>
+    <li><b>Blend</b>: 각 probe의 map texel마다 그 probe의 ray들을 가중 평균으로 모으고, 이전 값과 hysteresis(RTXGI 기본값 0.97)로 섞습니다. 시간 누적으로 noise를 줄이는 구조입니다. 가중치는 map마다 다릅니다.
+      <ul>
+        <li>irradiance: texel 방향과 ray 방향의 cosine (<math><mo>max</mo><mo>(</mo><mn>0</mn><mo>,</mo><mi mathvariant="bold">n</mi><mo>·</mo><mi mathvariant="bold">d</mi><mo>)</mo></math>)</li>
+        <li>distance(평균, 제곱 평균): cosine을 크게 거듭제곱한 날카로운 가중치. RTXGI 기본 지수는 50 (<math><msup><mrow><mo>(</mo><mi mathvariant="bold">n</mi><mo>·</mo><mi mathvariant="bold">d</mi><mo>)</mo></mrow><mn>50</mn></msup></math>)</li>
+      </ul></li>
+    <li><b>Border</b>: octahedral map 경계에서 bilinear filtering이 맞게 되도록 테두리 texel을 복사합니다.</li>
+  </ol>
+
+  <h3>왜 distance를 저장하는가 (light leak 방지)</h3>
+  <p>벽 하나를 사이에 둔 두 방이 있으면, 벽 너머 probe의 밝은 값이 이쪽 방으로 보간되어 새는 <b>light leak</b>이 생깁니다. DDGI는 shading 시점에 probe 방향의 거리 분포(평균, 분산)로 Chebyshev 부등식 기반의 가시성 가중치를 계산해, 벽 뒤 probe의 기여를 낮춥니다. 이 거리 값이 정확하려면 ray hit의 <code>t</code>가 정확해야 합니다.</p>
+
+  <h3>Backface hit</h3>
+  <p>Probe가 벽 속에 박혀 있으면 많은 ray가 표면의 <b>뒷면</b>을 맞힙니다. RTXGI는 backface hit을 음수 거리(<code>-0.2 × t</code>)로 기록하고, backface 비율이 높으면 probe를 비활성화하거나 위치를 옮깁니다(probe relocation, classification). 이 확장은 Majercik 외 2021 "Scaling Probe-Based Real-Time Dynamic Global Illumination for Production"에 정리되어 있습니다 <span class="mk b-guess">추측</span>(논문 서지 정보는 기억에 근거). 그래서 ray query는 <b>앞면과 뒷면을 구분해 알려줘야</b> 하고, backface culling을 하면 안 됩니다.</p>
+
+  <h3>Ray query infra에 대한 요구사항 정리</h3>
+  <div class="table-wrap"><table>
+    <tr><th>DDGI 단계</th><th>필요한 ray 질문</th><th>infra가 돌려줄 것</th></tr>
+    <tr><td>Probe trace</td><td>가장 가까운 hit</td><td>hit 여부, <code>t</code>, front/back, 어떤 instance의 어떤 삼각형인지, barycentrics</td></tr>
+    <tr><td>Hit shading</td><td>hit 지점의 표면 정보</td><td>world position, normal, albedo, emissive (instance와 삼각형 정보로 복원)</td></tr>
+    <tr><td>Direct light</td><td>광원까지 가려졌는가</td><td>bool 하나. 가장 가까운 것일 필요 없음</td></tr>
+    <tr><td>Probe classification</td><td>backface 비율</td><td>front/back 구분</td></tr>
+    <tr><td>나중 단계 (추측)</td><td>화면 pixel에서 쏘는 ray (RTAO, reflections 등)</td><td>같은 API를 재사용</td></tr>
+  </table></div>
+  <p>이 표가 Part 6~7의 HLSL API 선택을 결정합니다. 표의 두 번째 줄 "표면 정보 복원"은 의외로 큰 작업입니다(Part 8). 그래서 "ray가 어디에 맞았나"와 "거기 표면이 어떤가"를 같은 단계에서 만들지, 나눌지가 설계의 첫 결정이 됩니다(Part 11, D1).</p>
+
+  <details class="quiz"><summary>확인 질문: probe trace ray는 probe 중심에서 출발합니다. hit 지점에서 광원으로 쏘는 shadow ray와 출발점 성격이 어떻게 다른가?</summary>
+  Probe 중심은 표면 위가 아니므로 TMin을 0에 가깝게 둬도 문제가 없습니다. Shadow ray는 표면 위의 점에서 출발하므로, 부동소수 오차 때문에 자기 자신의 삼각형에 다시 맞는 <b>self-intersection</b>이 생깁니다. 출발점을 법선 방향으로 조금 밀거나 TMin을 키워야 합니다 (Part 7).</details>
+  <details class="quiz"><summary>확인 질문: indirect를 "이전 프레임 probe"에서 읽는 구조가 주는 이점과 대가는?</summary>
+  이점: ray 한 번(1 bounce)의 비용으로 프레임이 지날수록 2, 3, ... bounce가 누적되어 무한 bounce 효과를 냅니다. 대가: 조명이 바뀌면 수렴에 여러 프레임이 걸리는 지연(lag)이 있고, hysteresis 값이 이 반응 속도와 noise 사이의 trade-off를 정합니다.</details>
+</section>
+
+<!-- ============================================================ -->
+<section class="part" id="p3" data-title="DX11 → DX12 필수 개념">
+  <div class="part-head"><span class="part-no">03</span><h2>DX11에서 DX12로: 이번 작업에 필요한 것만</h2></div>
+  <p class="goal">목표: GPU virtual address, resource state, UAV barrier, root signature, upload memory를 MiniEngine wrapper와 연결해서 설명할 수 있다.</p>
+
+  <p>DXR은 DX12 위에서만 동작하고, DX12가 driver에게서 넘겨받은 책임들을 그대로 요구합니다. DX11 경험자가 DXR 코드에서 막히는 지점은 대부분 DXR 자체보다 이 부분입니다.</p>
+
+  <h3>3.1 GPU virtual address</h3>
+  <div class="dx11">
+    <div><div class="h">DX11</div>buffer를 쓰려면 view(SRV, UAV)를 만들어 slot에 꽂았습니다. 주소라는 개념이 노출되지 않았습니다.</div>
+    <div><div class="h">DX12</div>모든 buffer는 GPU 주소 공간의 64-bit 주소(<code>D3D12_GPU_VIRTUAL_ADDRESS</code>)를 가집니다. <code>resource->GetGPUVirtualAddress() + offset</code>으로 buffer의 중간을 가리킬 수 있습니다.</div>
+  </div>
+  <p>DXR의 build API는 view를 쓰지 않고 <b>주소만</b> 받습니다. vertex buffer 시작 주소, index buffer 시작 주소, 결과를 쓸 주소, scratch 주소, instance 배열 주소. MiniEngine은 Model 하나의 vertex와 index를 큰 buffer 하나(<code>m_DataBuffer</code>)에 몰아 넣어 두었으므로 <code>m_DataBuffer.GetGpuVirtualAddress() + mesh.vbOffset</code> 같은 계산이 BLAS 입력이 됩니다.</p>
+
+  <h3>3.2 Resource state와 barrier</h3>
+  <div class="dx11">
+    <div><div class="h">DX11</div>같은 texture를 RT로 쓰다가 SRV로 읽으면 driver가 알아서 flush하고 상태를 바꿨습니다. 연속된 두 Dispatch가 같은 UAV를 쓰면 driver가 사이를 직렬화했습니다.</div>
+    <div><div class="h">DX12</div>앱이 <code>ResourceBarrier</code>로 상태 전환(transition)을 직접 기록합니다. 같은 UAV를 쓰는 연속 작업 사이에는 <b>UAV barrier</b>를 직접 넣어야 합니다. 안 넣으면 두 작업이 겹쳐 실행될 수 있습니다.</div>
+  </div>
+  <p>MiniEngine에서는 <code>GpuResource::m_UsageState</code>가 현재 상태를 기억하고, <code>CommandContext::TransitionResource(res, newState)</code>가 barrier를 모았다가 <code>FlushResourceBarriers()</code>에서 한 번에 기록합니다. UAV barrier는 <code>InsertUAVBarrier(res)</code>입니다.</p>
+  <div class="note ray"><b class="tag">DXR에서 중요한 점</b>
+  Acceleration structure buffer는 <code>D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE</code> 상태로 <b>생성</b>되어야 하고, 이후 다른 상태로 <b>절대 transition하지 않습니다</b>. AS를 build한 직후 그 AS를 읽는 작업(TLAS build나 ray query) 사이에는 transition이 아니라 <b>UAV barrier</b>로 동기화합니다. MiniEngine의 <code>GpuBuffer</code>는 모든 buffer를 <code>COMMON</code>으로 생성하므로(<code>Core/GpuBuffer.cpp:34</code>) 그대로는 AS용으로 쓸 수 없습니다.</div>
+
+  <h3>3.3 Root signature</h3>
+  <p>DX11의 "shader stage별 slot 번호"를 대신하는 것이 <b>root signature</b>입니다. 함수 시그니처처럼 "이 shader는 0번 인자로 상수 4개, 1번 인자로 buffer 주소 하나, 2번 인자로 descriptor table 하나를 받는다"를 선언합니다. 인자 종류는 셋입니다.</p>
+  <div class="table-wrap"><table>
+    <tr><th>종류</th><th>담는 것</th><th>MiniEngine 호출</th><th>제약</th></tr>
+    <tr><td>Root constants</td><td>32-bit 값 몇 개</td><td><code>SetConstants</code></td><td>root signature 크기 한도 64 DWORD</td></tr>
+    <tr><td>Root descriptor</td><td>CBV/SRV/UAV의 GPU 주소</td><td><code>SetBufferSRV</code>, <code>SetDynamicConstantBufferView</code></td><td>buffer만 가능. texture는 불가</td></tr>
+    <tr><td>Descriptor table</td><td>descriptor heap 안 연속 구간의 시작</td><td><code>SetDescriptorTable</code>, <code>SetDynamicDescriptors</code></td><td>shader-visible heap이 bind되어 있어야 함</td></tr>
+  </table></div>
+  <p>TLAS는 shader에서 <code>RaytracingAccelerationStructure</code> 타입의 SRV로 보이고, <b>root descriptor(주소)로 바로 bind</b>할 수 있습니다. 단, MiniEngine의 <code>ComputeContext::SetBufferSRV</code>는 buffer 상태가 <code>NON_PIXEL_SHADER_RESOURCE</code>인지 assert합니다(<code>Core/CommandContext.h:535</code>). AS buffer는 그 상태가 아니므로 TLAS용 bind 함수가 따로 필요합니다.</p>
+
+  <h3>3.4 Descriptor heap과 bindless</h3>
+  <p>Texture는 root descriptor로 못 넘기므로 descriptor heap에 SRV를 만들어 두고 table로 가리킵니다. MiniEngine의 glTF renderer는 <code>Renderer::s_TextureHeap</code>이라는 큰 heap 하나에 모든 material texture SRV를 넣고 mesh마다 <code>srvTable</code> offset으로 가리킵니다(<code>Model/Renderer.cpp:661</code>).</p>
+  <p>Raster에서는 draw마다 table을 바꾸면 되지만, <b>ray는 어느 mesh에 맞을지 미리 모릅니다</b>. 그래서 hit 지점의 texture를 읽으려면 shader가 index로 heap 전체를 볼 수 있어야 하고, 이것을 <b>bindless</b>라고 부릅니다. SM 6.6의 <code>ResourceDescriptorHeap[index]</code>가 가장 간단한 방법입니다. Part 8에서 다시 다룹니다.</p>
+
+  <h3>3.5 Upload memory와 frame in flight</h3>
+  <div class="dx11">
+    <div><div class="h">DX11</div><code>Map(WRITE_DISCARD)</code>로 dynamic buffer에 매 프레임 쓰면 driver가 내부에서 새 메모리를 줬습니다(renaming).</div>
+    <div><div class="h">DX12</div>CPU가 쓰는 동안 GPU가 이전 프레임 데이터를 읽고 있을 수 있으므로, 앱이 fence로 "GPU가 다 썼다"를 확인한 메모리만 재사용해야 합니다.</div>
+  </div>
+  <p>MiniEngine은 <code>CommandContext::ReserveUploadMemory(size)</code>가 이를 처리합니다. upload heap의 linear allocator에서 메모리를 받고, command list가 끝난 fence 이후에 자동 반납합니다. 매 프레임 바뀌는 TLAS instance 배열을 여기에 쓰면 됩니다.</p>
+
+  <h3>3.6 Command list 버전</h3>
+  <p>D3D12 interface는 기능이 추가될 때마다 숫자가 붙은 새 interface가 생깁니다. DXR 함수는 <code>ID3D12Device5</code>(prebuild info 조회)와 <code>ID3D12GraphicsCommandList4</code>(AS build)에 있습니다. MiniEngine은 <code>ID3D12Device*</code>, <code>ID3D12GraphicsCommandList*</code>만 들고 있으므로 <code>QueryInterface</code>로 상위 interface를 얻어야 합니다.</p>
+
+  <details class="quiz"><summary>확인 질문: BLAS build 직후 같은 command list에서 TLAS build를 하면, 사이에 어떤 barrier가 필요한가?</summary>
+  BLAS buffer에 대한 UAV barrier입니다(또는 모든 UAV 대상인 null UAV barrier). BLAS는 이미 RAYTRACING_ACCELERATION_STRUCTURE 상태이므로 transition은 하지 않습니다. TLAS build가 BLAS 내용을 읽기 전에 BLAS 쓰기가 끝났음을 보장하는 용도입니다.</details>
+</section>
+
+<!-- ============================================================ -->
+<section class="part" id="p4" data-title="Ray tracing 기초">
+  <div class="part-head"><span class="part-no">04</span><h2>Ray tracing 기초 개념</h2></div>
+  <p class="goal">목표: t, barycentrics, BVH, closest hit와 any hit, opaque와 non-opaque를 구분한다.</p>
+
+  <h3>Ray와 t</h3>
+  <div class="eq">
+    <math display="block"><mrow>
+      <mi>P</mi><mo>(</mo><mi>t</mi><mo>)</mo><mo>=</mo><mi mathvariant="bold">o</mi><mo>+</mo><mi>t</mi><mspace width="0.15em"/><mi mathvariant="bold">d</mi><mo>,</mo>
+      <mspace width="1em"/>
+      <msub><mi>t</mi><mtext>min</mtext></msub><mo>≤</mo><mi>t</mi><mo>≤</mo><msub><mi>t</mi><mtext>max</mtext></msub>
+    </mrow></math>
+  </div>
+  <p><math><mi mathvariant="bold">o</mi></math>는 <code>RayDesc.Origin</code>, <math><mi mathvariant="bold">d</mi></math>는 <code>Direction</code>입니다. 구간 <code>[TMin, TMax]</code> 안의 교차만 인정합니다. <math><mo>‖</mo><mi mathvariant="bold">d</mi><mo>‖</mo><mo>=</mo><mn>1</mn></math>이면 hit의 <math><mi>t</mi></math>가 곧 거리이고, DDGI distance map에 들어갈 값이 이것입니다.</p>
+
+  <h3>삼각형 교차와 barycentrics</h3>
+  <p>삼각형 <math><mo>(</mo><msub><mi>V</mi><mn>0</mn></msub><mo>,</mo><msub><mi>V</mi><mn>1</mn></msub><mo>,</mo><msub><mi>V</mi><mn>2</mn></msub><mo>)</mo></math> 위의 점은 다음처럼 표현됩니다.</p>
+  <div class="eq">
+    <math display="block"><mrow>
+      <mi>P</mi><mo>=</mo><mo>(</mo><mn>1</mn><mo>−</mo><mi>u</mi><mo>−</mo><mi>v</mi><mo>)</mo><msub><mi>V</mi><mn>0</mn></msub><mo>+</mo><mi>u</mi><msub><mi>V</mi><mn>1</mn></msub><mo>+</mo><mi>v</mi><msub><mi>V</mi><mn>2</mn></msub><mo>,</mo>
+      <mspace width="1em"/>
+      <mi>u</mi><mo>,</mo><mi>v</mi><mo>≥</mo><mn>0</mn><mo>,</mo><mspace width="0.4em"/><mi>u</mi><mo>+</mo><mi>v</mi><mo>≤</mo><mn>1</mn>
+    </mrow></math>
+  </div>
+  <p>교차 검사는 이 <math><mo>(</mo><mi>u</mi><mo>,</mo><mi>v</mi><mo>)</mo></math>와 <math><mi>t</mi></math>를 함께 구하고, DXR은 <math><mo>(</mo><mi>u</mi><mo>,</mo><mi>v</mi><mo>)</mo></math>를 <b>barycentrics</b>로 돌려줍니다. hit 지점의 normal, UV도 같은 가중치로 세 vertex 값을 보간해서 얻습니다. Raster에서 rasterizer가 해 주던 보간을 이제 shader가 직접 합니다.</p>
+
+  <h3>BVH</h3>
+  <p>삼각형 수십만 개를 모두 검사할 수는 없으므로, 삼각형들을 bounding box 계층(BVH, Bounding Volume Hierarchy)으로 묶어 ray가 지나가지 않는 box는 통째로 건너뜁니다. DXR에서는 BVH 구조와 메모리 형식을 <b>driver와 하드웨어가 정하고</b>, 앱은 "이 삼각형들로 만들어 달라"고 요청만 합니다. 그 결과물이 <b>acceleration structure</b>(AS)입니다. 내용은 불투명(opaque) 데이터라 CPU에서 읽거나 해석할 수 없습니다.</p>
+
+  <h3>Closest hit와 첫 hit 종료 (visibility)</h3>
+  <ul>
+    <li><b>Closest hit 탐색</b>: 구간 안에서 가장 가까운 교차를 찾습니다. probe trace에 필요합니다.</li>
+    <li><b>첫 hit에서 종료</b>: 무엇이든 하나 확정되면 끝. shadow ray처럼 "가려졌는가"만 알면 될 때 훨씬 빠릅니다. DXR에서는 <code>RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH</code>로 지정합니다.</li>
+  </ul>
+  <div class="note"><b class="tag">용어 주의</b>
+  DXR에서 <b>"any hit"</b>는 탐색 방식이 아니라 <b>shader 단계의 이름</b>입니다(DXR 1.0). traversal 중 non-opaque 후보를 만날 때마다 호출되어 "이 후보를 인정할까"를 판단합니다. inline에서는 7.3의 <code>Proceed()</code> loop body가 그 역할을 합니다. "closest hit"도 1.0에서는 최종 hit에 대해 한 번 호출되는 shader 단계의 이름입니다. 문서를 읽을 때 탐색 방식과 shader 단계를 구분하세요.</div>
+
+  <h3>Opaque와 non-opaque</h3>
+  <p>Alpha test 재질(잎사귀, 철망)은 삼각형에 맞았어도 texture alpha가 0인 곳이면 "안 맞은 것"으로 쳐야 합니다. 이런 geometry를 <b>non-opaque</b>로 표시하면 traversal 도중 "이 후보를 인정할지" 앱 코드에 물어봅니다. 묻는 만큼 느려지므로, 확실히 불투명한 geometry는 <b>opaque</b>로 표시해 하드웨어가 혼자 처리하게 하는 것이 원칙입니다.</p>
+
+  <figure>
+    <div class="fig">
+    <svg viewBox="0 0 640 200" width="100%" style="min-width:520px" role="img" aria-label="ray가 두 삼각형을 지나며 closest hit과 첫 후보가 다른 경우">
+      <circle cx="40" cy="110" r="6" class="s-dot"/>
+      <text x="22" y="138" class="s-fg" font-size="13">Origin</text>
+      <line x1="40" y1="110" x2="610" y2="110" class="s-rayline" marker-end="url(#ah)"/>
+      <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="s-ray"/></marker></defs>
+      <rect x="190" y="40" width="200" height="140" rx="8" class="s-box" stroke-dasharray="4 4"/>
+      <text x="198" y="58" class="s-muted" font-size="12">BVH node (box)</text>
+      <polygon points="250,70 280,160 230,150" class="s-tlas"/>
+      <text x="216" y="178" class="s-acc" font-size="12">A: t=3.1 (opaque)</text>
+      <polygon points="330,60 360,150 310,160" class="s-blas"/>
+      <text x="300" y="52" class="s-acc" font-size="12">B: t=4.8</text>
+      <polygon points="470,70 500,160 450,150" class="s-blas"/>
+      <text x="440" y="178" class="s-muted" font-size="12">C: t=7.2 (box 밖, 다른 node)</text>
+      <text x="40" y="30" class="s-fg" font-size="13">closest hit → A,  first hit 종료 → 처음 확정되는 후보 (순서는 보장 없음)</text>
+    </svg>
+    </div>
+    <figcaption>Traversal이 후보를 방문하는 순서는 정해져 있지 않습니다. closest hit은 모든 후보를 비교한 결과이고, "첫 hit 종료"는 순서와 무관하게 아무거나 하나입니다.</figcaption>
+  </figure>
+
+  <details class="quiz"><summary>확인 질문: shadow ray에 closest hit을 쓰면 결과가 틀리는가, 느리기만 한가?</summary>
+  결과는 같고 느리기만 합니다. "무엇이든 맞았는가"는 closest hit 결과로도 알 수 있지만, 가장 가까운 것을 찾기 위해 불필요한 후보까지 계속 탐색합니다.</details>
+</section>
+
+<!-- ============================================================ -->
+<section class="part" id="p5" data-title="Acceleration Structure">
+  <div class="part-head"><span class="part-no">05</span><h2>DXR Acceleration Structure: BLAS와 TLAS</h2></div>
+  <p class="goal">목표: BLAS/TLAS build에 들어가는 구조체 필드를 하나하나 설명하고, 메모리와 동기화 규칙을 안다.</p>
+
+  <h3>5.1 두 단계 구조</h3>
+  <figure>
+    <div class="fig">
+    <svg viewBox="0 0 680 280" width="100%" style="min-width:560px" role="img" aria-label="TLAS가 instance 배열로 BLAS들을 가리키는 구조">
+      <rect x="20" y="20" width="640" height="96" rx="10" class="s-tlas"/>
+      <text x="36" y="44" class="s-acc" font-size="14" font-weight="700">TLAS (Top-Level)</text>
+      <text x="36" y="64" class="s-muted" font-size="12">instance 배열: 각 항목 = BLAS 주소 + 3×4 transform + InstanceID + mask + flags</text>
+      <g font-size="12">
+        <rect x="36" y="76" width="140" height="30" rx="6" class="s-box"/><text x="46" y="96" class="s-fg">inst 0: 기둥, T0</text>
+        <rect x="186" y="76" width="140" height="30" rx="6" class="s-box"/><text x="196" y="96" class="s-fg">inst 1: 기둥, T1</text>
+        <rect x="336" y="76" width="140" height="30" rx="6" class="s-box"/><text x="346" y="96" class="s-fg">inst 2: 바닥, T2</text>
+        <rect x="486" y="76" width="160" height="30" rx="6" class="s-box"/><text x="496" y="96" class="s-fg">inst 3: 커튼, T3</text>
+      </g>
+      <path d="M106 106 C106 150, 140 150, 150 170" class="s-line"/>
+      <path d="M256 106 C256 150, 170 150, 160 170" class="s-line"/>
+      <path d="M406 106 L400 170" class="s-line"/>
+      <path d="M566 106 L590 170" class="s-line"/>
+      <rect x="60" y="170" width="200" height="90" rx="10" class="s-blas"/>
+      <text x="74" y="192" class="s-acc" font-size="13" font-weight="700">BLAS: 기둥 mesh</text>
+      <text x="74" y="212" class="s-muted" font-size="12">geometry 0 (Draw 0)</text>
+      <text x="74" y="230" class="s-muted" font-size="12">object space 삼각형</text>
+      <text x="74" y="248" class="s-muted" font-size="12">하나를 두 instance가 공유</text>
+      <rect x="300" y="170" width="190" height="90" rx="10" class="s-blas"/>
+      <text x="314" y="192" class="s-acc" font-size="13" font-weight="700">BLAS: 바닥 mesh</text>
+      <text x="314" y="212" class="s-muted" font-size="12">geometry 0, 1, ...</text>
+      <rect x="520" y="170" width="140" height="90" rx="10" class="s-blas"/>
+      <text x="532" y="192" class="s-acc" font-size="13" font-weight="700">BLAS: 커튼</text>
+      <text x="532" y="212" class="s-muted" font-size="12">non-opaque</text>
+      <text x="532" y="230" class="s-muted" font-size="12">(alpha test)</text>
+    </svg>
+    </div>
+    <figcaption>BLAS는 object space 삼각형 묶음, TLAS는 "어느 BLAS를 어디에 놓는가"의 목록입니다. 물체가 움직이면 TLAS의 transform만 바꾸면 됩니다.</figcaption>
+  </figure>
+  <ul>
+    <li><b>BLAS (Bottom-Level)</b>: 실제 삼각형을 담습니다. 하나의 BLAS는 여러 개의 <b>geometry</b>로 구성될 수 있고, geometry 하나는 vertex buffer 구간 + index buffer 구간 하나입니다. 대개 mesh 하나에 BLAS 하나를 만듭니다.</li>
+    <li><b>TLAS (Top-Level)</b>: <b>instance</b>들의 목록. instance는 BLAS 하나를 가리키고 object-to-world transform을 가집니다. ray query는 항상 TLAS 하나를 대상으로 합니다.</li>
+  </ul>
+  <p>이 분리 덕분에 같은 mesh를 여러 번 배치해도 BLAS는 하나이고, 강체 이동은 TLAS만 다시 만들면 됩니다. 반대로 vertex 자체가 변하는 skinning은 BLAS를 다시 build(또는 update)해야 합니다.</p>
+
+  <h3>5.2 BLAS 입력: geometry desc</h3>
+<pre><code><span class="k">D3D12_RAYTRACING_GEOMETRY_DESC</span> g = {};
+g.Type  = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
+g.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;      <span class="c">// alpha test 재질이면 NONE</span>
+g.Triangles.VertexBuffer.StartAddress  = vbVA;        <span class="c">// position이 있는 첫 vertex 주소</span>
+g.Triangles.VertexBuffer.StrideInBytes = stride;      <span class="c">// vertex 하나 크기 (다른 attribute 포함 가능)</span>
+g.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+g.Triangles.VertexCount  = vertexCount;
+g.Triangles.IndexBuffer  = ibVA;
+g.Triangles.IndexFormat  = DXGI_FORMAT_R16_UINT;      <span class="c">// 또는 R32_UINT</span>
+g.Triangles.IndexCount   = indexCount;
+g.Triangles.Transform3x4 = 0;                          <span class="c">// 선택: geometry별 추가 transform</span></code></pre>
+  <p>주목할 점 세 가지입니다.</p>
+  <ul>
+    <li><b>Stride를 쓰므로 interleaved vertex를 그대로 쓸 수 있습니다.</b> position이 vertex의 맨 앞에 있으면 normal, UV가 섞인 buffer를 복사 없이 BLAS 입력으로 씁니다.</li>
+    <li><b>baseVertex 인자가 없습니다.</b> Raster의 <code>DrawIndexed(..., BaseVertexLocation)</code>는 index에 값을 더해 주지만 DXR에는 그런 필드가 없습니다. 대신 <code>StartAddress</code>를 <code>baseVertex × stride</code>만큼 밀어서 같은 효과를 냅니다.</li>
+    <li><b>VertexCount가 필요합니다.</b> index 값은 0 이상 VertexCount 미만이어야 합니다. Raster draw에는 vertex 개수 인자가 없었으므로 데이터에 별도로 없을 수 있습니다.</li>
+  </ul>
+
+  <h3>5.3 TLAS 입력: instance desc</h3>
+<pre><code><span class="k">D3D12_RAYTRACING_INSTANCE_DESC</span> inst = {};      <span class="c">// 64 byte, 배열 시작 주소는 16 byte 정렬</span>
+<span class="r">inst.Transform[3][4]</span>                              <span class="c">// object→world, 행 우선 3×4 (마지막 열이 translation)</span>
+inst.InstanceID   = ...;   <span class="c">// 24-bit, 앱이 자유롭게 쓰는 값. shader에서 CommittedInstanceID()</span>
+inst.InstanceMask = 0xFF;  <span class="c">// 8-bit. ray의 InstanceInclusionMask와 AND해서 0이면 무시</span>
+inst.InstanceContributionToHitGroupIndex = 0;  <span class="c">// DXR 1.0 pipeline용. inline에선 안 씀</span>
+inst.Flags = D3D12_RAYTRACING_INSTANCE_FLAG_NONE;  <span class="c">// CULL_DISABLE, FORCE_OPAQUE 등</span>
+inst.AccelerationStructure = blasVA;</code></pre>
+  <div class="note warn"><b class="tag">행렬 규약 함정</b>
+  DXR의 <code>Transform[3][4]</code>는 행 우선 3×4로, translation이 각 행의 4번째 칸(<code>[i][3]</code>)에 있습니다. MiniEngine의 <code>Matrix4</code>는 <code>XMMATRIX</code>를 감싼 것이라 <b>메모리 배치상</b> basis 축과 translation이 행(<code>m_mat.r[0..3]</code>)에 저장되고 translation은 4번째 행에 있습니다(<code>Core/Math/Matrix4.h:26-27</code>). 그래서 transpose 후 위 3행을 복사해야 합니다.
+  <br>헷갈리기 쉬운 점: <code>Matrix4</code>의 <b>연산자 표기</b>는 열 벡터식입니다. <code>M * v</code>로 쓰고 부모 행렬을 왼쪽에 둡니다(<code>Matrix4.h:77-79</code>, <code>Model.cpp</code>의 <code>ParentMatrix * xform</code>). 내부에서 DirectXMath 순서로 바꿔 호출할 뿐입니다. 즉 "코드 표기"와 "메모리 배치"를 구분해서 생각해야 합니다. 이 실수는 화면에 "물체가 엉뚱한 곳에 있음"으로만 나타나므로 debug view로 확인해야 합니다.</div>
+  <p><b>InstanceID와 InstanceIndex는 다릅니다.</b> InstanceIndex는 TLAS 배열 안의 순서(0, 1, 2 ...)로 자동으로 정해지고, InstanceID는 앱이 넣는 임의의 24-bit 값입니다. 보통 InstanceID에 "material/geometry table의 시작 번호" 같은 lookup key를 넣습니다.</p>
+
+  <h3>5.4 Build 절차</h3>
+<pre class="mermaid">
+flowchart TB
+  P["1. GetRaytracingAccelerationStructurePrebuildInfo<br/>(ID3D12Device5)"] --> A["2. buffer 할당<br/>result: RTAS 상태, UAV flag<br/>scratch: UAV 상태"]
+  A --> B["3. BuildRaytracingAccelerationStructure<br/>(ID3D12GraphicsCommandList4)"]
+  B --> U["4. UAV barrier"]
+  U --> N["5. TLAS build 또는 ray query"]
+</pre>
+  <ul>
+    <li><b>Prebuild info</b>: 입력을 주면 driver가 필요한 크기 세 가지(<code>ResultDataMaxSizeInBytes</code>, <code>ScratchDataSizeInBytes</code>, <code>UpdateScratchDataSizeInBytes</code>)를 알려줍니다. 크기는 GPU와 driver마다 다릅니다.</li>
+    <li><b>Result buffer</b>: AS가 저장될 곳. <code>ALLOW_UNORDERED_ACCESS</code> flag, <code>RAYTRACING_ACCELERATION_STRUCTURE</code> 초기 상태, 주소 256 byte 정렬.</li>
+    <li><b>Scratch buffer</b>: build 중에만 쓰는 임시 공간. <code>UNORDERED_ACCESS</code> 상태, 주소 <b>256 byte 정렬</b>. build가 끝나면 재사용 가능. 큰 buffer 하나를 나눠 여러 build에 쓸 때도 각 구간 시작이 256 byte 정렬이어야 합니다.</li>
+    <li><b>입력 buffer 상태</b>: vertex, index, instance 배열은 build 시점에 <code>NON_PIXEL_SHADER_RESOURCE</code> 상태여야 합니다. upload heap은 항상 GENERIC_READ이고 GENERIC_READ에 이 상태가 포함되므로 그대로 됩니다.</li>
+    <li><b>입력 주소 정렬</b>: VB 시작 주소와 stride는 vertex component 크기 단위(<code>R32G32B32_FLOAT</code>면 4 byte), IB 시작 주소는 index 크기 단위(R16이면 2 byte, R32면 4 byte), instance 배열은 16 byte로 정렬되어야 합니다.</li>
+  </ul>
+
+  <h3>5.5 Build flags와 갱신 전략</h3>
+  <div class="table-wrap"><table>
+    <tr><th>Flag</th><th>의미</th><th>언제</th></tr>
+    <tr><td><code>PREFER_FAST_TRACE</code></td><td>build는 느려도 traversal 품질 우선</td><td>한 번 만들고 오래 쓰는 정적 BLAS</td></tr>
+    <tr><td><code>PREFER_FAST_BUILD</code></td><td>traversal 품질을 조금 포기하고 build 속도 우선</td><td>매 프레임 다시 만드는 TLAS, skinned BLAS</td></tr>
+    <tr><td><code>ALLOW_UPDATE</code></td><td>나중에 <code>PERFORM_UPDATE</code>로 refit 가능</td><td>vertex만 조금 움직이고 topology는 그대로일 때</td></tr>
+    <tr><td><code>ALLOW_COMPACTION</code></td><td>build 후 실제 크기로 압축 복사 가능</td><td>정적 BLAS 메모리 절약 (보통 수십 % 감소, 수치는 GPU마다 다름)</td></tr>
+  </table></div>
+  <p><b>Rebuild vs update</b>: update(refit)는 기존 BVH 구조를 유지한 채 box 크기만 고칩니다. 빠르지만 물체가 많이 움직이면 box가 커져 traversal이 느려집니다. TLAS는 instance 수가 적으면 매 프레임 rebuild가 단순하고 품질도 좋다는 것이 일반적인 조언입니다 <span class="mk b-judge">판단</span>.</p>
+
+  <h3>5.6 TLAS를 shader에 넘기기</h3>
+  <p>HLSL에서는 <code>RaytracingAccelerationStructure Scene : register(t0);</code>로 선언합니다. CPU에서는 두 방법이 있습니다.</p>
+  <ul>
+    <li><b>Root SRV</b>: <code>SetComputeRootShaderResourceView(rootIndex, tlasVA)</code>. descriptor가 필요 없어 간단합니다.</li>
+    <li><b>Descriptor</b>: <code>ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE</code>, resource는 <code>nullptr</code>, 주소는 <code>RaytracingAccelerationStructure.Location</code>에 넣어 SRV를 만듭니다. bindless에서 heap index로 접근하려면 이쪽.</li>
+  </ul>
+
+  <h3>5.7 Build 호출 전체 모양</h3>
+  <p>5.2와 5.3의 구조체는 아래 "입력 묶음"에 들어갑니다. BLAS와 TLAS는 같은 구조체와 같은 함수를 쓰고, <code>Type</code>과 입력 배열 종류만 다릅니다.</p>
+<pre><code><span class="k">D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS</span> in = {};
+in.Type        = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;  <span class="c">// BLAS면 BOTTOM_LEVEL</span>
+in.Flags       = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_BUILD;
+in.NumDescs    = instanceCount;           <span class="c">// BLAS면 geometry desc 개수</span>
+in.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+in.InstanceDescs = instanceArrayVA;       <span class="c">// TLAS: GPU 주소. BLAS면 in.pGeometryDescs = CPU 포인터</span>
+
+<span class="c">// 1) 크기 조회: device5에서. 같은 입력(개수, flag)이면 크기도 같다.</span>
+<span class="k">D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO</span> info = {};
+device5-&gt;GetRaytracingAccelerationStructurePrebuildInfo(&amp;in, &amp;info);
+
+<span class="c">// 2) result, scratch buffer를 info 크기 이상으로 준비 (5.4의 상태, 정렬 조건)</span>
+
+<span class="c">// 3) build 기록: command list4에서</span>
+<span class="k">D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC</span> desc = {};
+desc.Inputs = in;
+desc.DestAccelerationStructureData    = resultVA;
+desc.ScratchAccelerationStructureData = scratchVA;
+desc.SourceAccelerationStructureData  = 0;  <span class="c">// update(refit)일 때만 이전 AS 주소</span>
+cmdList4-&gt;<span class="r">BuildRaytracingAccelerationStructure</span>(&amp;desc, 0, nullptr);</code></pre>
+  <ul>
+    <li><b>BLAS 입력은 CPU 포인터, TLAS 입력은 GPU 주소</b>입니다. geometry desc 배열은 build 호출 시점에 CPU에서 읽히지만, instance desc 배열은 GPU가 build 중에 읽습니다. 그래서 instance 배열은 GPU가 읽을 수 있는 메모리(upload heap 등)에 써야 하고, build가 끝날 때까지 살아 있어야 합니다.</li>
+    <li>마지막 두 인자는 build와 동시에 <b>postbuild info</b>(compaction 후 크기 등)를 GPU 메모리에 쓰게 하는 선택 기능입니다.</li>
+    <li>Prebuild info 크기는 "최대 입력"에 대해 한 번 구해 두고 재사용할 수 있습니다. TLAS를 매 프레임 build해도 instance 수 상한이 같으면 buffer를 다시 만들 필요가 없습니다.</li>
+  </ul>
+
+  <h3>5.8 Compaction 절차</h3>
+  <p>Compaction은 BLAS 메모리를 줄이는 선택 최적화입니다. 절차가 여러 프레임에 걸치므로 구조에 영향을 줍니다.</p>
+  <ol class="plain">
+    <li><code>ALLOW_COMPACTION</code> flag로 BLAS를 build하면서, postbuild info로 <code>COMPACTED_SIZE</code>를 UAV 상태의 작은 buffer에 쓰게 합니다.</li>
+    <li>그 값을 CPU로 readback합니다. GPU가 build를 끝낸 뒤(fence 이후)에만 읽을 수 있습니다.</li>
+    <li>그 크기로 새 result buffer를 만들고 <code>CopyRaytracingAccelerationStructure(dst, src, MODE_COMPACT)</code>로 복사합니다.</li>
+    <li>복사가 GPU에서 끝난 뒤 원래 buffer를 해제합니다.</li>
+  </ol>
+  <p>즉 "build 프레임"과 "compact 프레임"이 다르고, 그 사이 BLAS가 두 벌 존재합니다. 처음부터 넣을 필요는 없지만, 나중에 넣을 수 있게 BLAS 주소가 바뀔 수 있다는 점을 구조에서 허용해 두면 좋습니다 <span class="mk b-judge">판단</span>. BLAS 주소는 TLAS instance에 들어가므로, 주소가 바뀌면 TLAS를 다시 build해야 합니다.</p>
+
+  <h3>5.9 수명: GPU가 쓰는 동안 해제하지 않기</h3>
+  <p>DX11에서는 <code>Release()</code>해도 driver가 GPU 사용이 끝날 때까지 실제 해제를 미뤄 줬습니다. DX12에서는 GPU가 아직 읽고 있는 resource를 해제하면 정의되지 않은 동작이고, 보통 device removed로 나타납니다. AS도 마찬가지이고, TLAS는 BLAS 주소만 들고 있으므로 <b>BLAS를 해제하면 그것을 가리키는 TLAS도 무효</b>가 됩니다. 모델 교체, 창 크기 변경, 종료 시점의 해제 순서와 GPU 대기를 설계에서 정해야 합니다.</p>
+
+  <details class="quiz"><summary>확인 질문: 한 Mesh가 Draw 2개(같은 VB, 다른 index 구간, 다른 baseVertex)로 되어 있다. BLAS 하나에 geometry 몇 개를 어떻게 넣는가?</summary>
+  geometry 2개입니다. 각 geometry의 VertexBuffer.StartAddress는 <code>meshVB + baseVertex × stride</code>, IndexBuffer는 <code>meshIB + startIndex × indexSize</code>, IndexCount는 해당 draw의 index 수입니다. hit 시 <code>CommittedGeometryIndex()</code>가 0 또는 1로 어느 Draw인지 알려줍니다.</details>
+  <details class="quiz"><summary>확인 질문: TLAS build 결과 buffer에 TransitionResource를 호출하면 어떻게 되는가?</summary>
+  규칙 위반입니다. AS는 RTAS 상태에 고정되어야 하고, spec에 따르면 다른 상태로 transition하면 <b>runtime이 command list를 removed 상태로 만듭니다</b>. debug layer를 켜지 않아도 실패합니다. MiniEngine의 상태 추적 기반 helper(SetBufferSRV 등)를 AS에 그대로 쓰면 이런 transition이나 assert가 생길 수 있습니다. 그래서 AS buffer를 기존 buffer 타입과 어떻게 구분할지가 설계 결정이 됩니다(Part 11, D3).</details>
+</section>
+
+<!-- ============================================================ -->
+<section class="part" id="p6" data-title="DXR 1.0 vs 1.1 inline">
+  <div class="part-head"><span class="part-no">06</span><h2>DXR 1.0 pipeline과 DXR 1.1 inline ray query</h2></div>
+  <p class="goal">목표: 두 방식의 구조 차이를 설명하고, DDGI probe update에 inline이 맞는 이유와 한계를 안다.</p>
+
+  <h3>DXR 1.0: raytracing pipeline</h3>
+  <p>DXR 1.0은 ray tracing 전용 shader 단계들을 도입했습니다. <b>ray generation</b> shader가 <code>TraceRay()</code>를 호출하면, 하드웨어와 driver가 traversal을 하면서 상황에 따라 <b>intersection</b>, <b>any hit</b>, <b>closest hit</b>, <b>miss</b> shader를 호출합니다. 어떤 물체에 맞았을 때 어떤 shader를 부를지는 <b>Shader Binding Table</b>(SBT)이라는 GPU 메모리 표로 지정하고, 이 모든 shader를 묶은 <b>state object</b>(RT PSO)를 만들어 <code>DispatchRays()</code>로 실행합니다.</p>
+  <p>장점은 물체마다 다른 hit shader를 쓸 수 있는 유연성과, driver가 shader 실행을 재정렬해 최적화할 여지입니다. 단점은 준비물이 많다는 것입니다. state object, local root signature, SBT 레이아웃과 정렬 규칙, payload 크기 관리가 필요합니다.</p>
+
+  <h3>DXR 1.1: inline ray tracing (RayQuery)</h3>
+  <p>DXR 1.1(Raytracing Tier 1.1)은 <b>어떤 shader에서든</b> ray를 쏠 수 있는 <code>RayQuery</code> 객체를 추가했습니다. compute shader, pixel shader 안에서 <code>TraceRayInline()</code>을 부르고, 결과를 같은 함수 안에서 바로 읽습니다. 별도의 hit shader, SBT, state object가 없습니다. 기존 compute PSO와 root signature로 충분합니다.</p>
+
+  <div class="table-wrap"><table>
+    <tr><th></th><th>DXR 1.0 pipeline</th><th>DXR 1.1 inline</th></tr>
+    <tr><td>실행</td><td><code>DispatchRays</code> + raygen shader</td><td>일반 <code>Dispatch</code> / draw 안의 아무 shader</td></tr>
+    <tr><td>hit 처리</td><td>closest hit, any hit, miss shader로 분리</td><td>같은 함수 안 <code>Proceed()</code> loop와 결과 조회</td></tr>
+    <tr><td>준비물</td><td>state object, SBT, local root sig, payload</td><td>TLAS SRV 하나</td></tr>
+    <tr><td>물체마다 다른 shader</td><td>자연스러움 (SBT)</td><td>직접 분기 (switch on material)</td></tr>
+    <tr><td>재귀 (반사 안의 반사)</td><td>지원 (recursion depth)</td><td>loop로 직접 구현</td></tr>
+    <tr><td>최소 요구</td><td>Tier 1.0, SM 6.3</td><td>Tier 1.1, SM 6.5</td></tr>
+  </table></div>
+
+  <h3>지원 여부 확인</h3>
+<pre><code><span class="k">D3D12_FEATURE_DATA_D3D12_OPTIONS5</span> o5 = {};
+device-&gt;CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &amp;o5, sizeof(o5));
+bool inlineRT = o5.RaytracingTier &gt;= D3D12_RAYTRACING_TIER_1_1;
+
+<span class="k">D3D12_FEATURE_DATA_SHADER_MODEL</span> sm = { D3D_SHADER_MODEL_6_5 };  <span class="c">// 원하는 최고 버전을 넣으면</span>
+device-&gt;CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL, &amp;sm, sizeof(sm)); <span class="c">// 지원하는 최고 버전으로 낮춰 준다</span></code></pre>
+  <p>Tier는 GPU 하드웨어만이 아니라 driver와 OS runtime까지 합쳐서 보고되는 값이므로, 사양표가 아니라 실행 중에 이 함수로 확인해야 합니다. 지원하지 않는 환경에서 무엇을 할지(실행 중단, GI 끄기, 다른 경로)는 설계 결정입니다(Part 11, D2).</p>
+
+  <h3>왜 DDGI probe update에 inline이 맞는가</h3>
+  <ul>
+    <li><b>Hit 처리가 단순하고 균일합니다.</b> DDGI hit shading은 "모든 재질을 같은 diffuse 근사로" 처리하므로 재질별로 다른 hit shader가 필요 없습니다.</li>
+    <li><b>Compute 흐름에 바로 끼워 넣을 수 있습니다.</b> trace, blend, border가 모두 compute pass라서, MiniEngine의 <code>ComputeContext</code>와 <code>ComputePSO</code> 구조를 그대로 씁니다.</li>
+    <li><b>Visibility query가 매우 싸게 표현됩니다.</b> shadow ray는 flag 몇 개와 <code>Proceed()</code> 한 번입니다.</li>
+    <li>참고로 RTXGI-DDGI는 다른 선택을 했습니다. SDK 자체는 ray를 쏘지 않고 blend, relocation, classification compute shader만 제공하며, 샘플(test-harness)의 probe trace는 DXR 1.0 raygen shader(<code>ProbeTraceRGS.hlsl</code>)와 <code>TraceRay</code>로 구현되어 있습니다(main 브랜치 기준, <code>TraceRayInline</code> 사용처 없음). 즉 RTXGI 코드를 참고할 때 trace 부분은 1.0 구조를 inline으로 옮겨 읽어야 합니다.</li>
+  </ul>
+  <div class="note"><b class="tag">한계</b>
+  inline은 driver가 shader를 재정렬할 수 없으므로, ray 방향이 제각각인(incoherent) 상황에서 thread들이 다른 시점에 끝나며 효율이 떨어질 수 있습니다. 재질별로 크게 다른 hit 처리가 필요해지면 코드가 커집니다. 이 둘이 문제가 되는 시점이 오면 1.0 pipeline을 추가로 도입할 수 있고, AS는 두 방식이 그대로 공유합니다. <span class="mk b-judge">판단</span> 즉 AS 계층과 ray 질문 계층을 분리해 두는 것이 이후 확장에 유리합니다.</div>
+</section>
+
+<!-- ============================================================ -->
+<section class="part" id="p7" data-title="RayQuery HLSL API">
+  <div class="part-head"><span class="part-no">07</span><h2>RayQuery HLSL API 상세</h2></div>
+  <p class="goal">목표: closest hit, visibility, alpha test 세 가지 패턴을 직접 쓸 수 있고, 각 조회 함수가 무엇을 돌려주는지 안다.</p>
+
+  <h3>7.1 기본 흐름</h3>
+<pre><code><span class="k">RaytracingAccelerationStructure</span> Scene : register(t0);
+
+<span class="c">// 템플릿 인자의 flag는 컴파일 타임 상수. 하드웨어가 미리 최적화에 쓴다.</span>
+<span class="c">// 이 예시는 non-opaque(alpha test) geometry가 있을 수 있는 일반형이라 while loop가 필요하다.</span>
+<span class="k">RayQuery</span>&lt;RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES&gt; q;
+
+RayDesc ray;
+ray.Origin    = probePos;
+ray.Direction = dir;       <span class="c">// 정규화하면 t == 거리</span>
+ray.TMin      = 0.0;
+ray.TMax      = 1e27;
+
+<span class="c">// 실행 시점 flag는 템플릿 flag와 OR되어 적용된다.</span>
+q.<span class="r">TraceRayInline</span>(Scene, RAY_FLAG_NONE, 0xFF <span class="c">/*InstanceInclusionMask*/</span>, ray);
+
+<span class="k">while</span> (q.<span class="r">Proceed</span>())
+{
+    <span class="c">// non-opaque 후보가 나타날 때만 여기에 들어온다.</span>
+    <span class="c">// opaque 삼각형은 하드웨어가 알아서 commit 한다.</span>
+}
+
+<span class="k">if</span> (q.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
+{
+    float  t      = q.CommittedRayT();
+    uint   inst   = q.CommittedInstanceIndex();   <span class="c">// TLAS 배열 순서</span>
+    uint   id     = q.CommittedInstanceID();      <span class="c">// 앱이 넣은 24-bit 값</span>
+    uint   geo    = q.CommittedGeometryIndex();   <span class="c">// BLAS 안의 geometry 번호</span>
+    uint   prim   = q.CommittedPrimitiveIndex();  <span class="c">// geometry 안의 삼각형 번호</span>
+    float2 bary   = q.CommittedTriangleBarycentrics();
+    bool   front  = q.CommittedTriangleFrontFace();
+    float3x4 o2w  = q.CommittedObjectToWorld3x4();
+}
+<span class="k">else</span> <span class="c">// COMMITTED_NOTHING: miss → sky</span></code></pre>
+
+  <h3>7.2 Proceed loop의 의미</h3>
+  <p><code>Proceed()</code>는 "traversal을 계속하다가 앱의 판단이 필요한 후보를 만나면 멈추고 true를 반환, 끝나면 false"입니다. 모든 geometry가 opaque면 앱에 물을 것이 없으므로 한 번 호출에 끝까지 갑니다.</p>
+  <div class="note warn"><b class="tag">한 번만 호출할 때의 조건</b>
+  <code>q.Proceed();</code>를 loop 없이 한 번만 부르려면 non-opaque 후보가 <b>절대 나오지 않는다는 보장</b>이 있어야 합니다. 그 보장은 template flag에 <code>RAY_FLAG_FORCE_OPAQUE</code>(모두 opaque로 취급) 또는 <code>RAY_FLAG_CULL_NON_OPAQUE</code>(non-opaque를 무시)를 넣어서 만듭니다. spec 예제가 Proceed()를 한 번만 부르는 것도 이 flag 때문입니다. 이런 flag 없이 BLAS에 non-opaque geometry가 하나라도 있으면, 한 번의 Proceed()는 그 후보에서 멈추고 committed 결과는 <b>오류 없이 조용히 틀립니다</b>.</div>
+  <p>값은 두 계열로 나뉩니다.</p>
+  <ul>
+    <li><b>Candidate*</b>: loop 안에서 지금 멈춘 후보에 대한 정보 (<code>CandidateType()</code>, <code>CandidateTriangleRayT()</code>, <code>CandidateTriangleBarycentrics()</code>, <code>CandidateInstanceID()</code> ...)</li>
+    <li><b>Committed*</b>: 지금까지 인정된 가장 가까운 hit. loop가 끝난 뒤의 최종 결과.</li>
+  </ul>
+
+  <h3>7.3 Alpha test 패턴</h3>
+<pre><code><span class="k">while</span> (q.Proceed())
+{
+    <span class="k">if</span> (q.CandidateType() == CANDIDATE_NON_OPAQUE_TRIANGLE)
+    {
+        <span class="c">// 후보 삼각형의 UV를 barycentrics로 보간해 alpha texture를 읽는다</span>
+        float alpha = SampleAlpha(q.CandidateInstanceID(), q.CandidateGeometryIndex(),
+                                  q.CandidatePrimitiveIndex(), q.CandidateTriangleBarycentrics());
+        <span class="k">if</span> (alpha &gt;= cutoff)
+            q.<span class="r">CommitNonOpaqueTriangleHit</span>();   <span class="c">// 이 후보를 인정</span>
+        <span class="c">// 인정하지 않으면 그냥 다음 Proceed()</span>
+    }
+}</code></pre>
+  <p>주의: <code>Sample()</code>은 이웃 pixel과의 미분(ddx/ddy)으로 mip을 고릅니다. SM 6.6부터는 compute shader에서도 이웃 thread 기준 미분을 쓸 수 있지만, 서로 다른 방향으로 간 ray 사이의 미분은 의미가 없습니다. 그래서 <code>SampleLevel(…, mip)</code>으로 mip을 명시합니다. 이 경로는 vertex UV를 읽어야 해서 Part 8의 "surface 복원" 기반이 먼저 있어야 합니다. 즉 alpha test를 정확히 하려면 hit shading의 기반이 먼저 필요하고, 그 전까지 alpha test geometry를 어떻게 다룰지가 설계 결정이 됩니다(Part 11, D8).</p>
+
+  <h3>7.4 Visibility (shadow) 패턴</h3>
+<pre><code><span class="k">RayQuery</span>&lt;RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH
+       | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES
+       | RAY_FLAG_FORCE_OPAQUE&gt; sq;   <span class="c">// alpha 무시 시. 정확히 하려면 FORCE_OPAQUE 빼고 7.3 loop</span>
+sq.TraceRayInline(Scene, RAY_FLAG_NONE, 0xFF, shadowRay);
+sq.Proceed();
+bool visible = sq.CommittedStatus() == COMMITTED_NOTHING;</code></pre>
+
+  <h3>7.5 자주 쓰는 ray flag</h3>
+  <div class="table-wrap"><table>
+    <tr><th>Flag</th><th>효과</th><th>DDGI 용도</th></tr>
+    <tr><td><code>ACCEPT_FIRST_HIT_AND_END_SEARCH</code></td><td>첫 commit에서 종료</td><td>shadow ray</td></tr>
+    <tr><td><code>FORCE_OPAQUE</code></td><td>모든 geometry를 opaque로 취급</td><td>alpha test 무시 단계</td></tr>
+    <tr><td><code>CULL_BACK_FACING_TRIANGLES</code></td><td>뒷면 무시</td><td>probe trace에서는 <b>쓰면 안 됨</b> (backface 정보 필요)</td></tr>
+    <tr><td><code>CULL_NON_OPAQUE</code></td><td>non-opaque geometry 무시</td><td>특수 용도</td></tr>
+    <tr><td><code>SKIP_PROCEDURAL_PRIMITIVES</code></td><td>AABB geometry 무시</td><td>삼각형만 쓰면 항상 켜서 최적화 힌트로</td></tr>
+  </table></div>
+
+  <h3>7.6 Front face 판정 규칙</h3>
+  <p>DXR spec의 정의는 <b>"object space에서, 왼손 좌표계로 해석했을 때, ray 출발점에서 봐서 vertex가 시계 방향(clockwise)이면 앞면"</b>입니다. "왼손 좌표계로 해석"이라는 조건이 핵심입니다. 같은 숫자 데이터를 오른손 좌표계로 보면 시계 방향이 반시계 방향으로 보이기 때문입니다. 그래서 <b>오른손 좌표계에서 반시계(CCW)를 앞면으로 만든 데이터는 DXR 기본값 그대로 앞면이 맞게 나옵니다.</b></p>
+  <p>instance flag <code>TRIANGLE_FRONT_COUNTERCLOCKWISE</code>는 이 판정을 뒤집습니다. 왼손 좌표계에서 CCW를 앞면으로 쓰는 데이터에만 필요합니다.</p>
+  <div class="note warn"><b class="tag">이 repo에서의 함정</b>
+  MiniEngine은 오른손 좌표계를 쓰고(<code>Core/Camera.cpp:35</code>), glTF(오른손 좌표계, CCW 앞면)의 index 순서를 바꾸지 않습니다. raster 쪽은 <code>FrontCounterClockwise = TRUE</code>입니다(<code>Core/GraphicsCommon.cpp:167</code>). 이 raster 설정을 보고 DXR에도 <code>TRIANGLE_FRONT_COUNTERCLOCKWISE</code>를 켜면 <b>앞면과 뒷면이 통째로 뒤집혀</b> DDGI의 backface 판정이 망가집니다. 이 repo에서는 flag를 켜지 않는 것이 맞습니다. RTXGI 샘플도 왼손 좌표계일 때만 이 flag를 켭니다. spec과 RTXGI 코드로 확인한 내용이지만, 이 repo에서 실행해 확인하지는 않았으므로 debug view로 검증해야 합니다.</div>
+  <p><b>음수 scale(거울)</b>: winding은 object space에서 판정하므로 <b>instance transform의 determinant가 음수여도 앞면 판정은 바뀌지 않습니다</b>(spec). 판정이 뒤집히는 경우는 geometry desc의 <code>Transform3x4</code> determinant가 음수일 때, 그리고 거울 변환을 vertex 데이터에 미리 구워 넣었을 때입니다. MiniEngine glTF loader에는 음수 determinant node의 winding을 뒤집지 않는다는 TODO가 남아 있습니다(<code>Model/glTF.cpp:77</code>).</p>
+
+  <h3>7.7 Self-intersection</h3>
+  <p>표면 위의 점에서 쏘는 ray는 계산 오차로 자기 삼각형에 다시 맞을 수 있습니다. 해법은 출발점을 법선 방향으로 조금 밀거나(normal offset) TMin을 키우는 것입니다. 고정 epsilon은 장면 크기(이 프로젝트는 Sponza를 100배 키워 씁니다)에 따라 깨지므로, 좌표 크기에 비례한 offset을 쓰는 방법이 Ray Tracing Gems 6장(Wächter, Binder, "A Fast and Robust Method for Avoiding Self-Intersection")에 있습니다 <span class="mk b-guess">추측</span>(장 번호는 기억에 근거).</p>
+
+  <details class="quiz"><summary>확인 질문: 모든 geometry가 opaque인 장면에서 while(q.Proceed()) loop body는 몇 번 실행되는가?</summary>
+  0번입니다. opaque 후보는 앱에 묻지 않고 하드웨어가 처리하므로 Proceed()는 바로 false를 반환합니다.</details>
+  <details class="quiz"><summary>확인 질문: hit한 삼각형의 material을 찾으려면 어떤 값들의 조합이 필요한가?</summary>
+  어느 instance인가(InstanceID 또는 InstanceIndex)와 그 BLAS 안의 어느 geometry인가(GeometryIndex)입니다. 이 둘로 "geometry table"의 항목을 찾고, 그 항목에 material index, VB/IB 위치가 들어 있게 만드는 것이 일반적입니다. PrimitiveIndex는 그 geometry 안에서 어느 삼각형인지(= index buffer의 몇 번째 3개인지)입니다.</details>
+</section>
+
+<!-- ============================================================ -->
+<section class="part" id="p8" data-title="Hit 지점 surface 복원">
+  <div class="part-head"><span class="part-no">08</span><h2>Hit 지점의 표면 정보 복원</h2></div>
+  <p class="goal">목표: RayQuery가 주는 번호들에서 world position, normal, albedo까지 가는 경로를 그린다.</p>
+
+  <p>RayQuery가 주는 것은 "몇 번 instance, 몇 번 geometry, 몇 번 삼각형, barycentrics"뿐입니다. Raster에서는 vertex shader와 rasterizer가 normal, UV를 보간해 줬지만, 여기서는 직접 해야 합니다.</p>
+
+<pre class="mermaid">
+flowchart LR
+  H["hit<br/>InstanceID, GeometryIndex,<br/>PrimitiveIndex, bary"] --> G["Geometry table<br/>(StructuredBuffer)"]
+  G --> I["Index buffer에서<br/>삼각형 index 3개"]
+  I --> V["Vertex buffer에서<br/>normal, UV 3개씩"]
+  V --> B["bary로 보간"]
+  B --> W["ObjectToWorld로<br/>world 변환"]
+  G --> M["Material constants<br/>+ texture index"]
+  M --> T["texture SampleLevel"]
+</pre>
+
+  <h3>8.1 Geometry table</h3>
+  <p>"geometry 하나당 한 줄"인 StructuredBuffer를 하나 만들고, 각 줄에 VB offset, IB offset, stride, index format, material index를 넣습니다. TLAS instance의 InstanceID에는 "이 instance의 첫 geometry가 table의 몇 번째 줄인가"를 넣고, shader에서 <code>InstanceID + GeometryIndex</code>로 줄을 찾습니다. instance마다 geometry 수가 달라도 table 하나로 처리되는 방식입니다. instance 하나가 geometry 하나뿐이라면 InstanceID를 table 번호로 바로 써도 됩니다.</p>
+
+  <h3>8.2 Vertex fetch</h3>
+  <p>MiniEngine은 VB와 IB를 ByteAddressBuffer에 넣어 두었으므로 <code>Load3</code>, <code>Load</code>로 읽습니다. 16-bit index는 4 byte 단위로 읽은 뒤 상위/하위 반을 골라야 합니다. normal이 <code>R10G10B10A2_UNORM</code>, UV가 <code>R16G16_FLOAT</code>처럼 압축된 형식이면 shader에서 직접 풀어야 합니다(<code>f16tof32</code>, 비트 연산).</p>
+
+  <h3>8.3 여러 Model과 texture: bindless</h3>
+  <p>Model마다 <code>m_DataBuffer</code>가 따로 있으므로 shader가 "N번 Model의 buffer"를 고를 수 있어야 하고, texture도 마찬가지입니다. 방법은 두 가지입니다.</p>
+  <ul>
+    <li><b>SM 6.6 <code>ResourceDescriptorHeap[i]</code></b>: root signature에 <code>CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED</code> flag를 켜면 shader-visible heap 전체를 index로 접근합니다. MiniEngine의 <code>s_TextureHeap</code>을 그대로 활용할 수 있습니다.</li>
+    <li><b>unbounded descriptor table</b> (<code>Texture2D tex[] : register(t0, space1)</code>): SM 5.1부터 가능. root signature에 큰 range를 선언합니다.</li>
+  </ul>
+  <p>이 결정은 hit shading 전체의 binding 구조를 좌우합니다. AS를 만들고 ray를 쏘는 것만으로는 bindless가 필요 없으므로, 이 결정을 infra 첫 단계에 같이 할지 hit shading 단계로 미룰지도 설계 결정입니다(Part 11, D10) <span class="mk b-judge">판단</span>.</p>
+
+  <h3>8.4 Mip level 선택</h3>
+  <p>Probe ray는 멀리 있는 표면을 넓은 각도로 sampling하므로 가장 정밀한 mip 0을 읽으면 aliasing과 cache miss가 큽니다. DDGI 결과는 저주파이므로 높은 mip 고정이나 ray cone 기반 LOD를 쓰는 것이 흔합니다 <span class="mk b-judge">판단</span>.</p>
+</section>
+
+<!-- ============================================================ -->
+<section class="part" id="p9" data-title="성능 감각">
+  <div class="part-head"><span class="part-no">09</span><h2>성능 감각: ray 예산</h2></div>
+  <p class="goal">목표: probe 수와 ray 수가 비용에 어떻게 연결되는지 수치로 감을 잡는다.</p>
+  <p>아래 계산기는 단순 곱셈입니다. 실제 시간은 GPU, 장면, ray coherence에 크게 좌우되므로 결과 시간을 예측하는 도구가 아니라 <b>상대적인 규모</b>를 보는 도구입니다.</p>
+
+  <div class="calc">
+    <div class="inputs">
+      <label for="px">probe X<input id="px" type="number" min="1" value="16"></label>
+      <label for="py">probe Y<input id="py" type="number" min="1" value="8"></label>
+      <label for="pz">probe Z<input id="pz" type="number" min="1" value="16"></label>
+      <label for="rpp">rays / probe<input id="rpp" type="number" min="1" value="256"></label>
+      <label for="sh">shadow ray / hit<input id="sh" type="number" min="0" value="1"></label>
+    </div>
+    <div class="out">
+      <div><div class="v" id="o-probes">0</div><div class="k">probe 수</div></div>
+      <div><div class="v" id="o-rays">0</div><div class="k">primary ray / frame</div></div>
+      <div><div class="v" id="o-total">0</div><div class="k">shadow 포함 ray / frame (최대)</div></div>
+      <div><div class="v" id="o-px">0</div><div class="k">1080p 화면 pixel 대비 배율</div></div>
+    </div>
+  </div>
+
+  <ul>
+    <li><b>Probe trace는 incoherent</b>합니다. 한 probe의 ray가 구 전체로 퍼지므로 이웃 thread가 BVH의 다른 부분을 탐색합니다. 화면 primary ray보다 ray당 비용이 큽니다 <span class="mk b-judge">판단</span>.</li>
+    <li><b>Thread 배치</b>: 보통 thread group 하나가 probe 하나(또는 몇 개)를 맡게 해서, 한 group의 결과를 이어지는 blend 단계에서 쓰기 좋게 합니다.</li>
+    <li><b>TLAS build</b>: instance 수백 개 수준의 rebuild는 GPU에서 매우 짧다는 것이 일반적인 경험치입니다 <span class="mk b-guess">추측</span>. PIX로 측정해 확인합니다.</li>
+    <li><b>측정 도구</b>: PIX on Windows는 AS 내용을 시각화하고 build와 dispatch 시간을 보여줍니다. MiniEngine은 이미 WinPixEventRuntime을 쓰고 <code>ScopedTimer</code>로 GPU 구간을 잽니다. NVIDIA Nsight Graphics도 AS viewer가 있습니다.</li>
+  </ul>
+</section>
+
+<!-- ============================================================ -->
+<section class="part" id="p10" data-title="이 repo의 구조">
+  <div class="part-head"><span class="part-no">10</span><h2>이 repo의 구조: 설계에 필요한 사실</h2></div>
+  <p class="goal">목표: 설계 결정에 필요한 MiniEngine의 scene 표현, 프레임 흐름, 데이터 특성, 제약을 코드 위치와 함께 안다.</p>
+  <p>이 Part의 줄 번호는 작성 시점 기준입니다. 코드가 바뀌면 함수 이름으로 찾으세요.</p>
+
+  <h3>10.1 Scene 표현: Model, ModelInstance, Mesh</h3>
+  <div class="table-wrap"><table>
+    <tr><th>타입</th><th>무엇인가</th><th>ray query와 관련된 내용</th></tr>
+    <tr><td><code>Model</code> (<code>Model/Model.h</code>)</td><td>glTF 하나를 변환한 공유 데이터</td><td>모든 VB/IB가 <code>m_DataBuffer</code> 하나에 있음. <code>m_MeshData</code>에 Mesh 배열이 이어 붙어 있음. <code>m_SceneGraph</code>는 node 배열</td></tr>
+    <tr><td><code>ModelInstance</code></td><td>Model을 장면에 한 번 배치한 것</td><td>배치 transform(<code>m_Locator</code>), node별 world 행렬, animation 상태를 가짐. 같은 Model을 여러 번 배치하면 instance가 여러 개</td></tr>
+    <tr><td><code>Mesh</code></td><td>draw 단위. PSO 하나, material 하나</td><td><code>vbOffset</code>, <code>vbStride</code>, <code>ibOffset</code>, <code>ibFormat</code>, <code>meshCBV</code>(적용할 node 번호), <code>materialCBV</code>, <code>srvTable</code>, <code>psoFlags</code>, <code>Draw[numDraws]</code></td></tr>
+    <tr><td><code>GraphNode</code></td><td>glTF node</td><td>local transform과 계층. <code>matrixIdx</code>로 행렬 배열 위치를 가리킴</td></tr>
+  </table></div>
+  <ul>
+    <li><b>glTF에서 Mesh가 만들어지는 규칙</b>: mesh를 가진 glTF node마다 <code>CompileMesh</code>가 불립니다(<code>Model/ModelConvert.cpp:217</code>). 그 glTF mesh의 primitive들은 (psoFlags, 32-bit index 여부, material) 조합으로 묶이고, 조합 하나가 MiniEngine Mesh 하나가 됩니다(<code>Model/MeshConvert.h:39-43</code>, <code>ModelConvert.cpp:75-79</code>). 같은 조합의 primitive가 여럿이면 한 Mesh의 Draw 여러 개가 됩니다.</li>
+    <li><b>Vertex는 node local space</b>에 있습니다. 변환 때 넘기는 <code>localToObject</code> 행렬은 bounds 계산에만 쓰이고 vertex에 곱해지지 않습니다(<code>Model/MeshConvert.cpp:235, 248</code>). 그래서 world 위치를 얻으려면 Mesh마다 그 node의 world 행렬이 필요합니다.</li>
+    <li><b>Mesh와 행렬의 연결</b>: <code>mesh.meshCBV</code>가 node 번호이고, raster는 그 번호로 MeshConstants(world 행렬)를 찾습니다(<code>Model/Model.cpp:48, 62</code>). CPU에서 읽을 수 있는 world 행렬 사본은 <code>ModelInstance::m_BoundingSphereTransforms[meshCBV]</code>(<code>AffineTransform</code>)입니다.</li>
+    <li><b>Alpha test, two-sided, skin 여부</b>는 <code>Mesh::psoFlags</code>의 <code>kAlphaTest</code>, <code>kTwoSided</code>, <code>kHasSkin</code> bit로 알 수 있습니다(<code>Model/Model.h:36-50</code>, <code>MeshConvert.cpp:362-369</code>).</li>
+  </ul>
+
+  <h3>10.2 프레임 흐름</h3>
+  <ul>
+    <li><code>ModelViewer</code>는 장면에 <code>ModelInstance</code> 하나(<code>m_ModelInst</code>)만 둡니다(<code>ModelViewer/ModelViewer.cpp:69</code>).</li>
+    <li><b>Update</b>: <code>ModelViewer::Update</code>가 "Scene Update" command list를 열고 <code>ModelInstance::Update</code>를 부릅니다(<code>ModelViewer.cpp:228-232</code>). 여기서 animation을 진행하고 node world 행렬을 계산해 upload buffer에 쓰고 GPU buffer로 복사합니다(<code>Model/Model.cpp:157-246</code>). CPU 사본 <code>m_BoundingSphereTransforms</code>도 이때 갱신됩니다.</li>
+    <li><b>RenderScene</b>: "Scene Render" command list 하나에서 particle update, depth prepass, SSAO, shadow map, color pass, skybox, transparent 순서로 기록합니다(<code>ModelViewer.cpp:255-350</code>).</li>
+    <li><b>MeshSorter는 frustum culling된 목록</b>입니다(<code>Model/Model.cpp:58</code>). ray는 화면 밖 물체에도 맞아야 하므로, ray query용 scene 목록은 MeshSorter 결과를 쓸 수 없고 Model 전체를 순회해야 합니다.</li>
+    <li>Command queue는 graphics, compute, copy 세 개가 있습니다(<code>Core/CommandListManager.h:83-85</code>). <code>ComputeContext::Begin(name, true)</code>로 async compute queue에 기록할 수 있습니다(<code>Core/CommandContext.cpp:87-90</code>).</li>
+  </ul>
+
+  <h3>10.3 기본 장면(Sponza)의 데이터 특성</h3>
+  <p>아래는 <code>ModelViewer/Sponza/PBR/sponza2.gltf</code>를 스크립트로 집계한 값입니다. MiniEngine Mesh 개수는 10.1의 묶음 규칙을 glTF 데이터에 적용해 계산한 추론값이고, 실행 중에 센 값은 아닙니다.</p>
+  <div class="table-wrap"><table>
+    <tr><th>항목</th><th>값</th><th>설계에 주는 의미</th></tr>
+    <tr><td>glTF mesh, node</td><td>381개, 381개. 모든 node가 mesh 하나씩</td><td></td></tr>
+    <tr><td>primitive 2개인 mesh</td><td>12개. 두 primitive의 material이 서로 다름</td><td>별도 Mesh로 나뉘므로 MiniEngine Mesh는 약 393개, <b>모든 Mesh가 <code>numDraws == 1</code></b></td></tr>
+    <tr><td>node transform</td><td>모두 없음(identity)</td><td>모든 Mesh의 world 행렬이 <code>m_Locator</code> 하나와 같음</td></tr>
+    <tr><td>material</td><td>27개. alpha test(MASK) 3개: chain, leaf, Material__57. 이 3개가 two-sided 3개와 같음</td><td>alpha test 정책과 two-sided 정책이 같은 물체(잎, 쇠사슬 등)에 걸림</td></tr>
+    <tr><td>skin, animation</td><td>0개, 0개</td><td>Sponza만 보면 BLAS가 변하지 않음</td></tr>
+    <tr><td>배치 scale</td><td>원래 반지름의 100배로 키움(<code>ModelViewer.cpp:176</code>)</td><td>좌표 크기가 커서 고정 epsilon(7.7)에 주의</td></tr>
+  </table></div>
+  <p>단, <code>-model &lt;gltf 경로&gt;</code> 실행 인자로 다른 glTF를 열 수 있고, 이때는 모든 animation을 재생합니다(<code>ModelViewer.cpp:183-187</code>). 그래서 "Sponza에서는 안 일어나는 일"(움직이는 node, skinning, multi-draw Mesh)이 이 경로에서는 일어날 수 있습니다. 설계가 이것을 지원할지, 명시적으로 막을지 정해야 합니다.</p>
+  <details class="quiz"><summary>집계 방법 (직접 다시 확인하려면)</summary>
+  glTF는 JSON이므로 Python으로 읽습니다. <code>meshes[i].primitives</code>의 개수, <code>materials[i].alphaMode</code>와 <code>doubleSided</code>, <code>nodes[i]</code>에 <code>matrix</code>, <code>translation</code>, <code>rotation</code>, <code>scale</code> 키가 있는지, <code>skins</code>와 <code>animations</code>의 길이를 셉니다. Mesh 개수는 mesh를 가진 node마다 그 mesh의 primitive를 (material, index component type)으로 묶은 그룹 수를 더한 값입니다. 이 장면은 psoFlags가 material로 정해지므로 이 두 값으로 충분합니다 <span class="mk b-judge">판단</span>.</details>
+
+  <h3>10.4 개념과 코드의 대응, 그리고 제약</h3>
+  <div class="table-wrap"><table>
+    <tr><th>개념 (Part)</th><th>이 repo에서</th><th>의미</th></tr>
+    <tr><td>Tier 1.1 검사 (6)</td><td><code>Core/GraphicsCore.cpp:158</code>은 Tier가 NOT_SUPPORTED만 아니면 통과. <code>GameCore::IGameApp::RequiresRaytracingSupport()</code> 기본값 false(<code>Core/GameCore.h:45</code>), ModelViewer는 override 안 함</td><td>Tier 1.0 GPU도 "지원"으로 판정됨</td></tr>
+    <tr><td>상위 interface (3.6)</td><td><code>g_Device</code>는 <code>ID3D12Device*</code>, context의 command list는 <code>ID3D12GraphicsCommandList*</code>(<code>Core/CommandContext.h:170</code>)</td><td>Device5, CommandList4를 QueryInterface로 얻어야 함</td></tr>
+    <tr><td>RTAS 상태 고정 (3.2, 5.4)</td><td><code>GpuBuffer</code>가 COMMON 상태로 생성(<code>Core/GpuBuffer.cpp:34</code>)하고, 상태를 <code>m_UsageState</code>로 추적</td><td>그대로는 AS buffer로 못 씀</td></tr>
+    <tr><td>TLAS bind (5.6)</td><td><code>ComputeContext::SetBufferSRV</code>가 <code>NON_PIXEL_SHADER_RESOURCE</code> 상태를 assert(<code>Core/CommandContext.h:535</code>)</td><td>AS에는 이 함수를 쓸 수 없음</td></tr>
+    <tr><td>BLAS 입력 (5.2)</td><td>position이 vertex 맨 앞 <code>R32G32B32_FLOAT</code>(<code>Model/MeshConvert.cpp:341</code>). normal, tangent는 <code>R10G10B10A2</code>, UV는 <code>R16G16_FLOAT</code></td><td>VB를 복사 없이 BLAS 입력으로 쓸 수 있음. hit shading은 압축 형식을 직접 풀어야 함</td></tr>
+    <tr><td>입력 buffer 상태 (5.4)</td><td><code>m_DataBuffer</code>는 생성 시 초기 데이터 upload 후 <code>GENERIC_READ</code>로 전환(<code>Model/ModelLoader.cpp:236</code>, <code>Core/CommandContext.cpp:575</code>)</td><td>build 입력으로 바로 쓸 수 있음</td></tr>
+    <tr><td>baseVertex, VertexCount (5.2)</td><td><code>Mesh::Draw</code>는 <code>primCount, startIndex, baseVertex</code>만 가짐</td><td>VertexCount를 따로 구해야 함. Draw가 1개면 <code>vbSize / vbStride</code></td></tr>
+    <tr><td>Index format (5.2, 8.2)</td><td><code>ibFormat</code>이 R16 또는 R32(<code>Model/ModelConvert.cpp:125</code>)</td><td>geometry desc와 shader fetch 양쪽에서 구분</td></tr>
+    <tr><td>Instance transform (5.3)</td><td><code>m_BoundingSphereTransforms[meshCBV]</code>, <code>Matrix4</code> 메모리 배치는 translation이 4번째 행</td><td>transpose 후 3×4로 복사</td></tr>
+    <tr><td>매 프레임 upload (3.5)</td><td><code>CommandContext::ReserveUploadMemory</code>(<code>Core/CommandContext.h:134</code>)</td><td>instance 배열을 매 프레임 쓰기에 적합</td></tr>
+    <tr><td>Resource 해제 (5.9)</td><td><code>GpuResource::Destroy()</code>는 즉시 해제(<code>Core/GpuResource.h:40-45</code>). 지연 해제 장치 없음. GPU 대기는 <code>g_CommandManager.IdleGPU()</code>(<code>Core/CommandListManager.h:117</code>)</td><td>AS 해제 전에 GPU가 끝났음을 보장해야 함</td></tr>
+    <tr><td>Bindless (3.4, 8.3)</td><td>material texture SRV가 <code>Renderer::s_TextureHeap</code>에 모여 있고 Mesh는 <code>srvTable</code> offset을 가짐</td><td>SM 6.6 heap indexing과 잘 맞음</td></tr>
+    <tr><td>Shader 빌드 (6)</td><td>HLSL은 VS의 FxCompile로 빌드되어 header(<code>g_p파일이름</code>)가 됨(<code>PropertySheets/Build.props:59-70</code>). Desktop 기본 SM 6.2(<code>PropertySheets/Desktop.props:18</code>)</td><td>ray query shader는 파일별로 SM 6.5 이상을 지정해야 함</td></tr>
+    <tr><td>Skinning (5.1)</td><td>VS에서만 수행. skin된 vertex가 buffer로 남지 않음</td><td>skinned mesh를 ray에 보이려면 compute skinning과 BLAS 갱신이 필요</td></tr>
+  </table></div>
+
+  <div class="note warn"><b class="tag">알아 둘 기존 코드 이슈</b>
+  <code>Model/ModelConvert.cpp:153-155</code>의 세 memcpy는 한 Mesh 안에 Draw가 2개 이상이면 모두 틀린 위치에 씁니다.
+  <ul>
+    <li>153행 main VB: vertex <b>개수</b>(<code>curVertOffset</code>)를 byte offset 자리에 더함 (stride를 곱하지 않음)</li>
+    <li>154행 depth VB: draw별 offset이 없어 서로 덮어씀</li>
+    <li>155행 IB: index <b>개수</b>(<code>curIndexOffset</code>)를 byte offset 자리에 더함</li>
+  </ul>
+  10.3에서 본 것처럼 Sponza는 모든 Mesh가 <code>numDraws == 1</code>이라 지금은 증상이 없습니다. multi-draw Mesh를 다루는 설계(다른 model 지원, VertexCount를 다음 Draw의 baseVertex로 구하는 방법 등)라면 이 버그를 먼저 고쳐야 합니다. 코드 읽기와 데이터 집계로 판단했고, 실행 확인은 하지 않았습니다.</div>
+
+  <h3>10.5 개발 환경 확인 방법</h3>
+  <p>작성 시점에 이 repo의 개발 PC에서 확인한 내용과, 다른 PC에서 같은 것을 확인하는 방법입니다.</p>
+  <ul>
+    <li><b>GPU 선택</b>: adapter 선택 로직은 dedicated video memory가 가장 큰 adapter를 고릅니다. 작성 시점 PC는 RTX 4060 Laptop과 Intel UHD가 있어 NVIDIA가 선택됩니다. RTX 20 시리즈 이후 NVIDIA GPU는 최신 driver에서 Tier 1.1을 지원합니다 <span class="mk b-guess">추측</span>. 실제 값은 Part 6의 <code>CheckFeatureSupport</code>로 확인하세요.</li>
+    <li><b>Shader compiler</b>: Windows SDK의 dxc(작성 시점 1.8.2502)로 <code>dxc -T cs_6_5</code>에 RayQuery를 쓰는 최소 shader가 compile되는 것을 확인했습니다.</li>
+    <li><b>D3D12 runtime</b>: Agility SDK DLL은 출력 폴더에 복사되지만 실행 파일에 <code>D3D12SDKVersion</code> export가 없어 실제로는 OS의 D3D12 runtime이 쓰입니다. Windows 11 runtime은 DXR 1.1과 SM 6.6을 지원하므로 당장 문제는 없다고 봅니다 <span class="mk b-guess">추측</span>.</li>
+  </ul>
+</section>
+
+<!-- ============================================================ -->
+<section class="part" id="p11" data-title="설계 워크북">
+  <div class="part-head"><span class="part-no">11</span><h2>설계 워크북: 직접 설계하기</h2></div>
+  <p class="goal">목표: 결정 목록을 하나씩 채워 자기 설계안을 만든다. 각 결정에 "무엇을 골랐고, 이 repo의 어떤 사실 때문에"를 한두 문장으로 적을 수 있으면 된다.</p>
+
+  <h3>11.1 설계 순서</h3>
+  <ol class="plain">
+    <li><b>요구사항 확정</b>: Part 2의 요구사항 표를 출발점으로, "infra가 돌려줄 것"과 "infra 밖에 둘 것"을 정합니다 (D1).</li>
+    <li><b>제약 확인</b>: Part 10의 사실 중 결정을 강제하는 것(AS 상태, SetBufferSRV assert, 즉시 해제, frustum culling된 MeshSorter)을 먼저 표시합니다.</li>
+    <li><b>CPU 쪽 구조</b>: AS buffer, BLAS 단위, TLAS 갱신, 수명과 동기화 (D2~D7, D11).</li>
+    <li><b>Shader 쪽 구조</b>: alpha 정책, HLSL API 모양, binding (D8~D10).</li>
+    <li><b>검증과 단계</b>: 각 단계가 끝났음을 무엇으로 확인할지, 어떤 순서로 쪼갤지 (D12, D13).</li>
+  </ol>
+  <p>각 결정 칸에 적은 내용은 이 브라우저에만 저장됩니다. 맨 아래 버튼으로 전체를 Markdown으로 모아 복사할 수 있습니다.</p>
+
+  <div id="workbook">
+  <div class="dec"><h4>D1. Infra의 경계: 무엇까지 돌려주는가</h4>
+    <p><b>질문</b>: ray 질문의 결과로 infra가 무엇까지 책임지는가?</p>
+    <ul><li>hit 식별 정보까지 (t, instance, geometry, primitive, barycentrics, front face)</li><li>world position, normal까지 (vertex fetch 포함)</li><li>material(albedo, emissive)까지</li></ul>
+    <p class="crit"><b>기준</b>: shadow, AO처럼 표면 정보가 필요 없는 사용처, 첫 단계를 혼자 검증할 수 있는가, bindless가 언제 필요해지는가. <span class="rel">Part 0, 2, 8</span></p>
+    <textarea data-key="D1" aria-label="D1 내 결정" placeholder="내 결정과 근거"></textarea></div>
+
+  <div class="dec"><h4>D2. 지원하지 않는 환경</h4>
+    <p><b>질문</b>: Tier 1.1이 아닌 GPU에서 어떻게 할 것인가?</p>
+    <ul><li>시작 시 명확한 메시지와 함께 종료</li><li>실행하되 GI만 끔</li><li>다른 GI 경로(screen-space, software tracing)로 대체</li></ul>
+    <p class="crit"><b>기준</b>: 개발과 실행 대상 PC, 분기 코드의 유지 비용, 지금 Tier 검사가 Tier 1.0도 통과시킨다는 사실(10.4). <span class="rel">Part 6, 10.4</span></p>
+    <textarea data-key="D2" aria-label="D2 내 결정" placeholder="내 결정과 근거"></textarea></div>
+
+  <div class="dec"><h4>D3. AS buffer의 표현</h4>
+    <p><b>질문</b>: BLAS, TLAS, scratch buffer를 어떤 타입으로 들고 있을 것인가?</p>
+    <ul><li>기존 <code>GpuBuffer</code>를 쓰고 상태를 직접 조작</li><li>RTAS 상태로 생성하고 transition을 막는 전용 타입</li><li>raw <code>ID3D12Resource</code></li></ul>
+    <p class="crit"><b>기준</b>: transition 실수를 코드 구조로 막을 수 있는가, 기존 helper(<code>TransitionResource</code>, <code>SetBufferSRV</code>)를 실수로 쓸 수 있는가, scratch는 UAV 상태라는 차이. <span class="rel">Part 3.2, 5.4, 5.6, 10.4</span></p>
+    <textarea data-key="D3" aria-label="D3 내 결정" placeholder="내 결정과 근거"></textarea></div>
+
+  <div class="dec"><h4>D4. BLAS 단위</h4>
+    <p><b>질문</b>: BLAS 하나에 무엇을 담는가?</p>
+    <ul><li>Mesh마다 BLAS 하나</li><li>Model 전체를 BLAS 하나로 (Mesh는 geometry, node 행렬은 geometry의 <code>Transform3x4</code>)</li><li>정적 여부나 node 단위로 묶음</li></ul>
+    <p class="crit"><b>기준</b>: TLAS instance 수, node가 움직일 때(animation) 무엇을 다시 build해야 하는가, 같은 Model을 여러 번 배치할 때 공유되는가, BLAS들의 box가 많이 겹치면 traversal이 느려진다는 일반론 <span class="mk b-judge">판단</span>. 10.3의 Sponza 특성(약 393 Mesh, 모두 같은 transform)을 대입해 보세요. <span class="rel">Part 5.1, 5.5, 10.3</span></p>
+    <textarea data-key="D4" aria-label="D4 내 결정" placeholder="내 결정과 근거"></textarea></div>
+
+  <div class="dec"><h4>D5. Geometry 구성과 VertexCount</h4>
+    <p><b>질문</b>: <code>Mesh::Draw</code>를 geometry desc로 어떻게 옮기고, VertexCount는 어떻게 구하는가?</p>
+    <ul><li>Draw마다 geometry 하나, StartAddress를 baseVertex만큼 이동</li><li>Mesh 전체를 geometry 하나로 (Draw가 1개일 때만 성립)</li><li>multi-draw Mesh는 assert로 막고 Draw 1개만 지원</li></ul>
+    <p class="crit"><b>기준</b>: multi-draw 경로의 기존 버그(10.4), VertexCount가 틀리면 어떻게 드러나는가(debug layer, 잘못된 hit), Sponza가 모두 Draw 1개라는 사실. <span class="rel">Part 5.2, 10.3, 10.4</span></p>
+    <textarea data-key="D5" aria-label="D5 내 결정" placeholder="내 결정과 근거"></textarea></div>
+
+  <div class="dec"><h4>D6. TLAS 갱신</h4>
+    <p><b>질문</b>: TLAS를 언제, 어느 command list와 queue에서, 어떤 방식으로 갱신하는가?</p>
+    <ul><li>시점: 매 프레임 / transform이 바뀐 프레임만 / load 때 한 번</li><li>위치: "Scene Update" list / "Scene Render" list 앞부분 / async compute queue</li><li>방식: rebuild / update(refit). buffer 하나 / 프레임별 여러 개</li></ul>
+    <p class="crit"><b>기준</b>: 정적 장면에서의 낭비, 변경 감지 코드의 복잡도, 이전 프레임의 ray query가 읽던 TLAS를 덮어쓰는 순서 문제(같은 queue에 순서대로 제출하면 문제가 없다고 보지만 확인 필요 <span class="mk b-guess">추측</span>, 다른 queue로 옮기면 fence가 필요). <span class="rel">Part 3.5, 5.5, 9, 10.2</span></p>
+    <textarea data-key="D6" aria-label="D6 내 결정" placeholder="내 결정과 근거"></textarea></div>
+
+  <div class="dec"><h4>D7. Instance의 내용</h4>
+    <p><b>질문</b>: instance desc의 각 필드에 무엇을 넣는가?</p>
+    <ul><li>InstanceID(24 bit): geometry table 시작 번호 / Mesh 번호 / material 번호</li><li>InstanceMask(8 bit): 범주 나누기(GI 기여, 그림자만, 디버그용) 또는 전부 0xFF</li><li>Flags: 기본값 / two-sided에 <code>TRIANGLE_CULL_DISABLE</code> / 강제 opaque</li><li>Transform 출처와 변환(transpose)</li></ul>
+    <p class="crit"><b>기준</b>: shader가 hit에서 table을 한 번에 찾을 수 있는가(Part 8.1), mask를 나중에 쓰려면 지금 무엇을 정해 두어야 하는가, front face 규약(7.6). <span class="rel">Part 5.3, 7.6, 8.1</span></p>
+    <textarea data-key="D7" aria-label="D7 내 결정" placeholder="내 결정과 근거"></textarea></div>
+
+  <div class="dec"><h4>D8. Opaque, alpha test, two-sided 정책</h4>
+    <p><b>질문</b>: alpha test 재질과 two-sided 재질을 ray에서 어떻게 다루는가?</p>
+    <ul><li>alpha test: 처음엔 opaque로 build / non-opaque로 build하고 ray flag로 무시 / 처음부터 <code>Proceed()</code> loop에서 alpha 판정</li><li>two-sided의 뒷면 hit: 그대로 backface로 보고 / 앞면으로 취급 / 별도 표시를 HitInfo에 담음</li></ul>
+    <p class="crit"><b>기준</b>: alpha 판정에 필요한 기반(UV fetch, texture binding)이 언제 생기는가, opaque로 두면 잎과 쇠사슬이 꽉 찬 판처럼 빛을 막는 오차, DDGI가 backface 비율로 probe를 판정한다는 점(Part 2). Sponza에서는 이 두 정책이 같은 재질 3개에 걸립니다(10.3). <span class="rel">Part 2, 4, 7.2, 7.3, 10.3</span></p>
+    <textarea data-key="D8" aria-label="D8 내 결정" placeholder="내 결정과 근거"></textarea></div>
+
+  <div class="dec"><h4>D9. Shader 쪽 API 모양</h4>
+    <p><b>질문</b>: 사용하는 shader가 부를 HLSL 함수와 반환 타입은 어떤 모양인가?</p>
+    <ul><li>함수 종류: closest, visibility 두 개 / flag를 인자로 받는 범용 함수 하나</li><li>반환: HitInfo 구조체의 필드 목록</li><li>TMin, self-intersection offset을 helper가 정하는가 호출자가 정하는가</li></ul>
+    <p class="crit"><b>기준</b>: <code>RayQuery</code> template flag는 compile time 상수라는 점(7.1), 호출자가 실수하기 쉬운 규칙(backface culling 금지, non-opaque에서 Proceed 한 번 금지)을 helper가 숨겨 주는가. <span class="rel">Part 7</span></p>
+    <textarea data-key="D9" aria-label="D9 내 결정" placeholder="내 결정과 근거"></textarea></div>
+
+  <div class="dec"><h4>D10. Binding과 shader model</h4>
+    <p><b>질문</b>: TLAS, geometry table, vertex, texture를 shader에 어떻게 넘기고, 어떤 SM을 쓰는가?</p>
+    <ul><li>TLAS: root SRV / descriptor heap의 SRV</li><li>vertex, texture: 지금은 안 넘김 / unbounded table / SM 6.6 <code>ResourceDescriptorHeap</code></li><li>SM: ray query shader만 6.5 / 6.6 / 전체 상향</li></ul>
+    <p class="crit"><b>기준</b>: D1에서 정한 범위에 정말 필요한가, <code>SetBufferSRV</code> assert(10.4), 기존 <code>s_TextureHeap</code> 구조, shader 빌드 설정(10.4). <span class="rel">Part 3.3, 3.4, 5.6, 8.3, 10.4</span></p>
+    <textarea data-key="D10" aria-label="D10 내 결정" placeholder="내 결정과 근거"></textarea></div>
+
+  <div class="dec"><h4>D11. 동기화와 수명</h4>
+    <p><b>질문</b>: barrier, scratch, upload 메모리, 해제를 어떻게 관리하는가?</p>
+    <ul><li>BLAS와 TLAS build 사이, TLAS build와 dispatch 사이의 UAV barrier 위치</li><li>scratch: build마다 따로 / 큰 것 하나를 나눠 쓰기 / 하나를 순서대로 재사용(사이에 barrier)</li><li>모델 교체, 종료 시 해제 순서와 <code>IdleGPU</code> 호출 위치</li></ul>
+    <p class="crit"><b>기준</b>: MiniEngine에는 지연 해제가 없다는 사실(10.4), scratch 크기와 barrier 수의 trade-off. <span class="rel">Part 3.2, 5.4, 5.7, 5.9</span></p>
+    <textarea data-key="D11" aria-label="D11 내 결정" placeholder="내 결정과 근거"></textarea></div>
+
+  <div class="dec"><h4>D12. 검증 방법</h4>
+    <p><b>질문</b>: "AS가 맞다", "ray query 결과가 맞다"를 무엇으로 확인하는가?</p>
+    <ul><li>시각: hit t, instance 번호, front face를 색으로 보여 주는 debug view</li><li>수치: camera ray의 hit 거리를 raster depth와 비교해 불일치 pixel 수를 셈</li><li>도구: debug layer, GPU-based validation, PIX AS viewer</li></ul>
+    <p class="crit"><b>기준</b>: 사람 눈 없이 반복 가능한가, 무엇을 못 잡는가(화면 밖, 뒷면, 가려진 instance), 다음 단계(DDGI)로 넘어가기 전에 무엇이 보장되어야 하는가. <span class="rel">Part 7.6, 9, 12.1</span></p>
+    <textarea data-key="D12" aria-label="D12 내 결정" placeholder="내 결정과 근거"></textarea></div>
+
+  <div class="dec"><h4>D13. 지원 범위와 단계 분할</h4>
+    <p><b>질문</b>: 첫 버전이 지원할 장면의 범위와, 구현을 나눌 단계(commit)는?</p>
+    <ul><li>범위: Sponza만 / 정적 glTF 전반 / node animation 포함 / skinning 포함</li><li>지원하지 않는 입력이 들어오면: 무시 / assert / 경고 후 제외</li><li>단계: 각 단계가 끝났을 때 무엇이 동작하고 무엇으로 확인하는가</li></ul>
+    <p class="crit"><b>기준</b>: <code>-model</code> 경로가 animation을 재생한다는 사실(10.3), skinning은 compute skinning이 따로 필요하다는 사실(10.4), 단계마다 D12의 검증 하나가 붙는가. <span class="rel">Part 10.3, 10.4</span></p>
+    <textarea data-key="D13" aria-label="D13 내 결정" placeholder="내 결정과 근거"></textarea></div>
+
+  <div class="wb-actions">
+    <button type="button" id="wb-export">설계안을 Markdown으로 모으기</button>
+    <span id="wb-status" role="status"></span>
+  </div>
+  <textarea id="wb-out" class="wb-out" readonly aria-label="모은 설계안 Markdown" hidden></textarea>
+  </div>
+
+  <h3>11.2 결정 사이의 의존</h3>
+  <p>결정은 서로 묶여 있습니다. 하나를 바꾸면 아래가 같이 움직입니다.</p>
+  <ul>
+    <li>D4(BLAS 단위)를 바꾸면 D7(InstanceID의 의미)과 Part 8의 geometry table 구조가 바뀝니다.</li>
+    <li>D1에서 hit shading을 infra 밖에 두면 D8(alpha test)과 D10(bindless)을 뒤로 미룰 수 있습니다. 반대로 alpha test를 처음부터 정확히 하려면 D10이 먼저 필요합니다.</li>
+    <li>D6(TLAS 갱신 시점과 queue)은 D11(동기화)의 barrier와 fence 위치를 정합니다.</li>
+    <li>D13(지원 범위)에서 animation이나 skinning을 지원하기로 하면 D4와 D6의 선택지가 줄어듭니다.</li>
+  </ul>
+</section>
+
+<!-- ============================================================ -->
+<section class="part" id="p12" data-title="설계 평가">
+  <div class="part-head"><span class="part-no">12</span><h2>설계 평가 기준과 예시 설계안</h2></div>
+  <p class="goal">목표: 어떤 설계안이든 같은 기준으로 검토하고, 빠진 결정과 근거가 약한 결정을 찾는다.</p>
+
+  <h3>12.1 평가 기준</h3>
+  <h4>완결성</h4>
+  <ul class="check">
+    <li>워크북의 D1~D13에 모두 답이 있는가? "나중에"라고 답한 결정은 언제, 무엇이 생기면 다시 보는지 적혀 있는가?</li>
+    <li>Part 2 요구사항 표의 각 줄(closest hit, front/back, visibility, hit 식별 정보)을 어느 구성 요소가 맡는지 대응이 있는가?</li>
+  </ul>
+  <h4>정확성 (규칙 위반이 없는가)</h4>
+  <ul class="check">
+    <li>AS buffer가 RTAS 상태로 생성되고 transition되지 않는가? 상태를 추적하는 기존 helper를 통하지 않는가? (3.2, 5.6)</li>
+    <li>BLAS build → TLAS build → ray query 사이에 UAV barrier가 있는가? scratch를 여러 build가 공유하면 그 사이에도 있는가? (5.4)</li>
+    <li>instance 배열이 build가 끝날 때까지 살아 있는 GPU 메모리에 있는가? (5.7)</li>
+    <li>transform이 transpose되어 3×4로 들어가는가? front face 규약이 이 repo의 좌표계와 winding에 맞는가? (5.3, 7.6)</li>
+    <li>probe trace에 backface culling을 쓰지 않는가? non-opaque geometry가 있을 수 있는데 <code>Proceed()</code>를 한 번만 부르지 않는가? (7.2, 7.5)</li>
+    <li>AS를 GPU가 쓰는 동안 해제하는 경로가 없는가? (5.9)</li>
+  </ul>
+  <h4>이 repo에 맞는가</h4>
+  <ul class="check">
+    <li>MeshSorter의 culling된 목록이 아니라 장면 전체로 AS를 만드는가? (10.2)</li>
+    <li>Sponza 데이터 특성(Mesh 약 393개, 전부 같은 transform, 정적)을 근거로 BLAS 단위와 TLAS 갱신 빈도를 정했는가? <code>-model</code> 경로의 animation, skinning을 어떻게 다루는지 적혀 있는가? (10.3)</li>
+    <li>two-sided 재질에서 뒷면 hit을 DDGI가 어떻게 해석할지 다뤘는가? (2, 10.3)</li>
+  </ul>
+  <h4>확장성과 경계</h4>
+  <ul class="check">
+    <li>DDGI가 아닌 사용처(shadow, AO)가 같은 infra를 DDGI 코드 없이 쓸 수 있는가? (0, 6)</li>
+    <li>나중에 alpha test, bindless, compaction, BLAS update를 넣을 때 기존 인터페이스를 깨지 않는 자리가 있는가? (5.5, 5.8, 7.3)</li>
+    <li>DXR 1.0 pipeline이 필요해질 때 AS 계층을 그대로 공유할 수 있는가? (6)</li>
+  </ul>
+  <h4>검증 가능성</h4>
+  <ul class="check">
+    <li>각 단계가 끝났음을 사람 눈이 아닌 수치로 확인하는 방법이 있는가? 그 방법이 못 잡는 오류(화면 밖 geometry, 뒷면 판정, 화면에 안 보이는 instance)는 무엇으로 보완하는가?</li>
+    <li>debug layer와 GPU-based validation(MiniEngine 실행 인자 <code>-gpu_debug 1</code>)으로 한 번은 돌려 보는 단계가 있는가?</li>
+    <li>단계(commit) 하나가 하나의 검증 가능한 결과로 끝나는가?</li>
+  </ul>
+
+  <h3>12.2 예시 설계안</h3>
+  <p>평가 연습용 설계안입니다. 정답이 아니라 하나의 선택이고, 일부러 고치지 않은 약점도 있을 수 있습니다. <b>워크북을 먼저 직접 채운 뒤</b> 펼쳐서, 12.1의 기준으로 자기 설계안과 함께 평가해 보세요.</p>
+  <details class="quiz"><summary>예시 설계안 펼치기</summary>
+  <h4>범위</h4>
+  <p>infra는 AS 생성과 갱신, 그리고 shader에서 쓰는 ray 질문 두 가지(closest hit, visibility)까지만 맡는다. hit 결과는 식별 정보(t, instance, primitive, barycentrics, front face)까지만 돌려주고, 표면 정보 복원과 material 조회는 hit shading 단계로 미룬다.</p>
+  <h4>구성 요소</h4>
+  <ul>
+    <li><b>Core 계층</b>: Tier 1.1 이상인지 검사하고, 지원하지 않으면 실행하지 않는다(ModelViewer가 <code>RequiresRaytracingSupport()</code>를 override). <code>ID3D12Device5</code>와 <code>ID3D12GraphicsCommandList4</code>를 얻는 helper. RTAS 상태로 생성하고 transition을 허용하지 않는 AS 전용 buffer 타입. TLAS를 root SRV로 bind하는 전용 함수.</li>
+    <li><b>Model 계층</b>: Model의 Mesh마다 BLAS 하나, Draw마다 geometry 하나. 정적 BLAS는 <code>PREFER_FAST_TRACE</code>로 load 후 한 번 build. TLAS instance는 (ModelInstance, Mesh) 쌍 하나씩, transform은 <code>m_BoundingSphereTransforms[meshCBV]</code>에서. TLAS는 매 프레임 <code>ReserveUploadMemory</code>에 instance 배열을 쓰고 <code>PREFER_FAST_BUILD</code>로 rebuild. InstanceID에는 geometry table 시작 번호를 넣고, table은 StructuredBuffer로 둔다.</li>
+    <li><b>Shader 계층</b>: <code>RayQuery.hlsli</code>에 <code>TraceClosest(ray) → HitInfo{t, instanceIndex, instanceID, geometryIndex, primitiveIndex, barycentrics, frontFace}</code>와 <code>TraceVisibility(ray) → bool</code>. 처음에는 모든 geometry를 opaque로 build하되 geometry flag와 instance mask 자리를 남긴다. ray query shader만 SM 6.5.</li>
+  </ul>
+  <h4>순서와 검증</h4>
+  <ol class="plain">
+    <li>capability 검사와 AS buffer 타입. 검증: Tier 1.0 환경 흉내(강제로 실패 처리)에서 명확한 메시지로 종료.</li>
+    <li>BLAS, TLAS build. 검증: debug layer 경고 0, PIX AS viewer로 형태 확인.</li>
+    <li>debug view와 자동 비교. 화면 pixel마다 camera ray를 ray query로 쏘아 hit t를 linear depth로 바꾸고, raster depth buffer와 readback 비교(alpha test 영역 제외). front face를 색으로 보여 주는 view.</li>
+  </ol>
+  </details>
+  <details class="quiz"><summary>예시 설계안 평가 연습: 생각해 볼 질문</summary>
+  <ul>
+    <li>Sponza는 Mesh가 약 393개이고 모두 같은 transform입니다(10.3). Mesh당 BLAS 하나라면 TLAS instance가 약 393개입니다. Model 전체를 BLAS 하나로 만드는 것과 비교해 무엇을 얻고 잃는가? <code>-model</code> 경로의 animation까지 생각하면 답이 바뀌는가?</li>
+    <li>장면이 정적인데 TLAS를 매 프레임 rebuild하는 비용은 무시해도 되는가? 측정 전에 판단할 수 있는가?</li>
+    <li>"alpha test 영역 제외"는 어떻게 판별하는가? 그 판별 자체가 틀리면 검증이 무엇을 놓치는가?</li>
+    <li>leaf, chain 재질은 alpha test이자 two-sided입니다(10.3). 처음에 opaque로 두면 DDGI probe trace 결과(거리, backface 비율)에 어떤 오차가 생기는가?</li>
+    <li>모델 교체나 종료 시 BLAS를 해제하는 순서와 GPU 대기가 설계에 있는가(5.9)?</li>
+    <li>camera ray의 depth 비교는 화면 밖 geometry와 뒷면 판정을 검증하지 못합니다. 무엇으로 보완하는가?</li>
+  </ul></details>
+</section>
+
+<!-- ============================================================ -->
+<section class="part" id="p13" data-title="참고 자료">
+  <div class="part-head"><span class="part-no">13</span><h2>참고 자료</h2></div>
+  <p class="goal">우선순위 순서입니다. 처음 둘은 꼭 읽기를 권합니다.</p>
+  <ol class="plain">
+    <li><b>DirectX Raytracing (DXR) Functional Spec</b>: <a href="https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html" target="_blank" rel="noopener">microsoft.github.io/DirectX-Specs/d3d/Raytracing.html</a>. AS 구조체, 상태 규칙, RayQuery 전체 API의 원전. "Inline raytracing" 장과 "Acceleration structure" 장부터.</li>
+    <li><b>Majercik et al., Dynamic Diffuse Global Illumination with Ray-Traced Irradiance Fields</b>, JCGT 8(2), 2019: <a href="https://jcgt.org/published/0008/02/01/" target="_blank" rel="noopener">jcgt.org/published/0008/02/01</a>. DDGI 원 논문. 보충 자료에 shader 코드가 있습니다.</li>
+    <li><b>Majercik et al., Scaling Probe-Based Real-Time Dynamic Global Illumination for Production</b>, JCGT 2021. probe relocation, classification, backface 처리. <span class="mk b-guess">추측</span> 서지 정보는 기억에 근거하므로 제목으로 검색하세요.</li>
+    <li><b>NVIDIA RTXGI-DDGI</b>: <a href="https://github.com/NVIDIAGameWorks/RTXGI-DDGI" target="_blank" rel="noopener">github.com/NVIDIAGameWorks/RTXGI-DDGI</a>. 실제 구현. probe trace shader와 blend shader 구조 비교용.</li>
+    <li><b>DirectX-Graphics-Samples의 D3D12Raytracing 샘플들</b>: <a href="https://github.com/microsoft/DirectX-Graphics-Samples/tree/master/Samples/Desktop/D3D12Raytracing" target="_blank" rel="noopener">GitHub</a>. HelloWorld 샘플로 AS build의 최소 코드를 확인할 수 있습니다. 같은 폴더의 <code>D3D12RaytracingMiniEngineSample</code>은 이 repo와 같은 MiniEngine 위에 DXR 1.0을 붙인 샘플이라 BLAS 구성 방식을 비교하기 좋습니다(legacy Sponza 경로 기준).</li>
+    <li><b>Ray Tracing Gems (무료 PDF)</b>: 3장 "Introduction to DirectX Raytracing", 6장 self-intersection 회피. <span class="mk b-guess">추측</span> 장 번호는 기억에 근거합니다.</li>
+    <li><b>RTXGI-DDGI 소스에서 볼 파일</b>: <code>samples/test-harness/shaders/ddgi/ProbeTraceRGS.hlsl</code>(trace), <code>rtxgi-sdk/shaders/ddgi/ProbeBlendingCS.hlsl</code>(blend), <code>ProbeRayCommon.hlsl</code>(backface 음수 거리).</li>
+    <li><b>HLSL Shader Model 6.6 spec</b>의 Dynamic Resources 장: bindless(<code>ResourceDescriptorHeap</code>)가 필요해질 때.</li>
+  </ol>
+  <p style="color:var(--muted);font-size:14px">링크와 장 번호는 작성 시점의 기억에 기반하므로, 열리지 않으면 제목으로 검색하세요.</p>
+</section>
+</main>
+</div>
+
+<script>
+(function () {
+  var KEY = "ddgi-rq-primer-done";
+  var done = {};
+  try { done = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { done = {}; }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(done)); } catch (e) {} }
+
+  var toc = document.getElementById("toc");
+  document.querySelectorAll("section.part").forEach(function (sec) {
+    var id = sec.id;
+    var no = sec.querySelector(".part-no").textContent;
+    var li = document.createElement("li");
+    var a = document.createElement("a");
+    a.href = "#" + id;
+    a.innerHTML = '<span class="n">' + no + '</span><span class="t"></span>';
+    a.querySelector(".t").textContent = sec.getAttribute("data-title");
+    li.appendChild(a);
+    toc.appendChild(li);
+
+    var lab = document.createElement("label");
+    lab.className = "done-toggle";
+    var cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.id = "done-" + id;
+    cb.checked = !!done[id];
+    a.classList.toggle("done", cb.checked);
+    cb.addEventListener("change", function () {
+      done[id] = cb.checked;
+      a.classList.toggle("done", cb.checked);
+      save();
+    });
+    lab.appendChild(cb);
+    lab.appendChild(document.createTextNode("학습 완료"));
+    sec.querySelector(".part-head").appendChild(lab);
+  });
+
+
+  var WB = "ddgi-rq-primer-workbook";
+  var notes = {};
+  try { notes = JSON.parse(localStorage.getItem(WB) || "{}") || {}; } catch (e) { notes = {}; }
+  var areas = document.querySelectorAll(".dec textarea[data-key]");
+  areas.forEach(function (ta) {
+    var k = ta.getAttribute("data-key");
+    if (notes[k]) ta.value = notes[k];
+    ta.addEventListener("input", function () {
+      notes[k] = ta.value;
+      try { localStorage.setItem(WB, JSON.stringify(notes)); } catch (e) {}
+    });
+  });
+  document.getElementById("wb-export").addEventListener("click", function () {
+    var md = "# DDGI ray query infra 설계안\n";
+    areas.forEach(function (ta) {
+      var title = ta.closest(".dec").querySelector("h4").textContent;
+      md += "\n## " + title + "\n\n" + (ta.value.trim() || "(미정)") + "\n";
+    });
+    var out = document.getElementById("wb-out");
+    var status = document.getElementById("wb-status");
+    out.hidden = false;
+    out.value = md;
+    out.focus();
+    out.select();
+    function copied() { status.textContent = "클립보드에 복사했습니다."; }
+    function manual() { status.textContent = "아래 내용을 선택된 상태에서 Ctrl+C로 복사하세요."; }
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(md).then(copied, manual);
+      else manual();
+    } catch (e) { manual(); }
+  });
+
+  function n(id) { var v = parseInt(document.getElementById(id).value, 10); return isFinite(v) && v > 0 ? v : 0; }
+  function fmt(x) { return x.toLocaleString("ko-KR"); }
+  function calc() {
+    var probes = n("px") * n("py") * n("pz");
+    var rays = probes * n("rpp");
+    var sh = parseInt(document.getElementById("sh").value, 10); if (!isFinite(sh) || sh < 0) sh = 0;
+    var total = rays * (1 + sh);
+    document.getElementById("o-probes").textContent = fmt(probes);
+    document.getElementById("o-rays").textContent = fmt(rays);
+    document.getElementById("o-total").textContent = fmt(total);
+    document.getElementById("o-px").textContent = (total / (1920 * 1080)).toFixed(2) + "×";
+  }
+  ["px", "py", "pz", "rpp", "sh"].forEach(function (id) { document.getElementById(id).addEventListener("input", calc); });
+  calc();
+})();
+</script>
+<script type="module">
+import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs";
+mermaid.initialize({ startOnLoad: true, theme: matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "default" });
+</script>
+</body>
+</html>
