@@ -34,7 +34,10 @@
 #include "ShadowCamera.h"
 #include "Display.h"
 
-#define LEGACY_RENDERER
+// Dynamic GI 프로젝트에선 legacy path가 아닌 glTF path를 사용한다.
+// legacy는 Blinn-Phong, glTF는 PBR shading
+// Skinning/animation은 glTF path에만 있음
+// #define LEGACY_RENDERER
 
 using namespace GameCore;
 using namespace Math;
