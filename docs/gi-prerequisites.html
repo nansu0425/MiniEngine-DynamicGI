@@ -1,0 +1,1085 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dynamic GI 사전 지식</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root {
+  --bg: #f4f6f8;
+  --surface: #ffffff;
+  --fg: #1a2230;
+  --muted: #5a6677;
+  --line: #d8dee6;
+  --accent: #0b6b75;
+  --accent-soft: #e2f1f2;
+  --ray: #b0561a;
+  --ray-soft: #fbeee3;
+  --warn: #9a3412;
+  --warn-soft: #fdecdf;
+  --code-bg: #eef1f5;
+  --font-body: "IBM Plex Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", Consolas, "D2Coding", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f141b; --surface: #161d26; --fg: #dde4ec; --muted: #94a1b2; --line: #2a3442;
+    --accent: #5cc4cd; --accent-soft: #15303a; --ray: #f0a35c; --ray-soft: #33251a;
+    --warn: #f4a37a; --warn-soft: #3a2218; --code-bg: #1b2430; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f141b; --surface: #161d26; --fg: #dde4ec; --muted: #94a1b2; --line: #2a3442;
+  --accent: #5cc4cd; --accent-soft: #15303a; --ray: #f0a35c; --ray-soft: #33251a;
+  --warn: #f4a37a; --warn-soft: #3a2218; --code-bg: #1b2430; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 16px; line-height: 1.75; word-break: keep-all; overflow-wrap: anywhere; }
+.wrap { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 48px; max-width: 1120px; margin: 0 auto; padding-inline: 24px; padding-block: 40px 96px; }
+nav.toc { position: sticky; top: 24px; align-self: start; max-height: calc(100vh - 48px); overflow-y: auto; font-size: 13.5px; line-height: 1.5; }
+nav.toc .label { font-family: var(--font-mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+nav.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+nav.toc a { display: flex; gap: 8px; padding: 5px 8px; border-radius: 6px; color: var(--fg); text-decoration: none; }
+nav.toc a:hover, nav.toc a:focus-visible { background: var(--accent-soft); outline: none; }
+nav.toc a .n { font-family: var(--font-mono); color: var(--muted); min-width: 1.6em; }
+nav.toc a.done .t { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--line); }
+main { min-width: 0; max-width: 46rem; }
+header.hero { padding-bottom: 28px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: .1em; color: var(--accent); text-transform: uppercase; }
+h1 { font-size: clamp(28px, 4.2vw, 40px); line-height: 1.25; margin: 8px 0 14px; text-wrap: balance; font-weight: 700; }
+h2 { font-size: 24px; line-height: 1.35; margin: 0 0 6px; text-wrap: balance; }
+h3 { font-size: 18px; margin: 32px 0 6px; text-wrap: balance; }
+h4 { font-size: 15.5px; margin: 22px 0 4px; }
+p { margin: 10px 0; }
+.lede { color: var(--muted); font-size: 17px; }
+section.part { padding-top: 56px; scroll-margin-top: 16px; }
+.part-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.part-no { font-family: var(--font-mono); font-weight: 600; color: var(--accent); font-size: 15px; }
+.goal { color: var(--muted); font-size: 14.5px; margin-top: 2px; }
+.when { display: inline-block; font-family: var(--font-mono); font-size: 11.5px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--accent); color: var(--accent); }
+.when.later { border-color: var(--ray); color: var(--ray); }
+.done-toggle { margin-left: auto; font-size: 13px; color: var(--muted); display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.done-toggle input { accent-color: var(--accent); width: 16px; height: 16px; }
+code { font-family: var(--font-mono); font-size: .88em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; overflow-x: auto; font-size: 13.5px; line-height: 1.6; margin: 14px 0; }
+pre code { background: none; padding: 0; font-size: inherit; }
+pre .c { color: var(--muted); }
+.table-wrap { overflow-x: auto; margin: 14px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; line-height: 1.55; }
+th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+th { font-weight: 600; background: var(--code-bg); white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td code { white-space: nowrap; }
+td.m { text-align: center; font-family: var(--font-mono); }
+.req { color: var(--accent); font-weight: 700; }
+.ref { color: var(--muted); }
+.note { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 10px 14px; border-radius: 0 8px 8px 0; margin: 16px 0; font-size: 15px; }
+.note.ray { border-left-color: var(--ray); background: var(--ray-soft); }
+.note.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+.note b.tag { font-family: var(--font-mono); font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; display: block; margin-bottom: 2px; }
+details.quiz { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; margin: 10px 0; font-size: 15px; }
+details.quiz summary { cursor: pointer; font-weight: 500; }
+details.quiz summary::marker { color: var(--accent); }
+details.quiz[open] summary { margin-bottom: 6px; }
+.flow { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin: 16px 0; counter-reset: st; }
+.flow div { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font-size: 14px; line-height: 1.45; min-width: 0; }
+.flow div b { display: block; font-family: var(--font-mono); font-size: 11.5px; color: var(--accent); letter-spacing: .06em; }
+ul, ol.plain { padding-left: 1.3em; margin: 8px 0; }
+li { margin: 3px 0; }
+a { color: var(--accent); }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 13.5px; color: var(--muted); margin-top: 14px; }
+.legend span b { font-family: var(--font-mono); font-size: 11px; padding: 1px 6px; border-radius: 4px; margin-right: 6px; }
+.b-fact { background: var(--accent-soft); color: var(--accent); }
+.b-judge { background: var(--ray-soft); color: var(--ray); }
+.b-guess { background: var(--warn-soft); color: var(--warn); }
+.mk { font-family: var(--font-mono); font-size: 10.5px; padding: 0 5px; border-radius: 4px; vertical-align: 1px; margin-right: 4px; }
+math { font-family: "Cambria Math", "STIX Two Math", "Latin Modern Math", math; font-size: 1.08em; color: var(--fg); }
+.eq { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px 18px; margin: 14px 0; }
+.eq math { font-size: 1.25em; }
+.eq .where { font-size: 14px; color: var(--muted); margin-top: 10px; display: grid; grid-template-columns: max-content 1fr; gap: 2px 14px; }
+.eq .where math { font-size: 1.1em; }
+.check { list-style: none; padding-left: 0; }
+.check li { display: flex; gap: 8px; align-items: flex-start; }
+.check input { margin-top: 6px; accent-color: var(--accent); flex: none; }
+@media (max-width: 860px) {
+  .wrap { grid-template-columns: minmax(0, 1fr); gap: 16px; padding-inline: 16px; padding-block: 24px 72px; }
+  nav.toc { position: static; max-height: none; border: 1px solid var(--line); border-radius: 8px; padding: 12px; background: var(--surface); }
+}
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+<nav class="toc" aria-label="목차">
+  <div class="label">학습 순서</div>
+  <ol id="toc"></ol>
+</nav>
+
+<main>
+<header class="hero">
+  <div class="eyebrow">MiniEngine-DynamicGI · 사전 학습</div>
+  <h1>Dynamic GI 프로젝트 사전 지식</h1>
+  <p class="lede">이 프로젝트는 네 단계로 진행합니다: inline ray query 기반, reference path tracer, DDGI, RT reflection. 이 문서는 각 단계가 요구하는 지식을 정리하고, 그 지식을 순서대로 익히도록 구성했습니다.</p>
+  <div class="note"><b class="tag">전제</b>
+  DX11로 게임 엔진을 만들어 본 정도의 경험을 가정합니다. DX12, DXR, GI는 처음이라고 봅니다.</div>
+  <div class="legend">
+    <span><b class="b-fact">사실</b>논문, spec, 이 repo 코드로 확인되는 내용</span>
+    <span><b class="b-judge">판단</b>권장이나 trade-off 의견</span>
+    <span><b class="b-guess">추측</b>확인하지 않은 추정</span>
+  </div>
+  <p style="font-size:14px;color:var(--muted)">표시가 없는 서술은 사실에 해당합니다. 이 repo 코드 위치(<code>파일:라인</code>)는 작성 시점 기준입니다. 각 Part 오른쪽의 체크박스로 진도를 표시하면 이 브라우저에만 저장됩니다.</p>
+</header>
+
+<!-- ============================================================ -->
+<section class="part" id="p0" data-title="지식 지도">
+  <div class="part-head"><span class="part-no">00</span><h2>지식 지도: 단계별로 무엇이 필요한가</h2></div>
+  <p class="goal">목표: 네 단계 각각이 어떤 지식에 기대는지 보고, 시작 전에 익힐 것과 미뤄도 되는 것을 구분한다.</p>
+
+  <div class="flow">
+    <div><b>STAGE 1</b>Inline ray query 기반</div>
+    <div><b>STAGE 2</b>Reference path tracer</div>
+    <div><b>STAGE 3</b>DDGI (diffuse)</div>
+    <div><b>STAGE 4</b>RT reflection (specular)</div>
+  </div>
+
+  <p>단계 사이의 의존은 이렇습니다.</p>
+  <ul>
+    <li>2단계의 hit shading(material fetch, sun direct light, shadow ray)을 3단계 probe trace와 4단계 reflection hit이 그대로 재사용합니다.</li>
+    <li>4단계 reflection ray가 맞은 지점의 간접광은 3단계 DDGI volume에서 읽습니다. 그래서 DDGI가 reflection보다 먼저입니다.</li>
+    <li>3, 4단계 결과가 맞는지는 2단계 reference와 비교해서 판단합니다.</li>
+  </ul>
+
+  <h3>지식 영역 × 단계</h3>
+  <p><span class="req">●</span> 그 단계를 구현하려면 필요, <span class="ref">○</span> 결과를 이해하거나 디버깅할 때 필요.</p>
+  <div class="table-wrap"><table>
+    <tr><th>지식 영역</th><th>1</th><th>2</th><th>3</th><th>4</th><th>언제</th><th>어디서</th></tr>
+    <tr><td>Radiometry, rendering equation</td><td class="m ref">○</td><td class="m req">●</td><td class="m req">●</td><td class="m req">●</td><td><span class="when">시작 전</span></td><td><a href="#p1">Part 01</a></td></tr>
+    <tr><td>PBR 기초 (metallic-roughness, 에너지 보존, linear와 HDR)</td><td class="m ref">○</td><td class="m req">●</td><td class="m req">●</td><td class="m req">●</td><td><span class="when">시작 전</span></td><td><a href="#p2">Part 02</a></td></tr>
+    <tr><td>BRDF (Lambert, GGX microfacet)</td><td class="m ref">○</td><td class="m req">●</td><td class="m req">●</td><td class="m req">●</td><td><span class="when">시작 전</span></td><td><a href="#p3">Part 03</a></td></tr>
+    <tr><td>Monte Carlo, importance sampling</td><td></td><td class="m req">●</td><td class="m req">●</td><td class="m req">●</td><td><span class="when">시작 전</span></td><td><a href="#p4">Part 04</a></td></tr>
+    <tr><td>DX12 기초 (barrier, root signature, descriptor)</td><td class="m req">●</td><td class="m req">●</td><td class="m req">●</td><td class="m req">●</td><td><span class="when">시작 전</span></td><td><a href="#p5">Part 05</a></td></tr>
+    <tr><td>DXR acceleration structure, <code>RayQuery</code></td><td class="m req">●</td><td class="m req">●</td><td class="m req">●</td><td class="m req">●</td><td><span class="when">시작 전</span></td><td><a href="#p6">Part 06</a>, <a href="#p7">06</a></td></tr>
+    <tr><td>이 repo의 렌더링 경로와 G-buffer</td><td class="m req">●</td><td class="m req">●</td><td class="m ref">○</td><td class="m req">●</td><td><span class="when">시작 전</span></td><td><a href="#p8">Part 08</a></td></tr>
+    <tr><td>Path tracing (throughput, NEE, Russian roulette)</td><td></td><td class="m req">●</td><td class="m ref">○</td><td class="m ref">○</td><td><span class="when later">2단계 직전</span></td><td><a href="#p9">Part 09</a></td></tr>
+    <tr><td>DDGI 수학 (octahedral, Chebyshev, hysteresis)</td><td></td><td></td><td class="m req">●</td><td class="m ref">○</td><td><span class="when later">3단계 직전</span></td><td><a href="#p10">Part 10</a></td></tr>
+    <tr><td>GGX VNDF sampling, specular 합성</td><td></td><td class="m ref">○</td><td></td><td class="m req">●</td><td><span class="when later">4단계 직전</span></td><td><a href="#p11">Part 11</a></td></tr>
+    <tr><td>Denoising (temporal, à-trous)</td><td></td><td></td><td class="m ref">○</td><td class="m req">●</td><td><span class="when later">4단계 직전</span></td><td><a href="#p12">Part 12</a></td></tr>
+    <tr><td>측정 도구 (PIX, GPU timer, 이미지 비교)</td><td class="m req">●</td><td class="m req">●</td><td class="m req">●</td><td class="m req">●</td><td><span class="when">시작 전</span></td><td><a href="#p13">Part 13</a></td></tr>
+  </table></div>
+  <p>"시작 전"으로 표시한 항목을 먼저 끝내고, 나머지는 해당 단계 직전에 익히는 순서를 권합니다 <span class="mk b-judge">판단</span>. 한 번에 다 공부하면 DDGI나 denoiser 세부는 직접 구현할 때까지 머리에 남지 않기 때문입니다. 순서대로 따라갈 체크리스트는 <a href="#p14">Part 14</a>에 있습니다.</p>
+</section>
+
+<!-- ============================================================ -->
+<section class="part" id="p1" data-title="Radiometry">
+  <div class="part-head"><span class="part-no">01</span><h2>Radiometry와 rendering equation</h2></div>
+  <p class="goal">목표: radiance, irradiance, solid angle을 단위까지 구분하고, "균일한 하늘 아래 흰 Lambert 표면의 밝기"를 손으로 계산할 수 있다. <span class="when">시작 전</span></p>
+
+  <h3>Rendering equation</h3>
+  <div class="eq">
+    <math display="block"><mrow>
+      <msub><mi>L</mi><mtext>out</mtext></msub><mo>(</mo><mi>x</mi><mo>,</mo><msub><mi>ω</mi><mi>o</mi></msub><mo>)</mo>
+      <mo>=</mo>
+      <msub><mi>L</mi><mtext>emit</mtext></msub><mo>(</mo><mi>x</mi><mo>,</mo><msub><mi>ω</mi><mi>o</mi></msub><mo>)</mo>
+      <mo>+</mo>
+      <msub><mo largeop="true">∫</mo><mi>Ω</mi></msub>
+      <mi>f</mi><mo>(</mo><mi>x</mi><mo>,</mo><msub><mi>ω</mi><mi>i</mi></msub><mo>,</mo><msub><mi>ω</mi><mi>o</mi></msub><mo>)</mo>
+      <mspace width="0.2em"/>
+      <msub><mi>L</mi><mtext>in</mtext></msub><mo>(</mo><mi>x</mi><mo>,</mo><msub><mi>ω</mi><mi>i</mi></msub><mo>)</mo>
+      <mspace width="0.2em"/>
+      <mi>cos</mi><mo>⁡</mo><msub><mi>θ</mi><mi>i</mi></msub>
+      <mspace width="0.2em"/>
+      <mi>d</mi><msub><mi>ω</mi><mi>i</mi></msub>
+    </mrow></math>
+    <div class="where">
+      <math><msub><mi>ω</mi><mi>o</mi></msub></math><span>나가는 방향 (보통 카메라 쪽)</span>
+      <math><msub><mi>ω</mi><mi>i</mi></msub></math><span>들어오는 방향. 법선 쪽 반구 <math><mi>Ω</mi></math> 전체를 적분</span>
+      <math><mi>f</mi></math><span>BRDF. 들어온 빛을 나가는 방향으로 얼마나 보내는지 (<a href="#p3">Part 03</a>)</span>
+      <math><msub><mi>θ</mi><mi>i</mi></msub></math><span>법선과 <math><msub><mi>ω</mi><mi>i</mi></msub></math> 사이 각도</span>
+    </div>
+  </div>
+  <p>표면에서 나가는 빛은 스스로 내는 빛에, 반구 모든 방향에서 들어온 빛을 BRDF로 걸러 합한 값을 더한 것입니다. 방향 <math><msub><mi>ω</mi><mi>i</mi></msub></math>에서 들어오는 빛은 <b>그 방향으로 ray를 쐈을 때 처음 맞는 표면이 내보내는 빛</b>과 같습니다. 그래서 GI는 ray 질문의 연쇄입니다.</p>
+  <p>적분은 더하기로 나눌 수 있으므로, 들어오는 빛을 광원에서 바로 온 빛(direct)과 다른 표면에서 튕겨 온 빛(indirect)으로 나눠 따로 구해도 결과가 같습니다. 실제 renderer는 direct를 광원 방향과 shadow로, indirect를 GI 기법(이 프로젝트에서는 DDGI와 RT reflection)으로 구합니다. 지금 이 repo는 indirect를 IBL cubemap으로 흉내 냅니다. IBL은 "무한히 먼 환경"만 표현하므로 실내 벽끼리 주고받는 빛과 가림을 표현하지 못합니다.</p>
+
+  <h3>네 가지 양</h3>
+  <div class="table-wrap"><table>
+    <tr><th>양</th><th>단위</th><th>뜻</th><th>이 프로젝트에서</th></tr>
+    <tr><td>Radiant flux <math><mi>Φ</mi></math></td><td>W</td><td>단위 시간당 에너지</td><td>광원의 총 출력</td></tr>
+    <tr><td>Irradiance <math><mi>E</mi></math></td><td>W/m²</td><td>면적당 들어오는 flux</td><td>DDGI probe가 방향별로 저장하는 값</td></tr>
+    <tr><td>Radiance <math><mi>L</mi></math></td><td>W/(m²·sr)</td><td>면적당, solid angle당 flux. ray 하나가 실어 나르는 값</td><td>ray가 가져오는 값, 화면 pixel 값</td></tr>
+    <tr><td>Solid angle <math><mi>ω</mi></math></td><td>sr</td><td>단위 구 위의 넓이. 전체 구는 4π, 반구는 2π</td><td>적분 변수</td></tr>
+  </table></div>
+  <p>ray tracing은 radiance를 다룹니다. radiance는 진공에서 ray를 따라 변하지 않으므로, "점 x에서 방향 ω로 들어오는 radiance"는 "그 방향으로 쐈을 때 처음 맞은 표면이 x 쪽으로 내보내는 radiance"와 같습니다.</p>
+
+  <h3>반구 적분을 실제로 계산하기</h3>
+  <div class="eq">
+    <math display="block"><mrow>
+      <mi>d</mi><mi>ω</mi><mo>=</mo><mi>sin</mi><mo>⁡</mo><mi>θ</mi><mspace width="0.2em"/><mi>d</mi><mi>θ</mi><mspace width="0.2em"/><mi>d</mi><mi>φ</mi>
+      <mspace width="2em"/>
+      <mi>E</mi><mo>=</mo>
+      <msubsup><mo largeop="true">∫</mo><mn>0</mn><mrow><mn>2</mn><mi>π</mi></mrow></msubsup>
+      <msubsup><mo largeop="true">∫</mo><mn>0</mn><mrow><mi>π</mi><mo>/</mo><mn>2</mn></mrow></msubsup>
+      <mi>L</mi><mo>(</mo><mi>θ</mi><mo>,</mo><mi>φ</mi><mo>)</mo><mspace width="0.2em"/><mi>cos</mi><mo>⁡</mo><mi>θ</mi><mspace width="0.2em"/><mi>sin</mi><mo>⁡</mo><mi>θ</mi><mspace width="0.2em"/><mi>d</mi><mi>θ</mi><mspace width="0.2em"/><mi>d</mi><mi>φ</mi>
+    </mrow></math>
+    <div class="where">
+      <math><mi>θ</mi></math><span>법선과 이루는 각 (0이면 법선 방향)</span>
+      <math><mi>φ</mi></math><span>법선 둘레의 방위각</span>
+    </div>
+  </div>
+  <p><math><mi>L</mi></math>이 모든 방향에서 상수면 <math><mi>E</mi><mo>=</mo><mi>π</mi><mi>L</mi></math>입니다. 여기에 Lambert BRDF <math><mfrac><mi>ρ</mi><mi>π</mi></mfrac></math>를 곱하면 나가는 radiance는 <math><mi>ρ</mi><mi>L</mi></math>입니다. 즉 <b>균일한 하늘 아래 albedo 1인 Lambert 표면은 하늘과 같은 밝기</b>로 보입니다. 이 결과는 2단계 path tracer와 3단계 DDGI를 처음 검증할 때 쓰는 기준값입니다.</p>
+
+  <h3>Directional light는 적분에서 어떻게 되나</h3>
+  <p>태양처럼 한 방향에서만 오는 광원은 radiance가 그 방향에만 몰린 delta 분포입니다. 적분이 한 항으로 줄어 <math><msub><mi>L</mi><mtext>out</mtext></msub><mo>=</mo><mi>f</mi><mo>(</mo><msub><mi>ω</mi><mi>sun</mi></msub><mo>,</mo><msub><mi>ω</mi><mi>o</mi></msub><mo>)</mo><mspace width="0.2em"/><msub><mi>E</mi><mi>sun</mi></msub><mspace width="0.2em"/><mi>cos</mi><mo>⁡</mo><msub><mi>θ</mi><mi>sun</mi></msub></math>이 됩니다. 여기서 <math><msub><mi>E</mi><mi>sun</mi></msub></math>는 태양에 수직인 면이 받는 irradiance입니다. MiniEngine의 <code>SunIntensity</code>가 이 값에 해당합니다 (<code>ModelViewer/ModelViewer.cpp:290</code>). random ray로는 delta 방향을 맞힐 확률이 0이므로, 태양은 반드시 광원 방향으로 직접 shadow ray를 쏴서 계산합니다 (<a href="#p9">Part 09</a>의 NEE).</p>
+
+  <details class="quiz"><summary>확인 질문: 반구 전체에서 radiance 1이 들어올 때, cosine 없이 적분하면 얼마이고 cosine을 넣으면 얼마인가?</summary>
+  cosine 없이 적분하면 반구의 solid angle인 2π입니다. cosine을 넣으면 π입니다. 법선에서 먼 방향일수록 표면에 비스듬히 닿아 면적당 에너지가 줄기 때문에 절반이 됩니다. 이 π를 빠뜨리면 GI 결과가 정확히 π배 밝거나 어두워집니다. 처음 구현할 때 가장 흔한 실수입니다 <span class="mk b-judge">판단</span>.</details>
+  <details class="quiz"><summary>확인 질문: probe가 irradiance E를 저장할 때, 화면 shading은 E에 무엇을 곱해야 하는가?</summary>
+  Lambert라면 <math><mfrac><mi>ρ</mi><mi>π</mi></mfrac></math>입니다. 구현체에 따라 E 대신 <math><mi>E</mi><mo>/</mo><mi>π</mi></math>를 저장하고 albedo만 곱하기도 합니다. 저장 규약을 하나로 정하고, probe blend와 sampling 양쪽이 같은 규약을 쓰는지 확인해야 합니다 <span class="mk b-judge">판단</span>.</details>
+</section>
+
+<!-- ============================================================ -->
+<section class="part" id="p2" data-title="Blinn-Phong에서 PBR로">
+  <div class="part-head"><span class="part-no">02</span><h2>Blinn-Phong에서 PBR로</h2></div>
+  <p class="goal">목표: Blinn-Phong과 PBR의 차이를 GI 관점에서 설명하고, 이 repo의 glTF material 값이 shader에서 diffuse와 specular 계수로 바뀌는 과정을 코드로 따라갈 수 있다. <span class="when">시작 전</span></p>
+
+  <h3>GI에 PBR이 필요한 이유</h3>
+  <p>direct lighting만 할 때는 Blinn-Phong 계수를 눈으로 맞추면 됩니다. GI에서는 빛이 표면에서 튕길 때마다 그 표면의 반사율이 곱해집니다. 표면이 받은 에너지보다 많이 내보내면, bounce가 쌓일수록 밝기가 끝없이 커져 결과가 수렴하지 않습니다. 또 2단계 reference와 비교하려면 material 값과 광원 값이 물리적인 의미를 가져야 합니다. 그래서 GI는 <b>에너지 보존</b>을 지키는 material 모델을 전제로 합니다.</p>
+  <p>이 repo의 glTF 경로는 이미 PBR(metallic-roughness)로 shading합니다(<code>Model/Shaders/DefaultPS.hlsl</code>). legacy 경로가 Blinn-Phong이었고, 최근 commit에서 그 경로를 비활성화했습니다.</p>
+
+  <h3>무엇이 다른가</h3>
+  <div class="table-wrap"><table>
+    <tr><th></th><th>Blinn-Phong (흔한 구현)</th><th>PBR (이 repo의 glTF 경로)</th></tr>
+    <tr><td>material 입력</td><td>diffuse color, specular color, shininess n</td><td>base color, metallic, roughness</td></tr>
+    <tr><td>specular 모양</td><td><math><msup><mrow><mo>(</mo><mi>n</mi><mo>·</mo><mi>h</mi><mo>)</mo></mrow><mi>n</mi></msup></math></td><td>GGX microfacet 분포 D (<a href="#p3">Part 03</a>)</td></tr>
+    <tr><td>에너지</td><td>보장 안 됨. diffuse와 specular를 각각 더함</td><td>BRDF가 정규화되어 있고, specular로 반사되지 않은 만큼만 diffuse로 나감</td></tr>
+    <tr><td>보는 각도</td><td>반사율이 각도와 무관</td><td>Fresnel: 비스듬히 볼수록 반사율이 1에 가까워짐</td></tr>
+    <tr><td>간접광</td><td>상수 ambient</td><td>IBL, 그리고 이 프로젝트의 GI</td></tr>
+  </table></div>
+
+  <h3>정규화: shininess를 올리면 왜 어두워지는가</h3>
+  <p>정규화하지 않은 <math><msup><mrow><mo>(</mo><mi>n</mi><mo>·</mo><mi>h</mi><mo>)</mo></mrow><mi>n</mi></msup></math>는 n이 커질수록 highlight가 좁아지는데 최대값은 1로 그대로입니다. 그래서 반사하는 총 에너지가 줄어 매끈한 표면일수록 어두워집니다. 현실에서는 반대로, 같은 에너지가 좁은 범위에 몰려 highlight가 더 밝아집니다. 정규화 계수를 곱하면 n과 상관없이 총 에너지가 유지됩니다. Blinn-Phong에서는 <math><mfrac><mrow><mi>n</mi><mo>+</mo><mn>8</mn></mrow><mrow><mn>8</mn><mi>π</mi></mrow></mfrac></math>이 흔히 쓰이는 근사입니다 (Real-Time Rendering). GGX의 D는 처음부터 <math><mo>∫</mo><mi>D</mi><mo>(</mo><mi>h</mi><mo>)</mo><mo>(</mo><mi>n</mi><mo>·</mo><mi>h</mi><mo>)</mo><mi>d</mi><msub><mi>ω</mi><mi>h</mi></msub><mo>=</mo><mn>1</mn></math>이 되도록 만든 식입니다.</p>
+
+  <h3>Metallic-roughness material 모델</h3>
+  <p>glTF 2.0의 표준 material 모델입니다. 표면을 두 종류로 나눕니다.</p>
+  <div class="table-wrap"><table>
+    <tr><th></th><th>비금속 (metallic = 0)</th><th>금속 (metallic = 1)</th></tr>
+    <tr><td>diffuse</td><td>base color</td><td>없음 (0)</td></tr>
+    <tr><td>specular 반사율 <math><msub><mi>F</mi><mn>0</mn></msub></math></td><td>약 0.04, 무채색</td><td>base color (유색 반사)</td></tr>
+  </table></div>
+  <p>metallic이 0과 1 사이면 두 경우를 선형으로 섞습니다. 실제 재질은 대부분 0 아니면 1이고, 중간값은 texture filtering 경계나 녹슨 금속처럼 섞인 곳에 나옵니다. roughness는 0(거울)부터 1(완전히 거친 면)까지의 값이고, BRDF 식에는 제곱한 <math><mi>α</mi></math>로 들어갑니다 (<a href="#p3">Part 03</a>).</p>
+
+  <h4>이 repo에서 material 값이 계수가 되는 과정</h4>
+<pre><code><span class="c">// Model/Shaders/DefaultPS.hlsl:246-260 (요약)</span>
+float4 baseColor = baseColorFactor * baseColorTexture.Sample(...);
+float2 metallicRoughness = metallicRoughnessFactor *
+    metallicRoughnessTexture.Sample(...).bg;   <span class="c">// glTF 규약: B = metallic, G = roughness</span>
+float occlusion = occlusionTexture.Sample(...);
+
+Surface.c_diff = baseColor.rgb * (1 - kDielectricSpecular) * (1 - metallicRoughness.x) * occlusion;
+Surface.c_spec = lerp(kDielectricSpecular, baseColor.rgb, metallicRoughness.x) * occlusion;
+Surface.roughness = metallicRoughness.y;
+Surface.alpha     = metallicRoughness.y * metallicRoughness.y;</code></pre>
+  <ul>
+    <li><code>kDielectricSpecular</code>는 0.04입니다. <code>c_spec</code>가 위 표의 <math><msub><mi>F</mi><mn>0</mn></msub></math>입니다.</li>
+    <li><code>c_diff</code>의 <code>(1 - 0.04)</code>는 "specular로 반사된 만큼 diffuse로 들어가는 빛이 줄어든다"는 에너지 분배를 근사한 항입니다. <code>(1 - metallic)</code>는 금속에 diffuse가 없다는 뜻입니다.</li>
+    <li>ambient occlusion texture가 diffuse와 specular 모두에 곱해집니다. GI가 가림을 계산하게 되면 이 항과 겹칠 수 있습니다. 4단계 이후 비교할 때 염두에 둡니다 <span class="mk b-judge">판단</span>.</li>
+  </ul>
+
+  <h3>Linear 공간과 HDR</h3>
+  <ul>
+    <li><b>색 texture는 sRGB, 데이터 texture는 linear</b>: base color와 emissive는 sRGB로 표시해 <code>*_SRGB</code> format으로 만들고(<code>Model/ModelConvert.cpp:316, 319</code>, <code>Model/TextureConvert.cpp:169</code>), metallic-roughness, occlusion, normal은 linear로 둡니다(<code>ModelConvert.cpp:317-318, 320</code>). sRGB format은 sampling할 때 하드웨어가 linear로 바꿔 줍니다. 조명 계산은 모두 linear 값으로 합니다.</li>
+    <li><b>Scene color는 HDR</b>: <code>g_SceneColorBuffer</code>는 <code>R11G11B10_FLOAT</code>입니다(<code>Core/BufferManager.cpp:85</code>). 1을 넘는 밝기를 그대로 저장합니다.</li>
+    <li><b>Tonemapping과 exposure</b>: 화면에 내보내기 직전에 <code>PostEffects</code>가 tonemapping을 합니다. ModelViewer는 HDR과 adaptive exposure를 켭니다(<code>ModelViewer/ModelViewer.cpp:155-156</code>). adaptive exposure는 화면 평균 밝기에 따라 여러 frame에 걸쳐 노출을 바꾸므로, 이미지를 비교할 때는 tonemapping 전 값을 쓰거나 exposure를 고정해야 합니다 <span class="mk b-judge">판단</span>.</li>
+  </ul>
+
+  <details class="quiz"><summary>확인 질문: 금색 금속(base color가 노란색, metallic 1)의 diffuse 계수와 specular 반사율은?</summary>
+  diffuse 계수 <code>c_diff</code>는 <code>(1 - metallic)</code> 때문에 0입니다. specular 반사율 <code>c_spec</code>는 base color인 노란색입니다. 그래서 금속은 반사에 자기 색이 묻고, 비금속은 반사가 무채색이고 몸체 색은 diffuse에서 나옵니다.</details>
+  <details class="quiz"><summary>확인 질문: Blinn-Phong에서 diffuse color 흰색(1), specular color 흰색(1)으로 둔 표면을 GI 장면에 넣으면 무엇이 문제인가?</summary>
+  diffuse만으로도 받은 에너지를 전부 내보내는데 specular가 그 위에 더해지므로, 받은 것보다 많이 내보냅니다. 이런 표면 사이를 빛이 여러 번 튕기면 bounce마다 에너지가 늘어 결과가 발산합니다. PBR에서는 specular로 반사된 만큼 diffuse가 줄어 합이 1을 넘지 않습니다.</details>
+  <details class="quiz"><summary>확인 질문: roughness texture를 sRGB format으로 잘못 만들면 어떻게 되는가?</summary>
+  sampling할 때 하드웨어가 값을 sRGB 곡선으로 변환하므로, 중간 값이 원래보다 작아집니다. 예를 들어 0.5가 약 0.21이 됩니다. 표면이 의도보다 매끈하게 보이고 반사가 날카로워집니다.</details>
+</section>
+
+<!-- ============================================================ -->
+<section class="part" id="p3" data-title="BRDF">
+  <div class="part-head"><span class="part-no">03</span><h2>BRDF: Lambert와 GGX microfacet</h2></div>
+  <p class="goal">목표: GGX specular BRDF의 D, G, F 항을 설명하고, 이 repo의 shader가 각 항을 어떻게 구현했는지 찾을 수 있다. <span class="when">시작 전</span></p>
+
+  <h3>Cook-Torrance microfacet 모델</h3>
+  <p>표면을 아주 작은 거울 조각(microfacet)들의 모음으로 봅니다. 빛이 <math><mi>l</mi></math>에서 와서 <math><mi>v</mi></math>로 반사되려면 조각의 법선이 half vector <math><mi>h</mi><mo>=</mo><mtext>normalize</mtext><mo>(</mo><mi>l</mi><mo>+</mo><mi>v</mi><mo>)</mo></math>를 향해야 합니다.</p>
+  <div class="eq">
+    <math display="block"><mrow>
+      <msub><mi>f</mi><mi>s</mi></msub><mo>(</mo><mi>l</mi><mo>,</mo><mi>v</mi><mo>)</mo><mo>=</mo>
+      <mfrac>
+        <mrow><mi>D</mi><mo>(</mo><mi>h</mi><mo>)</mo><mspace width="0.2em"/><msub><mi>G</mi><mn>2</mn></msub><mo>(</mo><mi>l</mi><mo>,</mo><mi>v</mi><mo>)</mo><mspace width="0.2em"/><mi>F</mi><mo>(</mo><mi>v</mi><mo>,</mo><mi>h</mi><mo>)</mo></mrow>
+        <mrow><mn>4</mn><mspace width="0.2em"/><mo>(</mo><mi>n</mi><mo>·</mo><mi>l</mi><mo>)</mo><mo>(</mo><mi>n</mi><mo>·</mo><mi>v</mi><mo>)</mo></mrow>
+      </mfrac>
+    </mrow></math>
+    <div class="where">
+      <math><mi>D</mi></math><span>Normal distribution. 법선이 <math><mi>h</mi></math>인 조각이 얼마나 많은가. roughness가 모양을 정함</span>
+      <math><msub><mi>G</mi><mn>2</mn></msub></math><span>Masking-shadowing. 조각이 다른 조각에 가려 빛을 못 받거나 못 보이는 비율</span>
+      <math><mi>F</mi></math><span>Fresnel. 비스듬히 볼수록 반사율이 1에 가까워짐</span>
+    </div>
+  </div>
+
+  <h3>각 항의 대표 형태</h3>
+  <div class="eq">
+    <math display="block"><mrow>
+      <msub><mi>D</mi><mtext>GGX</mtext></msub><mo>(</mo><mi>h</mi><mo>)</mo><mo>=</mo>
+      <mfrac>
+        <msup><mi>α</mi><mn>2</mn></msup>
+        <mrow><mi>π</mi><msup><mrow><mo>(</mo><msup><mrow><mo>(</mo><mi>n</mi><mo>·</mo><mi>h</mi><mo>)</mo></mrow><mn>2</mn></msup><mo>(</mo><msup><mi>α</mi><mn>2</mn></msup><mo>−</mo><mn>1</mn><mo>)</mo><mo>+</mo><mn>1</mn><mo>)</mo></mrow><mn>2</mn></msup></mrow>
+      </mfrac>
+      <mspace width="2em"/>
+      <msub><mi>F</mi><mtext>Schlick</mtext></msub><mo>=</mo><msub><mi>F</mi><mn>0</mn></msub><mo>+</mo><mo>(</mo><mn>1</mn><mo>−</mo><msub><mi>F</mi><mn>0</mn></msub><mo>)</mo><msup><mrow><mo>(</mo><mn>1</mn><mo>−</mo><mi>v</mi><mo>·</mo><mi>h</mi><mo>)</mo></mrow><mn>5</mn></msup>
+    </mrow></math>
+    <div class="where">
+      <math><mi>α</mi></math><span>artist roughness의 제곱 (Disney, UE4 관례). 이 repo도 같음</span>
+      <math><msub><mi>F</mi><mn>0</mn></msub></math><span>수직 입사 반사율. 비금속 약 0.04, 금속은 base color</span>
+    </div>
+  </div>
+  <p><math><msub><mi>G</mi><mn>2</mn></msub></math>는 Smith 모델이 표준이고, <math><mi>v</mi></math> 방향만의 masking인 <math><msub><mi>G</mi><mn>1</mn></msub><mo>(</mo><mi>v</mi><mo>)</mo></math>가 따로 쓰입니다. <math><msub><mi>G</mi><mn>1</mn></msub></math>은 <a href="#p11">Part 11</a>의 VNDF sampling에서 다시 나옵니다. 실시간 렌더러는 <math><msub><mi>G</mi><mn>2</mn></msub></math>와 분모 <math><mn>4</mn><mo>(</mo><mi>n</mi><mo>·</mo><mi>l</mi><mo>)</mo><mo>(</mo><mi>n</mi><mo>·</mo><mi>v</mi><mo>)</mo></math>를 묶은 visibility 항 <math><mi>V</mi></math>로 계산하는 경우가 많습니다.</p>
+
+  <h3>이 repo의 구현</h3>
+  <div class="table-wrap"><table>
+    <tr><th>항</th><th>위치</th><th>내용</th></tr>
+    <tr><td>D</td><td><code>Model/Shaders/DefaultPS.hlsl</code> <code>Specular_D_GGX</code></td><td>위 GGX 식과 같음</td></tr>
+    <tr><td>G (visibility)</td><td><code>DefaultPS.hlsl:147</code> <code>G_Shlick_Smith_Hable</code></td><td><code>1 / lerp(LdotH², 1, α²/4)</code>. <code>LdotH</code>만 쓰는 Hable 근사</td></tr>
+    <tr><td>F</td><td><code>Fresnel_Shlick</code></td><td>Schlick 근사</td></tr>
+    <tr><td>Diffuse</td><td><code>Diffuse_Burley</code></td><td>Lambert가 아닌 Burley(Disney) diffuse. <code>c_diff</code>에 <math><mn>1</mn><mo>/</mo><mi>π</mi></math>가 들어 있지 않음</td></tr>
+    <tr><td>Specular BRDF</td><td><code>DefaultPS.hlsl:161</code> <code>Specular_BRDF</code></td><td><code>ND * GV * F</code></td></tr>
+  </table></div>
+  <div class="note warn"><b class="tag">reference와 비교하기 전에 확인할 것</b>
+  <ul style="margin:4px 0">
+    <li>Hable 근사의 원형은 분모에 4가 하나 더 붙어 있는 것으로 기억합니다 <span class="mk b-guess">추측</span>. 이 코드에는 그 4가 보이지 않습니다. diffuse에 <math><mn>1</mn><mo>/</mo><mi>π</mi></math>가 없는 것과 함께, 이 shader는 광원 intensity에 π 같은 상수를 흡수시키는 관례를 쓰는 것으로 보입니다 <span class="mk b-guess">추측</span>.</li>
+    <li>2단계 path tracer가 교과서 식(<math><mi>ρ</mi><mo>/</mo><mi>π</mi></math>, 분모 4)을 쓰면 raster 결과와 상수배만큼 어긋납니다. <b>path tracer와 raster가 같은 BRDF 함수를 include해서 쓰게 하거나</b>, 정규화 차이를 먼저 맞춰야 비교가 의미 있습니다 <span class="mk b-judge">판단</span>.</li>
+  </ul></div>
+
+  <h3>기존 IBL이 하는 일과 GI가 대체할 것</h3>
+  <p>현재 간접광은 두 함수가 전부입니다 (<code>DefaultPS.hlsl:288-289</code>).</p>
+  <ul>
+    <li><code>Diffuse_IBL</code> (<code>:198</code>): irradiance cubemap을 법선 방향으로 sampling해 Burley 계수를 곱합니다. <b>3단계 DDGI가 이 cubemap sampling을 대체합니다.</b></li>
+    <li><code>Specular_IBL</code> (<code>:212</code>): radiance cubemap을 반사 방향으로, roughness에 비례한 mip으로 sampling하고 <code>Fresnel_Shlick(c_spec, 1, NdotV)</code>를 곱합니다. <b>4단계 RT reflection이 이 cubemap sampling을 대체합니다.</b></li>
+  </ul>
+  <p><code>Specular_IBL</code>은 split-sum 근사의 두 번째 항(BRDF를 반구 적분한 값, 보통 DFG LUT라 부름) 대신 Fresnel 하나만 곱합니다. 그래서 거친 표면에서 G 항에 의한 에너지 손실이 빠져 있습니다. 4단계에서 "RT로 구한 incoming radiance에 무엇을 곱할지"를 정할 때 이 차이를 알아야 합니다 (<a href="#p11">Part 11</a>).</p>
+  <p>split-sum과 DFG LUT는 Karis, "Real Shading in Unreal Engine 4" (SIGGRAPH 2013 course)에 정리돼 있습니다.</p>
+
+  <details class="quiz"><summary>확인 질문: roughness 0.5인 표면의 α와 α²는? 이 repo의 <code>SurfaceProperties</code>에서 각각 어느 필드인가?</summary>
+  α = 0.25, α² = 0.0625입니다. <code>Surface.roughness</code>가 0.5, <code>Surface.alpha</code>가 0.25, <code>Surface.alphaSqr</code>가 0.0625입니다 (<code>DefaultPS.hlsl</code>의 <code>SurfaceProperties</code>와 main에서 채우는 부분).</details>
+  <details class="quiz"><summary>확인 질문: Fresnel 항을 계산할 때 <code>v·h</code>를 쓰는 경우와 <code>n·v</code>를 쓰는 경우는 각각 언제인가?</summary>
+  BRDF를 방향 하나(광원 하나)에 대해 계산할 때는 microfacet 법선인 h 기준이라 <code>v·h</code>(또는 같은 값인 <code>l·h</code>)를 씁니다. IBL처럼 반구 전체를 미리 적분한 값에 곱할 때는 특정 h가 없으므로 근사로 <code>n·v</code>를 씁니다. <code>Specular_IBL</code>이 후자입니다.</details>
+</section>
+
+<!-- ============================================================ -->
+<section class="part" id="p4" data-title="Monte Carlo">
+  <div class="part-head"><span class="part-no">04</span><h2>Monte Carlo 적분과 importance sampling</h2></div>
+  <p class="goal">목표: estimator 식으로 noise가 왜 생기고 어떻게 줄어드는지 설명하고, cosine-weighted sampling 코드를 직접 쓸 수 있다. <span class="when">시작 전</span></p>
+
+  <h3>Estimator</h3>
+  <div class="eq">
+    <math display="block"><mrow>
+      <mo>∫</mo><mi>f</mi><mo>(</mo><mi>x</mi><mo>)</mo><mspace width="0.2em"/><mi>d</mi><mi>x</mi>
+      <mo>≈</mo>
+      <msub><mi>F</mi><mi>N</mi></msub><mo>=</mo>
+      <mfrac><mn>1</mn><mi>N</mi></mfrac>
+      <munderover><mo>∑</mo><mrow><mi>k</mi><mo>=</mo><mn>1</mn></mrow><mi>N</mi></munderover>
+      <mfrac><mrow><mi>f</mi><mo>(</mo><msub><mi>X</mi><mi>k</mi></msub><mo>)</mo></mrow><mrow><mi>p</mi><mo>(</mo><msub><mi>X</mi><mi>k</mi></msub><mo>)</mo></mrow></mfrac>
+    </mrow></math>
+    <div class="where">
+      <math><msub><mi>X</mi><mi>k</mi></msub></math><span>확률 밀도 <math><mi>p</mi></math>로 뽑은 sample (여기서는 ray 방향)</span>
+      <math><mi>p</mi></math><span>PDF. <math><mi>f</mi><mo>≠</mo><mn>0</mn></math>인 곳에서 <math><mi>p</mi><mo>&gt;</mo><mn>0</mn></math>이어야 unbiased</span>
+    </div>
+  </div>
+  <ul>
+    <li><b>Unbiased</b>: 기댓값이 정확히 적분값입니다. sample을 무한히 모으면 정답에 수렴합니다. 2단계 reference path tracer가 정답 역할을 할 수 있는 근거입니다.</li>
+    <li><b>Noise = variance</b>: 표준편차는 <math><mn>1</mn><mo>/</mo><msqrt><mi>N</mi></msqrt></math>에 비례합니다. noise를 절반으로 줄이려면 sample이 4배 필요합니다.</li>
+    <li><b>Importance sampling</b>: <math><mi>p</mi></math>가 <math><mi>f</mi></math>와 비슷한 모양일수록 <math><mi>f</mi><mo>/</mo><mi>p</mi></math>가 상수에 가까워져 variance가 줄어듭니다. 같은 ray 수로 noise를 줄이는 가장 싼 방법입니다.</li>
+  </ul>
+
+  <h3>Cosine-weighted hemisphere sampling</h3>
+  <p>Lambert 표면의 적분 대상은 <math><mfrac><mi>ρ</mi><mi>π</mi></mfrac><mi>L</mi><mi>cos</mi><mo>⁡</mo><mi>θ</mi></math>입니다. <math><mi>p</mi><mo>(</mo><mi>ω</mi><mo>)</mo><mo>=</mo><mfrac><mrow><mi>cos</mi><mo>⁡</mo><mi>θ</mi></mrow><mi>π</mi></mfrac></math>로 뽑으면 sample 하나의 값이 다음처럼 됩니다.</p>
+  <div class="eq">
+    <math display="block"><mrow>
+      <mfrac>
+        <mrow><mfrac><mi>ρ</mi><mi>π</mi></mfrac><mi>L</mi><mo>(</mo><mi>ω</mi><mo>)</mo><mi>cos</mi><mo>⁡</mo><mi>θ</mi></mrow>
+        <mrow><mfrac><mrow><mi>cos</mi><mo>⁡</mo><mi>θ</mi></mrow><mi>π</mi></mfrac></mrow>
+      </mfrac>
+      <mo>=</mo><mi>ρ</mi><mspace width="0.2em"/><mi>L</mi><mo>(</mo><mi>ω</mi><mo>)</mo>
+    </mrow></math>
+  </div>
+  <p>cos와 π가 지워져 albedo × 들어온 radiance만 남습니다. 이 결과가 맞는지 확인하는 것이 Part 01의 "균일한 하늘" 테스트입니다.</p>
+<pre><code><span class="c">// u: [0,1)^2 난수. 반환값은 법선이 +z인 local 좌표의 방향</span>
+float3 SampleCosineHemisphere(float2 u)
+{
+    float r   = sqrt(u.x);
+    float phi = 2.0 * PI * u.y;
+    return float3(r * cos(phi), r * sin(phi), sqrt(max(0.0, 1.0 - u.x)));
+}
+<span class="c">// pdf = cosTheta / PI = dir.z / PI</span></code></pre>
+  <p>local 방향을 world로 옮기려면 법선에서 정규직교 기저(ONB)를 만들어야 합니다. Duff et al., "Building an Orthonormal Basis, Revisited" (JCGT 2017)의 branchless 방법이 표준입니다.</p>
+
+  <h3>GPU에서 난수 만들기</h3>
+  <ul>
+    <li><b>Hash 기반 RNG</b>: pixel 좌표, frame 번호, bounce 번호를 섞어 seed를 만들고 PCG 같은 hash로 난수를 뽑습니다. 상태를 저장할 필요가 없어 shader에 맞습니다. 비교 자료는 Jarzynski and Olano, "Hash Functions for GPU Rendering" (JCGT 2020).</li>
+    <li><b>Frame마다 다른 seed</b>: frame 번호를 seed에 넣지 않으면 매 frame 같은 방향을 쏴서 accumulation이 수렴하지 않습니다. 2단계에서 처음 만나는 버그 유형입니다 <span class="mk b-judge">판단</span>.</li>
+  </ul>
+
+  <details class="quiz"><summary>확인 질문: 반구를 균일하게 sampling하면(pdf = 1/2π) Lambert estimator는 어떻게 되고, 왜 noise가 더 큰가?</summary>
+  sample 값은 <math><mfrac><mrow><mo>(</mo><mi>ρ</mi><mo>/</mo><mi>π</mi><mo>)</mo><mi>L</mi><mi>cos</mi><mo>⁡</mo><mi>θ</mi></mrow><mrow><mn>1</mn><mo>/</mo><mn>2</mn><mi>π</mi></mrow></mfrac><mo>=</mo><mn>2</mn><mi>ρ</mi><mi>L</mi><mi>cos</mi><mo>⁡</mo><mi>θ</mi></math>입니다. 균일한 하늘에서도 cosθ에 따라 0부터 2ρL까지 흔들리므로 variance가 0이 아닙니다. cosine-weighted는 같은 조건에서 매 sample이 정확히 ρL이라 variance가 0입니다.</details>
+  <details class="quiz"><summary>확인 질문: 1 spp일 때 noise 표준편차가 σ였다. 64 frame을 균등 평균하면?</summary>
+  <math><mi>σ</mi><mo>/</mo><mn>8</mn></math>입니다. 이것이 temporal accumulation의 이론적 한계이고, 카메라가 움직이면 history가 끊겨 이만큼 얻지 못합니다 (<a href="#p12">Part 12</a>).</details>
+</section>
+
+<!-- ============================================================ -->
+<section class="part" id="p5" data-title="DX12 필수 개념">
+  <div class="part-head"><span class="part-no">05</span><h2>DXR에 필요한 DX12 개념</h2></div>
+  <p class="goal">목표: DX11에서는 runtime과 driver가 대신 해 주던 일 가운데 DXR 코드에서 직접 해야 하는 것을 MiniEngine wrapper와 연결해 설명할 수 있다. <span class="when">시작 전</span></p>
+
+  <p>DXR은 DX12 위에서만 동작합니다. DX11 경험자가 DXR 코드에서 막히는 지점은 DXR 자체보다 아래 개념인 경우가 많습니다 <span class="mk b-judge">판단</span>.</p>
+
+  <h3>GPU virtual address</h3>
+  <p>DX12의 buffer는 GPU 주소 공간의 한 구간이고, <code>GetGPUVirtualAddress()</code>로 시작 주소를 얻습니다. DXR은 대부분의 입력을 view 객체가 아니라 이 주소로 받습니다. BLAS의 vertex와 index buffer 위치, TLAS의 instance 배열 위치, 결과 AS와 scratch buffer 위치가 모두 주소입니다. MiniEngine에서는 <code>GpuResource::GetGpuVirtualAddress()</code>를 씁니다.</p>
+
+  <h3>Resource state와 barrier</h3>
+  <ul>
+    <li><b>Transition barrier</b>: resource를 어떤 용도로 쓰는지(state)를 앱이 알리고, 용도가 바뀔 때 barrier를 기록합니다. DX11에서는 runtime이 추적했습니다. MiniEngine은 <code>GpuResource::m_UsageState</code>로 state를 추적하고 <code>CommandContext::TransitionResource</code>로 barrier를 기록합니다.</li>
+    <li><b>UAV barrier</b>: 같은 resource에 대한 UAV 쓰기와 그 뒤의 읽기, 쓰기 사이의 순서를 보장합니다. AS build는 결과 buffer를 UAV처럼 씁니다. 그래서 BLAS build 뒤 TLAS build 전에, 또 TLAS build 뒤 trace 전에 UAV barrier가 필요합니다.</li>
+    <li><b>AS 전용 state</b>: AS buffer는 <code>D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE</code> state로 만들어야 하고, 다른 state로 바꿀 수 없습니다. 또 <code>ALLOW_UNORDERED_ACCESS</code> flag가 있어야 합니다. MiniEngine의 <code>GpuBuffer</code>는 <code>COMMON</code> state로 만들어지므로(<code>Core/GpuBuffer.cpp:34</code>) 그대로는 AS buffer로 쓸 수 없습니다.</li>
+  </ul>
+
+  <h3>Root signature</h3>
+  <p>shader가 읽는 resource의 배치표입니다. 항목은 세 종류입니다.</p>
+  <ul>
+    <li><b>Root constant</b>: 32-bit 값을 직접 넣습니다.</li>
+    <li><b>Root descriptor</b>: CBV, SRV, UAV를 GPU 주소 하나로 넣습니다. TLAS는 보통 root SRV로 넘깁니다.</li>
+    <li><b>Descriptor table</b>: descriptor heap의 연속 구간을 가리킵니다. texture는 이 방식으로만 넘길 수 있습니다.</li>
+  </ul>
+  <p>MiniEngine의 <code>ComputeContext::SetBufferSRV</code>는 buffer가 <code>NON_PIXEL_SHADER_RESOURCE</code> state인지 assert합니다(<code>Core/CommandContext.h:535</code>). AS buffer는 그 state가 될 수 없으므로, TLAS를 넘길 때는 이 함수 대신 command list의 <code>SetComputeRootShaderResourceView</code>를 직접 불러야 합니다.</p>
+
+  <h3>Descriptor heap과 bindless</h3>
+  <p>ray는 어느 물체에 맞을지 미리 알 수 없습니다. 그래서 hit shading은 장면의 모든 texture에 접근할 수 있어야 합니다. 방법은 두 가지입니다.</p>
+  <ul>
+    <li><b>SM 6.6 <code>ResourceDescriptorHeap[i]</code></b>: root signature에 <code>D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED</code>를 켜면, shader-visible heap 전체를 index로 접근합니다. index가 thread마다 다르면 <code>NonUniformResourceIndex()</code>로 감싸야 합니다.</li>
+    <li><b>Unbounded descriptor table</b> (<code>Texture2D tex[] : register(t0, space1)</code>): SM 5.1부터 가능합니다. root signature에 큰 range를 선언합니다.</li>
+  </ul>
+  <p>MiniEngine은 material texture SRV를 <code>Renderer::s_TextureHeap</code>(descriptor 4096개, <code>Model/Renderer.cpp:214</code>)에 모아 두고, <code>Mesh::srvTable</code>에 그 heap 안의 offset을 저장합니다. 두 방법 모두 이 heap을 그대로 활용할 수 있습니다.</p>
+
+  <h3>Upload memory와 수명</h3>
+  <ul>
+    <li>TLAS instance 배열처럼 매 frame CPU가 쓰는 데이터는 upload memory에 씁니다. GPU가 아직 읽고 있는 frame의 데이터를 덮어쓰면 안 됩니다. MiniEngine의 <code>CommandContext::ReserveUploadMemory</code>(<code>Core/CommandContext.h:134</code>)는 command context 단위로 임시 upload memory를 나눠 줘서 이 문제를 피합니다.</li>
+    <li>AS buffer를 해제하거나 다시 만들 때는 GPU가 그 buffer를 다 쓴 뒤여야 합니다. fence로 기다리거나 해제를 몇 frame 미루는 장치가 필요합니다.</li>
+  </ul>
+
+  <h3>Interface 버전</h3>
+  <p>AS 크기 조회(<code>GetRaytracingAccelerationStructurePrebuildInfo</code>)는 <code>ID3D12Device5</code>에, build(<code>BuildRaytracingAccelerationStructure</code>)는 <code>ID3D12GraphicsCommandList4</code>에 있습니다. MiniEngine의 <code>g_Device</code>는 <code>ID3D12Device*</code>이고(<code>Core/GraphicsCore.cpp:52</code>), context의 command list는 <code>ID3D12GraphicsCommandList*</code>입니다(<code>Core/CommandContext.h:170</code>). 그래서 <code>QueryInterface</code>로 상위 interface를 얻어 써야 합니다.</p>
+
+  <details class="quiz"><summary>확인 질문: 같은 command list에서 BLAS를 build하고 이어서 그 BLAS를 참조하는 TLAS를 build한다. 무엇이 빠지면 안 되는가?</summary>
+  BLAS 결과 buffer에 대한 UAV barrier입니다. BLAS 쓰기가 끝나기 전에 TLAS build가 BLAS를 읽으면 결과가 정의되지 않습니다. TLAS build 뒤에도 trace 전에 같은 이유로 UAV barrier가 필요합니다. AS buffer는 state가 고정이라 transition barrier로는 이 순서를 보장할 수 없습니다.</details>
+</section>
+
+<!-- ============================================================ -->
+<section class="part" id="p6" data-title="Acceleration Structure">
+  <div class="part-head"><span class="part-no">06</span><h2>Ray tracing 기초와 DXR acceleration structure</h2></div>
+  <p class="goal">목표: BLAS와 TLAS의 역할, build 절차, build flag 선택 기준을 설명하고, 이 repo의 mesh 데이터가 BLAS 입력으로 어떻게 연결되는지 짚을 수 있다. <span class="when">시작 전</span></p>
+
+  <h3>Ray, t, barycentrics</h3>
+  <ul>
+    <li>ray는 출발점 <math><mi>o</mi></math>, 방향 <math><mi>d</mi></math>, 구간 <math><mo>[</mo><msub><mi>t</mi><mtext>min</mtext></msub><mo>,</mo><msub><mi>t</mi><mtext>max</mtext></msub><mo>]</mo></math>로 정의합니다. 점은 <math><mi>o</mi><mo>+</mo><mi>t</mi><mi>d</mi></math>입니다. hit의 <math><mi>t</mi></math>는 <math><mi>d</mi></math>가 단위 벡터일 때 거리와 같습니다.</li>
+    <li>삼각형 교차는 hit 지점의 barycentric 좌표를 줍니다. DXR은 두 값 <math><mo>(</mo><msub><mi>b</mi><mn>1</mn></msub><mo>,</mo><msub><mi>b</mi><mn>2</mn></msub><mo>)</mo></math>를 돌려주고, 각각 vertex 1과 2의 가중치입니다. vertex 0의 가중치는 <math><mn>1</mn><mo>−</mo><msub><mi>b</mi><mn>1</mn></msub><mo>−</mo><msub><mi>b</mi><mn>2</mn></msub></math>입니다. normal과 UV는 이 가중치로 보간합니다.</li>
+    <li>모든 삼각형을 검사하지 않도록 bounding box 계층(BVH)을 씁니다. DXR에서 BVH의 실제 구조는 driver가 정하고 앱은 볼 수 없습니다.</li>
+  </ul>
+
+  <h3>두 단계 구조</h3>
+  <div class="table-wrap"><table>
+    <tr><th></th><th>BLAS (bottom level)</th><th>TLAS (top level)</th></tr>
+    <tr><td>담는 것</td><td>삼각형 geometry. object space</td><td>instance 목록. 각 instance는 BLAS 하나와 world transform</td></tr>
+    <tr><td>입력</td><td>geometry desc: vertex buffer 주소, stride, format, index buffer 주소, format, 개수, flag</td><td>instance desc 배열: 3×4 transform, <code>InstanceID</code>(24 bit), <code>InstanceMask</code>(8 bit), flag, BLAS 주소</td></tr>
+    <tr><td>바뀌는 때</td><td>mesh 모양이 바뀔 때</td><td>물체가 움직이거나 추가, 삭제될 때</td></tr>
+  </table></div>
+  <p>같은 BLAS를 여러 instance가 공유할 수 있습니다. <code>InstanceID</code>는 앱이 자유롭게 쓰는 값이라, hit shading에서 material과 mesh 정보를 찾는 index로 씁니다(<a href="#p7">Part 07</a>).</p>
+
+  <h3>Build 절차</h3>
+  <ol class="plain">
+    <li><code>GetRaytracingAccelerationStructurePrebuildInfo</code>로 결과 크기와 scratch 크기를 얻습니다.</li>
+    <li>결과 buffer(AS state, UAV flag, 256 byte 정렬)와 scratch buffer(UAV state)를 만듭니다.</li>
+    <li><code>BuildRaytracingAccelerationStructure</code>를 기록합니다.</li>
+    <li>결과 buffer에 UAV barrier를 겁니다.</li>
+  </ol>
+
+  <h3>Build flag와 갱신 전략</h3>
+  <div class="table-wrap"><table>
+    <tr><th>Flag</th><th>뜻</th></tr>
+    <tr><td><code>PREFER_FAST_TRACE</code></td><td>build가 느려도 trace가 빠른 구조. 정적 mesh BLAS에 맞음</td></tr>
+    <tr><td><code>PREFER_FAST_BUILD</code></td><td>trace 품질보다 build 속도. 매 frame 다시 만드는 구조에 맞음</td></tr>
+  </table></div>
+  <p>정적 장면이라면 BLAS는 시작할 때 한 번 <code>PREFER_FAST_TRACE</code>로 만들고, TLAS는 매 frame 다시 build하는 구성이 가장 단순합니다 <span class="mk b-judge">판단</span>. instance가 수백 개 수준이면 TLAS build는 짧을 것으로 봅니다 <span class="mk b-guess">추측</span>. PIX로 측정해 확인합니다.</p>
+
+  <h3>Opaque와 non-opaque</h3>
+  <p>geometry에 <code>D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE</code>를 주면 하드웨어가 hit를 바로 확정합니다. 주지 않으면 non-opaque가 되어, 앱이 후보 hit마다 받아들일지 정합니다. alpha test(잎, 쇠사슬) 물체가 여기에 해당합니다. 이 repo는 alpha test 여부를 <code>Mesh::psoFlags</code>의 <code>kAlphaTest</code> bit로 표시합니다(<code>Model/Model.h:46</code>).</p>
+  <p>front face는 기본적으로 ray 출발점에서 볼 때 vertex가 시계 방향인 면입니다. instance flag <code>TRIANGLE_FRONT_COUNTERCLOCKWISE</code>로 뒤집을 수 있습니다. probe나 reflection이 벽 뒷면에 맞았는지 판단할 때 쓰이므로, 장면의 winding 규칙과 맞는지 확인해야 합니다.</p>
+
+  <h3>이 repo의 mesh 데이터를 BLAS 입력으로</h3>
+  <ul>
+    <li>vertex의 맨 앞이 position <code>R32G32B32_FLOAT</code>입니다(<code>Model/MeshConvert.cpp:341</code>). 이 format은 BLAS vertex format으로 쓸 수 있으므로 vertex buffer를 복사하지 않고 stride만 지정해 넘길 수 있습니다.</li>
+    <li>vertex와 index는 모두 <code>Model::m_DataBuffer</code> 하나에 들어 있고, <code>Mesh</code>가 그 안의 offset을 가집니다(<code>vbOffset</code>, <code>vbStride</code>, <code>ibOffset</code>, <code>ibFormat</code>). index format은 mesh마다 16-bit 또는 32-bit입니다.</li>
+    <li><code>Mesh::Draw</code>는 <code>primCount</code>, <code>startIndex</code>, <code>baseVertex</code>만 가지고 vertex 개수는 없습니다. draw가 하나뿐인 mesh라면 <code>vbSize / vbStride</code>로 구할 수 있습니다.</li>
+  </ul>
+
+  <details class="quiz"><summary>확인 질문: Sponza를 BLAS 하나로 합쳐 만드는 것과 mesh마다 BLAS를 만드는 것은 각각 어떤 장단점이 있는가?</summary>
+  하나로 합치면 TLAS instance가 하나라 단순하고, BVH가 장면 전체를 보고 최적화되어 trace가 빠를 수 있습니다. 대신 mesh 하나가 움직이면 BLAS 전체를 다시 build해야 하고, hit에서 material을 찾을 때 <code>GeometryIndex</code>를 써야 합니다. mesh마다 만들면 움직임을 instance transform으로 처리할 수 있지만, instance 수가 늘고 BLAS끼리 겹치는 영역에서 trace 비용이 커질 수 있습니다 <span class="mk b-judge">판단</span>.</details>
+</section>
+
+<!-- ============================================================ -->
+<section class="part" id="p7" data-title="Inline RayQuery">
+  <div class="part-head"><span class="part-no">07</span><h2>Inline <code>RayQuery</code>와 hit 지점 표면 복원</h2></div>
+  <p class="goal">목표: closest hit, alpha test, shadow ray를 <code>RayQuery</code>로 쓰고, hit가 돌려주는 번호들에서 world position, normal, albedo까지 가는 경로를 그릴 수 있다. <span class="when">시작 전</span></p>
+
+  <h3>DXR 1.1 inline</h3>
+  <ul>
+    <li>이 프로젝트는 DXR 1.1 inline 방식을 씁니다. 일반 compute shader나 pixel shader 안에서 <code>RayQuery</code> 객체로 ray를 쏘고, 결과를 같은 shader에서 바로 처리합니다. DXR 1.0의 state object와 shader table은 필요 없습니다.</li>
+    <li>지원 여부는 <code>CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5)</code>의 <code>RaytracingTier</code>가 <code>TIER_1_1</code> 이상인지로 확인합니다. 이 repo의 검사(<code>Core/GraphicsCore.cpp:159</code>)는 <code>NOT_SUPPORTED</code>만 아니면 통과하므로, inline이 안 되는 Tier 1.0 GPU도 지원으로 판정합니다.</li>
+  </ul>
+
+  <h3>기본 흐름</h3>
+<pre><code>RaytracingAccelerationStructure Scene : register(t0);
+
+RayDesc ray;
+ray.Origin = origin; ray.Direction = dir; ray.TMin = tMin; ray.TMax = tMax;
+
+RayQuery&lt;RAY_FLAG_NONE&gt; q;
+q.TraceRayInline(Scene, RAY_FLAG_NONE, 0xFF, ray);
+while (q.Proceed())
+{
+    <span class="c">// non-opaque 후보만 여기로 옴: alpha test</span>
+    if (q.CandidateType() == CANDIDATE_NON_OPAQUE_TRIANGLE)
+    {
+        if (AlphaTest(q.CandidateInstanceID(), q.CandidateGeometryIndex(),
+                      q.CandidatePrimitiveIndex(), q.CandidateTriangleBarycentrics()))
+            q.CommitNonOpaqueTriangleHit();
+    }
+}
+if (q.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
+{
+    float  t     = q.CommittedRayT();
+    float2 bary  = q.CommittedTriangleBarycentrics();
+    uint   inst  = q.CommittedInstanceID();
+    uint   geom  = q.CommittedGeometryIndex();
+    uint   prim  = q.CommittedPrimitiveIndex();
+    bool   front = q.CommittedTriangleFrontFace();
+    float3x4 o2w = q.CommittedObjectToWorld3x4();
+}</code></pre>
+  <ul>
+    <li>모든 geometry가 opaque면 <code>Proceed()</code>는 처음부터 false를 돌려주고 loop body는 실행되지 않습니다.</li>
+    <li>template 인자의 flag는 compile time에 고정되고, <code>TraceRayInline</code>의 flag는 실행 중에 더해집니다. 고정할 수 있는 flag는 template에 두면 compiler가 불필요한 경로를 지울 수 있습니다.</li>
+  </ul>
+
+  <h3>Shadow ray (visibility)</h3>
+<pre><code>RayQuery&lt;RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_FORCE_OPAQUE&gt; q;
+q.TraceRayInline(Scene, 0, 0xFF, shadowRay);
+q.Proceed();
+bool occluded = q.CommittedStatus() != COMMITTED_NOTHING;</code></pre>
+  <p>가장 가까운 hit가 아니라 "무엇이든 맞았는가"만 필요하므로 첫 hit에서 끝냅니다. <code>FORCE_OPAQUE</code>를 쓰면 잎의 투명한 부분도 그림자를 만듭니다. alpha test 그림자가 필요하면 이 flag를 빼고 위의 loop를 씁니다.</p>
+
+  <h3>Self-intersection</h3>
+  <p>표면 위의 점에서 다시 ray를 쏘면, 부동소수 오차 때문에 출발한 삼각형에 다시 맞을 수 있습니다. 출발점을 geometric normal 방향으로 조금 밀거나 <code>TMin</code>을 키웁니다. 고정 epsilon은 장면 크기에 따라 맞지 않을 수 있습니다. 이 repo는 Sponza를 원래 반지름의 100배로 키워 배치합니다(<code>ModelViewer/ModelViewer.cpp:176</code>). 좌표 크기에 비례하는 offset 방법은 Ray Tracing Gems의 self-intersection 장에 있습니다.</p>
+
+  <h3>Hit 지점의 표면 복원</h3>
+  <p>raster에서는 vertex shader와 rasterizer가 normal과 UV를 보간해 줬지만, ray hit에서는 직접 해야 합니다.</p>
+  <ol class="plain">
+    <li><b>Geometry table</b>: geometry 하나당 한 줄인 StructuredBuffer를 만듭니다. 각 줄에 VB offset, IB offset, stride, index format, material index를 넣습니다. TLAS instance의 <code>InstanceID</code>에 "이 instance의 첫 줄 번호"를 넣고 <code>InstanceID + GeometryIndex</code>로 줄을 찾습니다.</li>
+    <li><b>Index fetch</b>: <code>PrimitiveIndex</code>번째 삼각형의 index 세 개를 읽습니다. <code>m_DataBuffer</code>는 <code>ByteAddressBuffer</code>라 4 byte 단위로 읽으므로, 16-bit index는 읽은 값의 상위와 하위 절반을 골라야 합니다.</li>
+    <li><b>Vertex fetch와 unpack</b>: normal과 tangent는 <code>R10G10B10A2_UNORM</code>, UV는 <code>R16G16_FLOAT</code>로 압축돼 있습니다(<code>Model/MeshConvert.cpp:342, 350</code>). shader에서 bit 연산과 <code>f16tof32</code>로 풉니다.</li>
+    <li><b>보간과 변환</b>: barycentrics로 보간한 뒤 <code>ObjectToWorld</code>로 world로 옮깁니다. non-uniform scale이 있으면 normal은 inverse transpose로 변환합니다.</li>
+    <li><b>Material</b>: material index로 상수와 texture index를 찾고, bindless로 texture를 읽습니다.</li>
+  </ol>
+  <p><b>Mip 선택</b>: compute shader와 ray hit에는 화면 미분이 없으므로 <code>Sample</code> 대신 <code>SampleLevel</code>로 mip을 직접 정합니다. 멀리 맞은 ray가 mip 0을 읽으면 aliasing과 cache miss가 큽니다. DDGI처럼 저주파 결과에는 높은 mip 고정으로 충분하고, 반사처럼 디테일이 보이는 곳은 ray cone으로 footprint를 추적하는 방법이 쓰입니다 <span class="mk b-judge">판단</span>.</p>
+
+  <details class="quiz"><summary>확인 질문: hit한 삼각형의 material을 찾으려면 어떤 값들의 조합이 필요한가?</summary>
+  어느 instance인가(<code>InstanceID</code> 또는 <code>InstanceIndex</code>)와 그 BLAS 안의 어느 geometry인가(<code>GeometryIndex</code>)입니다. 이 둘로 geometry table의 줄을 찾고, 그 줄에 material index를 넣어 둡니다. <code>PrimitiveIndex</code>는 그 geometry 안의 삼각형 번호라서 vertex fetch에 씁니다.</details>
+  <details class="quiz"><summary>확인 질문: probe 중심에서 쏘는 ray와 표면 위 hit 지점에서 쏘는 shadow ray는 self-intersection 처리가 왜 다른가?</summary>
+  probe 중심은 표면 위가 아니므로 <code>TMin</code>을 0에 가깝게 둬도 문제가 없습니다. shadow ray는 표면 위에서 출발하므로 출발한 삼각형에 다시 맞을 수 있어 offset이 필요합니다.</details>
+</section>
+
+<!-- ============================================================ -->
+<section class="part" id="p8" data-title="이 repo의 렌더링 경로">
+  <div class="part-head"><span class="part-no">08</span><h2>이 repo의 scene 구조와 렌더링 경로</h2></div>
+  <p class="goal">목표: 이 repo에서 ray에 넘길 scene 데이터가 어디 있는지, 현재 렌더링 경로에서 GI가 들어갈 자리와 빠져 있는 입력이 무엇인지 짚을 수 있다. <span class="when">시작 전</span></p>
+
+  <h3>Scene 표현</h3>
+  <div class="table-wrap"><table>
+    <tr><th>타입</th><th>무엇인가</th><th>ray tracing과 관련된 내용</th></tr>
+    <tr><td><code>Model</code> (<code>Model/Model.h</code>)</td><td>glTF 하나를 변환한 공유 데이터</td><td>모든 VB와 IB가 <code>m_DataBuffer</code> 하나에 있음. <code>m_MeshData</code>에 <code>Mesh</code>들이 이어 붙어 있음</td></tr>
+    <tr><td><code>ModelInstance</code></td><td>Model을 장면에 한 번 배치한 것</td><td>배치 transform <code>m_Locator</code>, mesh별 world transform의 CPU 사본 <code>m_BoundingSphereTransforms</code>(<code>Mesh::meshCBV</code>로 index)</td></tr>
+    <tr><td><code>Mesh</code></td><td>draw 단위. material 하나</td><td><code>vbOffset</code>, <code>vbStride</code>, <code>ibOffset</code>, <code>ibFormat</code>, <code>materialCBV</code>, <code>srvTable</code>, <code>psoFlags</code>, <code>draw[numDraws]</code></td></tr>
+  </table></div>
+  <ul>
+    <li><code>ModelViewer</code>는 <code>ModelInstance</code> 하나(<code>m_ModelInst</code>, <code>ModelViewer/ModelViewer.cpp:69</code>)에 Sponza를 불러옵니다(<code>:175</code>).</li>
+    <li>raster가 쓰는 mesh 목록은 frustum culling을 거칩니다(<code>Model/Model.cpp:58</code>). ray는 화면 밖 물체에도 맞아야 하므로, AS를 만들 때는 이 목록이 아니라 Model의 모든 mesh를 순회해야 합니다.</li>
+  </ul>
+
+  <h3>화면 pixel에서 출발하는 ray에 필요한 입력</h3>
+  <p>2단계 path tracer와 4단계 reflection은 <b>화면 pixel에서 출발하는 ray</b>를 쏘므로, pixel마다 표면 정보가 필요합니다.</p>
+  <ul>
+    <li><b>지금은 normal을 쓰는 pass가 없습니다.</b> <code>g_SceneNormalBuffer</code>(<code>Core/BufferManager.h:26</code>)는 존재하지만, render target으로 쓰는 곳은 <code>Model/SponzaRenderer.cpp:389</code>뿐입니다. 이 경로는 legacy 경로이고, 최근 commit에서 비활성화했습니다. glTF 경로의 <code>DefaultPS</code>는 color 하나만 출력합니다.</li>
+    <li>따라서 1단계에서 <b>thin G-buffer</b>(normal, roughness, 필요하면 F0 또는 metalness)를 출력하는 작업이 필요합니다. 방법은 둘입니다. color pass에서 MRT로 같이 쓰는 방법과, depth prepass를 확장하는 방법입니다. 후자는 material texture를 읽어야 해서 prepass 비용이 커집니다 <span class="mk b-judge">판단</span>.</li>
+    <li><b>World position</b>은 저장하지 않고 depth와 inverse view-projection 행렬로 복원하는 것이 보통입니다. 이때 <a href="#p12">Part 12</a>의 reprojection과 같은 행렬 지식을 씁니다.</li>
+  </ul>
+
+  <h3>지금 화면에 있는 빛</h3>
+  <div class="note warn"><b class="tag">sun direct light가 꺼져 있다</b>
+  <code>Model/Shaders/DefaultPS.hlsl:266</code>의 <code>#if 0</code> 때문에 sun shadow와 sun direct lighting 코드가 compile되지 않습니다. 실제로 계산되는 것은 emissive, <code>Diffuse_IBL</code>, <code>Specular_IBL</code>(SSAO를 곱한 값)뿐입니다. sun shadow map pass는 여전히 그려지지만(<code>ModelViewer/ModelViewer.cpp</code>의 "Sun Shadow Map" 구간) 결과를 읽는 곳이 없습니다. 코드 읽기로 판단했고 실행 화면으로 확인하지는 않았습니다.
+  <ul style="margin:6px 0 0">
+    <li>DDGI는 "direct light가 튕긴 빛"이므로, sun direct light를 화면에 다시 켜야 GI 결과를 눈으로 평가할 수 있습니다.</li>
+    <li>point light(Forward+ light grid)도 <code>DefaultPS.hlsl:292</code>의 TODO 상태로 shading되지 않습니다. probe hit shading도 sun만 다루는 것으로 시작하면 raster와 범위가 맞습니다 <span class="mk b-judge">판단</span>.</li>
+    <li>SSAO가 <code>c_diff</code>와 <code>c_spec</code>에 곱해집니다(<code>DefaultPS.hlsl:284-285</code>). GI가 이미 가림을 반영하므로 SSAO를 그대로 두면 이중으로 어두워질 수 있습니다 <span class="mk b-judge">판단</span>.</li>
+  </ul></div>
+
+  <h3>Shader model</h3>
+  <p>Desktop 기본 shader model은 6.2입니다(<code>MiniEngine/PropertySheets/Desktop.props:18</code>). <code>RayQuery</code>는 SM 6.5 이상, <code>ResourceDescriptorHeap</code> bindless는 SM 6.6 이상이 필요합니다. HLSL은 Visual Studio의 FxCompile 설정으로 빌드되고 결과가 <code>g_p파일이름</code> header가 되므로(<code>MiniEngine/PropertySheets/Build.props:59</code>), ray query를 쓰는 shader 파일은 파일별로 shader model을 올려 지정하는 방법을 알아 둬야 합니다.</p>
+
+  <details class="quiz"><summary>확인 질문: reflection ray의 출발점과 방향을 만드는 데 pixel마다 필요한 값은 무엇이고, 지금 이 repo에서 어디서 얻을 수 있는가?</summary>
+  출발점은 world position(depth buffer와 inverse view-projection으로 복원), 방향은 view vector와 normal, 그리고 GGX sampling을 위한 roughness가 필요합니다. depth는 <code>g_SceneDepthBuffer</code>에 있습니다. normal과 roughness는 지금 어디에도 저장되지 않으므로 thin G-buffer를 만들어야 합니다. 금속 여부와 F0는 Fresnel 가중에 필요하고, ray 방향 생성에는 필요 없습니다.</details>
+</section>
+
+<!-- ============================================================ -->
+<section class="part" id="p9" data-title="2단계: Path tracer">
+  <div class="part-head"><span class="part-no">09</span><h2>2단계: reference path tracer</h2></div>
+  <p class="goal">목표: path tracing loop를 pseudo code로 쓰고, raster 결과와 공정하게 비교하는 조건을 나열할 수 있다. <span class="when later">2단계 직전</span></p>
+
+  <h3>Path tracing loop</h3>
+  <p>rendering equation의 적분을 재귀적으로 Monte Carlo 추정합니다. 재귀 대신 loop와 <b>throughput</b> <math><mi>β</mi></math>(지금까지 곱해진 BRDF × cos / pdf)로 씁니다.</p>
+<pre><code>float3 radiance = 0, beta = 1;
+Ray ray = CameraRay(pixel, jitter);
+for (uint bounce = 0; bounce &lt; MAX_BOUNCE; ++bounce)
+{
+    Hit hit = TraceClosest(ray);                 <span class="c">// RayQuery</span>
+    if (!hit.valid) { radiance += beta * Sky(ray.dir); break; }
+
+    Surface s = ReconstructSurface(hit);         <span class="c">// Part 07</span>
+    if (bounce == 0) radiance += beta * s.emissive;  <span class="c">// emissive를 BRDF sampling으로만 다루는 경우</span>
+
+    <span class="c">// Next event estimation: sun 방향으로 shadow ray</span>
+    if (Visible(s.pos, SunDir))
+        radiance += beta * BRDF(s, SunDir, -ray.dir) * SunIntensity * saturate(dot(s.n, SunDir));
+
+    <span class="c">// 다음 방향 sampling</span>
+    BsdfSample bs = SampleBRDF(s, -ray.dir, rng);  <span class="c">// diffuse: cosine, specular: GGX VNDF</span>
+    beta *= bs.weight;                             <span class="c">// f * cos / pdf</span>
+
+    <span class="c">// Russian roulette</span>
+    if (bounce &gt;= 3) {
+        float q = min(0.95, MaxComponent(beta));
+        if (Rand(rng) &gt; q) break;
+        beta /= q;
+    }
+    ray = SpawnRay(s.pos, s.n, bs.dir);           <span class="c">// self-intersection 회피: Part 07</span>
+}</code></pre>
+  <ul>
+    <li><b>NEE (next event estimation)</b>: 매 bounce에서 광원을 직접 sampling합니다. sun은 delta 광원이라 이 방법으로만 기여가 잡힙니다 (Part 01).</li>
+    <li><b>Russian roulette</b>: 확률 q로 계속하고 살아남으면 <math><mi>β</mi></math>를 q로 나눕니다. 기댓값이 그대로라 unbiased를 유지하면서 기여가 작은 긴 path를 끊습니다.</li>
+    <li><b>Emissive 이중 계산</b>: emissive를 NEE로도 sampling하면 BRDF sampling으로 맞힌 emissive와 두 번 더해집니다. 위 코드처럼 한쪽으로만 계산해야 합니다.</li>
+  </ul>
+
+  <h3>Progressive accumulation</h3>
+  <div class="eq">
+    <math display="block"><mrow>
+      <msub><mi>μ</mi><mi>n</mi></msub><mo>=</mo><msub><mi>μ</mi><mrow><mi>n</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>+</mo>
+      <mfrac><mrow><msub><mi>x</mi><mi>n</mi></msub><mo>−</mo><msub><mi>μ</mi><mrow><mi>n</mi><mo>−</mo><mn>1</mn></mrow></msub></mrow><mi>n</mi></mfrac>
+    </mrow></math>
+  </div>
+  <ul>
+    <li>frame마다 1 spp를 더해 균등 평균합니다. 카메라, 광원, 물체가 바뀌면 <math><mi>n</mi></math>을 0으로 되돌립니다.</li>
+    <li>누적 buffer는 <code>R32G32B32A32_FLOAT</code>를 권합니다. 수천 frame을 더하면 half float는 정밀도가 부족합니다 <span class="mk b-judge">판단</span>.</li>
+    <li><b>Firefly</b>: 드물게 매우 밝은 sample(작은 pdf로 밝은 곳을 맞힌 경우)이 점으로 남습니다. sample을 clamp하면 사라지지만 bias가 생기므로, reference에서는 clamp하지 않고 오래 누적하는 쪽이 원칙입니다 <span class="mk b-judge">판단</span>.</li>
+  </ul>
+
+  <h3>Raster와 공정하게 비교하는 조건</h3>
+  <div class="table-wrap"><table>
+    <tr><th>조건</th><th>이유</th></tr>
+    <tr><td>tonemapping, exposure, bloom 전의 linear HDR 값을 비교</td><td>후처리는 오차를 비선형으로 바꿈</td></tr>
+    <tr><td>같은 BRDF 함수와 같은 정규화 상수</td><td>Part 03의 경고. 상수배 차이는 GI 오차처럼 보임</td></tr>
+    <tr><td>같은 광원 집합 (sun, sky, emissive)</td><td>raster는 지금 sun을 안 쓰고 IBL을 씀 (Part 08)</td></tr>
+    <tr><td>miss 시 sky radiance가 raster의 IBL cubemap과 같은 소스</td><td>하늘빛 차이가 간접광 차이로 섞임</td></tr>
+    <tr><td>bounce 수 범위를 명시</td><td>"direct + 1 bounce"끼리, "무한 bounce"끼리 비교해야 함</td></tr>
+    <tr><td>SSAO와 SSR 같은 화면 효과를 끄고 비교</td><td>GI가 아닌 근사가 섞임</td></tr>
+  </table></div>
+
+  <h3>오차 지표</h3>
+  <ul>
+    <li><b>RMSE, PSNR</b>: 계산이 쉽고 수렴 곡선을 그리기 좋습니다. 사람이 느끼는 차이와는 다를 수 있습니다.</li>
+    <li><b>FLIP</b> (NVIDIA, Andersson et al. 2020): 두 이미지를 번갈아 볼 때 사람이 느끼는 차이를 근사한 지표입니다. HDR 모드가 있고, 오차 위치를 보여주는 error map을 출력합니다. command line 도구가 공개돼 있습니다.</li>
+  </ul>
+
+  <details class="quiz"><summary>확인 질문: path tracer 결과가 raster보다 전체적으로 약 3배 밝다. 먼저 의심할 것 두 가지는?</summary>
+  하나는 π 정규화입니다. Lambert의 <math><mn>1</mn><mo>/</mo><mi>π</mi></math>가 한쪽에만 있으면 약 3.14배 차이가 납니다. 다른 하나는 광원 집합입니다. raster는 sun이 꺼져 있고 IBL만 있으므로, path tracer에 sun을 켰다면 밝기가 다른 것이 당연합니다. 균일한 하늘 테스트(Part 01)로 정규화부터 분리해 확인합니다.</details>
+  <details class="quiz"><summary>확인 질문: Russian roulette에서 살아남은 path의 β를 q로 나누지 않으면 결과는 어떻게 되는가?</summary>
+  긴 path의 기여가 확률 q만큼 빠지므로 결과가 체계적으로 어두워집니다(bias). 특히 실내처럼 bounce가 많이 필요한 장면에서 차이가 큽니다.</details>
+</section>
+
+<!-- ============================================================ -->
+<section class="part" id="p10" data-title="3단계: DDGI">
+  <div class="part-head"><span class="part-no">10</span><h2>3단계: DDGI의 수학</h2></div>
+  <p class="goal">목표: octahedral mapping, probe 보간 가중치, Chebyshev visibility, hysteresis를 식과 코드로 설명할 수 있다. <span class="when later">3단계 직전</span></p>
+
+  <p>원 논문은 Majercik et al., "Dynamic Diffuse Global Illumination with Ray-Traced Irradiance Fields" (JCGT 2019)이고, NVIDIA RTXGI-DDGI가 대표 구현입니다.</p>
+
+  <h3>자료 구조</h3>
+  <ul>
+    <li><b>Probe grid</b>: 장면을 덮는 3D 격자. 각 probe는 위치 하나를 가집니다.</li>
+    <li><b>Irradiance map</b>: probe마다 작은 octahedral map에 방향별 irradiance를 저장합니다. 흔히 border를 뺀 6×6 texel 정도를 씁니다 <span class="mk b-guess">추측</span>.</li>
+    <li><b>Distance map</b>: 같은 방식의 map에 방향별로 가장 가까운 표면까지 거리의 평균과 제곱 평균을 저장합니다. 흔히 14×14 texel 정도를 씁니다 <span class="mk b-guess">추측</span>.</li>
+    <li>모든 probe의 map을 큰 texture 하나(atlas)에 타일로 붙여 둡니다.</li>
+  </ul>
+  <p>irradiance는 법선이 조금 바뀌어도 반구 대부분이 겹쳐서 방향에 대해 부드럽게 변합니다. 그래서 diffuse GI는 이렇게 낮은 해상도로 저장해도 티가 덜 납니다. glossy 반사는 방향에 민감해서 같은 방식이 통하지 않고, 그래서 4단계에서 따로 다룹니다.</p>
+
+  <h3>한 frame의 update</h3>
+  <ol class="plain">
+    <li><b>Trace</b>: probe마다 N개의 ray를 구 전체에 고르게 쏩니다(spherical Fibonacci 같은 분포). 매 frame 무작위 회전을 줘서 시간에 따라 다른 방향을 sampling합니다. N은 구현에 따라 수십에서 수백 개이고, RTXGI 기본값은 256으로 기억합니다 <span class="mk b-guess">추측</span>.</li>
+    <li><b>Shade</b>: hit 지점의 radiance를 계산합니다. direct는 sun 방향 shadow ray로, indirect는 <b>이전 frame의 probe volume</b>을 hit 지점에서 sampling해서 구합니다. 이 feedback 때문에 frame이 지날수록 bounce가 누적됩니다. miss면 sky radiance를 씁니다. 결과 radiance와 hit 거리를 ray buffer에 씁니다.</li>
+    <li><b>Blend</b>: probe map의 texel마다 그 probe의 ray들을 가중 평균하고, 이전 값과 hysteresis로 섞습니다. irradiance는 texel 방향과 ray 방향의 cosine으로, distance는 그 cosine을 크게 거듭제곱한 날카로운 가중치로 모읍니다.</li>
+    <li><b>Border</b>: octahedral map 경계에서 bilinear filtering이 맞게 되도록 테두리 texel을 복사합니다.</li>
+  </ol>
+  <p><b>Backface hit</b>: probe가 벽 속에 박히면 ray 대부분이 표면 뒷면에 맞습니다. 이런 probe는 주변 표면에 어두운 값을 줘서 얼룩을 만듭니다. 원인을 판별하려면 probe별 backface hit 비율을 볼 수 있어야 하므로, trace 결과에 front face 여부를 남기고 backface culling을 하지 않습니다 <span class="mk b-judge">판단</span>.</p>
+
+  <h3>Octahedral mapping</h3>
+  <p>단위 구의 방향을 정사각형 texture 좌표로 펼치는 방법입니다. 팔면체에 투영한 뒤 아래 반쪽을 바깥으로 접습니다. 왜곡이 작고 계산이 싸서 probe map에 씁니다. 다른 방법과의 비교는 Cigolle et al., "A Survey of Efficient Representations for Independent Unit Vectors" (JCGT 2014)에 있습니다.</p>
+<pre><code>float2 OctWrap(float2 v) { return (1.0 - abs(v.yx)) * select(v.xy &gt;= 0.0, 1.0, -1.0); }
+
+float2 OctEncode(float3 n)          <span class="c">// 반환값 [-1,1]^2</span>
+{
+    n /= abs(n.x) + abs(n.y) + abs(n.z);
+    n.xy = n.z &gt;= 0.0 ? n.xy : OctWrap(n.xy);
+    return n.xy;
+}
+
+float3 OctDecode(float2 f)          <span class="c">// 입력 [-1,1]^2</span>
+{
+    float3 n = float3(f.x, f.y, 1.0 - abs(f.x) - abs(f.y));
+    float t = saturate(-n.z);
+    n.xy += select(n.xy &gt;= 0.0, -t, t);
+    return normalize(n);
+}</code></pre>
+  <p>펼친 정사각형의 가장자리는 구에서 서로 이어진 방향입니다. 그래서 bilinear filtering이 경계를 넘을 때 맞는 이웃을 읽도록 1 texel짜리 border를 둘러 복사합니다(위 update의 Border 단계). 테두리의 어느 texel이 어디로 복사되는지 직접 그려 보는 것을 권합니다 <span class="mk b-judge">판단</span>.</p>
+
+  <h3>표면에서 probe volume을 sampling하기</h3>
+  <p>shading 지점을 둘러싼 8개 probe의 irradiance를 가중 평균합니다. probe마다 가중치 세 개를 곱합니다.</p>
+  <div class="table-wrap"><table>
+    <tr><th>가중치</th><th>식 (개념)</th><th>역할</th></tr>
+    <tr><td>Trilinear</td><td>격자 안 위치로 계산한 일반 trilinear 계수</td><td>공간 보간</td></tr>
+    <tr><td>Backface (wrap shading)</td><td><math><msup><mrow><mo>(</mo><mfrac><mrow><mi>d</mi><mo>·</mo><mi>n</mi><mo>+</mo><mn>1</mn></mrow><mn>2</mn></mfrac><mo>)</mo></mrow><mn>2</mn></msup><mo>+</mo><mn>0.2</mn></math> (<math><mi>d</mi></math>: 표면에서 probe 방향)</td><td>표면 뒤쪽 probe의 영향 줄이기</td></tr>
+    <tr><td>Chebyshev visibility</td><td>아래 식</td><td>벽 너머 probe 차단 (light leak 방지)</td></tr>
+  </table></div>
+  <p>backface 식의 상수(0.2)와 형태는 논문과 RTXGI 구현을 기억해 적은 것입니다 <span class="mk b-guess">추측</span>. 구현 전에 원문과 대조하세요.</p>
+
+  <h4>Chebyshev visibility</h4>
+  <p>probe의 distance map은 방향별로 거리의 평균 <math><mi>μ</mi></math>와 제곱 평균 <math><msub><mi>m</mi><mn>2</mn></msub></math>를 저장합니다. shading 지점이 probe에서 거리 <math><mi>r</mi></math>에 있을 때, probe에서 그 방향으로 쏜 ray가 <math><mi>r</mi></math>보다 멀리 갔을 확률의 상한은 Chebyshev 부등식(one-sided)으로 구합니다. variance shadow map과 같은 원리입니다.</p>
+  <div class="eq">
+    <math display="block"><mrow>
+      <msup><mi>σ</mi><mn>2</mn></msup><mo>=</mo><mo>|</mo><msub><mi>m</mi><mn>2</mn></msub><mo>−</mo><msup><mi>μ</mi><mn>2</mn></msup><mo>|</mo>
+      <mspace width="2em"/>
+      <mi>w</mi><mo>=</mo>
+      <mrow><mo>{</mo><mtable columnalign="left">
+        <mtr><mtd><mn>1</mn></mtd><mtd><mtext>if </mtext><mi>r</mi><mo>≤</mo><mi>μ</mi></mtd></mtr>
+        <mtr><mtd><mfrac><msup><mi>σ</mi><mn>2</mn></msup><mrow><msup><mi>σ</mi><mn>2</mn></msup><mo>+</mo><msup><mrow><mo>(</mo><mi>r</mi><mo>−</mo><mi>μ</mi><mo>)</mo></mrow><mn>2</mn></msup></mrow></mfrac></mtd><mtd><mtext>otherwise</mtext></mtd></mtr>
+      </mtable></mrow>
+    </mrow></math>
+  </div>
+  <p>구현체들은 이 값을 세제곱하는 식으로 더 날카롭게 만들고, 0에 가까운 작은 하한을 둡니다 <span class="mk b-guess">추측</span>. 또 shading 지점을 법선과 view 방향으로 조금 밀어서 sampling합니다(normal bias, view bias). 그러지 않으면 표면 바로 위의 probe 거리와 비교할 때 자기 그림자가 생깁니다.</p>
+
+  <h3>Hysteresis</h3>
+  <div class="eq">
+    <math display="block"><mrow>
+      <msub><mi>E</mi><mi>t</mi></msub><mo>=</mo><mi>h</mi><mspace width="0.2em"/><msub><mi>E</mi><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>+</mo><mo>(</mo><mn>1</mn><mo>−</mo><mi>h</mi><mo>)</mo><mspace width="0.2em"/><msub><mover><mi>E</mi><mo>^</mo></mover><mi>t</mi></msub>
+    </mrow></math>
+    <div class="where">
+      <math><msub><mover><mi>E</mi><mo>^</mo></mover><mi>t</mi></msub></math><span>이번 frame ray들로 구한 추정값</span>
+      <math><mi>h</mi></math><span>0.97 근처. 클수록 noise가 줄고 조명 변화 반응이 느려짐</span>
+    </div>
+  </div>
+  <p>지수 이동 평균입니다. 정상 상태에서 유효 sample 수는 약 <math><mfrac><mrow><mn>1</mn><mo>+</mo><mi>h</mi></mrow><mrow><mn>1</mn><mo>−</mo><mi>h</mi></mrow></mfrac></math> frame 분량이고, h = 0.97이면 약 66 frame입니다. 조명이 크게 바뀐 직후에는 h를 낮춰 빨리 따라가게 하는 기법이 쓰입니다 <span class="mk b-judge">판단</span>.</p>
+
+  <h3>Artifact와 원인</h3>
+  <div class="table-wrap"><table>
+    <tr><th>증상</th><th>흔한 원인</th><th>볼 debug view</th></tr>
+    <tr><td>벽 너머 빛이 샘 (leak)</td><td>probe 간격 대비 벽이 얇음, distance map 해상도 부족, bias 부족</td><td>probe별 distance 시각화, 8개 probe 가중치</td></tr>
+    <tr><td>벽 근처가 검게 얼룩짐</td><td>probe가 벽 속에 있음 (backface hit 비율 높음)</td><td>probe 위치와 backface 비율</td></tr>
+    <tr><td>조명 변화 후 천천히 따라옴 (lag)</td><td>hysteresis가 큼</td><td>시간축 밝기 그래프</td></tr>
+    <tr><td>깜빡임 (flicker)</td><td>probe당 ray 수 부족, 회전 sampling이 매 frame 크게 달라짐</td><td>frame 간 차이 이미지</td></tr>
+    <tr><td>격자 모양이 보임</td><td>probe 간격이 넓음, trilinear 경계</td><td>probe grid overlay</td></tr>
+  </table></div>
+
+  <details class="quiz"><summary>확인 질문: OctEncode로 (0, 0, -1)을 encode하면 어디로 가는가? 그 점이 정사각형의 어디에 있는지가 왜 border 처리와 관련 있는가?</summary>
+  (0, 0, -1)은 z &lt; 0이라 접힘이 적용되어 네 모서리 중 하나((±1, ±1))로 갑니다. 정확히는 네 모서리가 모두 같은 방향(남극)입니다. 그래서 모서리 texel의 border는 대각선 반대편 모서리에서 복사해 와야 하고, 변의 border는 같은 변의 거울 위치에서 복사해야 합니다.</details>
+  <details class="quiz"><summary>확인 질문: Chebyshev 가중치가 r ≤ μ에서 1인 이유는?</summary>
+  shading 지점이 그 방향 평균 hit 거리보다 가깝다면, probe에서 그 지점까지 가는 동안 가로막는 표면이 평균적으로 없다는 뜻이므로 probe가 그 지점을 볼 수 있다고 봅니다. r이 μ를 넘어서면 표면 너머에 있을 가능성이 커지고, 분산이 작을수록 가중치가 빨리 떨어집니다.</details>
+</section>
+
+<!-- ============================================================ -->
+<section class="part" id="p11" data-title="4단계: RT reflection">
+  <div class="part-head"><span class="part-no">11</span><h2>4단계: RT reflection과 specular 합성</h2></div>
+  <p class="goal">목표: GGX VNDF sampling의 pdf와 sample weight를 유도하고, reflection 결과를 기존 shading에 합치는 방법을 정할 수 있다. <span class="when later">4단계 직전</span></p>
+
+  <h3>왜 VNDF인가</h3>
+  <p>D(h)를 그대로 sampling하면 view 방향에서 보이지 않는 microfacet도 뽑혀서, 반사 방향이 표면 아래로 가거나 weight가 매우 커지는 sample이 생깁니다. <b>Visible normal distribution</b>은 view 방향에서 보이는 microfacet만 그 보이는 면적에 비례해 뽑습니다.</p>
+  <div class="eq">
+    <math display="block"><mrow>
+      <msub><mi>D</mi><mi>v</mi></msub><mo>(</mo><mi>h</mi><mo>)</mo><mo>=</mo>
+      <mfrac>
+        <mrow><msub><mi>G</mi><mn>1</mn></msub><mo>(</mo><mi>v</mi><mo>)</mo><mspace width="0.2em"/><mo>max</mo><mo>(</mo><mn>0</mn><mo>,</mo><mi>v</mi><mo>·</mo><mi>h</mi><mo>)</mo><mspace width="0.2em"/><mi>D</mi><mo>(</mo><mi>h</mi><mo>)</mo></mrow>
+        <mrow><mi>n</mi><mo>·</mo><mi>v</mi></mrow>
+      </mfrac>
+      <mspace width="1.5em"/>
+      <mi>p</mi><mo>(</mo><mi>l</mi><mo>)</mo><mo>=</mo><mfrac><mrow><msub><mi>D</mi><mi>v</mi></msub><mo>(</mo><mi>h</mi><mo>)</mo></mrow><mrow><mn>4</mn><mo>(</mo><mi>v</mi><mo>·</mo><mi>h</mi><mo>)</mo></mrow></mfrac>
+    </mrow></math>
+  </div>
+  <p>sample weight <math><msub><mi>f</mi><mi>s</mi></msub><mo>(</mo><mi>l</mi><mo>,</mo><mi>v</mi><mo>)</mo><mo>(</mo><mi>n</mi><mo>·</mo><mi>l</mi><mo>)</mo><mo>/</mo><mi>p</mi><mo>(</mo><mi>l</mi><mo>)</mo></math>에 Part 03의 Cook-Torrance 식을 넣으면 D와 대부분의 항이 지워집니다.</p>
+  <div class="eq">
+    <math display="block"><mrow>
+      <mfrac>
+        <mrow><msub><mi>f</mi><mi>s</mi></msub><mo>(</mo><mi>l</mi><mo>,</mo><mi>v</mi><mo>)</mo><mo>(</mo><mi>n</mi><mo>·</mo><mi>l</mi><mo>)</mo></mrow>
+        <mrow><mi>p</mi><mo>(</mo><mi>l</mi><mo>)</mo></mrow>
+      </mfrac>
+      <mo>=</mo>
+      <mi>F</mi><mo>(</mo><mi>v</mi><mo>,</mo><mi>h</mi><mo>)</mo><mspace width="0.2em"/>
+      <mfrac>
+        <mrow><msub><mi>G</mi><mn>2</mn></msub><mo>(</mo><mi>l</mi><mo>,</mo><mi>v</mi><mo>)</mo></mrow>
+        <mrow><msub><mi>G</mi><mn>1</mn></msub><mo>(</mo><mi>v</mi><mo>)</mo></mrow>
+      </mfrac>
+    </mrow></math>
+  </div>
+  <p>weight가 0과 1 사이의 완만한 값이 되어 variance가 크게 줄어듭니다. 이 식을 종이에 직접 유도해 보는 것이 이 Part의 핵심 연습입니다. sampling 알고리즘(stretch, 반구 투영 sample, unstretch)과 HLSL로 옮기기 쉬운 코드는 Heitz, "Sampling the GGX Distribution of Visible Normals" (JCGT 2018)에 있습니다.</p>
+
+  <h3>Roughness 구간별 전략</h3>
+  <div class="table-wrap"><table>
+    <tr><th>구간</th><th>전략</th></tr>
+    <tr><td>거의 거울</td><td>반사 방향 하나로 쏨. noise가 거의 없어 denoise 생략 가능</td></tr>
+    <tr><td>중간 (noise가 가장 심한 구간)</td><td>VNDF 1 sample + denoiser (Part 12)</td></tr>
+    <tr><td>cutoff 이상</td><td>ray를 쏘지 않고 저주파 근사로 fallback (DDGI를 반사 방향으로 sampling하거나 prefiltered cubemap)</td></tr>
+  </table></div>
+  <p>구간 경계 값은 정해진 답이 없습니다. 4단계 초반에 raw 결과와 reference를 roughness별로 비교해서 정합니다 <span class="mk b-judge">판단</span>. 경계에서 두 방법을 섞지 않으면 이음새가 보입니다.</p>
+
+  <h3>Hit shading</h3>
+  <ul>
+    <li><b>Hit</b>: emissive + sun direct(shadow ray) + DDGI irradiance × diffuse 계수. 2단계 hit shading과 3단계 DDGI sampling 함수를 재사용합니다. hit 지점의 specular는 보통 생략하거나 단순화합니다 <span class="mk b-judge">판단</span>.</li>
+    <li><b>Miss</b>: sky radiance. raster의 radiance cubemap과 같은 소스를 씁니다.</li>
+    <li><b>Texture mip</b>: hit 지점에는 화면 미분이 없으므로 <code>SampleLevel</code>로 mip을 직접 정합니다. 반사는 거리에 따라 footprint가 커지므로 ray cone 방법이 맞습니다. 개요는 <a href="#p7">Part 07</a>, 상세는 Ray Tracing Gems의 texture LOD 장입니다.</li>
+  </ul>
+
+  <h3>기존 shading에 합치기: demodulation</h3>
+  <p>RT로 구한 값을 Forward+ pixel shader에서 <code>Specular_IBL</code> 대신 읽으려면, reflection pass를 color pass보다 먼저 돌려서 결과를 texture로 넘겨야 합니다. 이때 <b>무엇을 저장할지</b>가 중요합니다.</p>
+  <ul>
+    <li><b>BRDF weight를 곱한 값을 저장</b>하면, denoiser가 blur할 때 F0 같은 material 디테일까지 번집니다.</li>
+    <li><b>Incoming radiance만 저장(demodulate)</b>하고, color pass에서 "반구 적분된 specular 반사율"을 곱하는 방식이 흔합니다 <span class="mk b-judge">판단</span>. 이 반사율이 split-sum의 DFG 항입니다 (Part 03). 지금의 <code>Specular_IBL</code>처럼 Fresnel만 곱하면 거친 표면이 실제보다 밝아집니다.</li>
+  </ul>
+
+  <details class="quiz"><summary>확인 질문: VNDF sample weight F·G2/G1에서 F를 빼고 저장한다면, 그 값은 무엇을 뜻하는가?</summary>
+  G2/G1은 masking을 통과한 반사가 shadowing까지 통과할 비율입니다. F를 빼고 L_in × G2/G1을 저장했다가 나중에 F를 곱하는 방식은 demodulation의 한 형태입니다. 다만 F가 sample마다 다른 v·h를 쓰므로, 엄밀히 분리하려면 F를 반구 적분한 평균값(DFG)을 곱하는 근사를 받아들여야 합니다.</details>
+  <details class="quiz"><summary>확인 질문: reflection ray가 거친 바닥에서 출발해 어두운 회랑 안쪽에 맞았다. DDGI 없이 hit shading을 sun direct만으로 하면 반사에 어떻게 보이는가?</summary>
+  sun이 닿지 않는 곳은 완전히 검게 반사됩니다. 실제로는 그 지점도 간접광을 받으므로, hit 지점에서 DDGI를 읽어야 반사 속 어두운 영역이 맞는 밝기가 됩니다. 이것이 DDGI를 reflection보다 먼저 만드는 이유입니다.</details>
+</section>
+
+<!-- ============================================================ -->
+<section class="part" id="p12" data-title="4단계: Denoising">
+  <div class="part-head"><span class="part-no">12</span><h2>4단계: denoising</h2></div>
+  <p class="goal">목표: temporal accumulation, reflection reprojection, history rejection, à-trous filter가 각각 무엇을 해결하는지 설명할 수 있다. <span class="when later">4단계 직전</span></p>
+
+  <h3>Temporal accumulation</h3>
+  <div class="eq">
+    <math display="block"><mrow>
+      <msub><mi>c</mi><mi>t</mi></msub><mo>=</mo><mo>(</mo><mn>1</mn><mo>−</mo><mi>a</mi><mo>)</mo><mspace width="0.2em"/><mtext>history</mtext><mo>(</mo><msub><mi>p</mi><mtext>prev</mtext></msub><mo>)</mo><mo>+</mo><mi>a</mi><mspace width="0.2em"/><msub><mi>x</mi><mi>t</mi></msub>
+    </mrow></math>
+    <div class="where">
+      <math><msub><mi>p</mi><mtext>prev</mtext></msub></math><span>현재 pixel이 이전 frame에서 있던 위치 (reprojection)</span>
+      <math><mi>a</mi></math><span>0.05~0.2 정도. 누적 frame 수를 pixel마다 세어 <math><mi>a</mi><mo>=</mo><mo>max</mo><mo>(</mo><mn>1</mn><mo>/</mo><mi>n</mi><mo>,</mo><msub><mi>a</mi><mtext>min</mtext></msub><mo>)</mo></math>로 쓰기도 함</span>
+    </div>
+  </div>
+  <p>Part 04에서 본 것처럼 64 frame을 모으면 noise가 1/8이 됩니다. 문제는 history를 <b>어디서</b> 읽어 오느냐입니다.</p>
+
+  <h3>Reprojection: 이 repo의 velocity buffer</h3>
+  <ul>
+    <li><code>g_VelocityBuffer</code>(<code>Core/BufferManager.h:31</code>)는 <code>MotionBlur::GenerateCameraVelocityBuffer</code>가 채웁니다(<code>ModelViewer/ModelViewer.cpp:354</code>). shader <code>Core/Shaders/CameraVelocityCS.hlsl</code>는 depth와 "현재에서 이전 frame으로 가는 행렬" 하나로 계산합니다. 즉 <b>카메라 움직임만 반영</b>합니다. 움직이는 물체의 motion vector는 없습니다.</li>
+    <li>기존 TAA(<code>Core/TemporalEffects.cpp</code>)가 이 buffer를 읽습니다. TAA 코드는 reprojection과 neighborhood clamp의 실제 예제로 읽기 좋습니다.</li>
+    <li>Sponza처럼 정적인 장면에서는 카메라 velocity만으로 충분합니다. 동적 물체를 GI에 넣으려면 per-object motion vector가 필요합니다 <span class="mk b-judge">판단</span>.</li>
+  </ul>
+
+  <h3>Reflection은 표면과 다르게 움직인다</h3>
+  <p>거울에 비친 물체는 거울 표면이 아니라 <b>거울 너머 가상 위치</b>에 있는 것처럼 보입니다. 카메라가 움직이면 반사 상은 표면의 motion vector와 다르게 움직입니다. 표면 motion vector로 reflection history를 읽으면 반사가 끌리고 번집니다.</p>
+  <ul>
+    <li>매끈한 표면: 가상 위치 = 카메라 위치 + view 방향 × (표면까지 거리 + hit distance). 이 점을 이전 frame 행렬로 투영해 history 위치를 구합니다.</li>
+    <li>거친 표면: 반사 상이 흐려 표면 motion vector와 차이가 덜 보입니다. roughness에 따라 두 방식을 섞는 방법이 쓰입니다 <span class="mk b-judge">판단</span>.</li>
+    <li>그래서 reflection pass는 <b>hit distance를 같이 출력</b>해야 합니다. 나중에 추가하면 출력 포맷을 바꿔야 하므로 처음부터 넣습니다.</li>
+  </ul>
+
+  <h3>History rejection</h3>
+  <ul>
+    <li><b>Disocclusion</b>: 이전 frame에 가려져 있던 pixel은 history가 없습니다. 이전 frame의 depth, normal과 비교해 크게 다르면 history를 버립니다. 그러려면 이전 frame의 depth와 normal을 보관해야 합니다.</li>
+    <li><b>Variance clipping</b>: 현재 frame 주변 pixel의 평균과 표준편차로 상자를 만들고 history를 그 안으로 clip합니다. 조명 변화로 생긴 ghosting을 줄입니다. noise가 심한 입력에서는 상자도 흔들려서 효과가 약해지므로, spatial filter 뒤에 적용하거나 상자를 넓게 잡습니다 <span class="mk b-judge">판단</span>.</li>
+  </ul>
+
+  <h3>Spatial filter: SVGF의 à-trous</h3>
+  <p>Schied et al., "Spatiotemporal Variance-Guided Filtering" (HPG 2017)의 구조입니다.</p>
+  <ol class="plain">
+    <li>temporal 단계에서 pixel마다 luminance의 1차, 2차 moment를 누적해 <b>variance</b>를 추정합니다.</li>
+    <li>5×5 커널을 간격 1, 2, 4, 8, 16으로 벌리며 여러 번 적용합니다(à-trous, "구멍 뚫린" 커널). 몇 번의 pass로 넓은 범위를 싸게 덮습니다.</li>
+    <li>이웃 가중치에 <b>edge-stopping</b> 함수를 곱합니다. depth 차이, normal 차이, 그리고 variance로 정규화한 luminance 차이입니다. noise가 큰 곳은 강하게, 경계와 디테일은 약하게 blur됩니다.</li>
+  </ol>
+  <p>SVGF는 diffuse를 위해 설계됐습니다. specular에 쓰려면 roughness가 낮을수록 spatial 반경을 줄여야 반사 상이 뭉개지지 않습니다 <span class="mk b-judge">판단</span>.</p>
+
+  <details class="quiz"><summary>확인 질문: 카메라가 옆으로 움직일 때, 거울 바닥의 반사를 표면 motion vector로 reprojection하면 어떤 artifact가 생기는가?</summary>
+  바닥 표면 위치 기준으로 history를 읽으므로, 실제로는 다른 속도로 움직여야 할 반사 상이 바닥에 붙어서 끌려가는 것처럼 보입니다. 누적 비율이 높으면 반사 상이 번지는 ghosting이 됩니다.</details>
+  <details class="quiz"><summary>확인 질문: à-trous를 5 pass 적용하면 커널이 덮는 범위는 대략 몇 pixel인가?</summary>
+  간격이 1, 2, 4, 8, 16이고 각 pass가 중심에서 ±2칸이므로, 반경은 2 × (1 + 2 + 4 + 8 + 16) = 62 pixel입니다. 지름으로는 약 125 pixel입니다. 5×5 tap 5번(125 tap)으로 이 범위를 덮습니다.</details>
+</section>
+
+<!-- ============================================================ -->
+<section class="part" id="p13" data-title="측정 도구">
+  <div class="part-head"><span class="part-no">13</span><h2>측정과 디버깅 도구</h2></div>
+  <p class="goal">목표: GPU 시간, 중간 결과, reference 대비 오차를 각각 무엇으로 볼지 안다. <span class="when">시작 전</span></p>
+
+  <div class="table-wrap"><table>
+    <tr><th>보고 싶은 것</th><th>도구</th><th>비고</th></tr>
+    <tr><td>pass별 GPU 시간</td><td><code>ScopedTimer</code> (<code>Core/EngineProfiling.h</code>)</td><td>이미 "Depth Pre-Pass", "Sun Shadow Map" 같은 구간에 쓰임. 새 pass마다 감쌈</td></tr>
+    <tr><td>AS 내용, dispatch 입력과 출력, shader 단계별 값</td><td>PIX on Windows GPU capture</td><td>AS viewer로 BLAS와 TLAS 배치를 눈으로 확인. shader debugging</td></tr>
+    <tr><td>실행 중 on/off, 값 조정</td><td><code>EngineTuning</code>의 <code>BoolVar</code>, <code>NumVar</code> (<code>Core/EngineTuning.h</code>)</td><td>예: <code>g_SunLightIntensity</code>(<code>ModelViewer/ModelViewer.cpp:75</code>). GI on/off, hysteresis, roughness cutoff를 여기에 둠</td></tr>
+    <tr><td>reference 대비 오차</td><td>FLIP, RMSE/PSNR 스크립트</td><td>같은 카메라 위치에서 linear HDR로 저장한 이미지를 비교 (Part 09)</td></tr>
+    <tr><td>중간 buffer</td><td>debug view (직접 만듦)</td><td>G-buffer, hit distance, probe 상태, 누적 frame 수, variance</td></tr>
+  </table></div>
+
+  <details class="quiz"><summary>확인 질문: DDGI 결과가 reference보다 어둡다. 원인이 probe trace 쪽인지 표면 sampling 쪽인지 어떻게 나누어 확인하는가?</summary>
+  probe 하나를 골라 그 위치에서 path tracer로 irradiance를 직접 적분한 값과 probe에 저장된 값을 비교합니다. 둘이 맞으면 trace와 blend는 정상이고, 문제는 표면에서 8개 probe를 섞는 가중치(Chebyshev, backface, bias) 쪽입니다. 둘이 다르면 trace, hit shading, blend 중 하나입니다.</details>
+</section>
+
+<!-- ============================================================ -->
+<section class="part" id="p14" data-title="학습 체크리스트">
+  <div class="part-head"><span class="part-no">14</span><h2>학습 체크리스트</h2></div>
+  <p class="goal">각 항목은 "읽었다"가 아니라 "할 수 있다"로 적었습니다. 체크 상태는 이 브라우저에만 저장됩니다.</p>
+
+  <h3>시작 전</h3>
+  <ul class="check">
+    <li><input type="checkbox" data-key="c-rad" id="c-rad"><label for="c-rad">균일한 하늘 아래 Lambert 표면의 나가는 radiance를 적분으로 유도할 수 있다 (Part 01)</label></li>
+    <li><input type="checkbox" data-key="c-pbr" id="c-pbr"><label for="c-pbr">metallic, roughness, base color가 <code>c_diff</code>, <code>c_spec</code>, <code>alpha</code>로 바뀌는 과정을 코드 위치와 함께 설명하고, Blinn-Phong이 GI에서 문제가 되는 이유를 말할 수 있다 (Part 02)</label></li>
+    <li><input type="checkbox" data-key="c-brdf" id="c-brdf"><label for="c-brdf">D, G, F 각 항의 역할을 말하고 <code>DefaultPS.hlsl</code>에서 해당 함수를 찾을 수 있다 (Part 03)</label></li>
+    <li><input type="checkbox" data-key="c-norm" id="c-norm"><label for="c-norm">이 repo shader의 BRDF 정규화 상수가 교과서 식과 같은지 확인했다 (Part 03)</label></li>
+    <li><input type="checkbox" data-key="c-mc" id="c-mc"><label for="c-mc">cosine-weighted sampling 코드와 pdf를 쓰고, 균일 sampling보다 variance가 작은 이유를 말할 수 있다 (Part 04)</label></li>
+    <li><input type="checkbox" data-key="c-dxr" id="c-dxr"><label for="c-dxr">BLAS와 TLAS build 절차, 필요한 barrier, <code>RayQuery</code> closest hit와 shadow ray 코드를 보지 않고 쓸 수 있다 (Part 05~07)</label></li>
+    <li><input type="checkbox" data-key="c-path" id="c-path"><label for="c-path">현재 color pass에서 계산되는 빛의 종류와, thin G-buffer가 필요한 이유를 코드 위치와 함께 말할 수 있다 (Part 08)</label></li>
+    <li><input type="checkbox" data-key="c-pix" id="c-pix"><label for="c-pix">PIX로 ModelViewer를 capture하고 pass별 시간을 읽을 수 있다 (Part 13)</label></li>
+  </ul>
+
+  <h3>2단계 직전</h3>
+  <ul class="check">
+    <li><input type="checkbox" data-key="c-pt" id="c-pt"><label for="c-pt">throughput, NEE, Russian roulette를 포함한 path tracing loop를 보지 않고 쓸 수 있다 (Part 09)</label></li>
+    <li><input type="checkbox" data-key="c-fair" id="c-fair">
+      <label for="c-fair">raster와 reference를 공정하게 비교하는 조건을 다섯 가지 이상 말할 수 있다 (Part 09)</label></li>
+  </ul>
+
+  <h3>3단계 직전</h3>
+  <ul class="check">
+    <li><input type="checkbox" data-key="c-oct" id="c-oct"><label for="c-oct">octahedral encode, decode와 border 복사 규칙을 그림으로 설명할 수 있다 (Part 10)</label></li>
+    <li><input type="checkbox" data-key="c-cheb" id="c-cheb"><label for="c-cheb">Chebyshev visibility 식과 bias가 필요한 이유를 설명할 수 있다 (Part 10)</label></li>
+    <li><input type="checkbox" data-key="c-ddgi-paper" id="c-ddgi-paper"><label for="c-ddgi-paper">DDGI 원 논문을 읽고 Part 10의 <span class="mk b-guess">추측</span> 표시 항목을 원문과 대조했다</label></li>
+  </ul>
+
+  <h3>4단계 직전</h3>
+  <ul class="check">
+    <li><input type="checkbox" data-key="c-vndf" id="c-vndf"><label for="c-vndf">VNDF sample weight F·G2/G1을 직접 유도했다 (Part 11)</label></li>
+    <li><input type="checkbox" data-key="c-demod" id="c-demod"><label for="c-demod">demodulation을 하는 이유와 color pass에서 곱할 값을 정할 수 있다 (Part 11)</label></li>
+    <li><input type="checkbox" data-key="c-taa" id="c-taa"><label for="c-taa"><code>TemporalEffects.cpp</code>의 TAA resolve 흐름을 따라가며 reprojection과 clamp 위치를 짚을 수 있다 (Part 12)</label></li>
+    <li><input type="checkbox" data-key="c-svgf" id="c-svgf"><label for="c-svgf">SVGF 논문을 읽고 edge-stopping 함수 세 가지를 설명할 수 있다 (Part 12)</label></li>
+  </ul>
+
+</section>
+
+<!-- ============================================================ -->
+<section class="part" id="p15" data-title="참고 자료">
+  <div class="part-head"><span class="part-no">15</span><h2>참고 자료</h2></div>
+  <p class="goal">단계 순서로 정리했습니다.</p>
+
+  <h3>이론 (시작 전)</h3>
+  <ol class="plain">
+    <li><b>Physically Based Rendering, 4th ed.</b> (Pharr, Jakob, Humphreys): <a href="https://pbr-book.org/4ed/contents" target="_blank" rel="noopener">pbr-book.org</a>. 온라인 무료. radiometry, Monte Carlo, microfacet 장을 Part 01~04과 함께 읽습니다.</li>
+    <li><b>LearnOpenGL, PBR Theory</b>: <a href="https://learnopengl.com/PBR/Theory" target="_blank" rel="noopener">learnopengl.com/PBR/Theory</a>. Blinn-Phong 경험자가 PBR 개념을 처음 잡기 좋은 입문 글입니다. Part 02와 03 전에 읽습니다.</li>
+    <li><b>glTF 2.0 Specification</b>: <a href="https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html" target="_blank" rel="noopener">registry.khronos.org/glTF/specs/2.0</a>. "Metallic-Roughness Material" 절과 "Appendix B: BRDF Implementation"이 이 repo가 따르는 material 정의입니다.</li>
+    <li><b>Karis, Real Shading in Unreal Engine 4</b>, SIGGRAPH 2013 Physically Based Shading course: <a href="https://blog.selfshadow.com/publications/s2013-shading-course/" target="_blank" rel="noopener">course 페이지</a>. split-sum과 DFG LUT. 같은 course의 Hoffman, "Physics and Math of Shading"은 PBR의 물리적 배경을 설명합니다.</li>
+    <li><b>Duff et al., Building an Orthonormal Basis, Revisited</b>, JCGT 2017: <a href="https://jcgt.org/published/0006/01/01/" target="_blank" rel="noopener">jcgt.org/published/0006/01/01</a></li>
+    <li><b>Jarzynski and Olano, Hash Functions for GPU Rendering</b>, JCGT 2020: <a href="https://jcgt.org/published/0009/03/02/" target="_blank" rel="noopener">jcgt.org/published/0009/03/02</a></li>
+  </ol>
+
+  <h3>1단계 (시작 전)</h3>
+  <ol class="plain">
+    <li><b>DirectX Raytracing (DXR) Functional Spec</b>: <a href="https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html" target="_blank" rel="noopener">microsoft.github.io/DirectX-Specs/d3d/Raytracing.html</a>. AS 구조체, state 규칙, <code>RayQuery</code> 전체 API의 원전입니다. "Inline raytracing"과 acceleration structure 관련 장부터 읽습니다.</li>
+    <li><b>HLSL Shader Model 6.6 Dynamic Resources</b>: <a href="https://microsoft.github.io/DirectX-Specs/d3d/HLSL_SM_6_6_DynamicResources.html" target="_blank" rel="noopener">microsoft.github.io/DirectX-Specs/d3d/HLSL_SM_6_6_DynamicResources.html</a>. <code>ResourceDescriptorHeap</code> bindless.</li>
+    <li><b>DirectX-Graphics-Samples의 D3D12Raytracing 샘플</b>: <a href="https://github.com/microsoft/DirectX-Graphics-Samples/tree/master/Samples/Desktop/D3D12Raytracing" target="_blank" rel="noopener">GitHub</a>. HelloWorld 샘플에서 AS build의 최소 코드를 볼 수 있습니다.</li>
+  </ol>
+
+  <h3>2단계</h3>
+  <ol class="plain">
+    <li><b>Ray Tracing Gems I, II</b> (무료 PDF): <a href="https://www.realtimerendering.com/raytracinggems/" target="_blank" rel="noopener">realtimerendering.com/raytracinggems</a>. self-intersection, texture LOD(ray cone), sampling 관련 장.</li>
+    <li><b>FLIP</b>: <a href="https://github.com/NVlabs/flip" target="_blank" rel="noopener">github.com/NVlabs/flip</a>. 이미지 비교 도구.</li>
+  </ol>
+
+  <h3>3단계</h3>
+  <ol class="plain">
+    <li><b>Majercik et al., Dynamic Diffuse Global Illumination with Ray-Traced Irradiance Fields</b>, JCGT 2019: <a href="https://jcgt.org/published/0008/02/01/" target="_blank" rel="noopener">jcgt.org/published/0008/02/01</a></li>
+    <li><b>NVIDIA RTXGI-DDGI</b>: <a href="https://github.com/NVIDIAGameWorks/RTXGI-DDGI" target="_blank" rel="noopener">github.com/NVIDIAGameWorks/RTXGI-DDGI</a>. probe trace와 blend shader 구현, 기본 설정값을 Part 10의 <span class="mk b-guess">추측</span> 항목과 대조할 때 씁니다.</li>
+    <li><b>Cigolle et al., A Survey of Efficient Representations for Independent Unit Vectors</b>, JCGT 2014: <a href="https://jcgt.org/published/0003/02/01/" target="_blank" rel="noopener">jcgt.org/published/0003/02/01</a>. octahedral encoding.</li>
+  </ol>
+
+  <h3>4단계</h3>
+  <ol class="plain">
+    <li><b>Heitz, Sampling the GGX Distribution of Visible Normals</b>, JCGT 2018: <a href="https://jcgt.org/published/0007/04/01/" target="_blank" rel="noopener">jcgt.org/published/0007/04/01</a></li>
+    <li><b>Schied et al., Spatiotemporal Variance-Guided Filtering</b>, HPG 2017. 제목으로 검색하세요.</li>
+  </ol>
+
+  <p style="color:var(--muted);font-size:14px">링크는 작성 시점에 열리는 것을 확인했습니다. 단, Ray Tracing Gems 페이지는 자동 요청을 거부해(HTTP 403) 확인하지 못했습니다. JCGT 논문은 링크가 가리키는 제목까지 확인했고, 그 밖의 저자와 연도는 기억에 근거한 것이 있으니 인용할 때 원문 페이지에서 다시 확인하세요.</p>
+</section>
+</main>
+</div>
+
+<script>
+(function () {
+  var KEY = "gi-prereq-done";
+  var done = {};
+  try { done = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { done = {}; }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(done)); } catch (e) {} }
+
+  var toc = document.getElementById("toc");
+  document.querySelectorAll("section.part").forEach(function (sec) {
+    var id = sec.id;
+    var li = document.createElement("li");
+    var a = document.createElement("a");
+    a.href = "#" + id;
+    a.innerHTML = '<span class="n"></span><span class="t"></span>';
+    a.querySelector(".n").textContent = sec.querySelector(".part-no").textContent;
+    a.querySelector(".t").textContent = sec.getAttribute("data-title");
+    li.appendChild(a);
+    toc.appendChild(li);
+
+    var lab = document.createElement("label");
+    lab.className = "done-toggle";
+    var cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = !!done[id];
+    a.classList.toggle("done", cb.checked);
+    cb.addEventListener("change", function () {
+      done[id] = cb.checked;
+      a.classList.toggle("done", cb.checked);
+      save();
+    });
+    lab.appendChild(cb);
+    lab.appendChild(document.createTextNode("학습 완료"));
+    sec.querySelector(".part-head").appendChild(lab);
+  });
+
+  document.querySelectorAll(".check input[data-key]").forEach(function (cb) {
+    var k = cb.getAttribute("data-key");
+    cb.checked = !!done[k];
+    cb.addEventListener("change", function () { done[k] = cb.checked; save(); });
+  });
+})();
+</script>
+</body>
+</html>
