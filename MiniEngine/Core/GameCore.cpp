@@ -37,7 +37,7 @@ namespace GameCore
         LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
         CommandLineArgs::Initialize(argc, argv);
 
-        Graphics::Initialize(game.RequiresRaytracingSupport());
+        Graphics::Initialize(game.RequiresInlineRaytracing());
         SystemTime::Initialize();
         GameInput::Initialize();
         EngineTuning::Initialize();

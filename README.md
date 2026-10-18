@@ -6,6 +6,7 @@
 
 - Visual Studio 2022 (17.14 에서 확인), Desktop development with C++ workload, vcpkg 구성 요소
 - Windows SDK
+- inline raytracing (DXR Tier 1.1, Shader Model 6.5) 을 지원하는 GPU. WARP 는 지원하지 않는다.
 
 ## 빌드와 실행
 

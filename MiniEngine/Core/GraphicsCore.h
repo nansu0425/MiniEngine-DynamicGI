@@ -29,7 +29,7 @@ namespace Graphics
 
     using namespace Microsoft::WRL;
 
-    void Initialize(bool RequireDXRSupport=false);
+    void Initialize(bool RequireInlineRaytracing=false);
     void Shutdown(void);
 
     bool IsDeviceNvidia(ID3D12Device* pDevice);
@@ -37,6 +37,7 @@ namespace Graphics
     bool IsDeviceIntel(ID3D12Device* pDevice);
 
     extern ID3D12Device* g_Device;
+    extern ID3D12Device5* g_DXRDevice; // app이 inline raytracing을 요구할 때만 설정되고, 그 외에는 nullptr이다.
     extern CommandListManager g_CommandManager;
     extern ContextManager g_ContextManager;
 

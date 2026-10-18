@@ -27,6 +27,7 @@
 #include "ParticleEffectManager.h"
 #include "GameInput.h"
 #include "SponzaRenderer.h"
+#include "RayQuerySmokeTest.h"
 #include "glTF.h"
 #include "Renderer.h"
 #include "Model.h"
@@ -57,6 +58,8 @@ public:
 
     virtual void Update( float deltaT ) override;
     virtual void RenderScene( void ) override;
+
+    virtual bool RequiresInlineRaytracing() const override { return true; }
 
 private:
 
@@ -157,6 +160,7 @@ void ModelViewer::Startup( void )
     SSAO::Enable = true;
 
     Renderer::Initialize();
+    RayQuerySmokeTest::Run();
 
     LoadIBLTextures();
 
