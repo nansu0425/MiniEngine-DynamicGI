@@ -19,6 +19,11 @@
 
 조작법은 [MiniEngine/readme.md](MiniEngine/readme.md) 에 있다.
 
+## 코드 규칙
+
+- 이 프로젝트에서 작성하거나 수정한 코드의 주석은 한국어로 쓰고, 기술 용어는 영어로 쓴다. upstream 코드의 주석은 그대로 둔다.
+- source 파일은 UTF-8 로 저장한다. editor 는 [.editorconfig](.editorconfig), MSVC 는 `/utf-8` ([Build.props](MiniEngine/PropertySheets/Build.props)) 로 이를 따른다.
+
 ## License
 
 이 프로젝트의 작업은 MIT License 를 따른다([LICENSE](LICENSE)). upstream MiniEngine 코드는 Microsoft 의 MIT License 를 따른다([MiniEngine/License.txt](MiniEngine/License.txt)). Sponza asset 의 출처는 받은 뒤 `MiniEngine/ModelViewer/Sponza/pbr/copyright.txt` 에 있다.
