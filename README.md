@@ -16,7 +16,7 @@
    .\scripts\fetch-assets.ps1
    ```
 
-2. `MiniEngine/ModelViewer/ModelViewer.slnx` 를 열고 build 후 실행한다. DirectXTex, DirectXMesh 는 첫 build 때 vcpkg 가 받는다.
+2. `MiniEngine/MiniEngine.slnx` 를 열고 ModelViewer 를 build 후 실행한다. DirectXTex, DirectXMesh 는 첫 build 때 vcpkg 가 받는다.
 
 조작법은 [MiniEngine/readme.md](MiniEngine/readme.md) 에 있다.
 

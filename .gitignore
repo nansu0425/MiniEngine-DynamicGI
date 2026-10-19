@@ -2,8 +2,8 @@
 *.vcxproj.user
 
 /MiniEngine/Build/
-/Packages/
-/vcpkg_installed/
+/MiniEngine/Packages/
+/MiniEngine/vcpkg_installed/
 
 # scripts/fetch-assets.ps1 가 받아 오는 upstream asset
 /MiniEngine/ModelViewer/Sponza/

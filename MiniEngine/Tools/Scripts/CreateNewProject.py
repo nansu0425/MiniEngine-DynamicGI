@@ -37,7 +37,6 @@ def copy_app_template(project, guid):
     shutil.copy(os.path.join(TEMPLATES_FOLDER, 'pch.h'), project)
     shutil.copy(os.path.join(TEMPLATES_FOLDER, 'pch.cpp'), project)
     copy_template_file('Main.cpp', project, guid)
-    copy_template_file('AppTemplate.slnx', project, guid)
     copy_template_file('AppTemplate.vcxproj', project, guid)
 
 def copy_lib_template(project, guid):
