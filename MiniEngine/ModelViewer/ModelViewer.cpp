@@ -27,6 +27,7 @@
 #include "ParticleEffectManager.h"
 #include "GameInput.h"
 #include "SponzaRenderer.h"
+#include "RayQuerySmokeTest.h"
 #include "glTF.h"
 #include "Renderer.h"
 #include "Model.h"
@@ -34,9 +35,9 @@
 #include "ShadowCamera.h"
 #include "Display.h"
 
-// Dynamic GI ÇÁ·ÎÁ§Æ®¿¡¼± legacy path°¡ ¾Æ´Ñ glTF path¸¦ »ç¿ëÇÑ´Ù.
-// legacy´Â Blinn-Phong, glTF´Â PBR shading
-// Skinning/animationÀº glTF path¿¡¸¸ ÀÖÀ½
+// Dynamic GI í”„ë¡œì íŠ¸ì—ì„  legacy pathê°€ ì•„ë‹Œ glTF pathë¥¼ ì‚¬ìš©í•œë‹¤.
+// legacyëŠ” Blinn-Phong, glTFëŠ” PBR shading
+// Skinning/animationì€ glTF pathì—ë§Œ ìˆìŒ
 // #define LEGACY_RENDERER
 
 using namespace GameCore;
@@ -57,6 +58,8 @@ public:
 
     virtual void Update( float deltaT ) override;
     virtual void RenderScene( void ) override;
+
+    virtual bool RequiresInlineRaytracing() const override { return true; }
 
 private:
 
@@ -157,6 +160,7 @@ void ModelViewer::Startup( void )
     SSAO::Enable = true;
 
     Renderer::Initialize();
+    RayQuerySmokeTest::Run();
 
     LoadIBLTextures();
 

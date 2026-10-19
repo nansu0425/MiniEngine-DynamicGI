@@ -41,8 +41,8 @@ namespace GameCore
         // Optional UI (overlay) rendering pass.  This is LDR.  The buffer is already cleared.
         virtual void RenderUI( class GraphicsContext& ) {};
 
-        // Override this in applications that use DirectX Raytracing to require a DXR-capable device.
-        virtual bool RequiresRaytracingSupport() const { return false; }
+        // Inline raytracing을 쓰는 app은 override해서 이를 지원하는 device를 요구한다.
+        virtual bool RequiresInlineRaytracing() const { return false; }
     };
 }
 

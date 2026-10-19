@@ -50,6 +50,7 @@ namespace Graphics
     bool g_bTypedUAVLoadSupport_R16G16B16A16_FLOAT = false;
 
     ID3D12Device* g_Device = nullptr;
+    ID3D12Device5* g_DXRDevice = nullptr;
     CommandListManager g_CommandManager;
     ContextManager g_ContextManager;
 
@@ -148,20 +149,23 @@ namespace Graphics
         return GetVendorIdFromDevice(pDevice) == vendorID_Intel;
     }
 
-	// Check adapter support for DirectX Raytracing.
-	bool IsDirectXRaytracingSupported(ID3D12Device* testDevice)
-	{
-		D3D12_FEATURE_DATA_D3D12_OPTIONS5 featureSupport = {};
-
-        if (FAILED(testDevice->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &featureSupport, sizeof(featureSupport))))
+    bool IsInlineRaytracingSupported(ID3D12Device* testDevice)
+    {
+        D3D12_FEATURE_DATA_D3D12_OPTIONS5 options5 = {};
+        if (FAILED(testDevice->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &options5, sizeof(options5))))
+            return false;
+        if (options5.RaytracingTier < D3D12_RAYTRACING_TIER_1_1)
             return false;
 
-        return featureSupport.RaytracingTier != D3D12_RAYTRACING_TIER_NOT_SUPPORTED;
-	}
+        D3D12_FEATURE_DATA_SHADER_MODEL shaderModel = { D3D_SHADER_MODEL_6_5 };
+        if (FAILED(testDevice->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL, &shaderModel, sizeof(shaderModel))))
+            return false;
+        return shaderModel.HighestShaderModel >= D3D_SHADER_MODEL_6_5;
+    }
 }
 
 // Initialize the DirectX resources required to run.
-void Graphics::Initialize(bool RequireDXRSupport)
+void Graphics::Initialize(bool RequireInlineRaytracing)
 {
     Microsoft::WRL::ComPtr<ID3D12Device> pDevice;
 
@@ -259,8 +263,8 @@ void Graphics::Initialize(bool RequireDXRSupport)
             if (FAILED(D3D12CreateDevice(pAdapter.Get(), D3D_FEATURE_LEVEL_11_0, MY_IID_PPV_ARGS(&pDevice))))
                 continue;
 
-            // Does support DXR if required?
-            if (RequireDXRSupport && !IsDirectXRaytracingSupported(pDevice.Get()))
+            // Inline raytracing이 필요하면 지원 여부를 확인한다.
+            if (RequireInlineRaytracing && !IsInlineRaytracingSupported(pDevice.Get()))
                 continue;
 
             // By default, search for the adapter with the most memory because that's usually the dGPU.
@@ -278,10 +282,15 @@ void Graphics::Initialize(bool RequireDXRSupport)
         }
     }
 
-    if (RequireDXRSupport && !g_Device)
+	// WARP는 지원하지 않는다. DXR spec대로 구현돼있지 않은 edge case가 존재하기 때문이다. 
+    // 확인 사례 - NULL acceleration structure에 TraceRayInline을 하면 DXR spec대로 miss하지 않고 crash 발생
+    if (RequireInlineRaytracing && !g_Device)
     {
-        Utility::Printf("Unable to find a DXR-capable device. Halting.\n");
+        Utility::Printf("No hardware device supports inline raytracing. Halting.\n");
         __debugbreak();
+        // exit가 아닌 ExitProcess로 종료해 static 소멸자를 실행하지 않는다.
+        // engine 초기화 전이라 소멸자가 안전하게 동작한다는 보장이 없다.
+        ExitProcess(1);
     }
 
     if (g_Device == nullptr)
@@ -317,7 +326,14 @@ void Graphics::Initialize(bool RequireDXRSupport)
         if (DeveloperModeEnabled)
             g_Device->SetStablePowerState(TRUE);
     }
-#endif	
+#endif
+
+    if (RequireInlineRaytracing && FAILED(g_Device->QueryInterface(MY_IID_PPV_ARGS(&g_DXRDevice))))
+    {
+        Utility::Printf("Failed to query ID3D12Device5. Halting.\n");
+        __debugbreak();
+        ExitProcess(1);
+    }
 
 #if _DEBUG
     ID3D12InfoQueue* pInfoQueue = nullptr;
@@ -438,6 +454,12 @@ void Graphics::Shutdown( void )
     GraphRenderer::Shutdown();
     ParticleEffectManager::Shutdown();
     Display::Shutdown();
+
+    if (g_DXRDevice != nullptr)
+    {
+        g_DXRDevice->Release();
+        g_DXRDevice = nullptr;
+    }
 
 #if defined(_GAMING_DESKTOP) && defined(_DEBUG)
     ID3D12DebugDevice* debugInterface;
