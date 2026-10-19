@@ -13,7 +13,7 @@
 
 #pragma once
 
-#include "VectorMath.h"
+#include "Math/VectorMath.h"
 
 namespace Math
 {

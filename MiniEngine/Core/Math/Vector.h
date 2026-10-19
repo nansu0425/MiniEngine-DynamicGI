@@ -13,7 +13,7 @@
 
 #pragma once
 
-#include "Scalar.h"
+#include "Math/Scalar.h"
 
 namespace Math
 {

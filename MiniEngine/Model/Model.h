@@ -14,14 +14,14 @@
 #pragma once
 
 #include "Animation.h"
-#include "../Core/GpuBuffer.h"
-#include "../Core/VectorMath.h"
-#include "../Core/Camera.h"
-#include "../Core/CommandContext.h"
-#include "../Core/UploadBuffer.h"
-#include "../Core/TextureManager.h"
-#include "../Core/Math/BoundingBox.h"
-#include "../Core/Math/BoundingSphere.h"
+#include "Graphics/Resource/GpuBuffer.h"
+#include "Math/VectorMath.h"
+#include "Camera/Camera.h"
+#include "Graphics/Command/CommandContext.h"
+#include "Graphics/Resource/UploadBuffer.h"
+#include "Graphics/Texture/TextureManager.h"
+#include "Math/BoundingBox.h"
+#include "Math/BoundingSphere.h"
 #include <cstdint>
 
 namespace Renderer

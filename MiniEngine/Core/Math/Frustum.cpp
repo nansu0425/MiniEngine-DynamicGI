@@ -12,8 +12,8 @@
 //
 
 #include "pch.h"
-#include "Frustum.h"
-#include "Camera.h"
+#include "Math/Frustum.h"
+#include "Camera/Camera.h"
 
 using namespace Math;
 

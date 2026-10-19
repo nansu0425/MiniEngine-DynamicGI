@@ -40,7 +40,6 @@ def copy_app_template(project, guid):
     copy_template_file('Main.cpp', project, guid)
     copy_template_file('AppTemplate.slnx', project, guid)
     copy_template_file('AppTemplate.vcxproj', project, guid)
-    copy_template_file('AppTemplate.vcxproj.filters', project, guid)
     for file in glob(os.path.join(TEMPLATES_FOLDER, '*.png')):
         shutil.copy(file, project)
 
@@ -49,7 +48,6 @@ def copy_lib_template(project, guid):
     shutil.copy(os.path.join(TEMPLATES_FOLDER, 'pch.h'), project)
     shutil.copy(os.path.join(TEMPLATES_FOLDER, 'pch.cpp'), project)
     copy_template_file('LibTemplate.vcxproj', project, guid)
-    copy_template_file('LibTemplate.vcxproj.filters', project, guid)
 
 def create_project():
     if len(sys.argv) != 3 or sys.argv[1].lower() != 'app' and sys.argv[1].lower() != 'lib':

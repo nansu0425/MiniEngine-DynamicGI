@@ -47,7 +47,7 @@
 
 #include <d3d12.h>
 #include <dxgi1_6.h>
-#include "d3dx12.h"
+#include "Graphics/d3dx12.h"
 #ifdef _DEBUG
     #include <dxgidebug.h>
 #endif
@@ -69,8 +69,8 @@
 #include <ppltasks.h>
 #include <functional>
 
-#include "Utility.h"
-#include "VectorMath.h"
-#include "EngineTuning.h"
-#include "EngineProfiling.h"
-#include "Util/CommandLineArg.h"
+#include "Utility/Utility.h"
+#include "Math/VectorMath.h"
+#include "UI/EngineTuning.h"
+#include "Profiling/EngineProfiling.h"
+#include "Utility/CommandLineArg.h"

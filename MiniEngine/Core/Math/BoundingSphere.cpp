@@ -12,7 +12,7 @@
 //
 
 #include "pch.h"
-#include "BoundingSphere.h"
+#include "Math/BoundingSphere.h"
 
 using namespace Math;
 

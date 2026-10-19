@@ -6,7 +6,6 @@
 *.h eol=crlf
 *.hlsl eol=crlf
 *.vcxproj eol=crlf
-*.filters eol=crlf
 *.sln eol=crlf
 
 # Explicitly declare resource files as binary

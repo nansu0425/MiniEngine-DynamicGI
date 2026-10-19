@@ -13,9 +13,9 @@
 
 #pragma once
 
-#include "BoundingPlane.h"
-#include "BoundingSphere.h"
-#include "BoundingBox.h"
+#include "Math/BoundingPlane.h"
+#include "Math/BoundingSphere.h"
+#include "Math/BoundingBox.h"
 
 namespace Math
 {

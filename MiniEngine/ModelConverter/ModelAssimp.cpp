@@ -13,7 +13,7 @@
 
 #include "ModelAssimp.h"
 
-#include "../Model/ModelLoader.h"
+#include "Loader/ModelLoader.h"
 
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>

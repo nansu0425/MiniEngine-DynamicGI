@@ -48,6 +48,12 @@
 - 이 프로젝트에서 작성하거나 수정한 코드의 주석은 한국어로 쓰고, 기술 용어는 영어로 쓴다. upstream 코드의 주석은 그대로 둔다.
 - source 파일은 UTF-8 로 저장한다. editor 는 [.editorconfig](.editorconfig), MSVC 는 `/utf-8` ([Build.props](MiniEngine/PropertySheets/Build.props)) 로 이를 따른다.
 
+### 폴더 구조
+
+- source 파일은 기능별 폴더에 둔다. C++ 파일과 그 파일이 쓰는 shader 는 같은 폴더에 둔다. 여러 기능이 공유하는 `.hlsli` 는 `MiniEngine/Core/Shaders/` 에 둔다.
+- `#include` 는 C++ 와 shader 모두 project root 기준 경로로 쓴다 (예: `#include "Graphics/Command/CommandContext.h"`). Model, ModelViewer 에서는 `Core/` 와 `Model/` 이 모두 include path 에 있으므로 두 project 의 최상위 폴더 이름은 겹치지 않게 한다.
+- Visual Studio filter (`.vcxproj.filters`) 는 쓰지 않는다. Solution Explorer 에서 Show All Files 를 켜고 폴더 구조 그대로 본다.
+
 ## License
 
 이 프로젝트의 작업은 MIT License 를 따른다([LICENSE](LICENSE)). upstream MiniEngine 코드는 Microsoft 의 MIT License 를 따른다([MiniEngine/License.txt](MiniEngine/License.txt)). Sponza asset 의 출처는 받은 뒤 `MiniEngine/ModelViewer/Sponza/pbr/copyright.txt` 에 있다.

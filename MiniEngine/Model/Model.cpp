@@ -12,7 +12,7 @@
 //
 
 #include "Model.h"
-#include "Renderer.h"
+#include "Renderer/Renderer.h"
 #include "ConstantBuffers.h"
 
 using namespace Math;

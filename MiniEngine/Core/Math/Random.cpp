@@ -12,7 +12,7 @@
 //
 
 #include "pch.h"
-#include "Random.h"
+#include "Math/Random.h"
 
 namespace Math
 {
