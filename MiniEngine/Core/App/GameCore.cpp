@@ -66,6 +66,10 @@ namespace GameCore
 
         // GameInput이 UI가 가져간 입력을 걸러낼 수 있게 ImGui frame을 먼저 연다.
         ImGuiLayer::BeginFrame();
+        // scene을 rendering하기 전에 rendering buffer를 이번 frame의 scene 영역 크기에 맞춘다.
+        const RECT sceneViewport = ImGuiLayer::GetSceneViewport();
+        Display::SetSceneViewport(sceneViewport.left, sceneViewport.top,
+            sceneViewport.right - sceneViewport.left, sceneViewport.bottom - sceneViewport.top);
         GameInput::Update(DeltaTime);
         EngineTuning::Update(DeltaTime);
         

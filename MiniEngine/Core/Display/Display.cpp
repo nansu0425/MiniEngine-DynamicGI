@@ -34,11 +34,7 @@ namespace GameCore { extern HWND g_hWnd; }
 #include "Output/Core/CompiledShaders/BufferCopyPS.h"
 #include "Output/Core/CompiledShaders/PresentSDRPS.h"
 #include "Output/Core/CompiledShaders/PresentHDRPS.h"
-#include "Output/Core/CompiledShaders/CompositeSDRPS.h"
-#include "Output/Core/CompiledShaders/ScaleAndCompositeSDRPS.h"
-#include "Output/Core/CompiledShaders/CompositeHDRPS.h"
 #include "Output/Core/CompiledShaders/BlendUIHDRPS.h"
-#include "Output/Core/CompiledShaders/ScaleAndCompositeHDRPS.h"
 #include "Output/Core/CompiledShaders/MagnifyPixelsPS.h"
 #include "Output/Core/CompiledShaders/GenerateMipsLinearCS.h"
 #include "Output/Core/CompiledShaders/GenerateMipsLinearOddCS.h"
@@ -54,7 +50,6 @@ namespace GameCore { extern HWND g_hWnd; }
 DXGI_FORMAT SwapChainFormat = DXGI_FORMAT_R10G10B10A2_UNORM;
 
 using namespace Math;
-using namespace ImageScaling;
 using namespace Graphics;
 
 namespace
@@ -70,8 +65,7 @@ namespace
 
 namespace Graphics
 {
-    void PreparePresentSDR();
-    void PreparePresentHDR();
+    void PreparePresent();
     void CompositeOverlays( GraphicsContext& Context );
 
     enum eResolution { k720p, k900p, k1080p, k1440p, k1800p, k2160p };
@@ -80,7 +74,6 @@ namespace Graphics
     const uint32_t kNumPredefinedResolutions = 6;
 
     const char* ResolutionLabels[] = { "1280x720", "1600x900", "1920x1080", "2560x1440", "3200x1800", "3840x2160" };
-    EnumVar NativeResolution("Graphics/Display/Native Resolution", k1080p, kNumPredefinedResolutions, ResolutionLabels);
 #ifdef _GAMING_DESKTOP
     // This can set the window size to common dimensions.  It's also possible for the window to take on other dimensions
     // through resizing or going full-screen.
@@ -93,6 +86,9 @@ namespace Graphics
     const char* HDRModeLabels[] = { "HDR", "SDR", "Side-by-Side" };
     EnumVar HDRDebugMode("Graphics/Display/HDR Debug Mode", 0, 3, HDRModeLabels);
 
+    // scene은 swapchain의 이 사각형 영역에 1:1로 그린다. native resolution이 곧 그 크기다.
+    uint32_t g_SceneViewportX = 0;
+    uint32_t g_SceneViewportY = 0;
     uint32_t g_NativeWidth = 0;
     uint32_t g_NativeHeight = 0;
     uint32_t g_DisplayWidth = 1920;
@@ -131,24 +127,6 @@ namespace Graphics
         }
     }
 
-    void SetNativeResolution(void)
-    {
-        uint32_t NativeWidth, NativeHeight;
-
-        ResolutionToUINT(eResolution((int)NativeResolution), NativeWidth, NativeHeight);
-
-        if (g_NativeWidth == NativeWidth && g_NativeHeight == NativeHeight)
-            return;
-        DEBUGPRINT("Changing native resolution to %ux%u", NativeWidth, NativeHeight);
-
-        g_NativeWidth = NativeWidth;
-        g_NativeHeight = NativeHeight;
-
-        g_CommandManager.IdleGPU();
-
-        InitializeRenderingBuffers(NativeWidth, NativeHeight);
-    }
-
     void SetDisplayResolution(void)
     {
 #ifdef _GAMING_DESKTOP
@@ -178,14 +156,7 @@ namespace Graphics
     GraphicsPSO s_BlendUIHDRPSO(L"Core: BlendUIHDR");
     GraphicsPSO PresentSDRPS(L"Core: PresentSDR");
     GraphicsPSO PresentHDRPS(L"Core: PresentHDR");
-    GraphicsPSO CompositeSDRPS(L"Core: CompositeSDR");
-    GraphicsPSO ScaleAndCompositeSDRPS(L"Core: ScaleAndCompositeSDR");
-    GraphicsPSO CompositeHDRPS(L"Core: CompositeHDR");
-    GraphicsPSO ScaleAndCompositeHDRPS(L"Core: ScaleAndCompositeHDR");
     GraphicsPSO MagnifyPixelsPS(L"Core: MagnifyPixels");
-
-    const char* FilterLabels[] = { "Bilinear", "Sharpening", "Bicubic", "Lanczos" };
-    EnumVar UpsampleFilter("Graphics/Display/Scaling Filter", kSharpening, kFilterCount, FilterLabels);
 
     enum DebugZoomLevel { kDebugZoomOff, kDebugZoom2x, kDebugZoom4x, kDebugZoom8x, kDebugZoom16x, kDebugZoomCount };
     const char* DebugZoomLabels[] = { "Off", "2x Zoom", "4x Zoom", "8x Zoom", "16x Zoom" };
@@ -200,8 +171,6 @@ void Display::Resize(uint32_t width, uint32_t height)
     g_DisplayHeight = height;
 
     DEBUGPRINT("Changing display resolution to %ux%u", width, height);
-
-    g_PreDisplayBuffer.Create(L"PreDisplay Buffer", width, height, 1, SwapChainFormat);
 
     for (uint32_t i = 0; i < SWAP_CHAIN_BUFFER_COUNT; ++i)
         g_DisplayPlane[i].Destroy();
@@ -221,6 +190,28 @@ void Display::Resize(uint32_t width, uint32_t height)
     g_CommandManager.IdleGPU();
 
     ResizeDisplayDependentBuffers(g_NativeWidth, g_NativeHeight);
+}
+
+void Display::SetSceneViewport(uint32_t x, uint32_t y, uint32_t width, uint32_t height)
+{
+    // window를 최소화하면 크기가 0이 된다. 그동안은 이전 buffer를 그대로 둔다.
+    if (width == 0 || height == 0)
+        return;
+
+    g_SceneViewportX = x;
+    g_SceneViewportY = y;
+
+    if (g_NativeWidth == width && g_NativeHeight == height)
+        return;
+    DEBUGPRINT("Changing native resolution to %ux%u", width, height);
+
+    g_NativeWidth = width;
+    g_NativeHeight = height;
+
+    g_CommandManager.IdleGPU();
+
+    InitializeRenderingBuffers(width, height);
+    g_PreDisplayBuffer.Create(L"PreDisplay Buffer", width, height, 1, SwapChainFormat);
 }
 
 // Initialize the DirectX resources required to run.
@@ -315,24 +306,14 @@ void Display::Initialize(void)
     ObjName.Finalize();
 
     CreatePSO(PresentSDRPS, g_pPresentSDRPS);
-    CreatePSO(CompositeSDRPS, g_pCompositeSDRPS);
-    CreatePSO(ScaleAndCompositeSDRPS, g_pScaleAndCompositeSDRPS);
-    CreatePSO(CompositeHDRPS, g_pCompositeHDRPS);
-    CreatePSO(ScaleAndCompositeHDRPS, g_pScaleAndCompositeHDRPS);
+    CreatePSO(PresentHDRPS, g_pPresentHDRPS);
     CreatePSO(MagnifyPixelsPS, g_pMagnifyPixelsPS);
-
-    PresentHDRPS = PresentSDRPS;
-    PresentHDRPS.SetPixelShader(g_pPresentHDRPS, sizeof(g_pPresentHDRPS));
-    DXGI_FORMAT SwapChainFormats[2] = { DXGI_FORMAT_R10G10B10A2_UNORM, DXGI_FORMAT_R10G10B10A2_UNORM };
-    PresentHDRPS.SetRenderTargetFormats(2, SwapChainFormats, DXGI_FORMAT_UNKNOWN );
-    PresentHDRPS.Finalize();
 
 #undef CreatePSO
 
-    SetNativeResolution();
+    SetSceneViewport(0, 0, g_DisplayWidth, g_DisplayHeight);
 
-    g_PreDisplayBuffer.Create(L"PreDisplay Buffer", g_DisplayWidth, g_DisplayHeight, 1, SwapChainFormat);
-    ImageScaling::Initialize(g_PreDisplayBuffer.GetFormat());
+    ImageScaling::Initialize(SwapChainFormat);
 }
 
 void Display::Shutdown( void )
@@ -346,55 +327,50 @@ void Display::Shutdown( void )
     g_PreDisplayBuffer.Destroy();
 }
 
-void Graphics::PreparePresentHDR(void)
+void Graphics::PreparePresent(void)
 {
     GraphicsContext& Context = GraphicsContext::Begin(L"Present");
 
-    bool NeedsScaling = g_NativeWidth != g_DisplayWidth || g_NativeHeight != g_DisplayHeight;
+    ColorBuffer& DisplayPlane = g_DisplayPlane[g_CurrentBuffer];
 
     Context.SetRootSignature(s_PresentRS);
     Context.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    // scene viewport 밖에는 UI만 그린다. 반투명한 UI 아래에 이전 frame이 비치지 않게 먼저 지운다.
+    Context.TransitionResource(DisplayPlane, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
+    Context.ClearColor(DisplayPlane);
+
     Context.TransitionResource(g_SceneColorBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
     Context.SetDynamicDescriptor(0, 0, g_SceneColorBuffer.GetSRV());
+    Context.SetPipelineState(g_bEnableHDROutput ? PresentHDRPS : PresentSDRPS);
 
-    ColorBuffer& Dest = DebugZoom == kDebugZoomOff ? g_DisplayPlane[g_CurrentBuffer] : g_PreDisplayBuffer;
-
-    // On Windows, prefer scaling and compositing in one step via pixel shader
-    Context.SetRootSignature(s_PresentRS);
-    Context.TransitionResource(g_OverlayBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
     if (DebugZoom == kDebugZoomOff)
     {
-        Context.SetDynamicDescriptor(0, 1, g_OverlayBuffer.GetSRV());
-        Context.SetPipelineState(NeedsScaling ? ScaleAndCompositeHDRPS : CompositeHDRPS);
+        Context.SetRenderTarget(DisplayPlane.GetRTV());
+        Context.SetViewportAndScissor(g_SceneViewportX, g_SceneViewportY, g_NativeWidth, g_NativeHeight);
+        Context.Draw(3);
     }
     else
     {
-        Context.SetDynamicDescriptor(0, 1, GetDefaultTexture(kBlackTransparent2D));
-        Context.SetPipelineState(NeedsScaling ? ScaleAndCompositeHDRPS : PresentHDRPS);
-    }
-    Context.SetConstants(1, (float)g_HDRPaperWhite / 10000.0f, (float)g_MaxDisplayLuminance,
-        0.7071f / g_NativeWidth, 0.7071f / g_NativeHeight);
-    Context.TransitionResource(Dest, D3D12_RESOURCE_STATE_RENDER_TARGET);
-    Context.SetRenderTarget(Dest.GetRTV());
-    Context.SetViewportAndScissor(0, 0, g_DisplayWidth, g_DisplayHeight);
-    Context.Draw(3);
-
-    // Magnify without stretching
-    if (DebugZoom != kDebugZoomOff)
-    {
-        Context.SetPipelineState(MagnifyPixelsPS);
-        Context.TransitionResource(g_PreDisplayBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-        Context.TransitionResource(g_DisplayPlane[g_CurrentBuffer], D3D12_RESOURCE_STATE_RENDER_TARGET);
-        Context.SetRenderTarget(g_DisplayPlane[g_CurrentBuffer].GetRTV());
-        Context.SetDynamicDescriptor(0, 0, g_PreDisplayBuffer.GetSRV());
-        Context.SetViewportAndScissor(0, 0, g_DisplayWidth, g_DisplayHeight);
-        Context.SetConstants(1, 1.0f / ((int)DebugZoom + 1.0f));
+        Context.TransitionResource(g_PreDisplayBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET);
+        Context.SetRenderTarget(g_PreDisplayBuffer.GetRTV());
+        Context.SetViewportAndScissor(0, 0, g_NativeWidth, g_NativeHeight);
         Context.Draw(3);
 
-        CompositeOverlays(Context);
+        // Magnify without stretching
+        Context.SetPipelineState(MagnifyPixelsPS);
+        Context.TransitionResource(g_PreDisplayBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        Context.TransitionResource(DisplayPlane, D3D12_RESOURCE_STATE_RENDER_TARGET);
+        Context.SetRenderTarget(DisplayPlane.GetRTV());
+        Context.SetDynamicDescriptor(0, 0, g_PreDisplayBuffer.GetSRV());
+        Context.SetViewportAndScissor(g_SceneViewportX, g_SceneViewportY, g_NativeWidth, g_NativeHeight);
+        Context.SetConstants(1, 1.0f / ((int)DebugZoom + 1.0f));
+        Context.Draw(3);
     }
 
-    Context.TransitionResource(g_DisplayPlane[g_CurrentBuffer], D3D12_RESOURCE_STATE_PRESENT);
+    CompositeOverlays(Context);
+
+    Context.TransitionResource(DisplayPlane, D3D12_RESOURCE_STATE_PRESENT);
 
     // Close the final context to be executed before frame present.
     Context.Finish();
@@ -408,82 +384,13 @@ void Graphics::CompositeOverlays( GraphicsContext& Context )
     Context.SetDynamicDescriptor(0, 0, g_OverlayBuffer.GetSRV());
     Context.SetPipelineState(g_bEnableHDROutput ? s_BlendUIHDRPSO : s_BlendUIPSO);
     Context.SetConstants(1, (float)g_HDRPaperWhite / 10000.0f, (float)g_MaxDisplayLuminance);
+    Context.SetViewportAndScissor(0, 0, g_DisplayWidth, g_DisplayHeight);
     Context.Draw(3);
-}
-
-void Graphics::PreparePresentSDR(void)
-{
-    GraphicsContext& Context = GraphicsContext::Begin(L"Present");
-
-    Context.SetRootSignature(s_PresentRS);
-    Context.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-    // We're going to be reading these buffers to write to the swap chain buffer(s)
-    Context.TransitionResource(g_SceneColorBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | 
-        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-    Context.SetDynamicDescriptor(0, 0, g_SceneColorBuffer.GetSRV());
-
-    bool NeedsScaling = g_NativeWidth != g_DisplayWidth || g_NativeHeight != g_DisplayHeight;
-
-    // On Windows, prefer scaling and compositing in one step via pixel shader
-    if (DebugZoom == kDebugZoomOff && (UpsampleFilter == kSharpening || !NeedsScaling))
-    {
-        Context.TransitionResource(g_OverlayBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-        Context.SetDynamicDescriptor(0, 1, g_OverlayBuffer.GetSRV());
-        Context.SetPipelineState(NeedsScaling ? ScaleAndCompositeSDRPS : CompositeSDRPS);
-        Context.SetConstants(1, 0.7071f / g_NativeWidth, 0.7071f / g_NativeHeight);
-        Context.TransitionResource(g_DisplayPlane[g_CurrentBuffer], D3D12_RESOURCE_STATE_RENDER_TARGET);
-        Context.SetRenderTarget(g_DisplayPlane[g_CurrentBuffer].GetRTV());
-        Context.SetViewportAndScissor(0, 0, g_DisplayWidth, g_DisplayHeight);
-        Context.Draw(3);
-    }
-    else
-    {
-        ColorBuffer& Dest = DebugZoom == kDebugZoomOff ? g_DisplayPlane[g_CurrentBuffer] : g_PreDisplayBuffer;
-
-        // Scale or Copy
-        if (NeedsScaling)
-        {
-            ImageScaling::Upscale(Context, Dest, g_SceneColorBuffer, eScalingFilter((int)UpsampleFilter));
-        }
-        else
-        {
-            Context.SetPipelineState(PresentSDRPS);
-            Context.TransitionResource(Dest, D3D12_RESOURCE_STATE_RENDER_TARGET);
-            Context.SetRenderTarget(Dest.GetRTV());
-            Context.SetViewportAndScissor(0, 0, g_NativeWidth, g_NativeHeight);
-            Context.Draw(3);
-        }
-
-        // Magnify without stretching
-        if (DebugZoom != kDebugZoomOff)
-        {
-            Context.SetPipelineState(MagnifyPixelsPS);
-            Context.TransitionResource(g_PreDisplayBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-            Context.TransitionResource(g_DisplayPlane[g_CurrentBuffer], D3D12_RESOURCE_STATE_RENDER_TARGET);
-            Context.SetRenderTarget(g_DisplayPlane[g_CurrentBuffer].GetRTV());
-            Context.SetDynamicDescriptor(0, 0, g_PreDisplayBuffer.GetSRV());
-            Context.SetViewportAndScissor(0, 0, g_DisplayWidth, g_DisplayHeight);
-            Context.SetConstants(1, 1.0f / ((int)DebugZoom + 1.0f));
-            Context.Draw(3);
-        }
-
-        CompositeOverlays(Context);
-    }
-
-
-    Context.TransitionResource(g_DisplayPlane[g_CurrentBuffer], D3D12_RESOURCE_STATE_PRESENT);
-
-    // Close the final context to be executed before frame present.
-    Context.Finish();
 }
 
 void Display::Present(void)
 {
-    if (g_bEnableHDROutput)
-        PreparePresentHDR();
-    else
-        PreparePresentSDR();
+    PreparePresent();
 
     UINT PresentInterval = s_EnableVSync ? std::min(4, (int)Round(s_FrameTime * 60.0f)) : 0;
 
@@ -526,7 +433,6 @@ void Display::Present(void)
 
     TemporalEffects::Update((uint32_t)s_FrameIndex);
 
-    SetNativeResolution();
     SetDisplayResolution();
 }
 

@@ -258,12 +258,6 @@
     <FxCompile Include="Effects\MotionBlur\CameraMotionBlurPrePassCS.hlsl" />
     <FxCompile Include="Effects\MotionBlur\CameraMotionBlurPrePassLinearZCS.hlsl" />
     <FxCompile Include="Effects\MotionBlur\CameraVelocityCS.hlsl" />
-    <FxCompile Include="Display\CompositeHDRPS.hlsl">
-      <ShaderType>Pixel</ShaderType>
-    </FxCompile>
-    <FxCompile Include="Display\CompositeSDRPS.hlsl">
-      <ShaderType>Pixel</ShaderType>
-    </FxCompile>
     <FxCompile Include="Effects\PostEffects\CopyBackPostBufferCS.hlsl" />
     <FxCompile Include="Effects\PostEffects\DebugDrawHistogramCS.hlsl" />
     <FxCompile Include="Effects\PostEffects\DebugLuminanceHdr2CS.hlsl" />
@@ -385,12 +379,6 @@
       <ShaderType>Pixel</ShaderType>
     </FxCompile>
     <FxCompile Include="Effects\TemporalEffects\ResolveTAACS.hlsl" />
-    <FxCompile Include="Display\ScaleAndCompositeHDRPS.hlsl">
-      <ShaderType>Pixel</ShaderType>
-    </FxCompile>
-    <FxCompile Include="Display\ScaleAndCompositeSDRPS.hlsl">
-      <ShaderType>Pixel</ShaderType>
-    </FxCompile>
     <FxCompile Include="Graphics\ScreenQuadCommonVS.hlsl">
       <ShaderType>Vertex</ShaderType>
     </FxCompile>

@@ -7,6 +7,8 @@ namespace ImGuiLayer
 
     // BeginFrame과 Render 사이에서는 어디서든 ImGui widget을 호출할 수 있다.
     void BeginFrame(void);
+    // BeginFrame이 정한 이번 frame의 scene 영역(client 좌표, pixel). UI를 숨기면 window 전체다.
+    RECT GetSceneViewport(void);
     // 이번 frame의 widget을 g_OverlayBuffer에 그린다.
     void Render(void);
 

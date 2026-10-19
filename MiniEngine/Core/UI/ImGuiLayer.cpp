@@ -10,6 +10,7 @@
 #include <imgui.h>
 #include <imgui_impl_dx12.h>
 #include <imgui_impl_win32.h>
+#include <imgui_internal.h>
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -34,6 +35,7 @@ namespace
     float s_DpiScale = 0.0f;
     bool s_Visible = true;
     bool s_ShowDemoWindow = false;
+    RECT s_SceneViewport = {};
 
     void AllocSrvDescriptor(ImGui_ImplDX12_InitInfo*, D3D12_CPU_DESCRIPTOR_HANDLE* outCpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE* outGpuHandle)
     {
@@ -90,6 +92,24 @@ namespace
             }
             ImGui::EndMainMenuBar();
         }
+    }
+
+    RECT ToPixelRect(const ImVec2& pos, const ImVec2& size)
+    {
+        return { lroundf(pos.x), lroundf(pos.y), lroundf(pos.x + size.x), lroundf(pos.y + size.y) };
+    }
+
+    // panel이 차지하지 않은 central node를 scene 영역으로 쓴다.
+    void DrawDockSpace(void)
+    {
+        const ImGuiID dockSpaceId = ImGui::DockSpaceOverViewport(0, nullptr,
+            ImGuiDockNodeFlags_PassthruCentralNode | ImGuiDockNodeFlags_NoDockingOverCentralNode);
+
+        const ImGuiDockNode* centralNode = ImGui::DockBuilderGetCentralNode(dockSpaceId);
+        if (centralNode != nullptr)
+            s_SceneViewport = ToPixelRect(centralNode->Pos, centralNode->Size);
+        else
+            s_SceneViewport = ToPixelRect(ImGui::GetMainViewport()->WorkPos, ImGui::GetMainViewport()->WorkSize);
     }
 }
 
@@ -158,10 +178,19 @@ void ImGuiLayer::BeginFrame(void)
     if (s_Visible)
     {
         DrawMainMenu();
-        ImGui::DockSpaceOverViewport(0, nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
+        DrawDockSpace();
         if (s_ShowDemoWindow)
             ImGui::ShowDemoWindow(&s_ShowDemoWindow);
     }
+    else
+    {
+        s_SceneViewport = ToPixelRect(ImVec2(0.0f, 0.0f), io.DisplaySize);
+    }
+}
+
+RECT ImGuiLayer::GetSceneViewport(void)
+{
+    return s_SceneViewport;
 }
 
 void ImGuiLayer::Render(void)
