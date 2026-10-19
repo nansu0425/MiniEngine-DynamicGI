@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $ReferencesDir = Join-Path $RepoRoot 'references'
@@ -14,19 +14,35 @@ function Test-GitCommit($Dir, $Commit) {
     return $LASTEXITCODE -eq 0
 }
 
+function Set-SparseCheckout($Dir, $Patterns) {
+    if ($Patterns) {
+        # cone mode 는 하위 디렉토리를 제외할 수 없어서 non-cone pattern 을 쓴다
+        Invoke-Git -C $Dir sparse-checkout set --no-cone @Patterns
+    }
+    elseif ((git -C $Dir config --get core.sparseCheckout) -eq 'true') {
+        Invoke-Git -C $Dir sparse-checkout disable
+    }
+}
+
 foreach ($Reference in $Manifest) {
     $Destination = Join-Path $ReferencesDir $Reference.name
+    $IsNewClone = -not (Test-Path $Destination)
 
-    if (-not (Test-Path $Destination)) {
+    if ($IsNewClone) {
         Invoke-Git clone --quiet --filter=blob:none --no-checkout $Reference.url $Destination
-    }
-    elseif ((git -C $Destination rev-parse HEAD) -eq $Reference.commit) {
-        Write-Host "$($Reference.name) already at $($Reference.commit)"
-        continue
     }
     elseif (git -C $Destination status --porcelain) {
         # reference 안에서 실험한 변경을 덮어쓰지 않는다
         Write-Warning "$($Reference.name) has local changes. Skipped."
+        continue
+    }
+
+    # checkout 전에 적용해야 sparse 범위 밖의 blob 을 받지 않는다
+    Set-SparseCheckout $Destination $Reference.sparse
+
+    # --no-checkout clone 의 HEAD 는 manifest commit 과 같아도 working tree 가 비어 있다
+    if (-not $IsNewClone -and (git -C $Destination rev-parse HEAD) -eq $Reference.commit) {
+        Write-Host "$($Reference.name) already at $($Reference.commit)"
         continue
     }
 

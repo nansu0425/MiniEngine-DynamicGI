@@ -3,5 +3,16 @@
         "name": "RTXGI-DDGI",
         "url": "https://github.com/NVIDIAGameWorks/RTXGI-DDGI.git",
         "commit": "f33e496ca31b3f0eec1c4e2cbaa8bb620e337fa6"
+    },
+    {
+        "name": "DirectX-Graphics-Samples",
+        "url": "https://github.com/microsoft/DirectX-Graphics-Samples.git",
+        "commit": "e5975f9b0744fc5096dd593ed72bf8f5c004164f",
+        "sparse": [
+            "/Samples/Desktop/D3D12Raytracing/src/D3D12RaytracingMiniEngineSample/",
+            "!/Samples/Desktop/D3D12Raytracing/src/D3D12RaytracingMiniEngineSample/Sponza/",
+            "!/Samples/Desktop/D3D12Raytracing/src/D3D12RaytracingMiniEngineSample/Textures/",
+            "!*.png"
+        ]
     }
 ]

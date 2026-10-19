@@ -2,3 +2,7 @@ root = true
 
 [*.{cpp,h,inl,hlsl,hlsli}]
 charset = utf-8
+
+# Windows PowerShell 5.1 은 BOM 없는 script 를 system codepage 로 읽는다
+[*.ps1]
+charset = utf-8-bom
