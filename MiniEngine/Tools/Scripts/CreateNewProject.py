@@ -14,7 +14,6 @@ Author:  James Stanard
 import os
 import sys
 import shutil
-from glob import glob
 from uuid import uuid4
 
 TEMPLATES_FOLDER = "./Tools/Scripts/ProjectTemplates"
@@ -40,8 +39,6 @@ def copy_app_template(project, guid):
     copy_template_file('Main.cpp', project, guid)
     copy_template_file('AppTemplate.slnx', project, guid)
     copy_template_file('AppTemplate.vcxproj', project, guid)
-    for file in glob(os.path.join(TEMPLATES_FOLDER, '*.png')):
-        shutil.copy(file, project)
 
 def copy_lib_template(project, guid):
     '''Instantiates a new library project from a template'''
