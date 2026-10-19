@@ -20,6 +20,18 @@
 
 조작법은 [MiniEngine/readme.md](MiniEngine/readme.md) 에 있다.
 
+## Reference
+
+구현할 때 참고하는 외부 repo 는 `references/` 아래에 받는다. git 은 [references/manifest.json](references/manifest.json) 만 tracking 하고, 받은 repo 는 tracking 하지 않는다.
+
+```powershell
+.\scripts\fetch-references.ps1
+```
+
+- reference 를 추가하거나 버전을 바꿀 때는 `manifest.json` 에 `name`, `url`, `commit` 을 적고 script 를 다시 실행한다. commit 을 고정해서 어느 버전을 참고했는지 git history 에 남긴다.
+- 받은 repo 안에서 수정한 내용이 있으면 script 는 그 repo 를 건너뛴다.
+- `git clean -fdx` 는 `references/` 도 지운다. 지워지면 script 로 다시 받는다.
+
 ## 코드 규칙
 
 - 이 프로젝트에서 작성하거나 수정한 코드의 주석은 한국어로 쓰고, 기술 용어는 영어로 쓴다. upstream 코드의 주석은 그대로 둔다.
