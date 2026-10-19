@@ -16,6 +16,8 @@
 #include "Core/Graphics/GraphicsCore.h"
 #include "Core/Graphics/Command/CommandContext.h"
 #include "Core/Graphics/Command/CommandListManager.h"
+#include <algorithm>
+#include <atomic>
 
 namespace
 {
@@ -28,6 +30,15 @@ namespace
     uint64_t sm_ValidTimeStart = 0;
     uint64_t sm_ValidTimeEnd = 0;
     double sm_GpuTickDelta = 0.0;
+
+    // span query는 timer query 뒤에 frame마다 번갈아 쓰는 두 영역에 둔다. resolve를 기록하는
+    // context도 새 영역에 span을 남기므로, 아직 resolve하지 않은 이전 영역을 덮어쓰지 않는다.
+    constexpr uint32_t kMaxSpansPerFrame = 1024;
+    uint32_t sm_SpanRegionStart[2] = {};
+    uint32_t sm_CurrentSpanRegion = 0;
+    std::atomic<uint32_t> sm_NumSpans = 0;
+    uint32_t sm_ResolvedSpanStart = 0;
+    uint32_t sm_NumResolvedSpans = 0;
 }
 
 void GpuTimeManager::Initialize(uint32_t MaxNumTimers)
@@ -35,6 +46,10 @@ void GpuTimeManager::Initialize(uint32_t MaxNumTimers)
     uint64_t GpuFrequency;
     Graphics::g_CommandManager.GetCommandQueue()->GetTimestampFrequency(&GpuFrequency);
     sm_GpuTickDelta = 1.0 / static_cast<double>(GpuFrequency);
+
+    sm_SpanRegionStart[0] = MaxNumTimers * 2;
+    sm_SpanRegionStart[1] = sm_SpanRegionStart[0] + kMaxSpansPerFrame * 2;
+    const uint32_t NumQueries = sm_SpanRegionStart[1] + kMaxSpansPerFrame * 2;
 
     D3D12_HEAP_PROPERTIES HeapProps;
     HeapProps.Type = D3D12_HEAP_TYPE_READBACK;
@@ -46,7 +61,7 @@ void GpuTimeManager::Initialize(uint32_t MaxNumTimers)
     D3D12_RESOURCE_DESC BufferDesc;
     BufferDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
     BufferDesc.Alignment = 0;
-    BufferDesc.Width = sizeof(uint64_t) * MaxNumTimers * 2;
+    BufferDesc.Width = sizeof(uint64_t) * NumQueries;
     BufferDesc.Height = 1;
     BufferDesc.DepthOrArraySize = 1;
     BufferDesc.MipLevels = 1;
@@ -61,7 +76,7 @@ void GpuTimeManager::Initialize(uint32_t MaxNumTimers)
     sm_ReadBackBuffer->SetName(L"GpuTimeStamp Buffer");
 
     D3D12_QUERY_HEAP_DESC QueryHeapDesc;
-    QueryHeapDesc.Count = MaxNumTimers * 2;
+    QueryHeapDesc.Count = NumQueries;
     QueryHeapDesc.NodeMask = 1;
     QueryHeapDesc.Type = D3D12_QUERY_HEAP_TYPE_TIMESTAMP;
     ASSERT_SUCCEEDED(Graphics::g_Device->CreateQueryHeap(&QueryHeapDesc, MY_IID_PPV_ARGS(&sm_QueryHeap)));
@@ -100,7 +115,7 @@ void GpuTimeManager::BeginReadBack(void)
 
     D3D12_RANGE Range;
     Range.Begin = 0;
-    Range.End = (sm_NumTimers * 2) * sizeof(uint64_t);
+    Range.End = std::max(sm_NumTimers * 2, sm_ResolvedSpanStart + sm_NumResolvedSpans * 2) * sizeof(uint64_t);
     ASSERT_SUCCEEDED(sm_ReadBackBuffer->Map(0, &Range, reinterpret_cast<void**>(&sm_TimeStampBuffer)));
 
     sm_ValidTimeStart = sm_TimeStampBuffer[0];
@@ -121,11 +136,66 @@ void GpuTimeManager::EndReadBack(void)
     sm_ReadBackBuffer->Unmap(0, &EmptyRange);
     sm_TimeStampBuffer = nullptr;
 
+    // 여기까지 기록된 span이 이번 frame의 것이다. 이후의 span은 다른 영역에 쌓는다.
+    sm_ResolvedSpanStart = sm_SpanRegionStart[sm_CurrentSpanRegion];
+    sm_NumResolvedSpans = std::min(sm_NumSpans.exchange(0), kMaxSpansPerFrame);
+    sm_CurrentSpanRegion ^= 1;
+
     CommandContext& Context = CommandContext::Begin();
     Context.InsertTimeStamp(sm_QueryHeap, 1);
-    Context.ResolveTimeStamps(sm_ReadBackBuffer, sm_QueryHeap, sm_NumTimers * 2);
+    Context.ResolveTimeStamps(sm_ReadBackBuffer, sm_QueryHeap, 0, sm_NumTimers * 2);
+    Context.ResolveTimeStamps(sm_ReadBackBuffer, sm_QueryHeap, sm_ResolvedSpanStart, sm_NumResolvedSpans * 2);
     Context.InsertTimeStamp(sm_QueryHeap, 0);
     sm_Fence = Context.Finish();
+}
+
+uint32_t GpuTimeManager::BeginSpan(CommandContext& Context)
+{
+    // GpuTimeManager보다 먼저 만들어지는 context도 있다.
+    if (sm_QueryHeap == nullptr)
+        return kInvalidSpan;
+
+    const uint32_t SpanIdx = sm_NumSpans.fetch_add(1);
+    if (SpanIdx >= kMaxSpansPerFrame)
+        return kInvalidSpan;
+
+    const uint32_t Span = sm_SpanRegionStart[sm_CurrentSpanRegion] + SpanIdx * 2;
+    Context.InsertTimeStamp(sm_QueryHeap, Span);
+    return Span;
+}
+
+void GpuTimeManager::EndSpan(CommandContext& Context, uint32_t Span)
+{
+    if (Span != kInvalidSpan)
+        Context.InsertTimeStamp(sm_QueryHeap, Span + 1);
+}
+
+float GpuTimeManager::GetBusyTime(void)
+{
+    ASSERT(sm_TimeStampBuffer != nullptr, "Time stamp readback buffer is not mapped");
+
+    std::vector<std::pair<uint64_t, uint64_t>> Spans;
+    Spans.reserve(sm_NumResolvedSpans);
+    for (uint32_t i = 0; i < sm_NumResolvedSpans; ++i)
+    {
+        const uint64_t Start = sm_TimeStampBuffer[sm_ResolvedSpanStart + i * 2];
+        const uint64_t End = sm_TimeStampBuffer[sm_ResolvedSpanStart + i * 2 + 1];
+        // GetTime과 같은 기준으로, 이번 resolve 구간 밖에서 찍힌 값은 다른 frame의 것으로 보고 버린다.
+        if (Start >= sm_ValidTimeStart && End <= sm_ValidTimeEnd && Start < End)
+            Spans.emplace_back(Start, End);
+    }
+    std::sort(Spans.begin(), Spans.end());
+
+    uint64_t BusyTicks = 0;
+    uint64_t MergedEnd = 0;
+    for (const auto& Span : Spans)
+    {
+        if (Span.second <= MergedEnd)
+            continue;
+        BusyTicks += Span.second - std::max(Span.first, MergedEnd);
+        MergedEnd = Span.second;
+    }
+    return static_cast<float>(sm_GpuTickDelta * BusyTicks);
 }
 
 float GpuTimeManager::GetTime(uint32_t TimerIdx)

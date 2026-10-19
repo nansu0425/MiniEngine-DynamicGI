@@ -18,6 +18,7 @@
 #include "Core/Graphics/GraphicsCore.h"
 #include "Core/Graphics/Descriptor/DescriptorHeap.h"
 #include "Core/Profiling/EngineProfiling.h"
+#include "Core/Profiling/GpuTimeManager.h"
 #include "Core/Graphics/Resource/UploadBuffer.h"
 #include "Core/Graphics/Resource/ReadbackBuffer.h"
 
@@ -79,6 +80,7 @@ CommandContext& CommandContext::Begin( const std::wstring ID )
 {
     CommandContext* NewContext = g_ContextManager.AllocateContext(D3D12_COMMAND_LIST_TYPE_DIRECT);
     NewContext->SetID(ID);
+    NewContext->m_GpuSpan = GpuTimeManager::BeginSpan(*NewContext);
     if (ID.length() > 0)
         EngineProfiling::BeginBlock(ID, NewContext);
     return *NewContext;
@@ -89,6 +91,7 @@ ComputeContext& ComputeContext::Begin(const std::wstring& ID, bool Async)
     ComputeContext& NewContext = g_ContextManager.AllocateContext(
         Async ? D3D12_COMMAND_LIST_TYPE_COMPUTE : D3D12_COMMAND_LIST_TYPE_DIRECT)->GetComputeContext();
     NewContext.SetID(ID);
+    NewContext.m_GpuSpan = GpuTimeManager::BeginSpan(NewContext);
     if (ID.length() > 0)
         EngineProfiling::BeginBlock(ID, &NewContext);
     return NewContext;
@@ -138,6 +141,9 @@ uint64_t CommandContext::Finish( bool WaitForCompletion )
     if (m_ID.length() > 0)
         EngineProfiling::EndBlock(this);
 
+    GpuTimeManager::EndSpan(*this, m_GpuSpan);
+    m_GpuSpan = GpuTimeManager::kInvalidSpan;
+
     ASSERT(m_CurrentAllocator != nullptr);
 
     CommandQueue& Queue = g_CommandManager.GetQueue(m_Type);
@@ -175,6 +181,7 @@ CommandContext::CommandContext(D3D12_COMMAND_LIST_TYPE Type) :
     m_CurComputeRootSignature = nullptr;
     m_CurPipelineState = nullptr;
     m_NumBarriersToFlush = 0;
+    m_GpuSpan = GpuTimeManager::kInvalidSpan;
 }
 
 CommandContext::~CommandContext( void )

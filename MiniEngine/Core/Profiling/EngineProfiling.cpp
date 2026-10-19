@@ -271,8 +271,12 @@ public:
 
         GpuTimeManager::BeginReadBack();
         sm_RootScope.GatherTimes(FrameIndex);
-        s_FrameDelta.RecordStat(FrameIndex, GpuTimeManager::GetTime(0));
+        s_GpuBusyTime.RecordStat(FrameIndex, 1000.0f * GpuTimeManager::GetBusyTime());
         GpuTimeManager::EndReadBack();
+
+        s_FrameTime.RecordStat(FrameIndex, 1000.0f * Graphics::GetMeasuredFrameTime());
+        s_CpuBusyTime.RecordStat(FrameIndex, 1000.0f * Graphics::GetCpuBusyTime());
+        s_CpuWaitTime.RecordStat(FrameIndex, 1000.0f * Graphics::GetCpuWaitTime());
 
         float TotalCpuTime, TotalGpuTime;
         sm_RootScope.SumInclusiveTimes(TotalCpuTime, TotalGpuTime);
@@ -282,9 +286,11 @@ public:
         GraphRenderer::Update(XMFLOAT2(TotalCpuTime, TotalGpuTime), 0, GraphType::Global);
     }
 
-    static float GetTotalCpuTime(void) { return s_TotalCpuTime.GetAvg(); }
-    static float GetTotalGpuTime(void) { return s_TotalGpuTime.GetAvg(); }
-    static float GetFrameDelta(void) { return s_FrameDelta.GetAvg(); }
+    // 최근 frame들의 평균(ms)
+    static float GetFrameTime(void) { return s_FrameTime.GetAvg(); }
+    static float GetCpuBusyTime(void) { return s_CpuBusyTime.GetAvg(); }
+    static float GetCpuWaitTime(void) { return s_CpuWaitTime.GetAvg(); }
+    static float GetGpuBusyTime(void) { return s_GpuBusyTime.GetAvg(); }
 
     static void ShowTree( void );
 
@@ -314,19 +320,25 @@ private:
     GraphHandle m_GraphHandle;
     static StatHistory s_TotalCpuTime;
     static StatHistory s_TotalGpuTime;
-    static StatHistory s_FrameDelta;
+    static StatHistory s_FrameTime;
+    static StatHistory s_CpuBusyTime;
+    static StatHistory s_CpuWaitTime;
+    static StatHistory s_GpuBusyTime;
     static NestedTimingTree sm_RootScope;
     static NestedTimingTree* sm_CurrentNode;
 };
 
 StatHistory NestedTimingTree::s_TotalCpuTime;
 StatHistory NestedTimingTree::s_TotalGpuTime;
-StatHistory NestedTimingTree::s_FrameDelta;
+StatHistory NestedTimingTree::s_FrameTime;
+StatHistory NestedTimingTree::s_CpuBusyTime;
+StatHistory NestedTimingTree::s_CpuWaitTime;
+StatHistory NestedTimingTree::s_GpuBusyTime;
 NestedTimingTree NestedTimingTree::sm_RootScope(L"");
 NestedTimingTree* NestedTimingTree::sm_CurrentNode = &NestedTimingTree::sm_RootScope;
 namespace EngineProfiling
 {
-    BoolVar DrawFrameRate("Display Frame Rate", true);
+    BoolVar DrawFrameStats("Display Frame Stats", true);
     bool s_ShowProfiler = false;
     //BoolVar DrawPerfGraph("Display Performance Graph", false);
     const bool DrawPerfGraph = false;
@@ -356,26 +368,27 @@ namespace EngineProfiling
         return Paused;
     }
 
-    void ShowFrameRate( void )
+    void ShowFrameStats( void )
     {
-        if (!DrawFrameRate || !ImGuiLayer::BeginSceneOverlay())
+        if (!DrawFrameStats || !ImGuiLayer::BeginSceneOverlay())
             return;
 
-        float cpuTime = NestedTimingTree::GetTotalCpuTime();
-        float gpuTime = NestedTimingTree::GetTotalGpuTime();
-        float frameRate = 1.0f / NestedTimingTree::GetFrameDelta();
+        const float frameTime = NestedTimingTree::GetFrameTime();
+        const uint32_t frameRate = frameTime > 0.0f ? (uint32_t)(1000.0f / frameTime + 0.5f) : 0;
 
         // font의 글자 폭이 제각각이라 공백 대신 가장 긴 label 폭으로 값의 시작 위치를 맞춘다.
-        const float valueX = ImGui::GetCursorPosX() + ImGui::CalcTextSize("Frame Rate").x + ImGui::GetStyle().ItemSpacing.x * 2.0f;
-        auto row = [valueX]( const char* label, const char* format, auto value )
+        const float valueX = ImGui::GetCursorPosX() + ImGui::CalcTextSize("Frame").x + ImGui::GetStyle().ItemSpacing.x * 2.0f;
+        auto label = [valueX]( const char* text )
         {
-            ImGui::TextUnformatted(label);
+            ImGui::TextUnformatted(text);
             ImGui::SameLine(valueX);
-            ImGui::Text(format, value);
         };
-        row("CPU", "%.3f ms", cpuTime);
-        row("GPU", "%.3f ms", gpuTime);
-        row("Frame Rate", "%u Hz", (uint32_t)(frameRate + 0.5f));
+        label("Frame");
+        ImGui::Text("%.3f ms (%u Hz)", frameTime, frameRate);
+        label("CPU");
+        ImGui::Text("%.3f ms", NestedTimingTree::GetCpuBusyTime());
+        label("GPU");
+        ImGui::Text("%.3f ms", NestedTimingTree::GetGpuBusyTime());
 
         ImGuiLayer::EndSceneOverlay();
     }
@@ -391,6 +404,8 @@ namespace EngineProfiling
         ImGuiLayer::ShowPanel("Profiler", s_ShowProfiler, []
         {
             ImGui::Checkbox("Pause (Space)", &Paused);
+            // overlay의 CPU busy에서 뺀 시간이다.
+            ImGui::Text("CPU fence wait: %.3f ms", NestedTimingTree::GetCpuWaitTime());
             NestedTimingTree::ShowTree();
         });
     }

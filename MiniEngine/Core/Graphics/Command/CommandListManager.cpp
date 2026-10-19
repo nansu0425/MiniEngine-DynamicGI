@@ -13,6 +13,13 @@
 
 #include "Core/pch.h"
 #include "Core/Graphics/Command/CommandListManager.h"
+#include "Core/App/SystemTime.h"
+#include <atomic>
+
+namespace
+{
+    std::atomic<int64_t> s_FenceWaitTicks = 0;
+}
 
 CommandQueue::CommandQueue(D3D12_COMMAND_LIST_TYPE Type) :
     m_Type(Type),
@@ -178,10 +185,17 @@ void CommandQueue::WaitForFence(uint64_t FenceValue)
     {
         std::lock_guard<std::mutex> LockGuard(m_EventMutex);
 
+        const int64_t WaitStartTick = SystemTime::GetCurrentTick();
         m_pFence->SetEventOnCompletion(FenceValue, m_FenceEventHandle);
         WaitForSingleObject(m_FenceEventHandle, INFINITE);
         m_LastCompletedFenceValue = FenceValue;
+        s_FenceWaitTicks += SystemTime::GetCurrentTick() - WaitStartTick;
     }
+}
+
+int64_t CommandListManager::TakeFenceWaitTicks(void)
+{
+    return s_FenceWaitTicks.exchange(0);
 }
 
 void CommandListManager::WaitForFence(uint64_t FenceValue)

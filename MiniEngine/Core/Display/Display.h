@@ -42,5 +42,16 @@ namespace Graphics
     // The total number of frames per second
     float GetFrameRate(void);
 
+    // 직전 frame에서 앞 frame의 Present가 끝난 뒤부터 이번 Present를 호출하기 직전까지 걸린 CPU 시간(초).
+    // Present 안에서 기다린 시간과 GetCpuWaitTime은 들어가지 않는다.
+    float GetCpuBusyTime(void);
+
+    // 직전 frame에서 CPU가 GPU fence를 기다리며 막혀 있던 시간(초).
+    float GetCpuWaitTime(void);
+
+    // 직전 frame의 Present가 끝난 시점과 그 앞 frame의 Present가 끝난 시점 사이의 실측 간격(초).
+    // GetFrameTime과 달리 VSync를 켜도 고정값으로 바뀌지 않는다.
+    float GetMeasuredFrameTime(void);
+
     extern bool g_bEnableHDROutput;
 }

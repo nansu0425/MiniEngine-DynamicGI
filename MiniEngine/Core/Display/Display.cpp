@@ -55,6 +55,9 @@ using namespace Graphics;
 namespace
 {
     float s_FrameTime = 0.0f;
+    float s_CpuBusyTime = 0.0f;
+    float s_CpuWaitTime = 0.0f;
+    float s_MeasuredFrameTime = 0.0f;
     uint64_t s_FrameIndex = 0;
     int64_t s_FrameStartTick = 0;
 
@@ -399,6 +402,7 @@ void Display::Present(void)
 
     UINT PresentInterval = s_EnableVSync ? std::min(4, (int)Round(s_FrameTime * 60.0f)) : 0;
 
+    const int64_t PresentCallTick = SystemTime::GetCurrentTick();
     s_SwapChain1->Present(PresentInterval, 0);
 
     g_CurrentBuffer = (g_CurrentBuffer + 1) % SWAP_CHAIN_BUFFER_COUNT;
@@ -411,6 +415,18 @@ void Display::Present(void)
     //}
 
     int64_t CurrentTick = SystemTime::GetCurrentTick();
+
+    // 이 engine에서는 GPU를 앞질러 가지 않으려는 대기가 Present보다 frame 중간의 fence 대기에서 주로 일어나므로,
+    // Present 대기와 함께 fence 대기도 CPU busy에서 뺀다.
+    const int64_t FenceWaitTicks = g_CommandManager.TakeFenceWaitTicks();
+
+    // 첫 frame은 앞 frame의 Present가 없어서 잴 수 없다.
+    if (s_FrameStartTick != 0)
+    {
+        s_CpuWaitTime = (float)SystemTime::TicksToSeconds(FenceWaitTicks);
+        s_CpuBusyTime = std::max(0.0f, (float)SystemTime::TimeBetweenTicks(s_FrameStartTick, PresentCallTick) - s_CpuWaitTime);
+        s_MeasuredFrameTime = (float)SystemTime::TimeBetweenTicks(s_FrameStartTick, CurrentTick);
+    }
 
     if (s_EnableVSync)
     {
@@ -454,4 +470,19 @@ float Graphics::GetFrameTime(void)
 float Graphics::GetFrameRate(void)
 {
     return s_FrameTime == 0.0f ? 0.0f : 1.0f / s_FrameTime;
+}
+
+float Graphics::GetCpuBusyTime(void)
+{
+    return s_CpuBusyTime;
+}
+
+float Graphics::GetCpuWaitTime(void)
+{
+    return s_CpuWaitTime;
+}
+
+float Graphics::GetMeasuredFrameTime(void)
+{
+    return s_MeasuredFrameTime;
 }
