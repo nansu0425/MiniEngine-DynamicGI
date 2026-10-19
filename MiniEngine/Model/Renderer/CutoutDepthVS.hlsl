@@ -12,4 +12,4 @@
 //
 
 #define ENABLE_ALPHATEST
-#include "Renderer/DepthOnlyVS.hlsl"
+#include "Model/Renderer/DepthOnlyVS.hlsl"

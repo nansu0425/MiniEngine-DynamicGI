@@ -12,7 +12,7 @@
 //              Julia Careaga
 //
 
-#include "Particles/ParticleUtility.hlsli"
+#include "Core/Particles/ParticleUtility.hlsli"
 
 StructuredBuffer<uint> g_BinParticles : register(t0);
 ByteAddressBuffer g_BinCounters : register(t1);

@@ -12,14 +12,14 @@
 //             James Stanard
 //
 
-#include "pch.h"
-#include "Particles/ParticleEffect.h"
-#include "Graphics/Command/CommandContext.h"
-#include "Graphics/GraphicsCore.h"
-#include "Graphics/Resource/BufferManager.h"
-#include "Particles/ParticleEffectManager.h"
-#include "App/GameInput.h"
-#include "Math/Random.h"
+#include "Core/pch.h"
+#include "Core/Particles/ParticleEffect.h"
+#include "Core/Graphics/Command/CommandContext.h"
+#include "Core/Graphics/GraphicsCore.h"
+#include "Core/Graphics/Resource/BufferManager.h"
+#include "Core/Particles/ParticleEffectManager.h"
+#include "Core/App/GameInput.h"
+#include "Core/Math/Random.h"
 
 using namespace Math;
 using namespace ParticleEffectManager;

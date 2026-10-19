@@ -11,11 +11,11 @@
 // Author:  James Stanard 
 //
 
-#include "pch.h"
-#include "Profiling/GpuTimeManager.h"
-#include "Graphics/GraphicsCore.h"
-#include "Graphics/Command/CommandContext.h"
-#include "Graphics/Command/CommandListManager.h"
+#include "Core/pch.h"
+#include "Core/Profiling/GpuTimeManager.h"
+#include "Core/Graphics/GraphicsCore.h"
+#include "Core/Graphics/Command/CommandContext.h"
+#include "Core/Graphics/Command/CommandListManager.h"
 
 namespace
 {

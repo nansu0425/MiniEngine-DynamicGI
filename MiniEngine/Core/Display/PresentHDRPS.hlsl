@@ -11,8 +11,8 @@
 // Author:  James Stanard 
 //
 
-#include "Display/PresentRS.hlsli"
-#include "Shaders/ColorSpaceUtility.hlsli"
+#include "Core/Display/PresentRS.hlsli"
+#include "Core/Shaders/ColorSpaceUtility.hlsli"
 
 Texture2D<float3> MainBuffer : register(t0);
 

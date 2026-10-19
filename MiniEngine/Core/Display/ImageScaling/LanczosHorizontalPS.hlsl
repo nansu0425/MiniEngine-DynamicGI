@@ -12,9 +12,9 @@
 //             Jack Elliott
 //
 
-#include "Display/ImageScaling/LanczosFunctions.hlsli"
-#include "Display/PresentRS.hlsli"
-#include "Shaders/ShaderUtility.hlsli"
+#include "Core/Display/ImageScaling/LanczosFunctions.hlsli"
+#include "Core/Display/PresentRS.hlsli"
+#include "Core/Shaders/ShaderUtility.hlsli"
 
 Texture2D<float3> Source : register(t0);
 

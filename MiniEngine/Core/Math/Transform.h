@@ -13,8 +13,8 @@
 
 #pragma once
 
-#include "Math/Matrix3.h"
-#include "Math/BoundingSphere.h"
+#include "Core/Math/Matrix3.h"
+#include "Core/Math/BoundingSphere.h"
 
 namespace Math
 {

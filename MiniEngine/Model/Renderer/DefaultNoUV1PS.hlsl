@@ -12,4 +12,4 @@
 //
 
 #define NO_SECOND_UV 1
-#include "Renderer/DefaultPS.hlsl"
+#include "Model/Renderer/DefaultPS.hlsl"

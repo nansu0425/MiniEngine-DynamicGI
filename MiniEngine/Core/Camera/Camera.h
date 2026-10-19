@@ -13,8 +13,8 @@
 
 #pragma once
 
-#include "Math/VectorMath.h"
-#include "Math/Frustum.h"
+#include "Core/Math/VectorMath.h"
+#include "Core/Math/Frustum.h"
 
 namespace Math
 {

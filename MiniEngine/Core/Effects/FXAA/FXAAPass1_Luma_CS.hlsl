@@ -12,4 +12,4 @@
 //
 
 #define USE_LUMA_INPUT_BUFFER
-#include "Effects/FXAA/FXAAPass1CS.hlsli"
+#include "Core/Effects/FXAA/FXAAPass1CS.hlsli"

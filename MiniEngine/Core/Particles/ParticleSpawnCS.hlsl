@@ -12,8 +12,8 @@
 //          James Stanard 
 //
 
-#include "Particles/ParticleUpdateCommon.hlsli"
-#include "Particles/ParticleUtility.hlsli"
+#include "Core/Particles/ParticleUpdateCommon.hlsli"
+#include "Core/Particles/ParticleUtility.hlsli"
 
 StructuredBuffer< ParticleSpawnData > g_ResetData : register( t0 );
 RWStructuredBuffer< ParticleMotion > g_OutputBuffer : register( u2 );

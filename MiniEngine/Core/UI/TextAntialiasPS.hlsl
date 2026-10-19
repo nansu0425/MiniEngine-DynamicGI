@@ -11,7 +11,7 @@
 // Author:  James Stanard 
 //
 
-#include "UI/TextRS.hlsli"
+#include "Core/UI/TextRS.hlsli"
 
 cbuffer cbFontParams : register(b0)
 {

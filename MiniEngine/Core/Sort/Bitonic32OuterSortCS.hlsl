@@ -11,7 +11,7 @@
 // Author:  James Stanard 
 //
 
-#include "Sort/BitonicSortCommon.hlsli"
+#include "Core/Sort/BitonicSortCommon.hlsli"
 
 RWByteAddressBuffer g_SortBuffer : register(u0);
 

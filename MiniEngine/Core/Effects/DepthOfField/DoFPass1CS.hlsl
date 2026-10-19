@@ -11,7 +11,7 @@
 // Author:  James Stanard 
 //
 
-#include "Effects/DepthOfField/DoFCommon.hlsli"
+#include "Core/Effects/DepthOfField/DoFCommon.hlsli"
 
 Texture2D<float> LNDepthBuffer : register(t0);        // Linear/normalized depth buffer
 RWTexture2D<float3> TileClass : register(u0);

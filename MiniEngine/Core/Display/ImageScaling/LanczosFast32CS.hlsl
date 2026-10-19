@@ -18,4 +18,4 @@
 #define TILE_DIM_X 32
 #define TILE_DIM_Y 32
 #define ENABLE_FAST_PATH 1
-#include "Display/ImageScaling/LanczosCS.hlsl"
+#include "Core/Display/ImageScaling/LanczosCS.hlsl"

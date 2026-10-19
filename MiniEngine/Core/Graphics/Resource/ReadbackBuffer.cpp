@@ -11,9 +11,9 @@
 // Author:  James Stanard 
 //
 
-#include "pch.h"
-#include "Graphics/Resource/ReadbackBuffer.h"
-#include "Graphics/GraphicsCore.h"
+#include "Core/pch.h"
+#include "Core/Graphics/Resource/ReadbackBuffer.h"
+#include "Core/Graphics/GraphicsCore.h"
 
 using namespace Graphics;
 

@@ -11,7 +11,7 @@
 // Author:  Julia Careaga 
 //
 
-#include "Particles/ParticleRS.hlsli"
+#include "Core/Particles/ParticleRS.hlsli"
 
 ByteAddressBuffer g_ParticleInstance : register( t0 );
 RWByteAddressBuffer g_NumThreadGroups : register( u1 );

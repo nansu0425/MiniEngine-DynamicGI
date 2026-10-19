@@ -14,8 +14,8 @@
 
 #pragma once
 
-#include "Math/VectorMath.h"
-#include "Math/Color.h"
+#include "Core/Math/VectorMath.h"
+#include "Core/Math/Color.h"
 #include <cstdint>
 
 // Emission Properties and other particle structs

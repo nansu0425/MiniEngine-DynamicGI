@@ -12,4 +12,4 @@
 //
 
 #define ENABLE_SKINNING
-#include "Renderer/DefaultNoTangentVS.hlsl"
+#include "Model/Renderer/DefaultNoTangentVS.hlsl"

@@ -11,8 +11,8 @@
 // Author:  James Stanard 
 //
 
-#include "pch.h"
-#include "Math/Color.h"
+#include "Core/pch.h"
+#include "Core/Math/Color.h"
 
 using DirectX::XMVECTORU32;
 

@@ -14,12 +14,12 @@
 // This code depends on DirectXTex
 //
 
-#include "Loader/MeshConvert.h"
-#include "Loader/TextureConvert.h"
-#include "Loader/glTF.h"
-#include "Model.h"
-#include "Loader/IndexOptimizePostTransform.h"
-#include "Math/VectorMath.h"
+#include "Model/Loader/MeshConvert.h"
+#include "Model/Loader/TextureConvert.h"
+#include "Model/Loader/glTF.h"
+#include "Model/Model.h"
+#include "Model/Loader/IndexOptimizePostTransform.h"
+#include "Core/Math/VectorMath.h"
 #include "DirectXMesh.h"
 
 using namespace DirectX;

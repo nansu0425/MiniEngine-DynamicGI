@@ -13,11 +13,11 @@
 
 #pragma once
 
-#include "pch.h"
-#include "Graphics/Resource/GpuResource.h"
-#include "Utility/Utility.h"
-#include "Graphics/Texture/Texture.h"
-#include "Graphics/GraphicsCommon.h"
+#include "Core/pch.h"
+#include "Core/Graphics/Resource/GpuResource.h"
+#include "Core/Utility/Utility.h"
+#include "Core/Graphics/Texture/Texture.h"
+#include "Core/Graphics/GraphicsCommon.h"
 
 // A referenced-counted pointer to a Texture.  See methods below.
 class TextureRef;

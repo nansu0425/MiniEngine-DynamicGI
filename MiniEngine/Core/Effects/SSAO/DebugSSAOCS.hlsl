@@ -11,7 +11,7 @@
 // Author:  James Stanard 
 //
 
-#include "Effects/SSAO/SSAORS.hlsli"
+#include "Core/Effects/SSAO/SSAORS.hlsli"
 
 Texture2D<float> SsaoBuffer : register( t0 );
 RWTexture2D<float3> OutColor : register( u0 );

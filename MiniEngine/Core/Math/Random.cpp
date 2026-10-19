@@ -11,8 +11,8 @@
 // Author:  James Stanard 
 //
 
-#include "pch.h"
-#include "Math/Random.h"
+#include "Core/pch.h"
+#include "Core/Math/Random.h"
 
 namespace Math
 {

@@ -11,12 +11,12 @@
 // Author:  James Stanard 
 //
 
-#include "pch.h"
-#include "Graphics/Resource/BufferManager.h"
-#include "Display/Display.h"
-#include "Graphics/Command/CommandContext.h"
-#include "Graphics/Resource/EsramAllocator.h"
-#include "Effects/TemporalEffects/TemporalEffects.h"
+#include "Core/pch.h"
+#include "Core/Graphics/Resource/BufferManager.h"
+#include "Core/Display/Display.h"
+#include "Core/Graphics/Command/CommandContext.h"
+#include "Core/Graphics/Resource/EsramAllocator.h"
+#include "Core/Effects/TemporalEffects/TemporalEffects.h"
 
 namespace Graphics
 {

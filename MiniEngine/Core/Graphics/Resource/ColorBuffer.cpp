@@ -11,11 +11,11 @@
 // Author:  James Stanard 
 //
 
-#include "pch.h"
-#include "Graphics/Resource/ColorBuffer.h"
-#include "Graphics/GraphicsCommon.h"
-#include "Graphics/Command/CommandContext.h"
-#include "Graphics/Resource/EsramAllocator.h"
+#include "Core/pch.h"
+#include "Core/Graphics/Resource/ColorBuffer.h"
+#include "Core/Graphics/GraphicsCommon.h"
+#include "Core/Graphics/Command/CommandContext.h"
+#include "Core/Graphics/Resource/EsramAllocator.h"
 
 using namespace Graphics;
 

@@ -12,4 +12,4 @@
 //
 
 #define ENABLE_SKINNING
-#include "Renderer/CutoutDepthVS.hlsl"
+#include "Model/Renderer/CutoutDepthVS.hlsl"

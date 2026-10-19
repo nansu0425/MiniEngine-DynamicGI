@@ -13,4 +13,4 @@
 
 #define DEBUG_OUTPUT
 
-#include "Effects/FXAA/FXAAPass2CS.hlsli"
+#include "Core/Effects/FXAA/FXAAPass2CS.hlsli"

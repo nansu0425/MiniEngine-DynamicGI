@@ -12,18 +12,18 @@
 //             James Stanard
 //
 
-#include "Renderer/LightManager.h"
-#include "Graphics/Pipeline/PipelineState.h"
-#include "Graphics/Pipeline/RootSignature.h"
-#include "Graphics/Command/CommandContext.h"
-#include "Camera/Camera.h"
-#include "Graphics/Resource/BufferManager.h"
-#include "Effects/TemporalEffects/TemporalEffects.h"
+#include "Model/Renderer/LightManager.h"
+#include "Core/Graphics/Pipeline/PipelineState.h"
+#include "Core/Graphics/Pipeline/RootSignature.h"
+#include "Core/Graphics/Command/CommandContext.h"
+#include "Core/Camera/Camera.h"
+#include "Core/Graphics/Resource/BufferManager.h"
+#include "Core/Effects/TemporalEffects/TemporalEffects.h"
 
-#include "CompiledShaders/FillLightGridCS_8.h"
-#include "CompiledShaders/FillLightGridCS_16.h"
-#include "CompiledShaders/FillLightGridCS_24.h"
-#include "CompiledShaders/FillLightGridCS_32.h"
+#include "Output/Model/CompiledShaders/FillLightGridCS_8.h"
+#include "Output/Model/CompiledShaders/FillLightGridCS_16.h"
+#include "Output/Model/CompiledShaders/FillLightGridCS_24.h"
+#include "Output/Model/CompiledShaders/FillLightGridCS_32.h"
 
 using namespace Math;
 using namespace Graphics;

@@ -12,4 +12,4 @@
 //
 
 #define BITONICSORT_64BIT
-#include "Sort/Bitonic32PreSortCS.hlsl"
+#include "Core/Sort/Bitonic32PreSortCS.hlsl"

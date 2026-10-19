@@ -13,8 +13,8 @@
 //
 
 #pragma once
-#include "Particles/ParticleShaderStructs.h"
-#include "Math/Color.h"
+#include "Core/Particles/ParticleShaderStructs.h"
+#include "Core/Math/Color.h"
 #include <string>
 
 struct ParticleEffectProperties

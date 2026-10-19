@@ -11,7 +11,7 @@
 // Author:  James Stanard 
 //
 
-#include "Effects/DepthOfField/DoFCommon.hlsli"
+#include "Core/Effects/DepthOfField/DoFCommon.hlsli"
 
 StructuredBuffer<uint> WorkQueue : register(t5);
 RWTexture2D<float3> DstColor : register(u0);

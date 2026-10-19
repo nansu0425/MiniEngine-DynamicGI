@@ -35,14 +35,14 @@ def copy_app_template(project, guid):
     '''Instantiates a new solution from a template'''
     shutil.copy(os.path.join(TEMPLATES_FOLDER, 'packages.config'), project)
     shutil.copy(os.path.join(TEMPLATES_FOLDER, 'pch.h'), project)
-    shutil.copy(os.path.join(TEMPLATES_FOLDER, 'pch.cpp'), project)
+    copy_template_file('pch.cpp', project, guid)
     copy_template_file('Main.cpp', project, guid)
     copy_template_file('AppTemplate.vcxproj', project, guid)
 
 def copy_lib_template(project, guid):
     '''Instantiates a new library project from a template'''
     shutil.copy(os.path.join(TEMPLATES_FOLDER, 'pch.h'), project)
-    shutil.copy(os.path.join(TEMPLATES_FOLDER, 'pch.cpp'), project)
+    copy_template_file('pch.cpp', project, guid)
     copy_template_file('LibTemplate.vcxproj', project, guid)
 
 def create_project():

@@ -13,12 +13,12 @@
 
 #pragma once
 
-#include "Graphics/Resource/GpuBuffer.h"
-#include "Math/VectorMath.h"
-#include "Camera/Camera.h"
-#include "Graphics/Command/CommandContext.h"
-#include "Graphics/Resource/UploadBuffer.h"
-#include "Graphics/Texture/TextureManager.h"
+#include "Core/Graphics/Resource/GpuBuffer.h"
+#include "Core/Math/VectorMath.h"
+#include "Core/Camera/Camera.h"
+#include "Core/Graphics/Command/CommandContext.h"
+#include "Core/Graphics/Resource/UploadBuffer.h"
+#include "Core/Graphics/Texture/TextureManager.h"
 #include <cstdint>
 #include <vector>
 

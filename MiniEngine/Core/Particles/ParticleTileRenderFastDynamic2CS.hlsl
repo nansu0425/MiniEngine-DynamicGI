@@ -13,4 +13,4 @@
 #define DYNAMIC_RESOLUTION
 #define DISABLE_DEPTH_TESTS
 #define SUPPORT_TYPED_UAV_LOADS 1
-#include "Particles/ParticleTileRenderCS.hlsl"
+#include "Core/Particles/ParticleTileRenderCS.hlsl"

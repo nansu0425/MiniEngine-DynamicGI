@@ -12,4 +12,4 @@
 //
 
 #define GAMMA_SPACE
-#include "Display/ImageScaling/BicubicUpsamplePS.hlsl"
+#include "Core/Display/ImageScaling/BicubicUpsamplePS.hlsl"

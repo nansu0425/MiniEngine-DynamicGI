@@ -11,10 +11,10 @@
 // Author:  James Stanard 
 //
 
-#include "pch.h"
-#include "Graphics/Descriptor/DescriptorHeap.h"
-#include "Graphics/GraphicsCore.h"
-#include "Graphics/Command/CommandListManager.h"
+#include "Core/pch.h"
+#include "Core/Graphics/Descriptor/DescriptorHeap.h"
+#include "Core/Graphics/GraphicsCore.h"
+#include "Core/Graphics/Command/CommandListManager.h"
 
 using namespace Graphics;
 

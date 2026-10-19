@@ -11,9 +11,9 @@
 // Author:  James Stanard 
 //
 
-#include "pch.h"
-#include "Math/Frustum.h"
-#include "Camera/Camera.h"
+#include "Core/pch.h"
+#include "Core/Math/Frustum.h"
+#include "Core/Camera/Camera.h"
 
 using namespace Math;
 

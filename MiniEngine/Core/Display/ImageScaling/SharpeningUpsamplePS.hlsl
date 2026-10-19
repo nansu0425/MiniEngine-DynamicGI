@@ -13,8 +13,8 @@
 // This is a bilinear filter coupled with a sharpening pass flattened into one pass.
 //
 
-#include "Shaders/ShaderUtility.hlsli"
-#include "Display/PresentRS.hlsli"
+#include "Core/Shaders/ShaderUtility.hlsli"
+#include "Core/Display/PresentRS.hlsli"
 
 Texture2D<float3> ColorTex : register(t0);
 SamplerState BilinearClamp : register(s0);

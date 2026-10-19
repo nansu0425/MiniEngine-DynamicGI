@@ -12,8 +12,8 @@
 //
 // The CS for extracting bright pixels and downsampling them to an unblurred bloom buffer.
 
-#include "Shaders/ShaderUtility.hlsli"
-#include "Effects/PostEffects/PostEffectsRS.hlsli"
+#include "Core/Shaders/ShaderUtility.hlsli"
+#include "Core/Effects/PostEffects/PostEffectsRS.hlsli"
 
 SamplerState BiLinearClamp : register( s0 );
 Texture2D<float3> SourceTex : register( t0 );

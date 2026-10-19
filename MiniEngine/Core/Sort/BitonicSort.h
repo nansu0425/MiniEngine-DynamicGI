@@ -70,7 +70,7 @@
 
 #pragma once
 
-#include "Graphics/Resource/GpuBuffer.h"
+#include "Core/Graphics/Resource/GpuBuffer.h"
 
 namespace BitonicSort
 {

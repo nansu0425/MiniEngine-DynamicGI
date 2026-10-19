@@ -14,7 +14,7 @@
 #pragma once
 
 #include <string>
-#include "UI/TextRenderer.h"
+#include "Core/UI/TextRenderer.h"
 
 class CommandContext;
 

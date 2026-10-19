@@ -11,7 +11,7 @@
 // Author:  James Stanard 
 //
 
-#include "Effects/PostEffects/PostEffectsRS.hlsli"
+#include "Core/Effects/PostEffects/PostEffectsRS.hlsli"
 
 Texture2D<float> InputBuf : register( t0 );
 RWStructuredBuffer<float> Result : register( u0 );

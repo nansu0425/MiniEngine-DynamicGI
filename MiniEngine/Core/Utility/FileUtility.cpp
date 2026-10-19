@@ -11,8 +11,8 @@
 // Author:  James Stanard 
 //
 
-#include "pch.h"
-#include "Utility/FileUtility.h"
+#include "Core/pch.h"
+#include "Core/Utility/FileUtility.h"
 #include <fstream>
 //#include <zlib.h> // From NuGet package 
 

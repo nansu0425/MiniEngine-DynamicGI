@@ -13,9 +13,9 @@
 
 #pragma once
 
-#include "Graphics/Resource/PixelBuffer.h"
-#include "Math/Color.h"
-#include "Graphics/Resource/GpuBuffer.h"
+#include "Core/Graphics/Resource/PixelBuffer.h"
+#include "Core/Math/Color.h"
+#include "Core/Graphics/Resource/GpuBuffer.h"
 
 class EsramAllocator;
 

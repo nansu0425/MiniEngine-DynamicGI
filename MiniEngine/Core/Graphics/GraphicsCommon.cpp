@@ -11,27 +11,27 @@
 // Author:  James Stanard 
 //
 
-#include "pch.h"
-#include "Graphics/GraphicsCommon.h"
-#include "Graphics/Descriptor/SamplerManager.h"
-#include "Graphics/Command/CommandSignature.h"
-#include "Sort/BitonicSort.h"
-#include "Graphics/Texture/Texture.h"
-#include "Graphics/Pipeline/PipelineState.h"
-#include "Graphics/Pipeline/RootSignature.h"
-#include "Graphics/Resource/BufferManager.h"
+#include "Core/pch.h"
+#include "Core/Graphics/GraphicsCommon.h"
+#include "Core/Graphics/Descriptor/SamplerManager.h"
+#include "Core/Graphics/Command/CommandSignature.h"
+#include "Core/Sort/BitonicSort.h"
+#include "Core/Graphics/Texture/Texture.h"
+#include "Core/Graphics/Pipeline/PipelineState.h"
+#include "Core/Graphics/Pipeline/RootSignature.h"
+#include "Core/Graphics/Resource/BufferManager.h"
 
-#include "CompiledShaders/GenerateMipsLinearCS.h"
-#include "CompiledShaders/GenerateMipsLinearOddCS.h"
-#include "CompiledShaders/GenerateMipsLinearOddXCS.h"
-#include "CompiledShaders/GenerateMipsLinearOddYCS.h"
-#include "CompiledShaders/GenerateMipsGammaCS.h"
-#include "CompiledShaders/GenerateMipsGammaOddCS.h"
-#include "CompiledShaders/GenerateMipsGammaOddXCS.h"
-#include "CompiledShaders/GenerateMipsGammaOddYCS.h"
+#include "Output/Core/CompiledShaders/GenerateMipsLinearCS.h"
+#include "Output/Core/CompiledShaders/GenerateMipsLinearOddCS.h"
+#include "Output/Core/CompiledShaders/GenerateMipsLinearOddXCS.h"
+#include "Output/Core/CompiledShaders/GenerateMipsLinearOddYCS.h"
+#include "Output/Core/CompiledShaders/GenerateMipsGammaCS.h"
+#include "Output/Core/CompiledShaders/GenerateMipsGammaOddCS.h"
+#include "Output/Core/CompiledShaders/GenerateMipsGammaOddXCS.h"
+#include "Output/Core/CompiledShaders/GenerateMipsGammaOddYCS.h"
 
-#include "CompiledShaders/ScreenQuadCommonVS.h"
-#include "CompiledShaders/DownsampleDepthPS.h"
+#include "Output/Core/CompiledShaders/ScreenQuadCommonVS.h"
+#include "Output/Core/CompiledShaders/DownsampleDepthPS.h"
 
 namespace Graphics
 {

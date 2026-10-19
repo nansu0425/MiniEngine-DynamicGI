@@ -13,7 +13,7 @@
 
 #pragma once
 
-#include "Math/Common.h"
+#include "Core/Math/Common.h"
 
 namespace Math
 {

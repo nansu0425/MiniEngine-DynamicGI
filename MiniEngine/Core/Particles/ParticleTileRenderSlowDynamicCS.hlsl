@@ -11,4 +11,4 @@
 // Author:  James Stanard 
 
 #define DYNAMIC_RESOLUTION
-#include "Particles/ParticleTileRenderCS.hlsl"
+#include "Core/Particles/ParticleTileRenderCS.hlsl"

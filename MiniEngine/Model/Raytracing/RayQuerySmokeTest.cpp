@@ -1,12 +1,12 @@
-#include "Raytracing/RayQuerySmokeTest.h"
-#include "Graphics/GraphicsCore.h"
-#include "Graphics/Pipeline/RootSignature.h"
-#include "Graphics/Pipeline/PipelineState.h"
-#include "Graphics/Command/CommandContext.h"
-#include "Graphics/Resource/GpuBuffer.h"
-#include "Graphics/Resource/ReadbackBuffer.h"
+#include "Model/Raytracing/RayQuerySmokeTest.h"
+#include "Core/Graphics/GraphicsCore.h"
+#include "Core/Graphics/Pipeline/RootSignature.h"
+#include "Core/Graphics/Pipeline/PipelineState.h"
+#include "Core/Graphics/Command/CommandContext.h"
+#include "Core/Graphics/Resource/GpuBuffer.h"
+#include "Core/Graphics/Resource/ReadbackBuffer.h"
 
-#include "CompiledShaders/RayQuerySmokeTestCS.h"
+#include "Output/Model/CompiledShaders/RayQuerySmokeTestCS.h"
 
 using namespace Graphics;
 

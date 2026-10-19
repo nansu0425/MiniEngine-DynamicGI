@@ -11,7 +11,7 @@
 // Author:  James Stanard 
 //
 
-#include "Shaders/CommonRS.hlsli"
+#include "Core/Shaders/CommonRS.hlsli"
 
 Texture2DMS<float> DepthBuffer : register(t0);
 

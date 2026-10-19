@@ -1,13 +1,13 @@
-#include "pch.h"
-#include "App/GameCore.h"
-#include "Graphics/GraphicsCore.h"
-#include "App/SystemTime.h"
-#include "UI/TextRenderer.h"
-#include "App/GameInput.h"
-#include "Graphics/Command/CommandContext.h"
-#include "Graphics/Pipeline/RootSignature.h"
-#include "Graphics/Pipeline/PipelineState.h"
-#include "Graphics/Resource/BufferManager.h"
+#include "TEMPLATE_NAME/pch.h"
+#include "Core/App/GameCore.h"
+#include "Core/Graphics/GraphicsCore.h"
+#include "Core/App/SystemTime.h"
+#include "Core/UI/TextRenderer.h"
+#include "Core/App/GameInput.h"
+#include "Core/Graphics/Command/CommandContext.h"
+#include "Core/Graphics/Pipeline/RootSignature.h"
+#include "Core/Graphics/Pipeline/PipelineState.h"
+#include "Core/Graphics/Resource/BufferManager.h"
 
 using namespace GameCore;
 using namespace Graphics;

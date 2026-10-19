@@ -11,7 +11,7 @@
 // Author:  James Stanard 
 //
 
-#include "Effects/FXAA/FXAARootSignature.hlsli"
+#include "Core/Effects/FXAA/FXAARootSignature.hlsli"
 
 Texture2D<float> Luma : register(t0);
 ByteAddressBuffer WorkQueue : register(t1);
@@ -19,7 +19,7 @@ Buffer<float3> ColorQueue : register(t2);
 #if SUPPORT_TYPED_UAV_LOADS
 RWTexture2D<float3> DstColor : register(u0);
 #else
-#include "Shaders/PixelPacking_R11G11B10.hlsli"
+#include "Core/Shaders/PixelPacking_R11G11B10.hlsli"
 RWTexture2D<uint> DstColor : register(u0);
 #endif
 SamplerState LinearSampler : register(s0);

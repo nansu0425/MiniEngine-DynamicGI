@@ -11,8 +11,8 @@
 // Author:  James Stanard 
 //
 
-#include "pch.h"
-#include "App/SystemTime.h"
+#include "Core/pch.h"
+#include "Core/App/SystemTime.h"
 
 double SystemTime::sm_CpuTickDelta = 0.0;
 

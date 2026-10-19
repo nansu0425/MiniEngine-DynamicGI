@@ -12,7 +12,7 @@
 //             Julia Careaga
 //
 
-#include "Particles/ParticleUtility.hlsli"
+#include "Core/Particles/ParticleUtility.hlsli"
 
 #define THREAD_GROUP_SIZE 256
 

@@ -13,4 +13,4 @@
 
 #define VERTICAL_ORIENTATION
 
-#include "Effects/FXAA/FXAAPass2CS.hlsli"
+#include "Core/Effects/FXAA/FXAAPass2CS.hlsli"

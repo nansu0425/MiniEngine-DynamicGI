@@ -11,7 +11,7 @@
 // Author:  James Stanard 
 //
 
-#include "Particles/ParticleUtility.hlsli"
+#include "Core/Particles/ParticleUtility.hlsli"
 
 RWByteAddressBuffer g_DispatchIndirectArgs : register(u0);
 RWByteAddressBuffer g_DrawIndirectArgs : register(u1);

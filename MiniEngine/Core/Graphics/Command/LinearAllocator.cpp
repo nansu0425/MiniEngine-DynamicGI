@@ -12,10 +12,10 @@
 //             Alex Nankervis
 //
 
-#include "pch.h"
-#include "Graphics/Command/LinearAllocator.h"
-#include "Graphics/GraphicsCore.h"
-#include "Graphics/Command/CommandListManager.h"
+#include "Core/pch.h"
+#include "Core/Graphics/Command/LinearAllocator.h"
+#include "Core/Graphics/GraphicsCore.h"
+#include "Core/Graphics/Command/CommandListManager.h"
 #include <thread>
 
 using namespace Graphics;

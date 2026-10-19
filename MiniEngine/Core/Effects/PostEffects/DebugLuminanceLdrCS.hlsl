@@ -11,9 +11,9 @@
 // Author:  James Stanard 
 //
 
-#include "Shaders/ShaderUtility.hlsli"
-#include "Effects/PostEffects/PostEffectsRS.hlsli"
-#include "Shaders/PixelPacking.hlsli"
+#include "Core/Shaders/ShaderUtility.hlsli"
+#include "Core/Effects/PostEffects/PostEffectsRS.hlsli"
+#include "Core/Shaders/PixelPacking.hlsli"
 
 Texture2D<float3> Bloom : register( t0 );
 #if SUPPORT_TYPED_UAV_LOADS

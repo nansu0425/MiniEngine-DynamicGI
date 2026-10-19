@@ -11,13 +11,13 @@
 // Author:  James Stanard 
 //
 
-#include "pch.h"
-#include "Graphics/Resource/PixelBuffer.h"
-#include "Graphics/Resource/EsramAllocator.h"
-#include "Graphics/GraphicsCore.h"
-#include "Graphics/Resource/BufferManager.h"
-#include "Graphics/Command/CommandContext.h"
-#include "Graphics/Resource/ReadbackBuffer.h"
+#include "Core/pch.h"
+#include "Core/Graphics/Resource/PixelBuffer.h"
+#include "Core/Graphics/Resource/EsramAllocator.h"
+#include "Core/Graphics/GraphicsCore.h"
+#include "Core/Graphics/Resource/BufferManager.h"
+#include "Core/Graphics/Command/CommandContext.h"
+#include "Core/Graphics/Resource/ReadbackBuffer.h"
 #include <fstream>
 
 using namespace Graphics;

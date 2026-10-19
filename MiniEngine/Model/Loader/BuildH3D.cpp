@@ -1,8 +1,8 @@
-#include "Loader/ModelH3D.h"
-#include "Loader/ModelLoader.h"
-#include "Loader/MeshConvert.h"
-#include "Loader/TextureConvert.h"
-#include "Loader/glTF.h"
+#include "Model/Loader/ModelH3D.h"
+#include "Model/Loader/ModelLoader.h"
+#include "Model/Loader/MeshConvert.h"
+#include "Model/Loader/TextureConvert.h"
+#include "Model/Loader/glTF.h"
 #include <map>
 #include <vector>
 #include <string>

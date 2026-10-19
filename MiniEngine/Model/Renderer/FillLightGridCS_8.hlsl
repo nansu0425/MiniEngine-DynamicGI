@@ -2,4 +2,4 @@
 #define WORK_GROUP_SIZE_Y 8
 #define WORK_GROUP_SIZE_Z 1
 
-#include "Renderer/FillLightGridCS.hlsli"
+#include "Model/Renderer/FillLightGridCS.hlsli"

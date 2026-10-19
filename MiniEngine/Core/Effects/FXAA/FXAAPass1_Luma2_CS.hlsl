@@ -13,4 +13,4 @@
 
 #define USE_LUMA_INPUT_BUFFER
 #define SUPPORT_TYPED_UAV_LOADS 1
-#include "Effects/FXAA/FXAAPass1CS.hlsli"
+#include "Core/Effects/FXAA/FXAAPass1CS.hlsli"

@@ -13,14 +13,14 @@
 
 #pragma once
 
-#include "Utility/FileUtility.h"
+#include "Core/Utility/FileUtility.h"
 
 #ifndef _WIN32
 #define _WIN32
 #endif
 #pragma warning(push)
 #pragma warning(disable : 4100) // unreferenced formal parameter
-#include "Loader/json.hpp"
+#include "Model/Loader/json.hpp"
 #pragma warning(pop)
 
 #include <string>

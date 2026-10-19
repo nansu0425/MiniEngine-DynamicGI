@@ -11,7 +11,7 @@
 // Author:  James Stanard 
 //
 
-#include "Display/PresentRS.hlsli"
+#include "Core/Display/PresentRS.hlsli"
 
 Texture2D ColorTex : register(t0);
 SamplerState BilinearSampler : register(s0);

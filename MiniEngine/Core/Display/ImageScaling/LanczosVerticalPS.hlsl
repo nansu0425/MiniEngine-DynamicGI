@@ -10,4 +10,4 @@
 //
 
 #define LANCZOS_VERTICAL 1
-#include "Display/ImageScaling/LanczosHorizontalPS.hlsl"
+#include "Core/Display/ImageScaling/LanczosHorizontalPS.hlsl"

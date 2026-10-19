@@ -12,4 +12,4 @@
 
 #define LOW_RESOLUTION
 #define DISABLE_DEPTH_TESTS
-#include "Particles/ParticleTileRenderCS.hlsl"
+#include "Core/Particles/ParticleTileRenderCS.hlsl"

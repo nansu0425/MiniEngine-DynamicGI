@@ -12,4 +12,4 @@
 //
 
 #define INTERLEAVE_RESULT
-#include "Effects/SSAO/AoRenderCS.hlsli"
+#include "Core/Effects/SSAO/AoRenderCS.hlsli"

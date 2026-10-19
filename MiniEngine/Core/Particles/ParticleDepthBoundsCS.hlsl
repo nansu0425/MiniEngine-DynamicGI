@@ -12,7 +12,7 @@
 //             Alex Nankervis
 //
 
-#include "Particles/ParticleUtility.hlsli"
+#include "Core/Particles/ParticleUtility.hlsli"
 
 Texture2D<float> g_Input : register(t0);
 RWTexture2D<uint> g_Output8 : register(u0);

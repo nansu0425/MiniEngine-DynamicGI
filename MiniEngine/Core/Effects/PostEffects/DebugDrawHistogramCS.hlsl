@@ -11,7 +11,7 @@
 // Author:  James Stanard 
 //
 
-#include "Effects/PostEffects/PostEffectsRS.hlsli"
+#include "Core/Effects/PostEffects/PostEffectsRS.hlsli"
 
 ByteAddressBuffer Histogram : register( t0 );
 StructuredBuffer<float> Exposure : register( t1 );

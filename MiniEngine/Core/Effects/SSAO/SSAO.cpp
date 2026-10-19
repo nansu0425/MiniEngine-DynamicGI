@@ -11,24 +11,24 @@
 // Author:  James Stanard 
 //
 
-#include "pch.h"
-#include "Effects/SSAO/SSAO.h"
-#include "Graphics/Resource/BufferManager.h"
-#include "Graphics/GraphicsCore.h"
-#include "Graphics/Command/CommandContext.h"
-#include "Camera/Camera.h"
-#include "Effects/TemporalEffects/TemporalEffects.h"
+#include "Core/pch.h"
+#include "Core/Effects/SSAO/SSAO.h"
+#include "Core/Graphics/Resource/BufferManager.h"
+#include "Core/Graphics/GraphicsCore.h"
+#include "Core/Graphics/Command/CommandContext.h"
+#include "Core/Camera/Camera.h"
+#include "Core/Effects/TemporalEffects/TemporalEffects.h"
 
-#include "CompiledShaders/AoPrepareDepthBuffers1CS.h"
-#include "CompiledShaders/AoPrepareDepthBuffers2CS.h"
-#include "CompiledShaders/LinearizeDepthCS.h"
-#include "CompiledShaders/DebugSSAOCS.h"
-#include "CompiledShaders/AoRender1CS.h"
-#include "CompiledShaders/AoRender2CS.h"
-#include "CompiledShaders/AoBlurUpsampleBlendOutCS.h"
-#include "CompiledShaders/AoBlurUpsamplePreMinBlendOutCS.h"
-#include "CompiledShaders/AoBlurUpsampleCS.h"
-#include "CompiledShaders/AoBlurUpsamplePreMinCS.h"
+#include "Output/Core/CompiledShaders/AoPrepareDepthBuffers1CS.h"
+#include "Output/Core/CompiledShaders/AoPrepareDepthBuffers2CS.h"
+#include "Output/Core/CompiledShaders/LinearizeDepthCS.h"
+#include "Output/Core/CompiledShaders/DebugSSAOCS.h"
+#include "Output/Core/CompiledShaders/AoRender1CS.h"
+#include "Output/Core/CompiledShaders/AoRender2CS.h"
+#include "Output/Core/CompiledShaders/AoBlurUpsampleBlendOutCS.h"
+#include "Output/Core/CompiledShaders/AoBlurUpsamplePreMinBlendOutCS.h"
+#include "Output/Core/CompiledShaders/AoBlurUpsampleCS.h"
+#include "Output/Core/CompiledShaders/AoBlurUpsamplePreMinCS.h"
 
 using namespace Graphics;
 using namespace Math;

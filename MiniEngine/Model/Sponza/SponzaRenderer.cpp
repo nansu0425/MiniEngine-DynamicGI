@@ -13,28 +13,28 @@
 //
 
 // From Core
-#include "Graphics/GraphicsCore.h"
-#include "Graphics/Resource/BufferManager.h"
-#include "Camera/Camera.h"
-#include "Graphics/Command/CommandContext.h"
-#include "Effects/TemporalEffects/TemporalEffects.h"
-#include "Effects/SSAO/SSAO.h"
-#include "App/SystemTime.h"
-#include "Camera/ShadowCamera.h"
-#include "Sponza/ParticleEffects.h"
-#include "Sponza/SponzaRenderer.h"
-#include "Renderer/Renderer.h"
+#include "Core/Graphics/GraphicsCore.h"
+#include "Core/Graphics/Resource/BufferManager.h"
+#include "Core/Camera/Camera.h"
+#include "Core/Graphics/Command/CommandContext.h"
+#include "Core/Effects/TemporalEffects/TemporalEffects.h"
+#include "Core/Effects/SSAO/SSAO.h"
+#include "Core/App/SystemTime.h"
+#include "Core/Camera/ShadowCamera.h"
+#include "Model/Sponza/ParticleEffects.h"
+#include "Model/Sponza/SponzaRenderer.h"
+#include "Model/Renderer/Renderer.h"
 
 // From Model
-#include "Loader/ModelH3D.h"
+#include "Model/Loader/ModelH3D.h"
 
 // From ModelViewer
-#include "Renderer/LightManager.h"
+#include "Model/Renderer/LightManager.h"
 
-#include "CompiledShaders/DepthViewerVS.h"
-#include "CompiledShaders/DepthViewerPS.h"
-#include "CompiledShaders/ModelViewerVS.h"
-#include "CompiledShaders/ModelViewerPS.h"
+#include "Output/Model/CompiledShaders/DepthViewerVS.h"
+#include "Output/Model/CompiledShaders/DepthViewerPS.h"
+#include "Output/Model/CompiledShaders/ModelViewerVS.h"
+#include "Output/Model/CompiledShaders/ModelViewerPS.h"
 
 using namespace Math;
 using namespace Graphics;

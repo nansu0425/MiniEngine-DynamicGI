@@ -11,4 +11,4 @@
 // Author:  James Stanard 
 
 #define USE_LINEAR_Z
-#include "Effects/MotionBlur/CameraMotionBlurPrePassCS.hlsl"
+#include "Core/Effects/MotionBlur/CameraMotionBlurPrePassCS.hlsl"

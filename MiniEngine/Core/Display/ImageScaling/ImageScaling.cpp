@@ -11,28 +11,28 @@
 // Author:  James Stanard
 //
 
-#include "pch.h"
-#include "Display/ImageScaling/ImageScaling.h"
-#include "Graphics/Resource/BufferManager.h"
-#include "Graphics/Command/CommandContext.h"
+#include "Core/pch.h"
+#include "Core/Display/ImageScaling/ImageScaling.h"
+#include "Core/Graphics/Resource/BufferManager.h"
+#include "Core/Graphics/Command/CommandContext.h"
 
-#include "CompiledShaders/ScreenQuadPresentVS.h"
+#include "Output/Core/CompiledShaders/ScreenQuadPresentVS.h"
 
-#include "CompiledShaders/BilinearUpsamplePS.h"
-#include "CompiledShaders/BicubicHorizontalUpsamplePS.h"
-#include "CompiledShaders/BicubicVerticalUpsamplePS.h"
-#include "CompiledShaders/BicubicUpsampleCS.h"
-#include "CompiledShaders/BicubicUpsampleFast16CS.h"
-#include "CompiledShaders/BicubicUpsampleFast24CS.h"
-#include "CompiledShaders/BicubicUpsampleFast32CS.h"
-#include "CompiledShaders/SharpeningUpsamplePS.h"
+#include "Output/Core/CompiledShaders/BilinearUpsamplePS.h"
+#include "Output/Core/CompiledShaders/BicubicHorizontalUpsamplePS.h"
+#include "Output/Core/CompiledShaders/BicubicVerticalUpsamplePS.h"
+#include "Output/Core/CompiledShaders/BicubicUpsampleCS.h"
+#include "Output/Core/CompiledShaders/BicubicUpsampleFast16CS.h"
+#include "Output/Core/CompiledShaders/BicubicUpsampleFast24CS.h"
+#include "Output/Core/CompiledShaders/BicubicUpsampleFast32CS.h"
+#include "Output/Core/CompiledShaders/SharpeningUpsamplePS.h"
 
-#include "CompiledShaders/LanczosHorizontalPS.h"
-#include "CompiledShaders/LanczosVerticalPS.h"
-#include "CompiledShaders/LanczosCS.h"
-#include "CompiledShaders/LanczosFast16CS.h"
-#include "CompiledShaders/LanczosFast24CS.h"
-#include "CompiledShaders/LanczosFast32CS.h"
+#include "Output/Core/CompiledShaders/LanczosHorizontalPS.h"
+#include "Output/Core/CompiledShaders/LanczosVerticalPS.h"
+#include "Output/Core/CompiledShaders/LanczosCS.h"
+#include "Output/Core/CompiledShaders/LanczosFast16CS.h"
+#include "Output/Core/CompiledShaders/LanczosFast24CS.h"
+#include "Output/Core/CompiledShaders/LanczosFast32CS.h"
 
 using namespace Graphics;
 

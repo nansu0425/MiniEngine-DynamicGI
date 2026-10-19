@@ -11,4 +11,4 @@
 // Author(s):   James Stanard
 
 #define DISABLE_PARTICLE_SORT 1
-#include "Particles/ParticleVS.hlsl"
+#include "Core/Particles/ParticleVS.hlsl"

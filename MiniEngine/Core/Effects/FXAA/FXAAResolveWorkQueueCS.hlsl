@@ -14,7 +14,7 @@
 // The work queues are also padded out to a multiple of 64 with dummy work items.
 //
 
-#include "Effects/FXAA/FXAARootSignature.hlsli"
+#include "Core/Effects/FXAA/FXAARootSignature.hlsli"
 
 RWByteAddressBuffer IndirectParams : register(u0);
 RWByteAddressBuffer WorkQueue : register(u1);

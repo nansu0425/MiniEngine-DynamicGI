@@ -14,11 +14,11 @@
 
 #pragma once
 
-#include "Math/VectorMath.h"
-#include "Graphics/Texture/TextureManager.h"
-#include "Graphics/Resource/GpuBuffer.h"
-#include "Graphics/Descriptor/DescriptorHeap.h"
-#include "Math/BoundingBox.h"
+#include "Core/Math/VectorMath.h"
+#include "Core/Graphics/Texture/TextureManager.h"
+#include "Core/Graphics/Resource/GpuBuffer.h"
+#include "Core/Graphics/Descriptor/DescriptorHeap.h"
+#include "Core/Math/BoundingBox.h"
 
 namespace Renderer
 {

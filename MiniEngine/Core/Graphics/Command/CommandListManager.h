@@ -17,7 +17,7 @@
 #include <queue>
 #include <mutex>
 #include <stdint.h>
-#include "Graphics/Command/CommandAllocatorPool.h"
+#include "Core/Graphics/Command/CommandAllocatorPool.h"
 
 class CommandQueue
 {

@@ -11,7 +11,7 @@
 // Author:  James Stanard 
 //
 
-#include "Shaders/CommonRS.hlsli"
+#include "Core/Shaders/CommonRS.hlsli"
 
 #ifndef NON_POWER_OF_TWO
 #define NON_POWER_OF_TWO 0

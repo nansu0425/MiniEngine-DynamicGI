@@ -11,10 +11,10 @@
 // Author:  James Stanard 
 //
 
-#include "pch.h"
-#include "Graphics/Command/CommandSignature.h"
-#include "Graphics/Pipeline/RootSignature.h"
-#include "Graphics/GraphicsCore.h"
+#include "Core/pch.h"
+#include "Core/Graphics/Command/CommandSignature.h"
+#include "Core/Graphics/Pipeline/RootSignature.h"
+#include "Core/Graphics/GraphicsCore.h"
 
 using namespace Graphics;
 

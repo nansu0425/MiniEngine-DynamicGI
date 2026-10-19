@@ -11,8 +11,8 @@
 // Author:  James Stanard 
 //
 
-#include "Effects/PostEffects/ToneMappingUtility.hlsli"
-#include "Display/PresentRS.hlsli"
+#include "Core/Effects/PostEffects/ToneMappingUtility.hlsli"
+#include "Core/Display/PresentRS.hlsli"
 
 Texture2D<float3> MainBuffer : register(t0);
 Texture2D<float4> OverlayBuffer : register(t1);

@@ -13,7 +13,7 @@
 
 #pragma once
 
-#include "Graphics/Resource/PixelBuffer.h"
+#include "Core/Graphics/Resource/PixelBuffer.h"
 
 class EsramAllocator;
 

@@ -13,4 +13,4 @@
 
 #define NO_TANGENT_FRAME 1
 #define NO_SECOND_UV 1
-#include "Renderer/DefaultVS.hlsl"
+#include "Model/Renderer/DefaultVS.hlsl"

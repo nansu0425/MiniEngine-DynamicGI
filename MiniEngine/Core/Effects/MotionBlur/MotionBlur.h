@@ -13,7 +13,7 @@
 
 #pragma once
 
-#include "UI/EngineTuning.h"
+#include "Core/UI/EngineTuning.h"
 
 // Forward declarations
 namespace Math { class Matrix4; class Camera; }

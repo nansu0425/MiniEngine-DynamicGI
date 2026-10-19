@@ -11,8 +11,8 @@
 // Author:  James Stanard
 //
 
-#include "pch.h"
-#include "Graphics/Command/CommandListManager.h"
+#include "Core/pch.h"
+#include "Core/Graphics/Command/CommandListManager.h"
 
 CommandQueue::CommandQueue(D3D12_COMMAND_LIST_TYPE Type) :
     m_Type(Type),

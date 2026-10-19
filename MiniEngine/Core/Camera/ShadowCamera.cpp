@@ -11,8 +11,8 @@
 // Author:  James Stanard 
 //
 
-#include "pch.h"
-#include "Camera/ShadowCamera.h"
+#include "Core/pch.h"
+#include "Core/Camera/ShadowCamera.h"
 
 using namespace Math;
 

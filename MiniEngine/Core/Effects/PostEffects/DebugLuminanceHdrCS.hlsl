@@ -11,9 +11,9 @@
 // Author:  James Stanard 
 //
 
-#include "Effects/PostEffects/ToneMappingUtility.hlsli"
-#include "Effects/PostEffects/PostEffectsRS.hlsli"
-#include "Shaders/PixelPacking.hlsli"
+#include "Core/Effects/PostEffects/ToneMappingUtility.hlsli"
+#include "Core/Effects/PostEffects/PostEffectsRS.hlsli"
+#include "Core/Shaders/PixelPacking.hlsli"
 
 StructuredBuffer<float> Exposure : register(t0);
 Texture2D<float3> Bloom : register(t1);

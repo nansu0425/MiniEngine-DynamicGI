@@ -11,8 +11,8 @@
 // Author:  James Stanard 
 //
 
-#include "Effects/PostEffects/PostEffectsRS.hlsli"
-#include "Shaders/PixelPacking.hlsli"
+#include "Core/Effects/PostEffects/PostEffectsRS.hlsli"
+#include "Core/Shaders/PixelPacking.hlsli"
 
 RWTexture2D<float3> SceneColor : register( u0 );
 Texture2D<uint> PostBuffer : register( t0 );

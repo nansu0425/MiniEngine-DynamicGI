@@ -13,10 +13,10 @@
 
 #pragma once
 
-#include "Graphics/Pipeline/PipelineState.h"
-#include "Graphics/Descriptor/DescriptorHeap.h"
-#include "Graphics/Pipeline/RootSignature.h"
-#include "Graphics/GraphicsCommon.h"
+#include "Core/Graphics/Pipeline/PipelineState.h"
+#include "Core/Graphics/Descriptor/DescriptorHeap.h"
+#include "Core/Graphics/Pipeline/RootSignature.h"
+#include "Core/Graphics/GraphicsCommon.h"
 
 class CommandListManager;
 class ContextManager;

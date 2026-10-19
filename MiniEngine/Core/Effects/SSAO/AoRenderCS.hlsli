@@ -11,7 +11,7 @@
 // Author:  James Stanard 
 //
 
-#include "Effects/SSAO/SSAORS.hlsli"
+#include "Core/Effects/SSAO/SSAORS.hlsli"
 
 #ifndef INTERLEAVE_RESULT
 #define WIDE_SAMPLING 1

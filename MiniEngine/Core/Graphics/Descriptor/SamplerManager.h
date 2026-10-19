@@ -13,8 +13,8 @@
 
 #pragma once
 
-#include "pch.h"
-#include "Math/Color.h"
+#include "Core/pch.h"
+#include "Core/Math/Color.h"
 
 class SamplerDesc : public D3D12_SAMPLER_DESC
 {

@@ -11,11 +11,11 @@
 // Author(s):  Jack Elliott
 //
 
-#include "pch.h"
-#include "Graphics/Resource/BuddyAllocator.h"
-#include "Graphics/GraphicsCore.h"
-#include "Graphics/Command/CommandListManager.h"
-#include "Graphics/Command/CommandContext.h"
+#include "Core/pch.h"
+#include "Core/Graphics/Resource/BuddyAllocator.h"
+#include "Core/Graphics/GraphicsCore.h"
+#include "Core/Graphics/Command/CommandListManager.h"
+#include "Core/Graphics/Command/CommandContext.h"
 
 using namespace Graphics;
 using namespace std;

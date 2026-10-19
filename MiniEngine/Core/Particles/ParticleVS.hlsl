@@ -10,8 +10,8 @@
 //
 // Author(s):   James Stanard
 
-#include "Particles/ParticleUpdateCommon.hlsli"
-#include "Particles/ParticleUtility.hlsli"
+#include "Core/Particles/ParticleUpdateCommon.hlsli"
+#include "Core/Particles/ParticleUtility.hlsli"
 
 StructuredBuffer<ParticleVertex> g_VertexBuffer : register( t0 );
 StructuredBuffer<uint> g_IndexBuffer : register( t3 );

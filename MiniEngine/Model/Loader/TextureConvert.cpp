@@ -14,8 +14,8 @@
 // This code depends on DirectXTex
 //
 
-#include "Loader/TextureConvert.h"
-#include "Utility/Utility.h"
+#include "Model/Loader/TextureConvert.h"
+#include "Core/Utility/Utility.h"
 #include "DirectXTex.h"
 
 using namespace DirectX;

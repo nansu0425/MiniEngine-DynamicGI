@@ -11,20 +11,20 @@
 // Author:  James Stanard 
 //
 
-#include "pch.h"
-#include "UI/TextRenderer.h"
-#include "Utility/FileUtility.h"
-#include "Graphics/Texture/Texture.h"
-#include "App/SystemTime.h"
-#include "Graphics/GraphicsCore.h"
-#include "Graphics/Command/CommandContext.h"
-#include "Graphics/Pipeline/PipelineState.h"
-#include "Graphics/Pipeline/RootSignature.h"
-#include "Graphics/Resource/BufferManager.h"
-#include "CompiledShaders/TextVS.h"
-#include "CompiledShaders/TextAntialiasPS.h"
-#include "CompiledShaders/TextShadowPS.h"
-#include "UI/Fonts/consola24.h"
+#include "Core/pch.h"
+#include "Core/UI/TextRenderer.h"
+#include "Core/Utility/FileUtility.h"
+#include "Core/Graphics/Texture/Texture.h"
+#include "Core/App/SystemTime.h"
+#include "Core/Graphics/GraphicsCore.h"
+#include "Core/Graphics/Command/CommandContext.h"
+#include "Core/Graphics/Pipeline/PipelineState.h"
+#include "Core/Graphics/Pipeline/RootSignature.h"
+#include "Core/Graphics/Resource/BufferManager.h"
+#include "Output/Core/CompiledShaders/TextVS.h"
+#include "Output/Core/CompiledShaders/TextAntialiasPS.h"
+#include "Output/Core/CompiledShaders/TextShadowPS.h"
+#include "Core/UI/Fonts/consola24.h"
 #include <map>
 #include <string>
 #include <cstdio>

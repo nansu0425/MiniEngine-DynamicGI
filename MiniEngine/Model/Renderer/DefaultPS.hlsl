@@ -11,7 +11,7 @@
 // Author(s):	James Stanard
 //              Justin Saunders (ATG)
 
-#include "Renderer/Common.hlsli"
+#include "Model/Renderer/Common.hlsli"
 
 Texture2D<float4> baseColorTexture          : register(t0);
 Texture2D<float3> metallicRoughnessTexture  : register(t1);

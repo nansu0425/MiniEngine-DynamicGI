@@ -11,7 +11,7 @@
 // Author:  Julia Careaga 
 //
 
-#include "Particles/ParticleUtility.hlsli"
+#include "Core/Particles/ParticleUtility.hlsli"
 
 ByteAddressBuffer g_FinalInstanceCounter : register( t0 );
 RWByteAddressBuffer g_NumThreadGroups : register( u0 );

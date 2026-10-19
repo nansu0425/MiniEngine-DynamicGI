@@ -10,8 +10,8 @@
 //
 // Author(s):	James Stanard
 
-#include "Renderer/Common.hlsli"
-#include "Sponza/Lighting.hlsli"
+#include "Model/Renderer/Common.hlsli"
+#include "Model/Sponza/Lighting.hlsli"
 
 Texture2D<float3> texDiffuse		: register(t0);
 Texture2D<float3> texSpecular		: register(t1);

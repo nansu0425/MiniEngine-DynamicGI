@@ -15,7 +15,7 @@
 // The histogram measures logarithmic luminance ranging from 2^-12 up to 2^4.  This should provide a nice window
 // where the exposure would range from 2^-4 up to 2^4.
 
-#include "Effects/PostEffects/PostEffectsRS.hlsli"
+#include "Core/Effects/PostEffects/PostEffectsRS.hlsli"
 
 Texture2D<uint> LumaBuf : register( t0 );
 RWByteAddressBuffer Histogram : register( u0 );

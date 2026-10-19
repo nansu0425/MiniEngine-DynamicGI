@@ -11,7 +11,7 @@
 // Author:  James Stanard 
 //
 
-#include "Effects/DepthOfField/DoFRS.hlsli"
+#include "Core/Effects/DepthOfField/DoFRS.hlsli"
 
 #define USE_LINEAR_Z 1
 

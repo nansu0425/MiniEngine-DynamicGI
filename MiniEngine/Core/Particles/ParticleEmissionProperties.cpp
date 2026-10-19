@@ -11,8 +11,8 @@
 // Author:  Julia Careaga
 
 #pragma once
-#include "pch.h"
-#include "Particles/ParticleShaderStructs.h"
+#include "Core/pch.h"
+#include "Core/Particles/ParticleShaderStructs.h"
 
 EmissionProperties* CreateEmissionProperties()
 {

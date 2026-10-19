@@ -11,14 +11,14 @@
 // Author(s):  James Stanard
 //
 
-#include "Sponza/ParticleEffects.h"
-#include "Particles/ParticleEffectManager.h"
-#include "Graphics/Texture/TextureManager.h"
+#include "Model/Sponza/ParticleEffects.h"
+#include "Core/Particles/ParticleEffectManager.h"
+#include "Core/Graphics/Texture/TextureManager.h"
 #include <fstream>
 
 #pragma warning(push)
 #pragma warning(disable : 4100) // unreferenced formal parameter
-#include "Loader/json.hpp"
+#include "Model/Loader/json.hpp"
 #pragma warning(pop)
 
 using namespace std;

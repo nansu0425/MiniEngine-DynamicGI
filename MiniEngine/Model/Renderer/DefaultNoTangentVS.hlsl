@@ -12,4 +12,4 @@
 //
 
 #define NO_TANGENT_FRAME 1
-#include "Renderer/DefaultVS.hlsl"
+#include "Model/Renderer/DefaultVS.hlsl"

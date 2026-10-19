@@ -13,8 +13,8 @@
 
 #pragma once
 
-#include "Camera/Camera.h"
-#include "Math/VectorMath.h"
+#include "Core/Camera/Camera.h"
+#include "Core/Math/VectorMath.h"
 
 class ShadowCamera : public Math::BaseCamera
 {

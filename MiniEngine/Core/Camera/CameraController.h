@@ -13,9 +13,9 @@
 
 #pragma once
 
-#include "App/GameCore.h"
-#include "Math/VectorMath.h"
-#include "Math/BoundingSphere.h"
+#include "Core/App/GameCore.h"
+#include "Core/Math/VectorMath.h"
+#include "Core/Math/BoundingSphere.h"
 
 namespace Math
 {

@@ -11,16 +11,16 @@
 // Author:  James Stanard 
 //
 
-#include "pch.h"
-#include "Display/Display.h"
-#include "Graphics/GraphicsCore.h"
-#include "Graphics/Resource/BufferManager.h"
-#include "Graphics/Resource/ColorBuffer.h"
-#include "App/SystemTime.h"
-#include "Graphics/Command/CommandContext.h"
-#include "Graphics/Pipeline/RootSignature.h"
-#include "Display/ImageScaling/ImageScaling.h"
-#include "Effects/TemporalEffects/TemporalEffects.h"
+#include "Core/pch.h"
+#include "Core/Display/Display.h"
+#include "Core/Graphics/GraphicsCore.h"
+#include "Core/Graphics/Resource/BufferManager.h"
+#include "Core/Graphics/Resource/ColorBuffer.h"
+#include "Core/App/SystemTime.h"
+#include "Core/Graphics/Command/CommandContext.h"
+#include "Core/Graphics/Pipeline/RootSignature.h"
+#include "Core/Display/ImageScaling/ImageScaling.h"
+#include "Core/Effects/TemporalEffects/TemporalEffects.h"
 
 #pragma comment(lib, "dxgi.lib") 
 
@@ -30,24 +30,24 @@
 
 namespace GameCore { extern HWND g_hWnd; }
 
-#include "CompiledShaders/ScreenQuadPresentVS.h"
-#include "CompiledShaders/BufferCopyPS.h"
-#include "CompiledShaders/PresentSDRPS.h"
-#include "CompiledShaders/PresentHDRPS.h"
-#include "CompiledShaders/CompositeSDRPS.h"
-#include "CompiledShaders/ScaleAndCompositeSDRPS.h"
-#include "CompiledShaders/CompositeHDRPS.h"
-#include "CompiledShaders/BlendUIHDRPS.h"
-#include "CompiledShaders/ScaleAndCompositeHDRPS.h"
-#include "CompiledShaders/MagnifyPixelsPS.h"
-#include "CompiledShaders/GenerateMipsLinearCS.h"
-#include "CompiledShaders/GenerateMipsLinearOddCS.h"
-#include "CompiledShaders/GenerateMipsLinearOddXCS.h"
-#include "CompiledShaders/GenerateMipsLinearOddYCS.h"
-#include "CompiledShaders/GenerateMipsGammaCS.h"
-#include "CompiledShaders/GenerateMipsGammaOddCS.h"
-#include "CompiledShaders/GenerateMipsGammaOddXCS.h"
-#include "CompiledShaders/GenerateMipsGammaOddYCS.h"
+#include "Output/Core/CompiledShaders/ScreenQuadPresentVS.h"
+#include "Output/Core/CompiledShaders/BufferCopyPS.h"
+#include "Output/Core/CompiledShaders/PresentSDRPS.h"
+#include "Output/Core/CompiledShaders/PresentHDRPS.h"
+#include "Output/Core/CompiledShaders/CompositeSDRPS.h"
+#include "Output/Core/CompiledShaders/ScaleAndCompositeSDRPS.h"
+#include "Output/Core/CompiledShaders/CompositeHDRPS.h"
+#include "Output/Core/CompiledShaders/BlendUIHDRPS.h"
+#include "Output/Core/CompiledShaders/ScaleAndCompositeHDRPS.h"
+#include "Output/Core/CompiledShaders/MagnifyPixelsPS.h"
+#include "Output/Core/CompiledShaders/GenerateMipsLinearCS.h"
+#include "Output/Core/CompiledShaders/GenerateMipsLinearOddCS.h"
+#include "Output/Core/CompiledShaders/GenerateMipsLinearOddXCS.h"
+#include "Output/Core/CompiledShaders/GenerateMipsLinearOddYCS.h"
+#include "Output/Core/CompiledShaders/GenerateMipsGammaCS.h"
+#include "Output/Core/CompiledShaders/GenerateMipsGammaOddCS.h"
+#include "Output/Core/CompiledShaders/GenerateMipsGammaOddXCS.h"
+#include "Output/Core/CompiledShaders/GenerateMipsGammaOddYCS.h"
 
 #define SWAP_CHAIN_BUFFER_COUNT 3
 

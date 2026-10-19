@@ -12,4 +12,4 @@
 //
 
 #define SEPARATE_ALPHA_MEDIAN
-#include "Effects/DepthOfField/DoFMedianFilterCS.hlsl"
+#include "Core/Effects/DepthOfField/DoFMedianFilterCS.hlsl"

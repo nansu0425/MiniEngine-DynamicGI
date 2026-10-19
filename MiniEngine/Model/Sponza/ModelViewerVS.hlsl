@@ -12,7 +12,7 @@
 //             Alex Nankervis
 //
 
-#include "Renderer/Common.hlsli"
+#include "Model/Renderer/Common.hlsli"
 
 cbuffer VSConstants : register(b0)
 {

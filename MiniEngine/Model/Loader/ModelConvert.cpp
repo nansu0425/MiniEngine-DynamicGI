@@ -14,15 +14,15 @@
 // This code depends on DirectXTex
 //
 
-#include "Loader/ModelLoader.h"
-#include "Renderer/Renderer.h"
-#include "Loader/glTF.h"
-#include "Loader/TextureConvert.h"
-#include "Loader/MeshConvert.h"
-#include "Graphics/Texture/TextureManager.h"
-#include "Graphics/GraphicsCommon.h"
-#include "Utility/Utility.h"
-#include "Math/Common.h"
+#include "Model/Loader/ModelLoader.h"
+#include "Model/Renderer/Renderer.h"
+#include "Model/Loader/glTF.h"
+#include "Model/Loader/TextureConvert.h"
+#include "Model/Loader/MeshConvert.h"
+#include "Core/Graphics/Texture/TextureManager.h"
+#include "Core/Graphics/GraphicsCommon.h"
+#include "Core/Utility/Utility.h"
+#include "Core/Math/Common.h"
 
 #include <fstream>
 #include <map>

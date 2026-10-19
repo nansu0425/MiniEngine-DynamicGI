@@ -11,8 +11,8 @@
 // Author:  James Stanard 
 //
 
-#include "Effects/DepthOfField/DoFCommon.hlsli"
-#include "Shaders/PixelPacking.hlsli"
+#include "Core/Effects/DepthOfField/DoFCommon.hlsli"
+#include "Core/Shaders/PixelPacking.hlsli"
 
 Texture2D<float3> DoFColorBuffer : register(t0);
 Texture2D<float> DoFAlphaBuffer : register(t1);

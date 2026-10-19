@@ -12,7 +12,7 @@
 //             Julia Careaga
 //
 
-#include "Particles/ParticleUtility.hlsli"
+#include "Core/Particles/ParticleUtility.hlsli"
 
 #define MAX_PARTICLES_PER_LARGE_BIN (16 * MAX_PARTICLES_PER_BIN)
 

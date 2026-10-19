@@ -40,7 +40,7 @@
     #include <pix3.h>
 #endif
 
-#include "Graphics/d3dx12.h"
+#include "Core/Graphics/d3dx12.h"
 
 #include <cstdint>
 #include <cstdio>
@@ -53,7 +53,7 @@
 #include <wrl.h>
 #include <ppltasks.h>
 
-#include "Utility/Utility.h"
-#include "Math/VectorMath.h"
-#include "UI/EngineTuning.h"
-#include "Profiling/EngineProfiling.h"
+#include "Core/Utility/Utility.h"
+#include "Core/Math/VectorMath.h"
+#include "Core/UI/EngineTuning.h"
+#include "Core/Profiling/EngineProfiling.h"

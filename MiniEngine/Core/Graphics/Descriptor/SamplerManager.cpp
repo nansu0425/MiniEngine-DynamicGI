@@ -12,10 +12,10 @@
 //             Alex Nankervis
 //
 
-#include "pch.h"
-#include "Graphics/Descriptor/SamplerManager.h"
-#include "Graphics/GraphicsCore.h"
-#include "Utility/Hash.h"
+#include "Core/pch.h"
+#include "Core/Graphics/Descriptor/SamplerManager.h"
+#include "Core/Graphics/GraphicsCore.h"
+#include "Core/Utility/Hash.h"
 #include <map>
 
 using namespace std;

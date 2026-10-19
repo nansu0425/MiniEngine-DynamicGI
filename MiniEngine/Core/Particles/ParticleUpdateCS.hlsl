@@ -12,8 +12,8 @@
 //          Julia Careaga
 //
 
-#include "Particles/ParticleUpdateCommon.hlsli"
-#include "Particles/ParticleUtility.hlsli"
+#include "Core/Particles/ParticleUpdateCommon.hlsli"
+#include "Core/Particles/ParticleUtility.hlsli"
 
 cbuffer CB0 : register(b0)
 {

@@ -11,19 +11,19 @@
 // Author:  James Stanard 
 //
 
-#include "pch.h"
-#include "Effects/TemporalEffects/TemporalEffects.h"
-#include "Graphics/Resource/BufferManager.h"
-#include "Graphics/GraphicsCore.h"
-#include "Graphics/GraphicsCommon.h"
-#include "Graphics/Command/CommandContext.h"
-#include "App/SystemTime.h"
-#include "Effects/PostEffects/PostEffects.h"
+#include "Core/pch.h"
+#include "Core/Effects/TemporalEffects/TemporalEffects.h"
+#include "Core/Graphics/Resource/BufferManager.h"
+#include "Core/Graphics/GraphicsCore.h"
+#include "Core/Graphics/GraphicsCommon.h"
+#include "Core/Graphics/Command/CommandContext.h"
+#include "Core/App/SystemTime.h"
+#include "Core/Effects/PostEffects/PostEffects.h"
 
-#include "CompiledShaders/TemporalBlendCS.h"
-#include "CompiledShaders/BoundNeighborhoodCS.h"
-#include "CompiledShaders/ResolveTAACS.h"
-#include "CompiledShaders/SharpenTAACS.h"
+#include "Output/Core/CompiledShaders/TemporalBlendCS.h"
+#include "Output/Core/CompiledShaders/BoundNeighborhoodCS.h"
+#include "Output/Core/CompiledShaders/ResolveTAACS.h"
+#include "Output/Core/CompiledShaders/SharpenTAACS.h"
 
 using namespace Graphics;
 using namespace Math;

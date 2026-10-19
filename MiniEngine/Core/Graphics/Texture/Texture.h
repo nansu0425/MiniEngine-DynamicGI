@@ -13,8 +13,8 @@
 
 #pragma once
 
-#include "pch.h"
-#include "Graphics/Resource/GpuResource.h"
+#include "Core/pch.h"
+#include "Core/Graphics/Resource/GpuResource.h"
 
 class Texture : public GpuResource
 {

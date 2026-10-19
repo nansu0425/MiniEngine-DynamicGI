@@ -11,7 +11,7 @@
 // Author(s):	James Stanard
 //
 
-#include "Renderer/Common.hlsli"
+#include "Model/Renderer/Common.hlsli"
 
 struct VSOutput
 {

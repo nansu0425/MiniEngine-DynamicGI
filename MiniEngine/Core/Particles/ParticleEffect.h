@@ -12,10 +12,10 @@
 //             James Stanard
 
 #pragma once
-#include "pch.h"
-#include "Graphics/Resource/GpuBuffer.h"
-#include "Particles/ParticleEffectProperties.h"
-#include "Particles/ParticleShaderStructs.h"
+#include "Core/pch.h"
+#include "Core/Graphics/Resource/GpuBuffer.h"
+#include "Core/Particles/ParticleEffectProperties.h"
+#include "Core/Particles/ParticleShaderStructs.h"
 
 class ParticleEffect 
 {

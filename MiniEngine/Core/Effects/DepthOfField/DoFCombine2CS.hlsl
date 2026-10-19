@@ -12,4 +12,4 @@
 //
 
 #define SUPPORT_TYPED_UAV_LOADS 1
-#include "Effects/DepthOfField/DoFCombineCS.hlsl"
+#include "Core/Effects/DepthOfField/DoFCombineCS.hlsl"

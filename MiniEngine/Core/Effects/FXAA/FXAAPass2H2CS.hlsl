@@ -13,4 +13,4 @@
 
 #define SUPPORT_TYPED_UAV_LOADS 1
 
-#include "Effects/FXAA/FXAAPass2CS.hlsli"
+#include "Core/Effects/FXAA/FXAAPass2CS.hlsli"

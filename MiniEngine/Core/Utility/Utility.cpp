@@ -11,8 +11,8 @@
 // Author:  James Stanard 
 //
 
-#include "pch.h"
-#include "Utility/Utility.h"
+#include "Core/pch.h"
+#include "Core/Utility/Utility.h"
 #include <string>
 #include <locale>
 #if defined(_M_ARM64)

@@ -51,7 +51,7 @@
 ### 폴더 구조
 
 - source 파일은 기능별 폴더에 둔다. C++ 파일과 그 파일이 쓰는 shader 는 같은 폴더에 둔다. 여러 기능이 공유하는 `.hlsli` 는 `MiniEngine/Core/Shaders/` 에 둔다.
-- `#include` 는 C++ 와 shader 모두 project root 기준 경로로 쓴다 (예: `#include "Graphics/Command/CommandContext.h"`). Model, ModelViewer 에서는 `Core/` 와 `Model/` 이 모두 include path 에 있으므로 두 project 의 최상위 폴더 이름은 겹치지 않게 한다.
+- `#include` 는 C++ 와 shader 모두 `MiniEngine/` 기준 경로로 쓰고, 같은 폴더의 파일이나 pch 도 예외 없이 project 이름부터 쓴다 (예: `#include "Core/pch.h"`, `#include "Model/Renderer/Common.hlsli"`). build 가 만드는 shader header 는 `MiniEngine/Build/<Platform>/<Configuration>/` 기준 경로로 쓴다 (예: `#include "Output/Core/CompiledShaders/ScreenQuadPresentVS.h"`).
 - Visual Studio filter (`.vcxproj.filters`) 는 쓰지 않는다. Solution Explorer 에서 Show All Files 를 켜고 폴더 구조 그대로 본다.
 
 ## License

@@ -13,7 +13,7 @@
 
 #pragma once
 
-#include "Graphics/Descriptor/SamplerManager.h"
+#include "Core/Graphics/Descriptor/SamplerManager.h"
 
 class SamplerDesc;
 class CommandSignature;

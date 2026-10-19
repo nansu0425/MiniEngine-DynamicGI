@@ -13,8 +13,8 @@
 //          Julia Careaga
 //
 
-#include "Particles/ParticleUtility.hlsli"
-#include "Shaders/PixelPacking.hlsli"
+#include "Core/Particles/ParticleUtility.hlsli"
+#include "Core/Shaders/PixelPacking.hlsli"
 
 //#define DEBUG_LOW_RES
 

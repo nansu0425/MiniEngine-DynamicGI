@@ -11,28 +11,28 @@
 // Author:  James Stanard 
 //
 
-#include "pch.h"
-#include "Effects/FXAA/FXAA.h"
-#include "Graphics/GraphicsCore.h"
-#include "Graphics/Resource/BufferManager.h"
-#include "Graphics/Command/CommandContext.h"
+#include "Core/pch.h"
+#include "Core/Effects/FXAA/FXAA.h"
+#include "Core/Graphics/GraphicsCore.h"
+#include "Core/Graphics/Resource/BufferManager.h"
+#include "Core/Graphics/Command/CommandContext.h"
 
-#include "CompiledShaders/FXAAPass1_RGB_CS.h"
-#include "CompiledShaders/FXAAPass1_Luma_CS.h"
-#include "CompiledShaders/FXAAPass2HCS.h"
-#include "CompiledShaders/FXAAPass2VCS.h"
-#include "CompiledShaders/FXAAPass2HDebugCS.h"
-#include "CompiledShaders/FXAAPass2VDebugCS.h"
+#include "Output/Core/CompiledShaders/FXAAPass1_RGB_CS.h"
+#include "Output/Core/CompiledShaders/FXAAPass1_Luma_CS.h"
+#include "Output/Core/CompiledShaders/FXAAPass2HCS.h"
+#include "Output/Core/CompiledShaders/FXAAPass2VCS.h"
+#include "Output/Core/CompiledShaders/FXAAPass2HDebugCS.h"
+#include "Output/Core/CompiledShaders/FXAAPass2VDebugCS.h"
 
 // These shaders are when typed UAV loads of complex formats is available
-#include "CompiledShaders/FXAAPass1_RGB2_CS.h"
-#include "CompiledShaders/FXAAPass1_Luma2_CS.h"
-#include "CompiledShaders/FXAAPass2H2CS.h"
-#include "CompiledShaders/FXAAPass2V2CS.h"
-#include "CompiledShaders/FXAAPass2HDebug2CS.h"
-#include "CompiledShaders/FXAAPass2VDebug2CS.h"
+#include "Output/Core/CompiledShaders/FXAAPass1_RGB2_CS.h"
+#include "Output/Core/CompiledShaders/FXAAPass1_Luma2_CS.h"
+#include "Output/Core/CompiledShaders/FXAAPass2H2CS.h"
+#include "Output/Core/CompiledShaders/FXAAPass2V2CS.h"
+#include "Output/Core/CompiledShaders/FXAAPass2HDebug2CS.h"
+#include "Output/Core/CompiledShaders/FXAAPass2VDebug2CS.h"
 
-#include "CompiledShaders/FXAAResolveWorkQueueCS.h"
+#include "Output/Core/CompiledShaders/FXAAResolveWorkQueueCS.h"
 
 
 using namespace Graphics;

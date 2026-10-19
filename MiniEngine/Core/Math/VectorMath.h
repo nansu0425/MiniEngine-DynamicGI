@@ -51,10 +51,10 @@
 
 #pragma once
 
-#include "Math/Scalar.h"
-#include "Math/Vector.h"
-#include "Math/Quaternion.h"
-#include "Math/Matrix3.h"
-#include "Math/Transform.h"
-#include "Math/Matrix4.h"
-#include "Math/Functions.inl"
+#include "Core/Math/Scalar.h"
+#include "Core/Math/Vector.h"
+#include "Core/Math/Quaternion.h"
+#include "Core/Math/Matrix3.h"
+#include "Core/Math/Transform.h"
+#include "Core/Math/Matrix4.h"
+#include "Core/Math/Functions.inl"

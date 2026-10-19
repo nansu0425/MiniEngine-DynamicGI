@@ -11,8 +11,8 @@
 // Author(s):  Jack Elliott
 //
 
-#include "pch.h"
-#include "Graphics/Cube.h"
+#include "Core/pch.h"
+#include "Core/Graphics/Cube.h"
 
 namespace Graphics
 {

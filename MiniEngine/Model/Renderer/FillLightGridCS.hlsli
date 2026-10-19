@@ -11,7 +11,7 @@
 // Author(s):	Alex Nankervis
 //
 
-#include "Renderer/LightGrid.hlsli"
+#include "Model/Renderer/LightGrid.hlsli"
 
 // outdated warning about for-loop variable scope
 #pragma warning (disable: 3078)

@@ -11,9 +11,9 @@
 // Author:  James Stanard 
 //
 
-#include "pch.h"
-#include "Graphics/Resource/UploadBuffer.h"
-#include "Graphics/GraphicsCore.h"
+#include "Core/pch.h"
+#include "Core/Graphics/Resource/UploadBuffer.h"
+#include "Core/Graphics/GraphicsCore.h"
 
 using namespace Graphics;
 

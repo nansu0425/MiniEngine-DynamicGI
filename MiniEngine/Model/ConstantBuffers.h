@@ -13,8 +13,8 @@
 
 #pragma once
 
-#include "Math/Matrix3.h"
-#include "Math/Matrix4.h"
+#include "Core/Math/Matrix3.h"
+#include "Core/Math/Matrix4.h"
 #include <cstdint>
 
 __declspec(align(256)) struct MeshConstants

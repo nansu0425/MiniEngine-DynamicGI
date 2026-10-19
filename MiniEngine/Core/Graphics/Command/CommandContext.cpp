@@ -11,15 +11,15 @@
 // Author:  James Stanard 
 //
 
-#include "pch.h"
-#include "Graphics/Command/CommandContext.h"
-#include "Graphics/Resource/ColorBuffer.h"
-#include "Graphics/Resource/DepthBuffer.h"
-#include "Graphics/GraphicsCore.h"
-#include "Graphics/Descriptor/DescriptorHeap.h"
-#include "Profiling/EngineProfiling.h"
-#include "Graphics/Resource/UploadBuffer.h"
-#include "Graphics/Resource/ReadbackBuffer.h"
+#include "Core/pch.h"
+#include "Core/Graphics/Command/CommandContext.h"
+#include "Core/Graphics/Resource/ColorBuffer.h"
+#include "Core/Graphics/Resource/DepthBuffer.h"
+#include "Core/Graphics/GraphicsCore.h"
+#include "Core/Graphics/Descriptor/DescriptorHeap.h"
+#include "Core/Profiling/EngineProfiling.h"
+#include "Core/Graphics/Resource/UploadBuffer.h"
+#include "Core/Graphics/Resource/ReadbackBuffer.h"
 
 #pragma warning(push)
 #pragma warning(disable:4100) // unreferenced formal parameters in PIXCopyEventArguments() (WinPixEventRuntime.1.0.200127001)

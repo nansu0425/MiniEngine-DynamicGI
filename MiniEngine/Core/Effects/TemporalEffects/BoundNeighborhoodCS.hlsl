@@ -11,7 +11,7 @@
 // Author:  James Stanard 
 //
 
-#include "Shaders/CommonRS.hlsli"
+#include "Core/Shaders/CommonRS.hlsli"
 
 Texture2D<float3> InputColor : register(t0);
 RWTexture2D<float3> OutMin : register(u0);

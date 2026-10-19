@@ -11,7 +11,7 @@
 // Author:  James Stanard 
 //
 
-#include "Effects/SSAO/SSAORS.hlsli"
+#include "Core/Effects/SSAO/SSAORS.hlsli"
 
 RWTexture2D<float> LinearZ : register(u0);
 Texture2D<float> Depth : register(t0);

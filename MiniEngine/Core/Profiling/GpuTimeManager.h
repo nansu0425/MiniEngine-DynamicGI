@@ -13,7 +13,7 @@
 
 #pragma once
 
-#include "App/GameCore.h"
+#include "Core/App/GameCore.h"
 
 class CommandContext;
 

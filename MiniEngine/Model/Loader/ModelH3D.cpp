@@ -11,17 +11,17 @@
 // Author:  Alex Nankervis
 //
 
-#include "Loader/ModelH3D.h"
+#include "Model/Loader/ModelH3D.h"
 #include <string.h>
 #include <float.h>
 
-#include "Utility/Utility.h"
-#include "Graphics/Texture/TextureManager.h"
-#include "Graphics/GraphicsCore.h"
-#include "Graphics/Descriptor/DescriptorHeap.h"
-#include "Graphics/Command/CommandContext.h"
-#include "Graphics/Resource/UploadBuffer.h"
-#include "Graphics/GraphicsCommon.h"
+#include "Core/Utility/Utility.h"
+#include "Core/Graphics/Texture/TextureManager.h"
+#include "Core/Graphics/GraphicsCore.h"
+#include "Core/Graphics/Descriptor/DescriptorHeap.h"
+#include "Core/Graphics/Command/CommandContext.h"
+#include "Core/Graphics/Resource/UploadBuffer.h"
+#include "Core/Graphics/GraphicsCommon.h"
 #include <fstream>
 
 using namespace std;

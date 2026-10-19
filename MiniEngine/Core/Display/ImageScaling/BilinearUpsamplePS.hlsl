@@ -10,8 +10,8 @@
 //
 // Author:  James Stanard 
 
-#include "Shaders/ShaderUtility.hlsli"
-#include "Display/PresentRS.hlsli"
+#include "Core/Shaders/ShaderUtility.hlsli"
+#include "Core/Display/PresentRS.hlsli"
 
 Texture2D<float3> ColorTex : register(t0);
 

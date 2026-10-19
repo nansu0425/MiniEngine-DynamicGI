@@ -10,8 +10,8 @@
 //
 // Author:  James Stanard 
 
-#include "Shaders/ShaderUtility.hlsli"
-#include "Shaders/CommonRS.hlsli"
+#include "Core/Shaders/ShaderUtility.hlsli"
+#include "Core/Shaders/CommonRS.hlsli"
 
 Texture2D<float4> TemporalColor : register(t0);
 RWTexture2D<float3> OutColor : register(u0);

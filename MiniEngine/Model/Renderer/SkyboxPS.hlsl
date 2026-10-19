@@ -10,7 +10,7 @@
 //
 // Author(s):	James Stanard
 
-#include "Renderer/Common.hlsli"
+#include "Model/Renderer/Common.hlsli"
 
 cbuffer PSConstants : register(b0)
 {

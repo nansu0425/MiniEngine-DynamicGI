@@ -12,4 +12,4 @@
 //
 
 #define CONVERT_TO_SRGB
-#include "Graphics/GenerateMipsCS.hlsli"
+#include "Core/Graphics/GenerateMipsCS.hlsli"

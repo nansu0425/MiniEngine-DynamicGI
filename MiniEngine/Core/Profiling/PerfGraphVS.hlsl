@@ -11,7 +11,7 @@
 // Author:  Julia Careaga
 //
 
-#include "Profiling/PerfGraphRS.hlsli"
+#include "Core/Profiling/PerfGraphRS.hlsli"
 
 cbuffer CBGraphColor : register(b0)
 {

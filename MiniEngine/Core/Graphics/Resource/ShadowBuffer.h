@@ -13,7 +13,7 @@
 
 #pragma once
 
-#include "Graphics/Resource/DepthBuffer.h"
+#include "Core/Graphics/Resource/DepthBuffer.h"
 
 class EsramAllocator;
 

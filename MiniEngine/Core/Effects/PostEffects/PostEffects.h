@@ -13,8 +13,8 @@
 
 #pragma once
 
-#include "pch.h"
-#include "UI/EngineTuning.h"
+#include "Core/pch.h"
+#include "Core/UI/EngineTuning.h"
 
 class ComputeContext;
 

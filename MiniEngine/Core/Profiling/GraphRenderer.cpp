@@ -11,19 +11,19 @@
 // Author:  Julia Careaga
 //
 
-#include "pch.h"
-#include "Profiling/GraphRenderer.h"
-#include "Graphics/Command/CommandContext.h"
-#include "Graphics/Pipeline/PipelineState.h"
-#include "Graphics/Pipeline/RootSignature.h"
-#include "Graphics/Resource/BufferManager.h"
-#include "App/GameInput.h"
-#include "App/SystemTime.h"
-#include "Profiling/EngineProfiling.h"
+#include "Core/pch.h"
+#include "Core/Profiling/GraphRenderer.h"
+#include "Core/Graphics/Command/CommandContext.h"
+#include "Core/Graphics/Pipeline/PipelineState.h"
+#include "Core/Graphics/Pipeline/RootSignature.h"
+#include "Core/Graphics/Resource/BufferManager.h"
+#include "Core/App/GameInput.h"
+#include "Core/App/SystemTime.h"
+#include "Core/Profiling/EngineProfiling.h"
 
-#include "CompiledShaders/PerfGraphBackgroundVS.h"
-#include "CompiledShaders/PerfGraphVS.h"
-#include "CompiledShaders/PerfGraphPS.h"
+#include "Output/Core/CompiledShaders/PerfGraphBackgroundVS.h"
+#include "Output/Core/CompiledShaders/PerfGraphVS.h"
+#include "Output/Core/CompiledShaders/PerfGraphPS.h"
 
 #define PERF_GRAPH_ERROR uint32_t(0xFFFFFFFF)
 #define MAX_GLOBAL_GRAPHS 2

@@ -13,18 +13,18 @@
 
 #pragma once
 
-#include "pch.h"
-#include "Graphics/Command/CommandListManager.h"
-#include "Math/Color.h"
-#include "Graphics/Pipeline/PipelineState.h"
-#include "Graphics/Pipeline/RootSignature.h"
-#include "Graphics/Resource/GpuBuffer.h"
-#include "Graphics/Texture/Texture.h"
-#include "Graphics/Resource/PixelBuffer.h"
-#include "Graphics/Descriptor/DynamicDescriptorHeap.h"
-#include "Graphics/Command/LinearAllocator.h"
-#include "Graphics/Command/CommandSignature.h"
-#include "Graphics/GraphicsCore.h"
+#include "Core/pch.h"
+#include "Core/Graphics/Command/CommandListManager.h"
+#include "Core/Math/Color.h"
+#include "Core/Graphics/Pipeline/PipelineState.h"
+#include "Core/Graphics/Pipeline/RootSignature.h"
+#include "Core/Graphics/Resource/GpuBuffer.h"
+#include "Core/Graphics/Texture/Texture.h"
+#include "Core/Graphics/Resource/PixelBuffer.h"
+#include "Core/Graphics/Descriptor/DynamicDescriptorHeap.h"
+#include "Core/Graphics/Command/LinearAllocator.h"
+#include "Core/Graphics/Command/CommandSignature.h"
+#include "Core/Graphics/GraphicsCore.h"
 #include <vector>
 
 class ColorBuffer;

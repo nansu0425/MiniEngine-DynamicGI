@@ -13,4 +13,4 @@
 
 #define COMBINE_LOWER_RESOLUTIONS
 
-#include "Effects/SSAO/AoBlurAndUpsampleCS.hlsli"
+#include "Core/Effects/SSAO/AoBlurAndUpsampleCS.hlsli"

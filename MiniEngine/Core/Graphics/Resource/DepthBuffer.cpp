@@ -11,11 +11,11 @@
 // Author:  James Stanard 
 //
 
-#include "pch.h"
-#include "Graphics/Resource/DepthBuffer.h"
-#include "Graphics/GraphicsCore.h"
-#include "Graphics/Resource/EsramAllocator.h"
-#include "Graphics/Descriptor/DescriptorHeap.h"
+#include "Core/pch.h"
+#include "Core/Graphics/Resource/DepthBuffer.h"
+#include "Core/Graphics/GraphicsCore.h"
+#include "Core/Graphics/Resource/EsramAllocator.h"
+#include "Core/Graphics/Descriptor/DescriptorHeap.h"
 
 using namespace Graphics;
 

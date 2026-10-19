@@ -13,8 +13,8 @@
 
 #pragma once
 
-#include "Graphics/Descriptor/DescriptorHeap.h"
-#include "Graphics/Pipeline/RootSignature.h"
+#include "Core/Graphics/Descriptor/DescriptorHeap.h"
+#include "Core/Graphics/Pipeline/RootSignature.h"
 #include <vector>
 #include <queue>
 

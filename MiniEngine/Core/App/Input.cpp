@@ -11,9 +11,9 @@
 // Author:  James Stanard 
 //
 
-#include "pch.h"
-#include "App/GameCore.h"
-#include "App/GameInput.h"
+#include "Core/pch.h"
+#include "Core/App/GameCore.h"
+#include "Core/App/GameInput.h"
 
 #ifdef _GAMING_DESKTOP
 

@@ -11,16 +11,16 @@
 // Author:  James Stanard 
 //
 
-#include "pch.h"
-#include "App/GameCore.h"
-#include "Graphics/GraphicsCore.h"
-#include "App/SystemTime.h"
-#include "App/GameInput.h"
-#include "Graphics/Resource/BufferManager.h"
-#include "Graphics/Command/CommandContext.h"
-#include "Effects/PostEffects/PostEffects.h"
-#include "Display/Display.h"
-#include "Utility/CommandLineArg.h"
+#include "Core/pch.h"
+#include "Core/App/GameCore.h"
+#include "Core/Graphics/GraphicsCore.h"
+#include "Core/App/SystemTime.h"
+#include "Core/App/GameInput.h"
+#include "Core/Graphics/Resource/BufferManager.h"
+#include "Core/Graphics/Command/CommandContext.h"
+#include "Core/Effects/PostEffects/PostEffects.h"
+#include "Core/Display/Display.h"
+#include "Core/Utility/CommandLineArg.h"
 #include <shellapi.h>
 
 #pragma comment(lib, "runtimeobject.lib") 

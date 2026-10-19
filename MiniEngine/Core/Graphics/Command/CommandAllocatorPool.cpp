@@ -11,8 +11,8 @@
 // Author:  James Stanard
 //
 
-#include "pch.h"
-#include "Graphics/Command/CommandAllocatorPool.h"
+#include "Core/pch.h"
+#include "Core/Graphics/Command/CommandAllocatorPool.h"
 
 CommandAllocatorPool::CommandAllocatorPool(D3D12_COMMAND_LIST_TYPE Type) :
     m_cCommandListType(Type),

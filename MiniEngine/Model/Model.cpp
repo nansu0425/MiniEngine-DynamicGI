@@ -11,9 +11,9 @@
 // Author:   James Stanard
 //
 
-#include "Model.h"
-#include "Renderer/Renderer.h"
-#include "ConstantBuffers.h"
+#include "Model/Model.h"
+#include "Model/Renderer/Renderer.h"
+#include "Model/ConstantBuffers.h"
 
 using namespace Math;
 using namespace Renderer;

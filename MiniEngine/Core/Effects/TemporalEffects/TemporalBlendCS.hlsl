@@ -11,9 +11,9 @@
 // Author:  James Stanard 
 //
 
-#include "Shaders/CommonRS.hlsli"
-#include "Shaders/ShaderUtility.hlsli"
-#include "Shaders/PixelPacking_Velocity.hlsli"
+#include "Core/Shaders/CommonRS.hlsli"
+#include "Core/Shaders/ShaderUtility.hlsli"
+#include "Core/Shaders/PixelPacking_Velocity.hlsli"
 
 static const uint kLdsPitch = 18;
 static const uint kLdsRows = 10;

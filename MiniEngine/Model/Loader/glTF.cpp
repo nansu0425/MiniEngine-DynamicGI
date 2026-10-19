@@ -11,13 +11,13 @@
 // Author:  James Stanard
 //
 
-#include "Loader/glTF.h"
+#include "Model/Loader/glTF.h"
 
-#include "Graphics/Command/CommandContext.h"
-#include "Graphics/Descriptor/SamplerManager.h"
-#include "Graphics/Resource/UploadBuffer.h"
-#include "Graphics/GraphicsCore.h"
-#include "Utility/FileUtility.h"
+#include "Core/Graphics/Command/CommandContext.h"
+#include "Core/Graphics/Descriptor/SamplerManager.h"
+#include "Core/Graphics/Resource/UploadBuffer.h"
+#include "Core/Graphics/GraphicsCore.h"
+#include "Core/Utility/FileUtility.h"
 
 #include <fstream>
 #include <iostream>

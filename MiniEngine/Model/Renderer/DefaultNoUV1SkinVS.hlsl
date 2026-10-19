@@ -12,4 +12,4 @@
 //
 
 #define ENABLE_SKINNING
-#include "Renderer/DefaultNoUV1VS.hlsl"
+#include "Model/Renderer/DefaultNoUV1VS.hlsl"

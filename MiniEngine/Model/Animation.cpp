@@ -11,11 +11,11 @@
 // Author:   James Stanard
 //
 
-#include "Animation.h"
-#include "Model.h"
-#include "Utility/Utility.h"
-#include "Math/Common.h"
-#include "Math/Quaternion.h"
+#include "Model/Animation.h"
+#include "Model/Model.h"
+#include "Core/Utility/Utility.h"
+#include "Core/Math/Common.h"
+#include "Core/Math/Quaternion.h"
 
 using Math::Quaternion;
 using Math::Vector4;

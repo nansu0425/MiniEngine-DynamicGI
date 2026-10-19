@@ -11,12 +11,12 @@
 // Author:  James Stanard 
 //
 
-#include "pch.h"
-#include "Graphics/Descriptor/DynamicDescriptorHeap.h"
-#include "Graphics/Command/CommandContext.h"
-#include "Graphics/GraphicsCore.h"
-#include "Graphics/Command/CommandListManager.h"
-#include "Graphics/Pipeline/RootSignature.h"
+#include "Core/pch.h"
+#include "Core/Graphics/Descriptor/DynamicDescriptorHeap.h"
+#include "Core/Graphics/Command/CommandContext.h"
+#include "Core/Graphics/GraphicsCore.h"
+#include "Core/Graphics/Command/CommandListManager.h"
+#include "Core/Graphics/Pipeline/RootSignature.h"
 
 using namespace Graphics;
 

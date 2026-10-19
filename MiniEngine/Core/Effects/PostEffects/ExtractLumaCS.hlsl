@@ -13,8 +13,8 @@
 // The CS for extracting bright pixels and saving a log-luminance map (quantized to 8 bits).  This
 // is then used to generate an 8-bit histogram.
 
-#include "Shaders/ShaderUtility.hlsli"
-#include "Effects/PostEffects/PostEffectsRS.hlsli"
+#include "Core/Shaders/ShaderUtility.hlsli"
+#include "Core/Effects/PostEffects/PostEffectsRS.hlsli"
 
 SamplerState BiLinearClamp : register( s0 );
 Texture2D<float3> SourceTex : register( t0 );

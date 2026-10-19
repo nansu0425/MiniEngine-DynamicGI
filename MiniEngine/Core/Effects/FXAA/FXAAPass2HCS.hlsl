@@ -11,4 +11,4 @@
 // Author:  James Stanard 
 //
 
-#include "Effects/FXAA/FXAAPass2CS.hlsli"
+#include "Core/Effects/FXAA/FXAAPass2CS.hlsli"

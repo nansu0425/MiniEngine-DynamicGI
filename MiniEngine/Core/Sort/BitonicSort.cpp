@@ -11,22 +11,22 @@
 // Author(s):  James Stanard
 //
 
-#include "pch.h"
-#include "Sort/BitonicSort.h"
-#include "Graphics/Pipeline/RootSignature.h"
-#include "Graphics/Pipeline/PipelineState.h"
-#include "Graphics/Command/CommandContext.h"
-#include "Graphics/Resource/ReadbackBuffer.h"
-#include "Math/Common.h"
-#include "Math/Random.h"
+#include "Core/pch.h"
+#include "Core/Sort/BitonicSort.h"
+#include "Core/Graphics/Pipeline/RootSignature.h"
+#include "Core/Graphics/Pipeline/PipelineState.h"
+#include "Core/Graphics/Command/CommandContext.h"
+#include "Core/Graphics/Resource/ReadbackBuffer.h"
+#include "Core/Math/Common.h"
+#include "Core/Math/Random.h"
 
-#include "CompiledShaders/BitonicIndirectArgsCS.h"
-#include "CompiledShaders/Bitonic32PreSortCS.h"
-#include "CompiledShaders/Bitonic32InnerSortCS.h"
-#include "CompiledShaders/Bitonic32OuterSortCS.h"
-#include "CompiledShaders/Bitonic64PreSortCS.h"
-#include "CompiledShaders/Bitonic64InnerSortCS.h"
-#include "CompiledShaders/Bitonic64OuterSortCS.h"
+#include "Output/Core/CompiledShaders/BitonicIndirectArgsCS.h"
+#include "Output/Core/CompiledShaders/Bitonic32PreSortCS.h"
+#include "Output/Core/CompiledShaders/Bitonic32InnerSortCS.h"
+#include "Output/Core/CompiledShaders/Bitonic32OuterSortCS.h"
+#include "Output/Core/CompiledShaders/Bitonic64PreSortCS.h"
+#include "Output/Core/CompiledShaders/Bitonic64InnerSortCS.h"
+#include "Output/Core/CompiledShaders/Bitonic64OuterSortCS.h"
 
 namespace BitonicSort
 {

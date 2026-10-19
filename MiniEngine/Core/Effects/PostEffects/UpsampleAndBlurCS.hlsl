@@ -18,7 +18,7 @@
 // bloom buffer is the destination.
 //
 
-#include "Effects/PostEffects/PostEffectsRS.hlsli"
+#include "Core/Effects/PostEffects/PostEffectsRS.hlsli"
 
 Texture2D<float3> HigherResBuf : register( t0 );
 Texture2D<float3> LowerResBuf : register( t1 );

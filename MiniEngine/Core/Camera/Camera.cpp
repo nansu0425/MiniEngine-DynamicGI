@@ -11,8 +11,8 @@
 // Author:  James Stanard 
 //
 
-#include "pch.h"
-#include "Camera/Camera.h"
+#include "Core/pch.h"
+#include "Core/Camera/Camera.h"
 #include <cmath>
 
 using namespace Math;

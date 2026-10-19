@@ -11,10 +11,10 @@
 // Author:  James Stanard 
 //
 
-#include "pch.h"
-#include "Camera/CameraController.h"
-#include "Camera/Camera.h"
-#include "App/GameInput.h"
+#include "Core/pch.h"
+#include "Core/Camera/CameraController.h"
+#include "Core/Camera/Camera.h"
+#include "Core/App/GameInput.h"
 
 using namespace Math;
 using namespace GameCore;

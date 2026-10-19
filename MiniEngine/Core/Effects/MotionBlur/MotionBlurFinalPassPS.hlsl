@@ -11,8 +11,8 @@
 // Author:  James Stanard 
 //
 
-#include "Shaders/CommonRS.hlsli"
-#include "Shaders/PixelPacking_Velocity.hlsli"
+#include "Core/Shaders/CommonRS.hlsli"
+#include "Core/Shaders/PixelPacking_Velocity.hlsli"
 
 #define MAX_SAMPLE_COUNT  10
 #define STEP_SIZE         3.0

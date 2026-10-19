@@ -13,11 +13,11 @@
 
 #pragma once
 
-#include "Graphics/Resource/ColorBuffer.h"
-#include "Graphics/Resource/DepthBuffer.h"
-#include "Graphics/Resource/ShadowBuffer.h"
-#include "Graphics/Resource/GpuBuffer.h"
-#include "Graphics/GraphicsCore.h"
+#include "Core/Graphics/Resource/ColorBuffer.h"
+#include "Core/Graphics/Resource/DepthBuffer.h"
+#include "Core/Graphics/Resource/ShadowBuffer.h"
+#include "Core/Graphics/Resource/GpuBuffer.h"
+#include "Core/Graphics/GraphicsCore.h"
 
 namespace Graphics
 {

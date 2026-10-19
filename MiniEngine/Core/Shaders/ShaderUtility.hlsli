@@ -16,8 +16,8 @@
 
 #pragma warning( disable : 3571 )
 
-#include "Shaders/ColorSpaceUtility.hlsli"
-#include "Shaders/PixelPacking.hlsli"
+#include "Core/Shaders/ColorSpaceUtility.hlsli"
+#include "Core/Shaders/PixelPacking.hlsli"
 
 // Encodes a smooth logarithmic gradient for even distribution of precision natural to vision
 float LinearToLogLuminance( float x, float gamma = 4.0 )

@@ -12,13 +12,13 @@
 //
 
 
-#include "pch.h"
-#include "UI/TextRenderer.h"
-#include "App/GameInput.h"
-#include "Math/Color.h"
-#include "Display/Display.h"
-#include "Graphics/Command/CommandContext.h"
-#include "Profiling/GraphRenderer.h"
+#include "Core/pch.h"
+#include "Core/UI/TextRenderer.h"
+#include "Core/App/GameInput.h"
+#include "Core/Math/Color.h"
+#include "Core/Display/Display.h"
+#include "Core/Graphics/Command/CommandContext.h"
+#include "Core/Profiling/GraphRenderer.h"
 
 using namespace std;
 using namespace Math;

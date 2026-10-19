@@ -13,9 +13,9 @@
 
 #pragma once
 
-#include "Loader/glTF.h"
-#include "Math/BoundingSphere.h"
-#include "Math/BoundingBox.h"
+#include "Model/Loader/glTF.h"
+#include "Core/Math/BoundingSphere.h"
+#include "Core/Math/BoundingBox.h"
 
 #include <cstdint>
 #include <string>

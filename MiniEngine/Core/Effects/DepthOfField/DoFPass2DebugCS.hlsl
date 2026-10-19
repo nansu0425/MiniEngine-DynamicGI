@@ -12,4 +12,4 @@
 //
 
 #define SUPPORT_DEBUGGING
-#include "Effects/DepthOfField/DoFPass2CS.hlsl"
+#include "Core/Effects/DepthOfField/DoFPass2CS.hlsl"

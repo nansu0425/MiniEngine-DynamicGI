@@ -11,14 +11,14 @@
 // Author:  James Stanard 
 //
 
-#include "pch.h"
-#include "App/SystemTime.h"
-#include "Display/Display.h"
-#include "UI/TextRenderer.h"
-#include "Profiling/GraphRenderer.h"
-#include "App/GameInput.h"
-#include "Profiling/GpuTimeManager.h"
-#include "Graphics/Command/CommandContext.h"
+#include "Core/pch.h"
+#include "Core/App/SystemTime.h"
+#include "Core/Display/Display.h"
+#include "Core/UI/TextRenderer.h"
+#include "Core/Profiling/GraphRenderer.h"
+#include "Core/App/GameInput.h"
+#include "Core/Profiling/GpuTimeManager.h"
+#include "Core/Graphics/Command/CommandContext.h"
 #include <vector>
 #include <unordered_map>
 #include <array>

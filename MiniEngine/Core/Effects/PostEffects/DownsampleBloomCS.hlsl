@@ -12,7 +12,7 @@
 //
 // The CS for downsampling 16x16 blocks of pixels down to 4x4 and 1x1 blocks.
 
-#include "Effects/PostEffects/PostEffectsRS.hlsli"
+#include "Core/Effects/PostEffects/PostEffectsRS.hlsli"
 
 Texture2D<float3> BloomBuf : register( t0 );
 RWTexture2D<float3> Result1 : register( u0 );

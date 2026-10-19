@@ -13,8 +13,8 @@
 
 #pragma once
 
-#include "Math/VectorMath.h"
-#include "Math/Transform.h"
+#include "Core/Math/VectorMath.h"
+#include "Core/Math/Transform.h"
 
 namespace Math
 {

@@ -11,7 +11,7 @@
 // Author:  James Stanard 
 //
 
-#include "Particles/ParticleUtility.hlsli"
+#include "Core/Particles/ParticleUtility.hlsli"
 
 StructuredBuffer<ParticleVertex> g_VertexBuffer : register( t0 );
 ByteAddressBuffer g_VertexCount : register(t1);

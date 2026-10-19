@@ -16,14 +16,14 @@
 
 // modified from original source to improve performance (especially in debug builds), memory allocations, etc.
 
-#include "Utility/Utility.h"
+#include "Core/Utility/Utility.h"
 
 #include <stdint.h>
 #include <ASSERT.h>
 #include <math.h>
 #include <algorithm>
 
-#include "Loader/IndexOptimizePostTransform.h"
+#include "Model/Loader/IndexOptimizePostTransform.h"
 
 namespace
 {

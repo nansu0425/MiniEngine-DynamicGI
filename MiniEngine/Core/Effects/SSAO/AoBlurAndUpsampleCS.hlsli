@@ -11,7 +11,7 @@
 // Author:  James Stanard 
 //
 
-#include "Effects/SSAO/SSAORS.hlsli"
+#include "Core/Effects/SSAO/SSAORS.hlsli"
 
 Texture2D<float> LoResDB : register(t0);
 Texture2D<float> HiResDB : register(t1);

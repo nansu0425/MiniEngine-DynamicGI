@@ -13,8 +13,8 @@
 //
 // Thanks to Michal Drobot for his feedback.
 
-#include "Renderer/Common.hlsli"
-#include "Renderer/LightGrid.hlsli"
+#include "Model/Renderer/Common.hlsli"
+#include "Model/Renderer/LightGrid.hlsli"
 
 cbuffer PSConstants : register(b0)
 {

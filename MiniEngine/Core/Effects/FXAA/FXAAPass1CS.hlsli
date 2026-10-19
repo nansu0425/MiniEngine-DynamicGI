@@ -58,7 +58,7 @@ DAMAGES.
 */
 
 
-#include "Effects/FXAA/FXAARootSignature.hlsli"
+#include "Core/Effects/FXAA/FXAARootSignature.hlsli"
 
 RWByteAddressBuffer WorkCount : register(u0);
 RWByteAddressBuffer WorkQueue : register(u1);
@@ -67,7 +67,7 @@ RWBuffer<float3> ColorQueue : register(u2);
   Texture2D<float3> Color : register(t0);
   float3 FetchColor( int2 st ) { return Color[st]; }
 #else
-  #include "Shaders/PixelPacking_R11G11B10.hlsli"
+  #include "Core/Shaders/PixelPacking_R11G11B10.hlsli"
   Texture2D<uint> Color : register(t0);
   float3 FetchColor( int2 st ) { return Unpack_R11G11B10_FLOAT(Color[st]); }
 #endif

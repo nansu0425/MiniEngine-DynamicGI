@@ -11,8 +11,8 @@
 // Author:  James Stanard 
 //
 
-#include "pch.h"
-#include "Math/BoundingSphere.h"
+#include "Core/pch.h"
+#include "Core/Math/BoundingSphere.h"
 
 using namespace Math;
 

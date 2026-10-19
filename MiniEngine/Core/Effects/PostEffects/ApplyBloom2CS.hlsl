@@ -12,4 +12,4 @@
 //
 
 #define SUPPORT_TYPED_UAV_LOADS 1
-#include "Effects/PostEffects/ApplyBloomCS.hlsl"
+#include "Core/Effects/PostEffects/ApplyBloomCS.hlsl"

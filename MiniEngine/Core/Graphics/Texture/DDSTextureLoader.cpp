@@ -18,15 +18,15 @@
 // http://go.microsoft.com/fwlink/?LinkId=248929
 //--------------------------------------------------------------------------------------
 
-#include "pch.h"
+#include "Core/pch.h"
 
-#include "Graphics/Texture/DDSTextureLoader.h"
+#include "Core/Graphics/Texture/DDSTextureLoader.h"
 
-#include "Graphics/Texture/dds.h"
-#include "Graphics/Resource/GpuResource.h"
-#include "Graphics/GraphicsCore.h"
-#include "Graphics/Command/CommandContext.h"
-#include "Utility/Utility.h"
+#include "Core/Graphics/Texture/dds.h"
+#include "Core/Graphics/Resource/GpuResource.h"
+#include "Core/Graphics/GraphicsCore.h"
+#include "Core/Graphics/Command/CommandContext.h"
+#include "Core/Utility/Utility.h"
 
 struct handle_closer { void operator()(HANDLE h) { if (h) CloseHandle(h); } };
 typedef public std::unique_ptr<void, handle_closer> ScopedHandle;

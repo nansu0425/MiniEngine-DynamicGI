@@ -11,12 +11,12 @@
 // Author(s):  James Stanard 
 //
 
-#include "pch.h"
-#include "Graphics/Texture/Texture.h"
-#include "Graphics/Texture/DDSTextureLoader.h"
-#include "Utility/FileUtility.h"
-#include "Graphics/GraphicsCore.h"
-#include "Graphics/Command/CommandContext.h"
+#include "Core/pch.h"
+#include "Core/Graphics/Texture/Texture.h"
+#include "Core/Graphics/Texture/DDSTextureLoader.h"
+#include "Core/Utility/FileUtility.h"
+#include "Core/Graphics/GraphicsCore.h"
+#include "Core/Graphics/Command/CommandContext.h"
 #include <map>
 #include <thread>
 

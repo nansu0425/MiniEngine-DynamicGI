@@ -13,7 +13,7 @@
 
 #pragma once
 
-#include "Graphics/Resource/GpuResource.h"
+#include "Core/Graphics/Resource/GpuResource.h"
 
 class EsramAllocator;
 

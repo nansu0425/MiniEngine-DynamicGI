@@ -13,11 +13,11 @@
 
 #pragma once
 
-#include "Model.h"
-#include "Animation.h"
-#include "ConstantBuffers.h"
-#include "Math/BoundingSphere.h"
-#include "Math/BoundingBox.h"
+#include "Model/Model.h"
+#include "Model/Animation.h"
+#include "Model/ConstantBuffers.h"
+#include "Core/Math/BoundingSphere.h"
+#include "Core/Math/BoundingBox.h"
 
 #include <cstdint>
 #include <vector>

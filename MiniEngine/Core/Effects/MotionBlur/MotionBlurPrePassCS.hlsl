@@ -11,8 +11,8 @@
 // Author:  James Stanard 
 //
 
-#include "Shaders/CommonRS.hlsli"
-#include "Shaders/PixelPacking_Velocity.hlsli"
+#include "Core/Shaders/CommonRS.hlsli"
+#include "Core/Shaders/PixelPacking_Velocity.hlsli"
 
 Texture2D<float3> ColorBuffer : register(t0);
 Texture2D<packed_velocity_t> VelocityBuffer : register(t1);

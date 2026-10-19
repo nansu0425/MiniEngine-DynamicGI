@@ -12,4 +12,4 @@
 //
 
 #define GAMMA_SPACE
-#include "Display/ImageScaling/SharpeningUpsamplePS.hlsl"
+#include "Core/Display/ImageScaling/SharpeningUpsamplePS.hlsl"

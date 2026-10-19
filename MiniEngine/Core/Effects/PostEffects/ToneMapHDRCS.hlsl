@@ -12,4 +12,4 @@
 //
 
 #define ENABLE_HDR_DISPLAY_MAPPING 1
-#include "Effects/PostEffects/ToneMapCS.hlsl"
+#include "Core/Effects/PostEffects/ToneMapCS.hlsl"

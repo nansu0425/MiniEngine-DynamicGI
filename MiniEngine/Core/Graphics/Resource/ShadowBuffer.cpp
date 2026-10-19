@@ -11,10 +11,10 @@
 // Author:  James Stanard 
 //
 
-#include "pch.h"
-#include "Graphics/Resource/ShadowBuffer.h"
-#include "Graphics/Resource/EsramAllocator.h"
-#include "Graphics/Command/CommandContext.h"
+#include "Core/pch.h"
+#include "Core/Graphics/Resource/ShadowBuffer.h"
+#include "Core/Graphics/Resource/EsramAllocator.h"
+#include "Core/Graphics/Command/CommandContext.h"
 
 void ShadowBuffer::Create( const std::wstring& Name, uint32_t Width, uint32_t Height, D3D12_GPU_VIRTUAL_ADDRESS VidMemPtr )
 {

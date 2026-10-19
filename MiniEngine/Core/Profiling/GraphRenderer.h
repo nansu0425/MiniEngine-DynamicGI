@@ -11,7 +11,7 @@
 // Author:  Julia Careaga
 //
 
-#include "Graphics/GraphicsCore.h"
+#include "Core/Graphics/GraphicsCore.h"
 
 namespace GraphRenderer
 {

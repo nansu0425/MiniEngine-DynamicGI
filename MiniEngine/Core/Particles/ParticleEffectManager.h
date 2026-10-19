@@ -14,10 +14,10 @@
 
 #pragma once
 
-#include "Particles/ParticleEffectProperties.h"
-#include "Particles/ParticleEffect.h"
-#include "Graphics/Command/CommandContext.h"
-#include "Math/Random.h"
+#include "Core/Particles/ParticleEffectProperties.h"
+#include "Core/Particles/ParticleEffect.h"
+#include "Core/Graphics/Command/CommandContext.h"
+#include "Core/Math/Random.h"
 
 namespace Math
 {

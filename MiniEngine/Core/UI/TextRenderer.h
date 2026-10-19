@@ -13,8 +13,8 @@
 
 #pragma once
 
-#include "Math/Color.h"
-#include "Math/Vector.h"
+#include "Core/Math/Color.h"
+#include "Core/Math/Vector.h"
 #include <string>
 
 class Color;

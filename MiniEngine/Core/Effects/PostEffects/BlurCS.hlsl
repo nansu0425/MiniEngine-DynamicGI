@@ -16,7 +16,7 @@
 // the lowest resolution bloom buffer before starting the series of upsample-and-blur
 // passes.
 
-#include "Effects/PostEffects/PostEffectsRS.hlsli"
+#include "Core/Effects/PostEffects/PostEffectsRS.hlsli"
 
 Texture2D<float3> InputBuf : register( t0 );
 RWTexture2D<float3> Result : register( u0 );
