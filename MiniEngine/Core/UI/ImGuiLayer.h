@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 namespace ImGuiLayer
 {
     void Initialize(void);
@@ -16,6 +18,10 @@ namespace ImGuiLayer
     // F1로 UI를 숨겨도 보인다. View 메뉴에서 overlay를 끄면 false를 반환하고, 그때는 End를 부르지 않는다.
     bool BeginSceneOverlay(void);
     void EndSceneOverlay(void);
+
+    // View 메뉴에 name 항목을 달고, open이면 name 창을 열어 drawContent로 내용을 그린다.
+    // UI를 숨기면 메뉴와 창 모두 그리지 않는다. BeginFrame과 Render 사이에서 매 frame 부른다.
+    void ShowPanel(const char* name, bool& open, const std::function<void()>& drawContent);
 
     // true를 반환하면 window procedure는 그 message를 더 처리하지 않는다.
     bool HandleWindowMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);

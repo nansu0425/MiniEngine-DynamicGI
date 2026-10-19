@@ -92,6 +92,7 @@ namespace GameCore
         UiContext.Finish();
 
         EngineProfiling::ShowFrameRate();
+        EngineProfiling::ShowProfiler();
         ImGuiLayer::Render();
 
         Display::Present();

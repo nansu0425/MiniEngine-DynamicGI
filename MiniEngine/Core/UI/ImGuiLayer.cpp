@@ -238,6 +238,30 @@ void ImGuiLayer::EndSceneOverlay(void)
     ImGui::End();
 }
 
+void ImGuiLayer::ShowPanel(const char* name, bool& open, const std::function<void()>& drawContent)
+{
+    if (!s_Visible)
+        return;
+
+    // 같은 이름으로 BeginMainMenuBar, BeginMenu를 다시 열면 기존 메뉴 뒤에 항목이 붙는다.
+    if (ImGui::BeginMainMenuBar())
+    {
+        if (ImGui::BeginMenu("View"))
+        {
+            ImGui::MenuItem(name, nullptr, &open);
+            ImGui::EndMenu();
+        }
+        ImGui::EndMainMenuBar();
+    }
+
+    if (!open)
+        return;
+
+    if (ImGui::Begin(name, &open))
+        drawContent();
+    ImGui::End();
+}
+
 bool ImGuiLayer::HandleWindowMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     // 숨긴 동안에는 ImGui가 keyboard 입력을 받지 않으므로 toggle은 ImGui 밖에서 처리한다.

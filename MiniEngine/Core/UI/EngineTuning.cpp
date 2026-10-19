@@ -651,10 +651,7 @@ void EngineTuning::Display( GraphicsContext& Context, float x, float y, float w,
     Text.ResetCursor( x, y );
 
     if (!sm_IsVisible)
-    {
-        EngineProfiling::Display(Text, x, y, w, h);
         return;
-    }
 
     s_ScrollTopTrigger = y + h * 0.2f;
     s_ScrollBottomTrigger = y + h * 0.8f;

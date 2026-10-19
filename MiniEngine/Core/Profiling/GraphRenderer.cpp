@@ -20,6 +20,7 @@
 #include "Core/App/GameInput.h"
 #include "Core/App/SystemTime.h"
 #include "Core/Profiling/EngineProfiling.h"
+#include "Core/UI/TextRenderer.h"
 
 #include "Output/Core/CompiledShaders/PerfGraphBackgroundVS.h"
 #include "Output/Core/CompiledShaders/PerfGraphVS.h"

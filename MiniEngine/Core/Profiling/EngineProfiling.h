@@ -14,9 +14,9 @@
 #pragma once
 
 #include <string>
-#include "Core/UI/TextRenderer.h"
 
 class CommandContext;
+class GraphicsContext;
 
 namespace EngineProfiling
 {
@@ -27,8 +27,8 @@ namespace EngineProfiling
 
     // ImGuiLayer::BeginFrame과 Render 사이에서 부른다.
     void ShowFrameRate(void);
+    void ShowProfiler(void);
     void DisplayPerfGraph(GraphicsContext& Text);
-    void Display(TextContext& Text, float x, float y, float w, float h);
     bool IsPaused();
 }
 
