@@ -41,7 +41,7 @@
 
 - 논문은 알고리즘과 수식을 참고해 구현한다. 본문과 그림은 repo 에 옮기지 않는다.
 - MIT 처럼 허용하는 license 의 코드는 가져다 쓸 수 있다. 가져온 코드에는 원래의 copyright 와 license 문구를 남긴다.
-- license 가 없거나 재배포를 막는 코드는 두지 않는다. [RTXGI-DDGI](https://github.com/NVIDIAGameWorks/RTXGI-DDGI) 는 NVIDIA RTX SDKs License 라서, 그 코드나 파생물을 이 repo 에 넣을 수 없다. RTXGI-DDGI 는 idea 만 참고하고 소스 코드는 받거나 열어 보지 않는다. RTXGI-DDGI 의 idea 를 쓴 곳에는 출처를 남긴다.
+- license 가 없거나 재배포를 막는 코드는 사용하지 않는다. 코드가 구현한 idea만 참고한다.
 
 ## 코드 규칙
 
