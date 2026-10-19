@@ -9,8 +9,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
 <style>
-/* Layout: 좌측 sticky 목차 + 본문 한 줄기. 구조(결정, 일정, probe grid)는 cobalt, 빛과 ray 는 orange.
-   작업 ID(M1-3, D-4, OW2, R6)는 mono chip 이고 서로 link 로 이어진다. */
+/* Layout: 좌측 sticky 목차 + 본문 한 줄기. 구조(결정, 일정, probe grid)는 cobalt, 빛과 ray 와 발표일은 orange.
+   작업 ID(M1-3, P-2, I5, D-4, OW2, R6)는 mono chip 이고 서로 link 로 이어진다. 점선 테두리는 개선 후보나 범위 밖이다. */
 :root {
   --bg: #f3f5f8;
   --surface: #ffffff;
@@ -119,7 +119,6 @@ a.ref:hover { border-color: var(--accent); }
 .pri { font-size: 11.5px; font-weight: 600; white-space: nowrap; padding: 1px 8px; border-radius: 999px; justify-self: start; }
 .pri.must { background: var(--accent); color: var(--surface); }
 .pri.should { border: 1px solid var(--accent); color: var(--accent); }
-.pri.could { border: 1px dashed var(--muted); color: var(--muted); }
 .status { font-size: 12px; font-weight: 600; padding: 1px 9px; border-radius: 999px; white-space: nowrap; }
 .status.doing { background: var(--ray-soft); color: var(--ray); }
 .status.todo { background: var(--surface-2); color: var(--muted); }
@@ -151,7 +150,7 @@ svg text { font-family: var(--font-body); }
 .b { fill: var(--surface); stroke: var(--line); stroke-width: 1.2; }
 .b-acc { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.2; }
 .b-in { fill: var(--surface); stroke: var(--accent); stroke-width: 1; }
-.b-ray { fill: var(--ray-soft); stroke: var(--ray-mark); stroke-width: 1.2; }
+.b-cand { fill: var(--surface); stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 4 3; }
 .b-fut { fill: var(--surface); stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 5 4; }
 .ln { stroke: var(--muted); stroke-width: 1.5; fill: none; }
 .ln-ord { stroke-dasharray: 4 3; }
@@ -162,11 +161,12 @@ svg text { font-family: var(--font-body); }
 .gl { stroke: var(--line); stroke-width: 1; }
 .fri { fill: var(--ray-soft); }
 .bar { fill: var(--accent); }
+.bar-p2 { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.2; }
 .bar-fut { fill: none; stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 5 4; }
 .bar-spare { fill: var(--surface-2); stroke: var(--muted); stroke-width: 1; }
 .ck { fill: var(--ray-mark); }
 .dl { stroke: var(--ray); stroke-width: 2; }
-.dl-soft { stroke: var(--ray); stroke-width: 1.5; stroke-dasharray: 3 3; }
+.gate-line { stroke: var(--accent); stroke-width: 2; }
 .f-c0 { fill: var(--c0); } .f-c1 { fill: var(--c1); } .f-c2 { fill: var(--c2); }
 .f-ray { fill: var(--ray-mark); } .f-ref { fill: var(--ref-mark); } .f-acc { fill: var(--accent); } .f-rest { fill: var(--surface-2); }
 .f-surf { fill: var(--surface); }
@@ -179,8 +179,13 @@ th, td { text-align: left; vertical-align: top; padding: 10px 12px; border-botto
 tr:last-child td { border-bottom: 0; }
 th { font-size: 12px; font-weight: 600; color: var(--muted); background: var(--surface-2); white-space: nowrap; }
 td.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+td p + p { margin-top: 4px; }
+td .lbl { font-size: 11.5px; color: var(--muted); font-weight: 600; margin-right: 4px; }
 .tbl-ref td { min-width: 180px; }
 .tbl-ref td:first-child { min-width: 120px; font-weight: 600; }
+.cands td { min-width: 90px; }
+.cands td:nth-child(2) { min-width: 260px; }
+.cands td.rank { text-align: center; color: var(--muted); }
 
 /* premises */
 .premises { display: grid; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
@@ -202,10 +207,6 @@ td.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; whit
 .ow dt { color: var(--muted); font-size: 12px; padding-top: 2px; }
 .ow dd { margin: 0; }
 .ow .goal { font-weight: 600; }
-.matrix td { min-width: 96px; }
-.matrix td:first-child { min-width: 150px; }
-.matrix .cell { display: flex; flex-wrap: wrap; gap: 4px; }
-.matrix .empty { color: var(--line); }
 
 /* facts */
 .facts { display: grid; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
@@ -235,38 +236,34 @@ td.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; whit
 .eq .op { font-family: var(--font-mono); color: var(--muted); }
 .raydata { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .raydata div { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 13px; display: grid; gap: 2px; }
+.raydata div.later { border-style: dashed; }
 .raydata b { font-size: 13px; }
 .raydata code { font-size: 11.5px; justify-self: start; }
 @media (max-width: 640px) { .raydata { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-.masks { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-.masks div { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 13px; display: grid; gap: 2px; }
-.masks div.no { border-style: dashed; }
-@media (max-width: 640px) { .masks { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
-/* cascade layout */
-.cascade-wrap { display: grid; grid-template-columns: minmax(0, 380px) minmax(0, 1fr); gap: 20px; align-items: start; }
-@media (max-width: 860px) { .cascade-wrap { grid-template-columns: minmax(0, 1fr); } }
-.calc { display: grid; gap: 8px; font-size: 14px; }
-
-/* milestones */
-.chain { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)) auto; gap: 8px; align-items: stretch; }
-.chain li { position: relative; }
-.chain a { display: grid; gap: 4px; height: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--fg); text-decoration: none; }
+/* phases and milestones */
+.chain { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; align-items: stretch; }
+.chain a { display: grid; gap: 4px; height: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--fg); text-decoration: none; align-content: start; }
 .chain a:hover { border-color: var(--accent); }
+.chain .ph { font-size: 11px; color: var(--muted); letter-spacing: .04em; }
 .chain .mid { font-family: var(--font-mono); font-weight: 600; color: var(--accent); font-size: 13px; }
 .chain .mt { font-weight: 600; font-size: 14px; line-height: 1.35; }
 .chain .wk { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); }
 .chain .give { font-size: 12.5px; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 4px; }
-.chain .next a { border-style: dashed; color: var(--muted); align-content: center; }
-@media (max-width: 980px) { .chain { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (max-width: 560px) { .chain { grid-template-columns: minmax(0, 1fr); } }
+.chain .gate a { background: var(--accent-soft); border-color: var(--accent); }
+.chain .p2 a { border-style: dashed; border-color: var(--accent); }
+.chain .next a { border-style: dashed; color: var(--muted); }
 .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
 .toolbar button {
   font: inherit; font-size: 13px; color: var(--fg); background: var(--surface); border: 1px solid var(--line);
   border-radius: 999px; padding: 4px 12px; cursor: pointer;
 }
 .toolbar button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+.ms-list { display: grid; gap: 18px; }
+.phase-label { font-size: 13px; font-weight: 600; color: var(--accent); letter-spacing: .03em; padding-top: 6px; }
 .ms { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: grid; gap: 14px; }
+.ms.gate-box { background: var(--accent-soft); border-color: var(--accent); }
+.ms.p2 { border-style: dashed; border-color: var(--accent); }
 .ms > header { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 14px; align-items: baseline; }
 .ms > header .big { font-family: var(--font-mono); font-size: 26px; font-weight: 600; color: var(--accent); line-height: 1; }
 .ms > header h3 { margin: 0; }
@@ -282,6 +279,7 @@ td.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; whit
 .done-list { list-style: none; padding: 0; display: grid; gap: 6px; font-size: 14px; }
 .done-list li { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 10px; }
 .done-list li::before { content: ""; width: 12px; height: 12px; margin-top: 6px; border: 1.5px solid var(--muted); border-radius: 3px; }
+ol.rules { display: grid; gap: 6px; font-size: 14px; max-width: 76ch; }
 details { font-size: 13.5px; }
 details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
 details .refs { margin-top: 8px; display: grid; gap: 4px; color: var(--fg); }
@@ -332,7 +330,7 @@ details .refs code { font-size: 11.5px; }
     <li><a href="#s2"><span class="n">2</span><span>목표와 전제</span></a></li>
     <li><a href="#s3"><span class="n">3</span><span>Open world 기준</span></a></li>
     <li><a href="#s4"><span class="n">4</span><span>출발점</span></a></li>
-    <li><a href="#s5"><span class="n">5</span><span>전체 설계</span></a></li>
+    <li><a href="#s5"><span class="n">5</span><span>기본 구현 설계</span></a></li>
     <li><a href="#s6"><span class="n">6</span><span>Milestone</span></a></li>
     <li><a href="#s7"><span class="n">7</span><span>일정</span></a></li>
     <li><a href="#s8"><span class="n">8</span><span>검증과 측정</span></a></li>
@@ -347,12 +345,12 @@ details .refs code { font-size: 11.5px; }
 <header class="hero">
   <p class="eyebrow">MiniEngine-DynamicGI</p>
   <h1>DDGI 구현 로드맵</h1>
-  <p class="lede">MiniEngine 에 DDGI (Dynamic Diffuse Global Illumination) 를 구현하기까지의 단계, 결정, 일정, 검증 방법을 정한다. 범위는 Ray Query Infra 부터 DDGI 완료까지다. 이후 단계인 Specular GI (RT Reflection) 는 계획하지 않고, 그 단계가 DDGI 의 산출물을 어떻게 이어받는지만 <a href="#s9">9장</a>에 적는다.</p>
+  <p class="lede">MiniEngine 에 DDGI (Dynamic Diffuse Global Illumination) 를 구현하기까지의 단계, 결정, 일정, 검증 방법을 정한다. 먼저 논문 (Majercik 2019, 2021) 수준의 기본 기능을 정상 동작시키고 검증한다. 그다음 남은 기간에 open world 기준으로 개선 후보의 우선순위를 매겨 순서대로 개선한다. 이후 단계인 RT Reflection 은 계획하지 않고, 이어받는 지점만 <a href="#s9">9장</a>에 적는다.</p>
   <dl class="keys">
-    <div><dt>DDGI 개발 완료</dt><dd>11/12<span>목요일, 11/13 W5 발표</span></dd></div>
+    <div><dt>기본 완성</dt><dd>11/5<span>목요일, 11/6 W4 발표</span></dd></div>
+    <div><dt>DDGI 개발 완료</dt><dd>11/12<span>개선 포함, 11/13 W5 발표</span></dd></div>
     <div><dt>모든 개발 완료</dt><dd>11/26<span>RT Reflection 포함, 11/27 발표</span></dd></div>
     <div><dt>최종 발표</dt><dd>12/4<span>11/28 ~ 12/3 은 buffer</span></dd></div>
-    <div><dt>DDGI 예산</dt><dd>2.0 ms<span>64 MiB, 1080p, RTX 4060 Laptop</span></dd></div>
   </dl>
   <p class="meta"><span>작성 2026-10-19</span><span>상태 초안</span><span>inline ray tracing (RayQuery) 전용</span></p>
 </header>
@@ -361,7 +359,7 @@ details .refs code { font-size: 11.5px; }
   <h2 id="h-overview"><span class="n">0</span>한눈에 보기</h2>
   <figure class="fig">
     <div class="fig-scroll w-wide">
-      <svg viewBox="0 0 960 340" role="img" aria-label="10월 19일부터 12월 4일까지의 일정. 매주 금요일이 발표일이고 개발은 토요일부터 목요일까지 한다. M1 은 W2 sprint, M2 와 M3 앞부분은 W3 sprint, M3 뒷부분과 M4 는 W4 sprint, M5 는 W5 sprint 이고 11월 12일에 DDGI 개발을 끝낸다. W6, W7 sprint 는 RT Reflection 이고 11월 26일에 모든 개발을 끝낸다. 11월 28일부터 12월 3일은 buffer, 12월 4일이 최종 발표다.">
+      <svg viewBox="0 0 960 340" role="img" aria-label="10월 19일부터 12월 4일까지의 일정. 매주 금요일이 발표일이고 개발은 토요일부터 목요일까지 한다. M1, M2, M3 가 기본 구현이고 11월 5일에 기본 완성을 검증한다. 11월 7일부터 12일까지 측정, 우선순위 결정, 개선을 하고 11월 12일에 DDGI 개발을 끝낸다. W6, W7 sprint 는 RT Reflection 이고 11월 26일에 모든 개발을 끝낸다. 11월 28일부터 12월 3일은 buffer, 12월 4일이 최종 발표다.">
         <!-- 1일 = 17px, x0 = 130 (10/19). 주황 띠는 금요일 발표일 -->
         <g>
           <rect class="fri" x="198" y="40" width="17" height="242"/>
@@ -403,22 +401,23 @@ details .refs code { font-size: 11.5px; }
           <text class="t gl-label" x="12" y="65">M1 Ray Query Infra</text>
           <text class="t gl-label" x="12" y="99">M2 Hit Lighting</text>
           <text class="t gl-label" x="12" y="133">M3 DDGI Core</text>
-          <text class="t gl-label" x="12" y="167">M4 품질, Leak</text>
-          <text class="t gl-label" x="12" y="201">M5 Open World</text>
+          <text class="t gl-label" x="12" y="167">측정, 우선순위</text>
+          <text class="t gl-label" x="12" y="201">개선 (순위대로)</text>
           <text class="ts" x="12" y="235">RT Reflection</text>
           <text class="ts" x="12" y="269">Buffer</text>
         </g>
         <g>
           <rect class="bar" x="130" y="50" width="68" height="22" rx="4"><title>M1: 10/19 ~ 10/22 (4일)</title></rect>
-          <rect class="bar" x="215" y="84" width="51" height="22" rx="4"><title>M2: 10/24 ~ 10/26 (3일)</title></rect>
-          <rect class="bar" x="266" y="118" width="51" height="22" rx="4"><title>M3 앞부분: 10/27 ~ 10/29</title></rect>
-          <rect class="bar" x="334" y="118" width="34" height="22" rx="4"><title>M3 뒷부분: 10/31 ~ 11/1</title></rect>
-          <rect class="bar" x="368" y="152" width="68" height="22" rx="4"><title>M4: 11/2 ~ 11/5 (4일)</title></rect>
-          <rect class="bar" x="453" y="186" width="102" height="22" rx="4"><title>M5: 11/7 ~ 11/12 (6일)</title></rect>
+          <rect class="bar" x="215" y="84" width="85" height="22" rx="4"><title>M2: 10/24 ~ 10/28 (5일)</title></rect>
+          <rect class="bar" x="300" y="118" width="17" height="22" rx="4"><title>M3 시작: 10/29</title></rect>
+          <rect class="bar" x="334" y="118" width="102" height="22" rx="4"><title>M3: 10/31 ~ 11/5</title></rect>
+          <rect class="bar-p2" x="453" y="152" width="34" height="22" rx="4"><title>P-1, P-2: 11/7 ~ 11/8</title></rect>
+          <rect class="bar-p2" x="487" y="186" width="68" height="22" rx="4"><title>P-3: 11/9 ~ 11/12</title></rect>
           <rect class="bar-fut" x="572" y="220" width="102" height="22" rx="4"><title>RT Reflection: 11/14 ~ 11/19 (이 문서 범위 밖)</title></rect>
           <rect class="bar-fut" x="691" y="220" width="102" height="22" rx="4"><title>RT Reflection: 11/21 ~ 11/26 (이 문서 범위 밖)</title></rect>
           <rect class="bar-spare" x="810" y="254" width="102" height="22" rx="4"><title>buffer: 11/28 ~ 12/3</title></rect>
         </g>
+        <line class="gate-line" x1="436" y1="40" x2="436" y2="294"/>
         <line class="dl" x1="555" y1="40" x2="555" y2="294"/>
         <line class="dl" x1="793" y1="40" x2="793" y2="294"/>
         <g class="tm">
@@ -430,12 +429,13 @@ details .refs code { font-size: 11.5px; }
           <line class="gl" x1="801.5" y1="290" x2="801.5" y2="296"/><text x="801.5" y="309" text-anchor="middle">11/27</text>
           <line class="gl" x1="920.5" y1="290" x2="920.5" y2="296"/><text x="920.5" y="309" text-anchor="middle">12/4</text>
         </g>
-        <text class="tv" x="551" y="330" text-anchor="end">DDGI 개발 완료 11/12</text>
+        <text class="tv" x="432" y="330" text-anchor="end">기본 완성 11/5</text>
+        <text class="tv" x="551" y="330" text-anchor="end">DDGI 완료 11/12</text>
         <text class="tv" x="789" y="330" text-anchor="end">모든 개발 완료 11/26</text>
         <text class="tv" x="929" y="330" text-anchor="end">최종 발표 12/4</text>
       </svg>
     </div>
-    <figcaption>막대는 개발 기간이고, 주황 띠와 마름모는 금요일 발표일이다. 주말에도 개발하므로 sprint 는 토요일부터 목요일까지 6일이고 (첫 sprint 만 4일), 목요일이 그 주의 개발 마감이다. 세로선은 DDGI 개발 완료와 모든 개발 완료 시점이다. 점선 막대 (RT Reflection) 는 이 문서 범위 밖이고, 회색 막대는 계획된 작업을 넣지 않는 buffer 주다. 주마다 끝낼 작업과 발표 내용은 <a href="#s7-1">7.1 주간 계획</a>에 있다.</figcaption>
+    <figcaption>진한 막대는 1단계 기본 구현, 테두리만 있는 막대는 2단계 측정과 개선이다. 주황 띠와 마름모는 금요일 발표일이고, sprint 는 토요일부터 목요일까지 6일이다 (첫 sprint 만 4일). 파란 세로선은 기본 완성 검증, 주황 세로선은 DDGI 개발 완료와 모든 개발 완료 시점이다. 점선 막대 (RT Reflection) 는 이 문서 범위 밖이고, 회색 막대는 계획된 작업을 넣지 않는 buffer 주다. 주마다 끝낼 작업과 발표 내용은 <a href="#s7-1">7.1 주간 계획</a>에 있다.</figcaption>
   </figure>
 </section>
 
@@ -444,21 +444,23 @@ details .refs code { font-size: 11.5px; }
 
   <h3 id="s1-1"><span class="n">1.1</span>표기</h3>
   <ul class="list">
-    <li>결정, 일정, 목표치는 모두 판단이다. 따로 표시하지 않는다.</li>
-    <li>코드, 문서, spec 으로 확인한 사실은 출처(파일 경로와 줄 번호)를 같이 적는다. 줄 번호는 작성 시점(2026-10-19) 기준이다.</li>
+    <li>결정, 일정, 목표치, 작업량 추정은 모두 판단이다. 따로 표시하지 않는다.</li>
+    <li>코드, 문서, spec 으로 확인한 사실은 출처 (파일 경로와 줄 번호) 를 같이 적는다. 줄 번호는 작성 시점 (2026-10-19) 기준이다.</li>
     <li>확인하지 않은 추정은 <span class="guess">(추측)</span> 으로 표시한다.</li>
+    <li>설계에 쓴 idea 의 출처를 적는다. 논문은 절 번호로 적고 (예: Majercik 2021 §4.3), RTXGI-DDGI 에서 가져온 idea 는 "idea 출처: RTXGI-DDGI" 로 적는다. RTXGI-DDGI 는 commit f33e496 시점의 idea 만 참고했고 코드는 참고하지 않는다 (<a class="ref" href="#d-1">D-1</a>).</li>
     <li>경로는 repo root 기준이다. <code>references/</code> 아래 경로는 <a href="../references/manifest.json">references/manifest.json</a> 의 commit 기준이다.</li>
-    <li>작업과 결정의 ID(<a class="ref" href="#m1-3">M1-3</a>, <a class="ref" href="#d-4">D-4</a>, <a class="ref" href="#ow2">OW2</a>, <a class="ref" href="#r6">R6</a>)는 해당 항목으로 가는 link 다.</li>
+    <li>ID (<a class="ref" href="#m1-3">M1-3</a>, <a class="ref" href="#p-2">P-2</a>, <a class="ref" href="#i5">I5</a>, <a class="ref" href="#d-4">D-4</a>, <a class="ref" href="#ow2">OW2</a>, <a class="ref" href="#r6">R6</a>) 는 해당 항목으로 가는 link 다. M 은 기본 구현 작업, P 는 개선 단계 작업, I 는 개선 후보, D 는 결정, OW 는 기준, R 은 위험이다.</li>
   </ul>
 
   <h3 id="s1-2"><span class="n">1.2</span>관련 문서</h3>
   <ul class="list">
-    <li><a href="펄어비스%20인턴%20WEEK%201.pdf">펄어비스 인턴 WEEK 1.pdf</a>: 주제 선정 배경과 4단계 진행 계획(Ray Query Infra, Reference Path Tracer, DDGI, RT Reflection). 이 로드맵은 그중 앞의 세 단계를 구체화한다.</li>
+    <li><a href="펄어비스%20인턴%20WEEK%201.pdf">펄어비스 인턴 WEEK 1.pdf</a>: 주제 선정 배경과 4단계 진행 계획 (Ray Query Infra, Reference Path Tracer, DDGI, RT Reflection). 이 로드맵은 그중 앞의 세 단계를 구체화한다.</li>
   </ul>
 
   <h3 id="s1-3"><span class="n">1.3</span>갱신 규칙</h3>
   <ul class="list">
     <li>진행 상태는 <a href="#s7-1">7.1 주간 계획</a>의 상태 칸에만 적는다.</li>
+    <li>개선 후보의 순위는 <a href="#cands">6.4 개선 후보</a> 표의 순위 칸에만 적는다 (<a class="ref" href="#p-2">P-2</a>).</li>
     <li>결정을 바꾸면 해당 결정 항목을 고치고, 바꾼 이유는 commit body 에 남긴다.</li>
     <li>측정값은 M1 에서 만드는 <code>docs/ddgi-measurements.md</code> 에만 기록한다. 이 문서에는 목표치만 둔다.</li>
   </ul>
@@ -474,94 +476,98 @@ details .refs code { font-size: 11.5px; }
 
   <h3 id="s2-2"><span class="n">2.2</span>전제</h3>
   <div class="premises">
+    <div class="premise"><div class="k">진행 방식</div><div class="v"><p>1단계에서 논문의 기본 기능을 이 엔진에 구현해 정상 동작시키고 검증한다. 2단계에서 기본 구현을 3장 기준으로 측정하고, 개선 후보에 우선순위를 매겨 순서대로 개선한다.</p><p class="why">사용자 결정</p></div></div>
+    <div class="premise"><div class="k">기본 기능의 범위</div><div class="v"><p>Majercik 2019 의 기능 (probe trace, irradiance 와 distance blend, Chebyshev visibility 를 쓴 sampling, multi-bounce) 과 Majercik 2021 §4 의 품질 개선 (self-shadow bias 와 backface 처리, perceptual encoding, 수렴 heuristic) 이다. Majercik 2021 의 probe 위치 조정 (§5), probe state (§6), tracking window 와 여러 volume (§7) 은 개선 후보다.</p><p class="why">범위를 이렇게 나눈 것은 판단이다. RTXGI-DDGI 도 위치 조정, probe state, scrolling 을 기본 설정에서 끈다 (idea 출처: RTXGI-DDGI).</p></div></div>
     <div class="premise"><div class="k">발표 일정</div><div class="v"><p>매주 금요일에 발표한다 (W2 10/23 ~ W7 11/27). 12/4 (W8) 가 최종 발표다.</p><p class="why">사용자가 알려 준 일정</p></div></div>
     <div class="premise"><div class="k">개발 완료</div><div class="v"><p>DDGI 와 RT Reflection 의 모든 개발을 11/26 (목) 까지 끝내고 11/27 (W7) 발표에서 보인다. 11/28 ~ 12/3 은 buffer 로 두고 계획된 작업을 넣지 않는다.</p><p class="why">사용자 결정</p></div></div>
     <div class="premise"><div class="k">주간 cycle</div><div class="v"><p>토요일부터 목요일까지 6일 개발하고, 목요일에 그 주의 개발을 끝낸다. 금요일은 발표와 다음 sprint 계획에 쓴다. 첫 sprint 는 10/19 (월) ~ 10/22 (목) 4일이다.</p><p class="why">주말 포함 개발과 발표 전날 개발 마감은 사용자 결정이다. 금요일을 개발 일수에서 뺀 것은 발표 당일에 쓸 수 있는 시간을 알 수 없어 보수적으로 잡은 판단이다.</p></div></div>
-    <div class="premise"><div class="k">DDGI 개발 완료</div><div class="v"><p>11/12 (목). 11/13 (W5) 발표에서 보인다.</p><p class="why">11/26 까지의 개발 가능일 34일 중 RT Reflection 에 W6, W7 sprint 12일을 남긴다. RT Reflection 은 normal/roughness buffer, reflection ray, hit shading 재사용, temporal/spatial denoiser 가 필요해 2 sprint 보다 짧으면 위험하다고 본다.</p></div></div>
-    <div class="premise"><div class="k">Ray tracing 방식</div><div class="v"><p>inline ray tracing (DXR 1.1 RayQuery) 만 쓴다. DXR 1.0 pipeline (RayGen, shader table) 은 쓰지 않는다.</p><p class="why">사용자 결정</p></div></div>
+    <div class="premise"><div class="k">DDGI 일수</div><div class="v"><p>11/26 까지 개발 가능일 34일 중 DDGI 에 22일을 쓴다. 1단계 기본 구현 16일 (~ 11/5), 2단계 측정과 개선 6일 (11/7 ~ 11/12). RT Reflection 에 W6, W7 sprint 12일을 남긴다.</p><p class="why">RT Reflection 은 normal/roughness buffer, reflection ray, hit shading 재사용, temporal/spatial denoiser 가 필요해 2 sprint 보다 짧으면 위험하다고 본다.</p></div></div>
+    <div class="premise"><div class="k">Ray tracing 방식</div><div class="v"><p>inline ray tracing (DXR 1.1 RayQuery) 만 쓴다. DXR pipeline (RayGen, shader table) 은 쓰지 않는다.</p><p class="why">사용자 결정</p></div></div>
     <div class="premise"><div class="k">개발 GPU</div><div class="v"><p>RTX 4060 Laptop. 성능 목표는 이 GPU 기준이다.</p><p class="why">개발 PC 에는 RTX 4060 Laptop 과 Intel UHD 가 있고 (2026-10-19 확인), MiniEngine 은 조건을 만족하는 adapter 중 dedicated video memory 가 가장 큰 것을 고른다 (<code>MiniEngine/Core/GraphicsCore.cpp:271-281</code>)</p></div></div>
-    <div class="premise"><div class="k">장면 단위</div><div class="v"><p>1 m = 100 unit. Sponza 를 100배로 키워 쓴다.</p><p class="why"><code>MiniEngine/ModelViewer/ModelViewer.cpp:180</code></p></div></div>
-    <div class="premise"><div class="k">RTXGI 코드 사용</div><div class="v"><p>읽기만 하고 복사하지 않는다. 논문과 RTXGI 를 읽고 독립적으로 구현한다.</p><p class="why">RTXGI-DDGI 는 NVIDIA RTX SDKs License 이고, SDK 를 open source license 에 종속시키는 사용을 금지한다 (<code>references/RTXGI-DDGI/License.txt</code> 4(e)). 이 repo 는 MIT 다. 법률 검토가 아니라 보수적으로 고른 판단이다.</p></div></div>
+    <div class="premise"><div class="k">장면 단위</div><div class="v"><p>1 m = 100 unit.</p><p class="why">glTF 2.0 의 길이 단위는 m 이고, ModelViewer 는 Sponza 를 100배로 키운다 (<code>MiniEngine/ModelViewer/ModelViewer.cpp:180</code>). Sponza 의 POSITION 범위 37.2 × 15.6 × 22.9 도 m 로 보면 자연스럽다.</p></div></div>
+    <div class="premise"><div class="k">RTXGI-DDGI 참고 범위</div><div class="v"><p>idea 만 참고하고 코드는 참고하지 않는다. <code>references/</code> 에도 두지 않는다 (README 의 참고 범위).</p><p class="why">RTXGI-DDGI 는 NVIDIA RTX SDKs License 이고, SDK 의 복사, 수정, 파생물 작성을 막으며 SDK 를 open source license 에 종속시키는 사용을 금지한다 (License.txt 4(b), 4(e)). 이 repo 는 MIT 로 공개되어 있다. 법률 검토가 아니라 보수적으로 고른 판단이다.</p></div></div>
   </div>
 </section>
 
 <section id="s3" aria-labelledby="h-s3">
   <h2 id="h-s3"><span class="n">3</span>Open world action game 기준</h2>
   <div class="prose">
-    <p>설계를 고르거나 구현 후 개선 방향을 정할 때 이 기준을 쓴다. 개선안은 "어떤 OW 항목을 얼마나 개선하고, OW2 예산을 얼마나 쓰는가" 로 비교한다. 개선 commit 의 body 에는 관련 OW ID 와 측정 전후 값을 적는다.</p>
-    <p class="note">목표치는 아직 측정 근거가 없는 초안이다. M3 에서 첫 측정을 한 뒤 이 기준을 고친다.</p>
+    <p>기본 구현을 측정하고 개선 후보의 우선순위를 정할 때 이 기준을 쓴다 (<a class="ref" href="#p-2">P-2</a>). 개선안은 "어떤 OW 항목을 얼마나 개선하고, OW2 예산을 얼마나 쓰는가" 로 비교한다. 개선 commit 의 body 에는 관련 OW ID 와 측정 전후 값을 적는다.</p>
+    <p class="note">목표치는 아직 측정 근거가 없는 초안이다. P-2 에서 기본 구현을 처음 측정한 뒤 고친다.</p>
   </div>
 
   <div class="ow-grid">
-    <article class="ow" id="ow1"><header><span class="id">OW1</span><b>world 크기와 무관한 비용</b></header><p class="why">world 전체를 probe 로 덮을 수 없다.</p><dl><dt>지표</dt><dd>test layout 을 키울 때 DDGI GPU time, memory 변화 (TLAS build 제외)</dd><dt>목표</dt><dd class="goal">변화 5% 이하</dd></dl></article>
-    <article class="ow" id="ow2"><header><span class="id">OW2</span><b>고정 예산</b></header><p class="why">60 fps 의 frame 당 16.6 ms 중 일부만 GI 에 쓸 수 있고, 이후 RT Reflection 몫도 남겨야 한다.</p><dl><dt>지표</dt><dd>DDGI 전체 (probe update + shading 추가분) GPU time @1080p, Profile build. DDGI resource memory</dd><dt>목표</dt><dd class="goal">2.0 ms 이하, 64 MiB 이하</dd></dl></article>
-    <article class="ow" id="ow3"><header><span class="id">OW3</span><b>빠른 이동 대응</b></header><p class="why">질주, 탈것, 활강.</p><dl><dt>지표</dt><dd>30 m/s 고정 경로 비행에서 새로 들어온 영역의 검은 영역, popping, cascade 경계 끊김</dd><dt>목표</dt><dd class="goal">눈에 띄는 popping 없음, 새 영역 수렴 0.5 s 이하</dd></dl></article>
-    <article class="ow" id="ow4"><header><span class="id">OW4</span><b>조명 변화 반응</b></header><p class="why">time of day, 폭발, 문 열림.</p><dl><dt>지표</dt><dd>sun 각도를 한 번에 크게 바꾼 뒤 reference 대비 오차가 수렴값 수준으로 돌아오는 시간</dd><dt>목표</dt><dd class="goal">0.5 s 이하</dd></dl></article>
-    <article class="ow" id="ow5"><header><span class="id">OW5</span><b>시간 안정성</b></header><p class="why">정지 화면의 깜빡임은 바로 눈에 띈다.</p><dl><dt>지표</dt><dd>정지 camera, 정적 조명에서 연속 frame 간 간접광 평균 상대 변화</dd><dt>목표</dt><dd class="goal">1% 이하</dd></dl></article>
-    <article class="ow" id="ow6"><header><span class="id">OW6</span><b>light leak 방지</b></header><p class="why">동굴, 건물 안팎 전환이 잦다.</p><dl><dt>지표</dt><dd>고정한 leak 측정 위치에서 reference 대비 오차</dd><dt>목표</dt><dd class="goal">M4 에서 첫 측정 후 정한다</dd></dl></article>
-    <article class="ow" id="ow7"><header><span class="id">OW7</span><b>동적 물체</b></header><p class="why">character 는 주변 조명과 어울려야 하고, 움직이는 물체는 주변 간접광을 바꿔야 한다.</p><dl><dt>지표</dt><dd>skinned mesh 의 간접광 수신, rigid 물체 이동 후 간접광 반영 latency</dd><dt>목표</dt><dd class="goal">수신은 필수, 기여는 선택</dd></dl></article>
+    <article class="ow" id="ow1"><header><span class="id">OW1</span><b>world 크기와 무관한 비용</b></header><p class="why">world 전체를 probe 로 덮을 수 없다.</p><dl><dt>지표</dt><dd>test layout 을 키울 때 DDGI 와 TLAS 의 GPU time, memory 변화 (둘을 나눠 측정)</dd><dt>목표</dt><dd class="goal">DDGI 변화 5% 이하</dd></dl></article>
+    <article class="ow" id="ow2"><header><span class="id">OW2</span><b>고정 예산</b></header><p class="why">60 fps 의 frame 당 16.67 ms 중 일부만 GI 에 쓸 수 있고, 이후 RT Reflection 몫도 남겨야 한다.</p><dl><dt>지표</dt><dd>DDGI 전체 (probe update + shading 추가분) GPU time @1080p, Profile build. DDGI resource memory</dd><dt>목표</dt><dd class="goal">2.0 ms 이하, 64 MiB 이하</dd></dl></article>
+    <article class="ow" id="ow3"><header><span class="id">OW3</span><b>빠른 이동 대응</b></header><p class="why">질주, 탈것, 활강.</p><dl><dt>지표</dt><dd>30 m/s 고정 경로 비행에서 간접광의 tile 별 frame 간 변화 p95, 새로 들어온 영역이 수렴값의 10% 안에 들기까지의 시간</dd><dt>목표</dt><dd class="goal">수렴 0.5 s 이하, p95 목표는 P-2 에서 정함</dd></dl></article>
+    <article class="ow" id="ow4"><header><span class="id">OW4</span><b>조명 변화 반응</b></header><p class="why">time of day 처럼 조명이 크게 바뀌는 경우.</p><dl><dt>지표</dt><dd>sun 각도를 한 번에 바꾼 뒤 간접광이 새 수렴값의 10% 안에 들기까지의 시간. 밝아지는 경우와 어두워지는 경우를 나눠 잰다</dd><dt>목표</dt><dd class="goal">0.5 s 이하</dd></dl></article>
+    <article class="ow" id="ow5"><header><span class="id">OW5</span><b>시간 안정성</b></header><p class="why">정지 화면의 깜빡임은 바로 눈에 띈다.</p><dl><dt>지표</dt><dd>정지 camera, 정적 조명에서 간접광의 tile 별 frame 간 상대 변화 p95</dd><dt>목표</dt><dd class="goal">1% 이하</dd></dl></article>
+    <article class="ow" id="ow6"><header><span class="id">OW6</span><b>light leak 방지</b></header><p class="why">동굴, 건물 안팎 전환이 잦다.</p><dl><dt>지표</dt><dd>고정한 leak 측정 위치에서 reference 대비 오차</dd><dt>목표</dt><dd class="goal">P-2 에서 첫 측정 후 정한다</dd></dl></article>
+    <article class="ow" id="ow7"><header><span class="id">OW7</span><b>동적 물체</b></header><p class="why">character 는 주변 조명과 어울려야 하고, 움직이는 물체는 주변 간접광을 바꿔야 한다.</p><dl><dt>지표</dt><dd>공중을 포함한 경로에서 skinned mesh 의 간접광 수신, rigid 물체 이동 후 간접광 반영 latency</dd><dt>목표</dt><dd class="goal">수신은 필수, 기여는 선택</dd></dl></article>
     <article class="ow" id="ow8"><header><span class="id">OW8</span><b>확장성</b></header><p class="why">사양 폭이 넓다.</p><dl><dt>지표</dt><dd>quality preset 별 비용</dd><dt>목표</dt><dd class="goal">preset 마다 그 사양에서 OW2 만족</dd></dl></article>
   </div>
 
   <figure class="fig">
     <div class="fig-scroll w-mid">
-      <svg viewBox="0 0 760 82" role="img" aria-label="60 fps 한 frame 16.6 ms 중 DDGI 상한은 2.0 ms 다.">
+      <svg viewBox="0 0 760 82" role="img" aria-label="60 fps 한 frame 16.67 ms 중 DDGI 상한은 2.0 ms 다.">
         <text class="ts" x="140" y="38" text-anchor="end">60 fps 한 frame</text>
-        <rect class="f-acc" x="150" y="20" width="67.5" height="28" rx="3"><title>DDGI 상한 2.0 ms</title></rect>
-        <rect class="f-rest" x="219.5" y="20" width="490.5" height="28" rx="3"><title>나머지 14.6 ms</title></rect>
+        <rect class="f-acc" x="150" y="20" width="65.2" height="28" rx="3"><title>DDGI 상한 2.0 ms</title></rect>
+        <rect class="f-rest" x="217.2" y="20" width="492.8" height="28" rx="3"><title>나머지 14.67 ms</title></rect>
         <text class="tv" x="150" y="70">DDGI 상한 2.0 ms</text>
-        <text class="tv" x="710" y="70" text-anchor="end">16.6 ms</text>
+        <text class="tv" x="710" y="70" text-anchor="end">16.67 ms</text>
       </svg>
     </div>
     <figcaption>OW2 의 GPU 예산을 frame 길이에 맞춰 그린 것이다. 나머지 시간에는 기존 pass 와 이후 RT Reflection 이 들어간다.</figcaption>
   </figure>
 
-  <h3 id="s3-map"><span class="n">3.1</span>기준과 작업의 연결</h3>
-  <div class="tbl matrix">
+  <h3 id="s3-1"><span class="n">3.1</span>측정 방법과 기본 구현에서의 측정</h3>
+  <div class="tbl">
     <table>
-      <thead><tr><th>기준</th><th>M1</th><th>M2</th><th>M3</th><th>M4</th><th>M5</th></tr></thead>
+      <thead><tr><th>기준</th><th>측정 장면과 도구</th><th>기본 구현 (P-2) 에서</th></tr></thead>
       <tbody>
-        <tr><td><a class="ref" href="#ow1">OW1</a> world 크기</td><td class="empty">-</td><td class="empty">-</td><td><div class="cell"><a class="ref" href="#m3-1">M3-1</a></div></td><td class="empty">-</td><td><div class="cell"><a class="ref" href="#m5-2">M5-2</a><a class="ref" href="#m5-4">M5-4</a></div></td></tr>
-        <tr><td><a class="ref" href="#ow2">OW2</a> 고정 예산</td><td class="empty">-</td><td class="empty">-</td><td><div class="cell"><a class="ref" href="#m3-6">M3-6</a><a class="ref" href="#m3-7">M3-7</a></div></td><td><div class="cell"><a class="ref" href="#m4-2">M4-2</a></div></td><td><div class="cell"><a class="ref" href="#m5-5">M5-5</a></div></td></tr>
-        <tr><td><a class="ref" href="#ow3">OW3</a> 빠른 이동</td><td class="empty">-</td><td class="empty">-</td><td class="empty">-</td><td class="empty">-</td><td><div class="cell"><a class="ref" href="#m5-1">M5-1</a><a class="ref" href="#m5-2">M5-2</a><a class="ref" href="#m5-4">M5-4</a><a class="ref" href="#m5-5">M5-5</a></div></td></tr>
-        <tr><td><a class="ref" href="#ow4">OW4</a> 조명 변화</td><td class="empty">-</td><td><div class="cell"><a class="ref" href="#m2-3">M2-3</a><a class="ref" href="#m2-4">M2-4</a></div></td><td class="empty">-</td><td class="empty">-</td><td><div class="cell"><a class="ref" href="#m5-3">M5-3</a></div></td></tr>
-        <tr><td><a class="ref" href="#ow5">OW5</a> 시간 안정성</td><td class="empty">-</td><td class="empty">-</td><td><div class="cell"><a class="ref" href="#m3">M3 완료 기준</a></div></td><td class="empty">-</td><td><div class="cell"><a class="ref" href="#m5-3">M5-3</a></div></td></tr>
-        <tr><td><a class="ref" href="#ow6">OW6</a> light leak</td><td class="empty">-</td><td><div class="cell"><a class="ref" href="#m2-3">M2-3</a><a class="ref" href="#m2-4">M2-4</a></div></td><td class="empty">-</td><td><div class="cell"><a class="ref" href="#m4-1">M4-1</a><a class="ref" href="#m4-2">M4-2</a><a class="ref" href="#m4-3">M4-3</a><a class="ref" href="#m4-4">M4-4</a><a class="ref" href="#m4-6">M4-6</a></div></td><td class="empty">-</td></tr>
-        <tr><td><a class="ref" href="#ow7">OW7</a> 동적 물체</td><td><div class="cell"><a class="ref" href="#m1-7">M1-7</a></div></td><td class="empty">-</td><td class="empty">-</td><td class="empty">-</td><td><div class="cell"><a class="ref" href="#m5-6">M5-6</a></div></td></tr>
-        <tr><td><a class="ref" href="#ow8">OW8</a> 확장성</td><td class="empty">-</td><td class="empty">-</td><td class="empty">-</td><td class="empty">-</td><td><div class="cell"><a class="ref" href="#m5-7">M5-7</a></div></td></tr>
+        <tr><td><a class="ref" href="#ow1">OW1</a></td><td>test layout (<a class="ref" href="#p-4">P-4</a>) 의 크기를 바꿔 DDGI 와 TLAS 비용을 따로 측정</td><td>고정 volume 이라 넓은 world 를 덮을 수 없다. 구조적으로 만족하지 못함으로 기록한다</td></tr>
+        <tr><td><a class="ref" href="#ow2">OW2</a></td><td>Profile, 1080p, pass 별 GPU time (<a class="ref" href="#m3-7">M3-7</a>), resource memory</td><td>측정한다 (Sponza)</td></tr>
+        <tr><td><a class="ref" href="#ow3">OW3</a></td><td>고정 경로 비행, 간접광 tile 지표 (<a class="ref" href="#p-1">P-1</a>)</td><td>고정 volume 이라 camera 를 따라가지 않는다. 구조적으로 만족하지 못함으로 기록한다</td></tr>
+        <tr><td><a class="ref" href="#ow4">OW4</a></td><td>sun 각도 step 변화와 연속 회전, 간접광 tile 지표 (<a class="ref" href="#p-1">P-1</a>)</td><td>측정한다 (Sponza)</td></tr>
+        <tr><td><a class="ref" href="#ow5">OW5</a></td><td>정지 camera, 간접광 tile 지표 (<a class="ref" href="#p-1">P-1</a>)</td><td>측정한다 (Sponza)</td></tr>
+        <tr><td><a class="ref" href="#ow6">OW6</a></td><td>고정 leak 측정 위치 (<a class="ref" href="#m2-5">M2-5</a>) 에서 reference 비교 (<a class="ref" href="#m2-4">M2-4</a>)</td><td>측정한다 (기본 완성 검증의 원인 분류를 그대로 쓴다)</td></tr>
+        <tr><td><a class="ref" href="#ow7">OW7</a></td><td>skinned asset 과 공중 경로</td><td>skinned asset 이 없어 측정하지 못함으로 기록한다 (<a class="ref" href="#i13">I13</a> 에서 준비)</td></tr>
+        <tr><td><a class="ref" href="#ow8">OW8</a></td><td>preset 별 비용</td><td>preset 이 없어 해당 없음 (<a class="ref" href="#i17">I17</a>)</td></tr>
       </tbody>
     </table>
   </div>
-  <p class="note">칸의 ID 는 그 기준을 개선하거나 측정하는 작업이다. M2 의 reference 와 capture 는 OW4, OW6 측정의 바탕이다. M1, M2 의 나머지 작업은 이후 작업 전체의 바탕이라 특정 기준에 묶지 않았다.</p>
+  <p class="note">시간 특성 지표는 노출을 적용하기 전의 HDR 간접광으로 잰다. ModelViewer 는 auto exposure 를 켠다 (<code>MiniEngine/ModelViewer/ModelViewer.cpp:159</code>).</p>
 </section>
 
 <section id="s4" aria-labelledby="h-s4">
   <h2 id="h-s4"><span class="n">4</span>출발점: 계획에 영향을 주는 현재 상태</h2>
-  <p class="note">코드와 asset 으로 확인한 현재 상태 중 계획을 바꾸는 사실만 적는다. 경로는 <code>MiniEngine/</code> 아래다.</p>
+  <p class="note">코드와 asset 으로 확인한 현재 상태 중 계획을 바꾸는 사실만 적는다. 4.1 ~ 4.3 의 경로는 <code>MiniEngine/</code> 아래다.</p>
 
   <h3 id="s4-1"><span class="n">4.1</span>Scene 과 model data</h3>
   <div class="facts">
-    <div class="fact"><div class="what"><p>ModelViewer 는 <code>ModelInstance</code> 하나만 둔다. <code>ModelInstance</code> 에는 크기 조절(<code>Resize</code>)만 있고 이동, 회전 setter 가 없다.</p><p class="src">ModelViewer/ModelViewer.cpp:72, Model/Model.h:133-175</p></div><p class="impact">여러 instance 배치와 움직이는 물체를 위해 추가해야 한다 (<a class="ref" href="#m1-7">M1-7</a>)</p></div>
+    <div class="fact"><div class="what"><p>ModelViewer 는 <code>ModelInstance</code> 하나만 둔다. <code>ModelInstance</code> 에는 크기 조절 (<code>Resize</code>) 만 있고 이동, 회전 setter 가 없다.</p><p class="src">ModelViewer/ModelViewer.cpp:72, Model/Model.h:133-175</p></div><p class="impact">여러 instance 배치와 움직이는 물체는 개선 단계에서 추가한다 (<a class="ref" href="#p-4">P-4</a>, <a class="ref" href="#i13">I13</a>)</p></div>
     <div class="fact"><div class="what"><p>화면 그리기용 <code>MeshSorter</code> 는 frustum culling 을 거친 목록이다.</p><p class="src">Model/Model.cpp:58</p></div><p class="impact">ray 는 화면 밖 물체에도 맞아야 하므로 TLAS 는 Model 전체를 순회해 만든다.</p></div>
-    <div class="fact"><div class="what"><p>vertex 는 position <code>R32G32B32_FLOAT</code> 가 맨 앞이고, normal, tangent 는 <code>R10G10B10A2_UNORM</code>, UV 는 <code>R16G16_FLOAT</code> 다. Model 의 VB, IB 는 모두 buffer 하나(<code>m_DataBuffer</code>)에 있다.</p><p class="src">Model/MeshConvert.cpp:341-363, Model/Model.h:114</p></div><p class="impact">BLAS 가 기존 VB 를 복사 없이 입력으로 쓸 수 있다. hit 에서는 normal, UV 를 shader 가 직접 풀어야 한다 (<a class="ref" href="#m1-3">M1-3</a>)</p></div>
+    <div class="fact"><div class="what"><p>vertex 는 position <code>R32G32B32_FLOAT</code> 가 맨 앞이고, normal, tangent 는 <code>R10G10B10A2_UNORM</code>, UV 는 <code>R16G16_FLOAT</code> 다. Model 의 VB, IB 는 모두 buffer 하나 (<code>m_DataBuffer</code>) 에 있다.</p><p class="src">Model/MeshConvert.cpp:341-363, Model/Model.h:114, Model/ModelLoader.cpp:236</p></div><p class="impact">BLAS 가 기존 VB 를 복사 없이 입력으로 쓸 수 있다. hit 에서는 normal, UV 를 shader 가 직접 풀어야 한다 (<a class="ref" href="#m1-3">M1-3</a>)</p></div>
     <div class="fact"><div class="what"><p>index 는 <code>R16_UINT</code> 이고, 최대 index 가 0xFFFF 를 넘을 때만 <code>R32_UINT</code> 다.</p><p class="src">Model/MeshConvert.cpp:144, Model/ModelConvert.cpp:125</p></div><p class="impact">geometry desc 와 shader 의 index 읽기가 두 format 을 모두 다뤄야 한다.</p></div>
     <div class="fact"><div class="what"><p>vertex 는 node 의 local space 에 있고, world 행렬은 vertex shader 가 곱한다. 변환 때의 <code>localToObject</code> 는 bounds 계산에만 쓰인다.</p><p class="src">Model/MeshConvert.cpp:229-256, Model/Shaders/DefaultVS.hlsl:113</p></div><p class="impact">TLAS instance transform 에 node 의 world 행렬을 넣는다.</p></div>
-    <div class="fact"><div class="what"><p>glTF mesh 안의 primitive 는 (psoFlags, 32-bit index 여부, material) 이 같으면 한 <code>Mesh</code> 의 여러 <code>Draw</code> 로 묶인다. <code>Draw</code> 가 여럿인 <code>Mesh</code> 는 VB, depth VB, IB 를 잘못된 위치에 복사한다 (vertex 수와 index 수를 byte offset 자리에 더하고, depth VB 는 같은 위치에 덮어씀).</p><p class="src">Model/MeshConvert.h:39-43, Model/ModelConvert.cpp:75-80, :152-155</p></div><p class="impact">Sponza 는 해당하지 않는다 (아래 줄). 다른 glTF 를 쓰면 BLAS 입력이 틀린다 (<a class="ref" href="#r6">R6</a>)</p></div>
+    <div class="fact"><div class="what"><p>glTF mesh 안의 primitive 는 (psoFlags, 32-bit index 여부, material) 이 같으면 한 <code>Mesh</code> 의 여러 <code>Draw</code> 로 묶인다. <code>Draw</code> 가 여럿인 <code>Mesh</code> 는 VB, depth VB, IB 를 잘못된 위치에 복사한다 (vertex 수와 index 수를 byte offset 자리에 더하고, depth VB 는 같은 위치에 덮어씀).</p><p class="src">Model/MeshConvert.h:39-43, Model/ModelConvert.cpp:75-80, :152-155</p></div><p class="impact">Sponza 는 해당하지 않는다 (아래 줄). <a class="ref" href="#m1-1">M1-1</a> 의 지원 범위에서 막고, 다른 glTF 를 쓰기 전에 고친다 (<a class="ref" href="#r6">R6</a>)</p></div>
     <div class="fact"><div class="what"><p>skinning 은 vertex shader 에서만 한다. skin 된 vertex 가 buffer 로 남지 않는다.</p><p class="src">Model/Shaders/DefaultVS.hlsl:88-111</p></div><p class="impact">skinned mesh 의 BLAS 는 지금 구조로 만들 수 없다 (<a class="ref" href="#d-9">D-9</a>)</p></div>
-    <div class="fact"><div class="what"><p>Sponza (<code>sponza2.gltf</code>): node 381개 (transform 없음), primitive 393개, material 27개 (MASK 3개, double-sided 3개), animation 과 skin 없음. primitive 가 여럿인 glTF mesh 12개는 primitive 마다 material 이 달라서, 위의 묶음 규칙에 따르면 <code>Mesh</code> 393개가 모두 <code>Draw</code> 1개다. MASK material 을 쓰는 primitive 는 32개다.</p><p class="src">ModelViewer/Sponza/PBR/sponza2.gltf 를 script 로 집계</p></div><p class="impact">정적 장면이다. alpha test 대상은 <code>Mesh</code> 32개다 (<a class="ref" href="#m1-8">M1-8</a>, <a class="ref" href="#m4-5">M4-5</a>)</p></div>
+    <div class="fact"><div class="what"><p>Sponza (<code>sponza2.gltf</code>): node 381개 (transform 없음), primitive 393개, material 27개, animation 과 skin 없음. MASK 3개와 double-sided 3개는 같은 material (chain, leaf, Material__57) 이다. primitive 가 여럿인 glTF mesh 12개는 primitive 마다 material 이 달라서, 위의 묶음 규칙에 따르면 <code>Mesh</code> 393개가 모두 <code>Draw</code> 1개다. 이 3개 material 을 쓰는 primitive 는 32개다.</p><p class="src">ModelViewer/Sponza/PBR/sponza2.gltf 를 script 로 집계</p></div><p class="impact">정적 장면이다. alpha test 이자 two-sided 인 <code>Mesh</code> 가 32개다 (<a class="ref" href="#i12">I12</a>)</p></div>
   </div>
 
   <h3 id="s4-2"><span class="n">4.2</span>Renderer 와 shading</h3>
   <div class="facts">
-    <div class="fact"><div class="what"><p>현재 경로의 <code>DefaultPS</code> 는 sun 직접광을 계산하지 않는다. sun 부분은 <code>#if 0</code> 안에 있고, 실제로는 emissive, SSAO 를 곱한 diffuse IBL, specular IBL 만 더한다.</p><p class="src">Model/Shaders/DefaultPS.hlsl:266-289</p></div><p class="impact">bounce 할 직접광이 없다. sun 직접광 재활성화가 DDGI 의 선행 작업이다 (<a class="ref" href="#m2-1">M2-1</a>)</p></div>
-    <div class="fact"><div class="what"><p>glTF 경로에는 G-buffer, MRT 가 없다. color pass 의 render target 은 하나다.</p><p class="src">Model/Renderer.cpp:199, :629-642</p></div><p class="impact">DDGI 는 forward pass 에서 적용한다 (<a class="ref" href="#d-5">D-5</a>)</p></div>
+    <div class="fact"><div class="what"><p>현재 경로의 <code>DefaultPS</code> 는 sun 직접광을 계산하지 않는다. sun 부분은 <code>#if 0</code> 안에 있고, 실제로는 emissive, diffuse IBL, specular IBL 만 더한다. SSAO 는 <code>c_diff</code> 와 <code>c_spec</code> 에 모두 곱한다.</p><p class="src">Model/Shaders/DefaultPS.hlsl:266-289, :284-285</p></div><p class="impact">bounce 할 직접광이 없다. sun 직접광 재활성화가 DDGI 의 선행 작업이다 (<a class="ref" href="#m2-1">M2-1</a>, <a class="ref" href="#d-5">D-5</a>)</p></div>
+    <div class="fact"><div class="what"><p>glTF 경로에는 G-buffer, MRT 가 없다. color pass 의 render target 은 하나다.</p><p class="src">Model/Renderer.cpp:199, :629-642</p></div><p class="impact">DDGI 는 forward pass 에서 적용한다 (<a class="ref" href="#d-5">D-5</a>). raster 와 수치로 비교하려면 debug 출력을 따로 만든다 (<a class="ref" href="#m2-6">M2-6</a>)</p></div>
     <div class="fact"><div class="what"><p>Forward+ point/spot light 는 legacy 경로에서만 채워진다.</p><p class="src">Model/SponzaRenderer.cpp:157, :331</p></div><p class="impact">현재 광원은 sun, sky (IBL cubemap), emissive 뿐이다 (<a class="ref" href="#d-8">D-8</a>)</p></div>
-    <div class="fact"><div class="what"><p>sun 방향은 EngineTuning 변수로 실행 중에 바꿀 수 있다. sky 는 정적 IBL cubemap 이다.</p><p class="src">ModelViewer/ModelViewer.cpp:78-80, :278-283</p></div><p class="impact">time of day 실험은 바로 할 수 있다. sky 는 sun 과 어긋난다 (<a class="ref" href="#r9">R9</a>)</p></div>
-    <div class="fact"><div class="what"><p>sun shadow map 의 범위가 Sponza 크기로 고정되어 있다.</p><p class="src">ModelViewer/ModelViewer.cpp:286</p></div><p class="impact">open world test layout 에서는 shadow camera 가 camera 를 따라가야 한다 (<a class="ref" href="#m5-1">M5-1</a>)</p></div>
-    <div class="fact"><div class="what"><p>raster 는 반시계 방향(CCW)을 앞면으로 쓴다. DXR 의 앞면 판정은 raster state 와 별개의 규칙(과 instance flag)을 따른다.</p><p class="src">Core/GraphicsCommon.cpp:167, DXR spec</p></div><p class="impact">probe trace 의 backface 판정이 이 규칙에 달려 있다. front face debug view 로 확인한다 (<a class="ref" href="#m1-5">M1-5</a>)</p></div>
+    <div class="fact"><div class="what"><p>sun 방향은 EngineTuning 변수로 실행 중에 바꿀 수 있다. sky 는 정적 IBL cubemap 이다.</p><p class="src">ModelViewer/ModelViewer.cpp:78-80, :278-283</p></div><p class="impact">sun 각도 변화로 OW4 를 바로 잴 수 있다. sky 는 sun 과 어긋난다 (<a class="ref" href="#i14">I14</a>, <a class="ref" href="#r9">R9</a>)</p></div>
+    <div class="fact"><div class="what"><p>sun shadow map 의 범위가 Sponza 크기로 고정되어 있다.</p><p class="src">ModelViewer/ModelViewer.cpp:286</p></div><p class="impact">넓은 test layout 에서는 shadow camera 가 camera 를 따라가야 한다 (<a class="ref" href="#p-4">P-4</a>)</p></div>
+    <div class="fact"><div class="what"><p>camera 의 far clip 이 10000 unit (100 m) 이다.</p><p class="src">ModelViewer/ModelViewer.cpp:196</p></div><p class="impact">volume 바깥의 경계가 지금은 거의 안 보인다. 늘리면 드러난다 (<a class="ref" href="#i15">I15</a>)</p></div>
+    <div class="fact"><div class="what"><p>TAA (viewport jitter) 와 auto exposure 가 켜져 있다.</p><p class="src">ModelViewer/ModelViewer.cpp:156, :159, :246</p></div><p class="impact">ray 와 raster 를 비교할 때는 TAA 를 끄고 (<a class="ref" href="#m1-5">M1-5</a>), 시간 지표는 노출 전 HDR 로 잰다 (<a class="ref" href="#p-1">P-1</a>)</p></div>
+    <div class="fact"><div class="what"><p>raster 는 반시계 방향 (CCW) 을 앞면으로 쓴다. DXR 의 앞면 판정은 raster state 와 별개의 규칙 (과 instance flag) 을 따른다.</p><p class="src">Core/GraphicsCommon.cpp:167, DXR spec</p></div><p class="impact">probe trace 의 backface 판정이 이 규칙에 달려 있다. front face debug view 로 확인한다 (<a class="ref" href="#m1-5">M1-5</a>)</p></div>
     <div class="fact"><div class="what"><p>common SRV table 은 t10~t19 10칸으로 선언됐지만 8칸만 할당한다.</p><p class="src">Model/Renderer.cpp:222, Model/Shaders/Common.hlsli:28</p></div><p class="impact">t18, t19 가 비어 있다. DDGI 의 shading 용 SRV 자리로 쓸 수 있다 (<a class="ref" href="#d-6">D-6</a>)</p></div>
     <div class="fact"><div class="what"><p>material texture SRV 는 <code>Renderer::s_TextureHeap</code> (4,096칸) 에 material 마다 5개씩 연속으로 있다.</p><p class="src">Model/Renderer.cpp:214, Model/ModelLoader.cpp:70</p></div><p class="impact">heap 시작을 가리키는 table 하나로 모든 material texture 에 접근할 수 있다 (<a class="ref" href="#m1-3">M1-3</a>)</p></div>
-    <div class="fact"><div class="what"><p><code>FlyingFPSCamera</code> 의 이동 속도가 1000 unit/s (10 m/s) 로 고정되어 있다.</p><p class="src">Core/CameraController.cpp:30-31</p></div><p class="impact"><a class="ref" href="#ow3">OW3</a> 측정을 위해 속도 조절과 고정 경로 비행이 필요하다 (<a class="ref" href="#m5-1">M5-1</a>)</p></div>
+    <div class="fact"><div class="what"><p><code>FlyingFPSCamera</code> 의 이동 속도는 최대 1000 unit/s (10 m/s) 이고, left shift 로 0.1배가 된다. 속도를 바꾸는 tuning 변수는 없다.</p><p class="src">Core/CameraController.cpp:30-31, :60-68</p></div><p class="impact">30 m/s 측정을 위해 속도 조절과 고정 경로 비행이 필요하다 (<a class="ref" href="#p-1">P-1</a>)</p></div>
   </div>
 
   <h3 id="s4-3"><span class="n">4.3</span>Core 의 제약</h3>
@@ -571,33 +577,34 @@ details .refs code { font-size: 11.5px; }
     <div class="fact"><div class="what"><p><code>GpuBuffer</code> 는 <code>COMMON</code> state 로 만들어지고 state 를 추적한다. <code>ComputeContext::SetBufferSRV</code> 는 <code>NON_PIXEL_SHADER_RESOURCE</code> state 를 assert 한다.</p><p class="src">Core/GpuBuffer.cpp:34, Core/CommandContext.h:535</p></div><p class="impact">AS 는 <code>RAYTRACING_ACCELERATION_STRUCTURE</code> state 에 고정되어야 하므로 기존 buffer 타입과 bind helper 를 쓸 수 없다. 전용 타입을 만든다 (<a class="ref" href="#m1-2">M1-2</a>)</p></div>
     <div class="fact"><div class="what"><p><code>GpuResource::Destroy</code> 는 즉시 해제하고, 지연 해제 장치가 없다.</p><p class="src">Core/GpuResource.h:40-45</p></div><p class="impact">AS, ray buffer 를 해제하기 전에 GPU 가 끝났음을 보장해야 한다 (<a class="ref" href="#m1-2">M1-2</a>)</p></div>
     <div class="fact"><div class="what"><p><code>RootSignature::Finalize</code> 는 descriptor table 크기를 모두 더하고, <code>DynamicDescriptorHeap::ParseRootSignature</code> 는 그 합이 256 이하인지 assert 한다.</p><p class="src">Core/RootSignature.cpp:127-128, Core/DynamicDescriptorHeap.cpp:332-345</p></div><p class="impact">큰 bindless table 을 기존 root signature 경로로 만들면 assert 에 걸린다. root signature 를 직접 만들거나 이 계산에서 bindless table 을 빼야 한다.</p></div>
-    <div class="fact"><div class="what"><p><code>SetDynamicDescriptor</code> 는 commit 할 때 자기 descriptor heap 을 bind 한다.</p><p class="src">Core/DynamicDescriptorHeap.cpp:261, :279</p></div><p class="impact">같은 dispatch 에서 <code>s_TextureHeap</code> 의 table 과 섞어 쓸 수 없다. TLAS SRV, 출력 UAV 도 <code>s_TextureHeap</code> 에 둔다.</p></div>
-    <div class="fact"><div class="what"><p>debug layer 가 <code>INVALID_DESCRIPTOR_HANDLE</code>, <code>DESCRIPTOR_TABLE_NOT_SET</code> 메시지를 숨긴다.</p><p class="src">Core/GraphicsCore.cpp:357, :366</p></div><p class="impact">bindless 작업 중 binding 오류가 숨을 수 있다. M1 검증 때 한 번은 풀고 확인한다.</p></div>
+    <div class="fact"><div class="what"><p><code>SetDynamicDescriptor</code> 는 commit 할 때 자기 descriptor heap 을 bind 한다.</p><p class="src">Core/DynamicDescriptorHeap.cpp:261</p></div><p class="impact">같은 dispatch 에서 <code>s_TextureHeap</code> 의 table 과 섞어 쓸 수 없다. TLAS SRV, 출력 UAV 도 <code>s_TextureHeap</code> 에 둔다.</p></div>
+    <div class="fact"><div class="what"><p>debug layer 는 Debug 구성에서만 기본으로 켜지고, 다른 구성에서는 <code>-debug 1</code> 이 필요하다. GPU-based validation 은 debug layer 가 켜졌을 때 <code>-gpu_debug 1</code> 로 켜진다. <code>INVALID_DESCRIPTOR_HANDLE</code>, <code>DESCRIPTOR_TABLE_NOT_SET</code> 메시지는 Debug 구성에서 숨겨진다.</p><p class="src">Core/GraphicsCore.cpp:172-197, :338, :357, :366</p></div><p class="impact">검증은 Debug 구성, 또는 <code>-debug 1 -gpu_debug 1</code> 로 한다. 숨긴 메시지는 bindless 작업 중 한 번은 풀고 확인한다 (<a class="ref" href="#m1">M1</a> 완료 기준)</p></div>
     <div class="fact"><div class="what"><p><code>ScopedTimer</code> 는 Release 구성에서 아무 일도 하지 않는다.</p><p class="src">Core/EngineProfiling.h:34-40</p></div><p class="impact">성능 측정은 Profile 구성에서 한다.</p></div>
-    <div class="fact"><div class="what"><p>debug 용 line, sphere 그리기 기능과 화면 capture 기능이 없다. DirectXTex (dx12 feature) 는 vcpkg 의존성에 있다.</p><p class="src">vcpkg.json (repo root)</p></div><p class="impact">probe 시각화 (<a class="ref" href="#m3-5">M3-5</a>) 와 HDR capture (<a class="ref" href="#m2-4">M2-4</a>) 를 직접 만든다.</p></div>
+    <div class="fact"><div class="what"><p>debug 용 line, sphere 그리기 기능이 없다. 화면 capture 를 부르는 곳은 없지만, readback 해서 raw texel 을 파일로 쓰는 <code>PixelBuffer::ExportToFile</code> 이 있다. DirectXTex (dx12 feature) 는 vcpkg 의존성에 있다.</p><p class="src">Core/PixelBuffer.h:38, Core/PixelBuffer.cpp:387-410, vcpkg.json (repo root)</p></div><p class="impact">probe 시각화를 직접 만든다 (<a class="ref" href="#m3-6">M3-6</a>). HDR capture 는 <code>ExportToFile</code> 에서 시작한다 (<a class="ref" href="#m2-4">M2-4</a>)</p></div>
   </div>
 
-  <h3 id="s4-4"><span class="n">4.4</span>Reference</h3>
+  <h3 id="s4-4"><span class="n">4.4</span>논문과 참고 범위</h3>
   <div class="facts">
-    <div class="fact"><div class="what"><p>RTXGI 의 SDK, test harness, 문서 어디에도 inline ray tracing 경로가 없다. probe trace 는 DXR 1.0 RayGen (<code>ProbeTraceRGS.hlsl</code>) 이다.</p><p class="src">references/RTXGI-DDGI/samples/test-harness/shaders/ddgi/ProbeTraceRGS.hlsl</p></div><p class="impact">trace 는 RayGen 구조를 RayQuery compute shader 로 옮겨 써야 한다.</p></div>
-    <div class="fact"><div class="what"><p>RTXGI test harness 는 probe ray radiance 를 <code>saturate</code> 해서 저장하고, 설정 파일의 irradiance format 이 unorm (<code>R10G10B10A2_UNORM</code>) 이다.</p><p class="src">references/RTXGI-DDGI/samples/test-harness/shaders/ddgi/ProbeTraceRGS.hlsl:200</p></div><p class="impact">그대로 따르면 강한 sun 아래의 야외에서 간접광이 잘린다 (<a class="ref" href="#d-4">D-4</a>)</p></div>
-    <div class="fact"><div class="what"><p>RTXGI 에는 camera 를 따라가는 cascade 가 없다. 여러 volume 의 blend 와 ray 예산 기반 update 는 UE4 plugin 에 있다.</p><p class="src">references/RTXGI-DDGI/ue4-plugin/4.27/RTXGI/Source/RTXGI/Private/DDGIVolumeUpdate.cpp:586-602, :803-823</p></div><p class="impact">cascade 는 직접 설계한다 (<a class="ref" href="#d-3">D-3</a>, <a class="ref" href="#m5-4">M5-4</a>)</p></div>
+    <div class="fact"><div class="what"><p>Majercik 2019 는 probe trace, octahedral atlas (1 texel border), irradiance 와 distance 의 blend, Chebyshev visibility 와 backface weight 를 쓴 sampling, multi-bounce 를 다룬다. Majercik 2021 은 그 위에 self-shadow bias 와 backface 처리 (§4.1), perceptual encoding (§4.2), 수렴 heuristic (§4.3), probe 위치 조정 (§5), probe state (§6), tracking window 와 여러 volume (§7) 을 더한다.</p><p class="src">references/Majercik2019-DDGI.pdf, references/Majercik2021-ScalingDDGI.pdf</p></div><p class="impact">기본 구현의 범위를 이 두 논문으로 정한다 (<a href="#s2-2">2.2</a>)</p></div>
+    <div class="fact"><div class="what"><p>Majercik 2021 은 camera 를 따라가는 tracking window 를 3D circular buffer 로 구현한다 (§7.3). 넓은 world 를 위한 multiresolution cascaded volume 과 여러 volume 의 blend 를 다루고 (§7.4), per-frame ray budget 은 향후 과제로 언급한다.</p><p class="src">references/Majercik2021-ScalingDDGI.pdf</p></div><p class="impact">open world 개선 후보의 출발점이다 (<a class="ref" href="#i3">I3</a>, <a class="ref" href="#i5">I5</a>, <a class="ref" href="#i10">I10</a>)</p></div>
+    <div class="fact"><div class="what"><p>Majercik 2019 의 보충 자료 (supplement.zip) 에는 G3D 기반 코드가 있지만 license 파일도, 파일 header 의 license 문구도 없다.</p><p class="src">jcgt.org/published/0008/02/01 의 supplement.zip 목록과 파일 header (2026-10-19 확인)</p></div><p class="impact">논문 PDF 만 references 에 두고 보충 코드는 참고하지 않는다.</p></div>
+    <div class="fact"><div class="what"><p>RTXGI-DDGI 의 공개 구현 (commit f33e496) 은 probe trace 에 DXR pipeline (RayGen, shader table) 을 쓰고, inline ray tracing 경로는 없다.</p><p class="src">idea 출처: RTXGI-DDGI</p></div><p class="impact">probe trace 의 inline 구조는 직접 설계한다 (<a class="ref" href="#d-2">D-2</a>)</p></div>
   </div>
 </section>
 
 <section id="s5" aria-labelledby="h-s5">
-  <h2 id="h-s5"><span class="n">5</span>전체 설계</h2>
+  <h2 id="h-s5"><span class="n">5</span>기본 구현 설계</h2>
+  <p class="note">이 장은 1단계 기본 구현의 설계다. 개선 단계의 설계는 후보마다 <a href="#cands">6.4</a> 에서 정하고, 고른 후보만 그때 설계한다.</p>
 
   <h3 id="s5-1"><span class="n">5.1</span>Frame 흐름</h3>
   <figure class="fig">
     <div class="fig-scroll w-wide">
-      <svg viewBox="0 0 960 310" role="img" aria-label="한 frame 의 흐름. Scene Update 다음 TLAS build, 그 다음 DDGI update (scroll, probe trace, blend, relocation과 classification) 가 실행되고, 이어서 depth prepass, SSAO, shadow, color pass, sky와 post 가 실행된다. probe trace 는 TLAS 와 이전 frame 의 atlas 를 읽고, color pass 는 이번 frame 의 atlas 를 읽는다.">
+      <svg viewBox="0 0 960 310" role="img" aria-label="한 frame 의 흐름. Scene Update 다음 TLAS build, 그 다음 DDGI update 가 실행된다. 기본 구현의 DDGI update 는 probe trace 와 blend 이고, scroll 과 relocation, classification 은 개선 후보다. 이어서 depth prepass, SSAO, shadow, color pass, sky 와 post 가 실행된다. probe trace 는 TLAS 와 이전 frame 의 atlas 를 읽고, color pass 는 이번 frame 의 atlas 를 읽는다.">
         <defs>
           <marker id="fa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk"/></marker>
           <marker id="fa-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk-acc"/></marker>
           <marker id="fa-ray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="mk-ray"/></marker>
         </defs>
-        <!-- row 1 -->
         <rect class="b" x="12" y="60" width="148" height="56" rx="8"/>
         <text class="t" x="86" y="84" text-anchor="middle">Scene Update</text>
         <text class="tm" x="86" y="102" text-anchor="middle">node world 행렬</text>
@@ -611,25 +618,25 @@ details .refs code { font-size: 11.5px; }
         <rect class="b-acc" x="372" y="16" width="576" height="124" rx="10"/>
         <text class="t" x="388" y="38">DDGI update</text>
         <text class="ts" x="474" y="38">compute</text>
-        <rect class="b-in" x="388" y="64" width="90" height="48" rx="6"/>
-        <text class="t" x="433" y="85" text-anchor="middle">scroll</text>
-        <text class="ts" x="433" y="102" text-anchor="middle">cascade 이동</text>
+        <rect class="b-cand" x="388" y="64" width="90" height="48" rx="6"/>
+        <text class="ts" x="433" y="85" text-anchor="middle">scroll</text>
+        <text class="tm" x="433" y="102" text-anchor="middle">I3</text>
         <rect class="b-in" x="500" y="64" width="140" height="48" rx="6"/>
         <text class="t" x="570" y="85" text-anchor="middle">probe trace</text>
         <text class="ts" x="570" y="102" text-anchor="middle">RayQuery</text>
         <rect class="b-in" x="662" y="64" width="140" height="48" rx="6"/>
         <text class="t" x="732" y="85" text-anchor="middle">blend</text>
         <text class="ts" x="732" y="102" text-anchor="middle">irradiance, distance</text>
-        <rect class="b-in" x="824" y="64" width="112" height="48" rx="6"/>
-        <text class="t" x="880" y="85" text-anchor="middle">relocation</text>
-        <text class="t" x="880" y="102" text-anchor="middle">classification</text>
+        <rect class="b-cand" x="824" y="64" width="112" height="48" rx="6"/>
+        <text class="ts" x="880" y="80" text-anchor="middle">relocation,</text>
+        <text class="ts" x="880" y="93" text-anchor="middle">classification</text>
+        <text class="tm" x="880" y="106" text-anchor="middle">I1, I2</text>
         <line class="ln ln-ord" x1="478" y1="88" x2="498" y2="88" marker-end="url(#fa)"/>
         <line class="ln ln-ord" x1="640" y1="88" x2="660" y2="88" marker-end="url(#fa)"/>
         <line class="ln ln-ord" x1="802" y1="88" x2="822" y2="88" marker-end="url(#fa)"/>
         <path class="ln ln-ray" d="M732,64 L732,52 L570,52 L570,62" marker-end="url(#fa-ray)"/>
         <text class="ts" x="651" y="46" text-anchor="middle">이전 frame atlas, multi-bounce</text>
 
-        <!-- row 2 -->
         <path class="ln ln-ord" d="M420,140 L420,176 L162,176 L162,224" marker-end="url(#fa)"/>
         <text class="ts" x="290" y="170" text-anchor="middle">실행 순서</text>
         <rect class="b" x="12" y="226" width="300" height="56" rx="8"/>
@@ -637,7 +644,7 @@ details .refs code { font-size: 11.5px; }
         <text class="ts" x="162" y="268" text-anchor="middle">기존 pass</text>
         <rect class="b-acc" x="352" y="216" width="400" height="76" rx="8"/>
         <text class="t" x="552" y="242" text-anchor="middle">Color pass (DefaultPS)</text>
-        <text class="ts" x="552" y="262" text-anchor="middle">emissive + sun 직접광 + DDGI × SSAO</text>
+        <text class="ts" x="552" y="262" text-anchor="middle">emissive + sun 직접광 + c_diff × DDGI × SSAO</text>
         <text class="ts" x="552" y="279" text-anchor="middle">+ specular IBL</text>
         <rect class="b" x="788" y="226" width="160" height="56" rx="8"/>
         <text class="t" x="868" y="250" text-anchor="middle">Sky, 투명 물체</text>
@@ -649,107 +656,87 @@ details .refs code { font-size: 11.5px; }
         <text class="ts halo" x="742" y="188">이번 frame, SRV</text>
       </svg>
     </div>
-    <figcaption>점선은 실행 순서, 실선은 data 의 흐름이다. probe trace 는 TLAS 와 이전 frame 의 atlas 를 읽어 hit 지점의 간접광을 구하고 (multi-bounce), color pass 는 이번 frame 에 blend 된 atlas 를 읽는다.</figcaption>
+    <figcaption>점선 화살표는 실행 순서, 실선 화살표는 data 의 흐름이다. 점선 상자 (scroll, relocation, classification) 는 기본 구현에 없고 개선 후보로 고르면 들어가는 자리다. probe trace 는 TLAS 와 이전 frame 의 atlas 를 읽어 hit 지점의 간접광을 구하고 (multi-bounce), color pass 는 이번 frame 에 blend 된 atlas 를 읽는다.</figcaption>
   </figure>
   <ul class="list">
-    <li>DDGI update 는 color pass 앞에 둔다. 처음에는 graphics queue 에서 순서대로 실행하고, async compute 는 측정 후 선택 작업으로 둔다 (<a class="ref" href="#m5-7">M5-7</a>).</li>
-    <li>TLAS build 의 정확한 위치(어느 command list, queue)는 <a class="ref" href="#m1-1">M1-1</a> 에서 정한다.</li>
+    <li>DDGI update 는 color pass 앞에 두고 graphics queue 에서 순서대로 실행한다. async compute 는 개선 후보다 (<a class="ref" href="#i16">I16</a>).</li>
+    <li>기본 구현은 Majercik 2019 처럼 모든 probe 를 매 frame 갱신한다 (<a class="ref" href="#d-10">D-10</a>).</li>
+    <li>TLAS build 의 정확한 위치 (어느 command list, queue) 는 <a class="ref" href="#m1-1">M1-1</a> 에서 정한다.</li>
   </ul>
 
   <h3 id="s5-2"><span class="n">5.2</span>핵심 결정</h3>
   <div class="decisions">
     <article class="decision" id="d-1">
-      <header><span class="id">D-1</span><b>RTXGI 는 읽기만 하고 독립 구현한다</b></header>
+      <header><span class="id">D-1</span><b>RTXGI-DDGI 는 idea 만 참고한다</b></header>
       <div class="body">
-        <span>결정</span><p>RTXGI 코드를 복사하지 않고 논문 (Majercik 2019, 2021) 과 RTXGI 를 읽어 독립 구현한다.</p>
-        <span>근거</span><p>license (<a href="#s2-2">2.2</a>)</p>
-        <span>대안</span><p class="alt">SDK 를 그대로 통합: license 와 DXR 1.0 전제 때문에 제외</p>
+        <span>결정</span><p>논문과 RTXGI-DDGI 의 idea 를 바탕으로 직접 구현한다. RTXGI-DDGI 의 코드는 참고하지 않고 <code>references/</code> 에도 두지 않는다. RTXGI-DDGI 에서 가져온 idea 에는 출처를 적는다.</p>
+        <span>근거</span><p>license (<a href="#s2-2">2.2</a>). 코드가 working directory 에 있으면 AI agent 가 작업 중에 읽고 비슷한 코드를 만들 위험을 통제하기 어렵다.</p>
+        <span>대안</span><p class="alt">SDK 를 통합하거나 코드를 읽으며 옮기기: license 때문에 제외</p>
       </div>
     </article>
     <article class="decision" id="d-2">
       <header><span class="id">D-2</span><b>Probe trace 는 RayQuery compute shader</b></header>
       <div class="body">
-        <span>결정</span><p>thread group 하나가 probe 하나, thread 하나가 ray 하나를 맡는다. ray data 의 규약은 RTXGI 와 같게 한다.</p>
-        <span>근거</span><p>사용자 결정 (inline). RTXGI 의 blend, relocation, classification 이 이 규약을 전제로 한다.</p>
-        <span>대안</span><p class="alt">thread 하나가 probe 하나: ray 결과를 blend 가 다시 모아야 해서 이점이 없다</p>
+        <span>결정</span><p>thread group 하나가 probe 하나, thread 하나가 ray 하나를 맡는다. ray 결과는 아래 규약으로 저장한다.</p>
+        <span>근거</span><p>사용자 결정 (inline). blend 가 probe 하나의 ray 를 한 group 안에서 모으기 쉬운 배치다.</p>
+        <span>대안</span><p class="alt">이웃 probe 의 같은 ray 를 한 warp 로 묶는 배치: 성능 개선 후보 (<a class="ref" href="#i11">I11</a>)</p>
       </div>
       <div class="extra">
         <p class="sub">RAY DATA 규약 (ray 하나당 저장하는 값)</p>
         <div class="raydata">
-          <div><b>miss</b><span>sky radiance</span><code>거리 1e27</code></div>
+          <div><b>miss</b><span>sky radiance</span><code>매우 큰 거리</code></div>
           <div><b>앞면 hit</b><span>radiance</span><code>거리 t</code></div>
-          <div><b>뒷면 hit</b><span>radiance 없음</span><code>거리 -0.2t</code></div>
-          <div><b>fixed ray</b><span>거리만, blend 제외</span><code>32개</code></div>
+          <div><b>뒷면 hit</b><span>radiance 0, 거리를 80% 줄이고 음수로 표시</span><code>-0.2t</code></div>
+          <div class="later"><b>고정 방향 ray</b><span>I1, I2 를 고를 때만. 거리만 저장하고 blend 에서 뺀다</span><code>idea: RTXGI-DDGI</code></div>
         </div>
+        <p class="note">뒷면 hit 의 radiance 0 과 거리 80% 단축은 Majercik 2021 §4.1 이다. 음수 부호로 뒷면을 표시하는 것은 idea 출처: RTXGI-DDGI.</p>
       </div>
     </article>
     <article class="decision" id="d-3">
-      <header><span class="id">D-3</span><b>Camera 중심 scrolling cascade</b></header>
+      <header><span class="id">D-3</span><b>기본은 고정 volume 하나</b></header>
       <div class="body">
-        <span>결정</span><p>volume 은 camera 중심의 scrolling cascade (clipmap) 로 한다. 처음부터 ring buffer indexing 과 cascade 배열로 만들고, M3 에서는 고정된 cascade 1개로 쓴다. 배치는 <a href="#s5-3">5.3</a>.</p>
-        <span>근거</span><p><a class="ref" href="#ow1">OW1</a>. scroll indexing 을 나중에 모든 shader 에 끼워 넣는 것보다 처음부터 offset 0 으로 두는 편이 싸다.</p>
-        <span>대안</span><p class="alt">고정 volume 여러 개 배치: world 크기에 비례해 비용이 늘어 OW1 위반</p>
+        <span>결정</span><p>Sponza 를 덮는 고정 volume 하나로 시작한다. probe 저장은 circular buffer indexing 으로 하고 scroll offset 은 0 으로 둔다. 설정은 <a href="#s5-3">5.3</a>.</p>
+        <span>근거</span><p>tracking window (Majercik 2021 §7.3) 를 나중에 개선 후보로 고를 때 indexing 을 다시 짜지 않기 위해서다. 고정 volume 으로 기본 구현을 먼저 검증한다.</p>
+        <span>대안</span><p class="alt">처음부터 camera 중심 cascade: 개선 후보로 미룬다 (<a class="ref" href="#i3">I3</a>, <a class="ref" href="#i5">I5</a>)</p>
       </div>
     </article>
     <article class="decision" id="d-4">
-      <header><span class="id">D-4</span><b>HDR 을 자르지 않는 format</b></header>
+      <header><span class="id">D-4</span><b>HDR 과 큰 거리를 담는 float format</b></header>
       <div class="body">
-        <span>결정</span><p>ray data <code>R32G32B32A32_FLOAT</code>, irradiance <code>R16G16B16A16_FLOAT</code>, distance <code>R16G16_FLOAT</code>, probe data <code>R16G16B16A16_FLOAT</code> 로 시작하고, 압축은 측정 후 한다.</p>
-        <span>근거</span><p><a href="#s4-4">4.4</a> 의 RTXGI saturate 사실. 야외 sun 은 밝다.</p>
-        <span>대안</span><p class="alt">RTXGI 기본 (<code>R10G10B10A2_UNORM</code> + gamma 5): memory 는 작지만 HDR 이 잘린다</p>
+        <span>결정</span><p>ray data <code>R32G32B32A32_FLOAT</code>, irradiance <code>R16G16B16A16_FLOAT</code>, distance <code>R32G32_FLOAT</code>, probe data <code>R16G16B16A16_FLOAT</code> 로 시작한다.</p>
+        <span>근거</span><p>unorm format 은 [0, 1] 만 담아 강한 sun 의 HDR radiance 가 잘린다. distance 는 거리² 를 저장하는데 이 장면 단위에서는 fp16 범위가 모자란다 (<a href="#s5-3">5.3</a>). Majercik 2019 Figure 12 가 format 별 정밀도를 비교한다.</p>
+        <span>대안</span><p class="alt">unorm 이나 packing 한 작은 format: memory 는 작지만 HDR 이 잘리거나 정밀도가 모자란다. memory 압축은 개선 후보 (<a class="ref" href="#i9">I9</a>)</p>
       </div>
     </article>
     <article class="decision" id="d-5">
       <header><span class="id">D-5</span><b>GI 는 forward pass 에서 적용한다</b></header>
       <div class="body">
-        <span>결정</span><p><code>DefaultPS</code> 의 <code>Diffuse_IBL</code> 이 irradiance cubemap 을 읽는 자리 (<code>DefaultPS.hlsl:208</code>) 를 DDGI sampling 으로 바꾸고, volume 밖에서는 IBL 로 fallback 한다. SSAO 는 DDGI 항에도 계속 곱한다.</p>
-        <span>근거</span><p>G-buffer 가 없다 (<a href="#s4-2">4.2</a>). 투명 물체도 같은 경로로 GI 를 받는다. DDGI 는 저주파라 작은 scale 의 가려짐을 AO 로 보완해야 한다 (<code>references/RTXGI-DDGI/docs/Algorithms.md</code>).</p>
+        <span>결정</span><p><code>DefaultPS</code> 의 <code>Diffuse_IBL</code> 이 irradiance cubemap 을 읽는 자리 (<code>DefaultPS.hlsl:208</code>) 를 DDGI sampling 으로 바꾼다. volume 경계 근처에서는 IBL 과 서서히 섞는다 (경계 fade, idea 출처: RTXGI-DDGI). SSAO 는 지금처럼 <code>c_diff</code>, <code>c_spec</code> 에 곱한다.</p>
+        <span>근거</span><p>G-buffer 가 없다 (<a href="#s4-2">4.2</a>). depth prepass 와 EQUAL depth test 덕분에 pixel 당 sampling 은 한 번이다. 투명 물체도 같은 경로로 GI 를 받는다. DDGI 는 probe 간격보다 작은 가려짐을 표현하지 못하므로 AO 로 보완한다 (AO 와 함께 쓰는 구성, idea 출처: RTXGI-DDGI).</p>
         <span>대안</span><p class="alt">G-buffer 를 만들고 screen-space pass 로 적용: RT Reflection 에서 normal buffer 가 필요해지면 다시 검토</p>
       </div>
       <div class="extra">
-        <p class="sub">DDGI 이후 DefaultPS 의 색 합성</p>
-        <div class="eq" role="img" aria-label="최종 색은 emissive, sun 직접광, DDGI irradiance 에 SSAO 를 곱한 항, specular IBL 의 합이다.">
+        <p class="sub">기본 구현 이후 DefaultPS 의 색 합성</p>
+        <div class="eq" role="img" aria-label="최종 색은 emissive, sun 직접광, c_diff 와 DDGI irradiance 와 SSAO 의 곱, specular IBL 과 SSAO 의 곱의 합이다.">
           <span class="term">emissive<small>지금과 같음</small></span><span class="op">+</span>
           <span class="term new">sun 직접광<small>다시 켬, M2-1</small></span><span class="op">+</span>
-          <span class="term new">DDGI irradiance × SSAO<small>diffuse IBL 자리, M3-4</small></span><span class="op">+</span>
-          <span class="term later">specular IBL<small>RT Reflection 에서 교체</small></span>
+          <span class="term new">c_diff × DDGI irradiance × SSAO<small>diffuse IBL 자리, M3-4</small></span><span class="op">+</span>
+          <span class="term later">specular IBL × SSAO<small>RT Reflection 에서 교체</small></span>
         </div>
       </div>
     </article>
     <article class="decision" id="d-6">
-      <header><span class="id">D-6</span><b>모든 cascade 를 한 Texture2DArray 에</b></header>
+      <header><span class="id">D-6</span><b>DefaultPS 는 SM 6.2 를 유지하고 table 로 받는다</b></header>
       <div class="body">
-        <span>결정</span><p>모든 cascade 가 같은 probe 수를 쓰고, 한 <code>Texture2DArray</code> 안에 cascade 별 slice 범위를 둔다. 그러면 cascade 수와 무관하게 SRV 는 irradiance, distance, probe data 3개다. <code>DefaultPS</code> 는 SM 6.2 를 유지하고 common SRV table 로 받는다. 빈 칸이 t18, t19 둘뿐이라 table 을 한 칸 이상 늘린다 (root signature 는 <code>Renderer.cpp:86-97</code> 과 HLSL 문자열 <code>Common.hlsli:22-38</code> 두 곳에 있다).</p>
+        <span>결정</span><p>volume 의 SRV 3개 (irradiance, distance, probe data) 와 volume constants 를 common SRV table 과 constant buffer 로 넘긴다. 빈 칸이 t18, t19 둘뿐이라 table 을 한 칸 이상 늘린다 (root signature 는 <code>Renderer.cpp:86-97</code> 과 HLSL 문자열 <code>Common.hlsli:22-38</code> 두 곳에 있다).</p>
         <span>근거</span><p><a href="#s4-2">4.2</a> 의 common SRV table 사실. <code>DefaultPS</code> 의 모든 permutation 을 SM 6.6 으로 올리지 않아도 된다.</p>
         <span>대안</span><p class="alt"><code>DefaultPS</code> 도 SM 6.6 bindless: PSO permutation 전체를 다시 확인해야 한다</p>
       </div>
-      <figure class="fig">
-        <div class="fig-scroll w-mid w-cap">
-          <svg viewBox="0 0 640 132" role="img" aria-label="irradiance Texture2DArray 하나에 slice 36장이 있고, 0부터 11은 C0, 12부터 23은 C1, 24부터 35는 C2 다.">
-            <g class="f-c0">
-              <rect x="24" y="34" width="10" height="64" rx="1"/><rect x="38" y="34" width="10" height="64" rx="1"/><rect x="52" y="34" width="10" height="64" rx="1"/><rect x="66" y="34" width="10" height="64" rx="1"/><rect x="80" y="34" width="10" height="64" rx="1"/><rect x="94" y="34" width="10" height="64" rx="1"/><rect x="108" y="34" width="10" height="64" rx="1"/><rect x="122" y="34" width="10" height="64" rx="1"/><rect x="136" y="34" width="10" height="64" rx="1"/><rect x="150" y="34" width="10" height="64" rx="1"/><rect x="164" y="34" width="10" height="64" rx="1"/><rect x="178" y="34" width="10" height="64" rx="1"/>
-            </g>
-            <g class="f-c1">
-              <rect x="236" y="34" width="10" height="64" rx="1"/><rect x="250" y="34" width="10" height="64" rx="1"/><rect x="264" y="34" width="10" height="64" rx="1"/><rect x="278" y="34" width="10" height="64" rx="1"/><rect x="292" y="34" width="10" height="64" rx="1"/><rect x="306" y="34" width="10" height="64" rx="1"/><rect x="320" y="34" width="10" height="64" rx="1"/><rect x="334" y="34" width="10" height="64" rx="1"/><rect x="348" y="34" width="10" height="64" rx="1"/><rect x="362" y="34" width="10" height="64" rx="1"/><rect x="376" y="34" width="10" height="64" rx="1"/><rect x="390" y="34" width="10" height="64" rx="1"/>
-            </g>
-            <g class="f-c2">
-              <rect x="448" y="34" width="10" height="64" rx="1"/><rect x="462" y="34" width="10" height="64" rx="1"/><rect x="476" y="34" width="10" height="64" rx="1"/><rect x="490" y="34" width="10" height="64" rx="1"/><rect x="504" y="34" width="10" height="64" rx="1"/><rect x="518" y="34" width="10" height="64" rx="1"/><rect x="532" y="34" width="10" height="64" rx="1"/><rect x="546" y="34" width="10" height="64" rx="1"/><rect x="560" y="34" width="10" height="64" rx="1"/><rect x="574" y="34" width="10" height="64" rx="1"/><rect x="588" y="34" width="10" height="64" rx="1"/><rect x="602" y="34" width="10" height="64" rx="1"/>
-            </g>
-            <text class="t" x="24" y="24">C0 (2 m)</text>
-            <text class="t" x="236" y="24">C1 (4 m)</text>
-            <text class="t" x="448" y="24">C2 (8 m)</text>
-            <text class="tm" x="24" y="118">slice 0 ~ 11</text>
-            <text class="tm" x="236" y="118">slice 12 ~ 23</text>
-            <text class="tm" x="448" y="118">slice 24 ~ 35</text>
-          </svg>
-        </div>
-        <figcaption>irradiance atlas 하나의 slice 배치. slice 한 장이 probe 한 층 (24 × 24 probe) 이고 irradiance 는 192 × 192 texel, distance 는 384 × 384 texel 이다. distance, probe data 도 같은 배치를 쓴다.</figcaption>
-      </figure>
     </article>
     <article class="decision" id="d-7">
       <header><span class="id">D-7</span><b>Hit 처리를 두 층으로 나눠 공용화</b></header>
       <div class="body">
-        <span>결정</span><p><code>HitSurface</code> (geometry, material 복원) 와 <code>HitLighting</code> (sun + shadow ray, sky, emissive, DDGI 간접광) 을 probe trace, reference path tracer, 이후 RT Reflection 이 같이 쓴다. 구조는 <a href="#s5-4">5.4</a> 그림.</p>
+        <span>결정</span><p><code>HitSurface</code> (geometry, material 복원) 와 <code>HitLighting</code> (sun + shadow ray, sky, emissive, DDGI 간접광) 을 probe trace, reference path tracer, 이후 RT Reflection 이 같이 쓴다. <code>HitSurface</code> 는 texture LOD 를 인자로 받는다 (probe ray 는 고정 mip). 구조는 <a href="#s5-4">5.4</a> 그림.</p>
         <span>근거</span><p>WEEK 1 계획에서 RT Reflection 의 hit 간접광을 DDGI 로 채우기로 했다.</p>
         <span>대안</span><p class="alt">사용처마다 따로 구현: 결과가 어긋나 reference 비교가 무의미해진다</p>
       </div>
@@ -758,165 +745,87 @@ details .refs code { font-size: 11.5px; }
       <header><span class="id">D-8</span><b>광원은 sun, sky, emissive</b></header>
       <div class="body">
         <span>결정</span><p>광원 범위는 sun (directional), sky (IBL cubemap), emissive 다. point, spot light 는 범위 밖이다.</p>
-        <span>근거</span><p><a href="#s4-2">4.2</a> 의 Forward+ 사실. open world 야외 조명은 sun 과 sky 가 지배적이다.</p>
-        <span>대안</span><p class="alt">Forward+ light 를 살려 hit 에서도 계산: 일정상 제외</p>
+        <span>근거</span><p><a href="#s4-2">4.2</a> 의 Forward+ 사실. open world 야외 조명은 sun 과 sky 가 지배적이라고 본다.</p>
+        <span>대안</span><p class="alt">Forward+ light 를 살려 hit 에서도 계산: 일정상 제외. 이 때문에 폭발 같은 국소 조명 변화는 OW4 로 잴 수 없다</p>
       </div>
     </article>
     <article class="decision" id="d-9">
-      <header><span class="id">D-9</span><b>Instance mask 로 물체 범주를 나눈다</b></header>
+      <header><span class="id">D-9</span><b>TLAS 는 매 frame 갱신, 기본 구현은 정적 물체만</b></header>
       <div class="body">
-        <span>결정</span><p>TLAS 는 매 frame 갱신하고, instance mask 로 범주를 나눈다. skinned mesh 의 BLAS (compute skinning) 는 만들지 않는다.</p>
-        <span>근거</span><p><a class="ref" href="#ow7">OW7</a>. skinning 은 vertex shader 에서만 해서 skin 된 vertex 가 buffer 로 남지 않는다 (<a href="#s4-1">4.1</a>).</p>
-        <span>대안</span><p class="alt">compute skinning + BLAS refit: 비용과 일정 때문에 제외</p>
-      </div>
-      <div class="extra">
-        <p class="sub">INSTANCE 범주</p>
-        <div class="masks">
-          <div><b>static</b><span>GI 에 기여</span></div>
-          <div><b>dynamic rigid</b><span>GI 에 기여, transform 은 매 frame 갱신</span></div>
-          <div class="no"><b>skinned</b><span>TLAS 에 없음, 간접광 수신만</span></div>
-          <div><b>debug</b><span>시각화 전용</span></div>
-        </div>
+        <span>결정</span><p>TLAS 는 매 frame 다시 만들고, instance mask 에 범주 (static, dynamic rigid, debug) 를 넣을 자리를 둔다. 기본 구현은 정적 Sponza 만 넣는다. skinned mesh 는 TLAS 에 넣지 않는다.</p>
+        <span>근거</span><p>나중에 움직이는 물체를 넣을 때 구조를 바꾸지 않기 위해서다. skinning 은 vertex shader 에서만 해서 skin 된 vertex 가 buffer 로 남지 않는다 (<a href="#s4-1">4.1</a>).</p>
+        <span>대안</span><p class="alt">compute skinning + BLAS refit: 비용과 일정 때문에 제외. 동적 물체는 개선 후보 (<a class="ref" href="#i13">I13</a>)</p>
       </div>
     </article>
     <article class="decision" id="d-10">
-      <header><span class="id">D-10</span><b>Ray 예산 기반 probe update</b></header>
+      <header><span class="id">D-10</span><b>모든 probe 를 매 frame 갱신한다</b></header>
       <div class="body">
-        <span>결정</span><p>probe update 는 ray 예산 기반으로 schedule 한다. cascade 별 갱신 주기, round-robin probe window, 새로 들어온 probe 우선.</p>
-        <span>근거</span><p><a class="ref" href="#ow2">OW2</a>, <a class="ref" href="#ow3">OW3</a>. UE4 plugin 의 ray budget 방식을 참고한다.</p>
-        <span>대안</span><p class="alt">매 frame 전체 갱신: cascade 가 늘면 예산을 넘는다</p>
+        <span>결정</span><p>기본 구현은 모든 probe 를 매 frame trace 하고 blend 한다.</p>
+        <span>근거</span><p>Majercik 2019 의 기본 동작이다 (모든 probe 를 active 로 두고 같은 수의 ray 를 쏜다). 비용은 <a class="ref" href="#m3-7">M3-7</a> 에서 잰다.</p>
+        <span>대안</span><p class="alt">probe state 와 ray 예산 기반 scheduler: 개선 후보 (<a class="ref" href="#i2">I2</a>, <a class="ref" href="#i10">I10</a>)</p>
       </div>
     </article>
     <article class="decision" id="d-11">
       <header><span class="id">D-11</span><b>Diffuse 만 다루는 reference path tracer</b></header>
       <div class="body">
-        <span>결정</span><p>reference path tracer 는 diffuse 만 다루고, probe trace 와 같은 광원 model 과 albedo 처리를 쓴다.</p>
-        <span>근거</span><p>DDGI 가 맡는 것은 diffuse 간접광이다. RTXGI test harness 의 <code>PathTraceRGS.hlsl</code> 도 같은 방식이라 비교가 같은 조건이 된다.</p>
+        <span>결정</span><p>reference path tracer 는 diffuse 만 다루고, probe trace 와 같은 광원 model 을 쓴다. albedo 는 양쪽 모두 0.9 로 자른다.</p>
+        <span>근거</span><p>DDGI 가 맡는 것은 diffuse 간접광이다. 같은 광원 model 과 같은 albedo 상한을 써야 비교가 같은 조건이 된다 (idea 출처: RTXGI-DDGI test harness).</p>
         <span>대안</span><p class="alt">raster 와 같은 BRDF 전체 (WEEK 1 계획): specular 는 RT Reflection 단계에서 확장</p>
       </div>
     </article>
     <article class="decision" id="d-12">
-      <header><span class="id">D-12</span><b>Hysteresis 로 조명 변화에 대응</b></header>
+      <header><span class="id">D-12</span><b>Hysteresis 와 수렴 heuristic 은 논문대로</b></header>
       <div class="body">
-        <span>결정</span><p>RTXGI 의 irradiance/brightness threshold 방식 (큰 변화에서 hysteresis 를 낮춤) 으로 시작하고, OW4 를 못 맞추면 전역 조명 변화 (sun 각도 변화량) 를 감지해 hysteresis 를 낮추는 규칙을 더한다.</p>
-        <span>근거</span><p><a class="ref" href="#ow4">OW4</a>, <a class="ref" href="#ow5">OW5</a> 는 서로 반대 방향이다. 둘을 같이 측정하며 조정한다.</p>
-        <span>대안</span><p class="alt">hysteresis 고정: OW4 를 맞추면 OW5 가 깨진다</p>
+        <span>결정</span><p>hysteresis 0.97 에서 시작한다 (Majercik 2019 는 0.85 ~ 0.98 을 썼다). 수렴 heuristic 은 Majercik 2021 §4.3 을 따른다. 변화량이 최대값의 25% 를 넘으면 hysteresis 를 0.15 낮추고, 80% 를 넘으면 0 으로 둔다.</p>
+        <span>근거</span><p>기본 구현은 논문의 동작을 먼저 검증한다.</p>
+        <span>대안</span><p class="alt">새 probe 의 hysteresis 조정, 양방향 변화 감지, 밝기 급변 제한: 개선 후보 (<a class="ref" href="#i6">I6</a>, <a class="ref" href="#i7">I7</a>)</p>
       </div>
     </article>
   </div>
 
-  <h3 id="s5-3"><span class="n">5.3</span>Cascade 초기값</h3>
-  <p class="note">M5 에서 쓸 출발점이다. 숫자는 M3 의 측정으로 고친다.</p>
-  <div class="cascade-wrap">
-    <figure class="fig">
-      <div class="fig-scroll">
-        <svg viewBox="0 0 420 424" role="img" aria-label="위에서 본 cascade 배치. camera 를 중심으로 C0 는 2 m 간격으로 ±24 m, C1 은 4 m 간격으로 ±48 m, C2 는 8 m 간격으로 ±96 m 를 덮는다.">
-          <defs>
-            <pattern id="p-c2" patternUnits="userSpaceOnUse" x="30" y="30" width="15" height="15"><circle class="f-c2" cx="7.5" cy="7.5" r="1.6"/></pattern>
-            <pattern id="p-c1" patternUnits="userSpaceOnUse" x="120" y="120" width="7.5" height="7.5"><circle class="f-c1" cx="3.75" cy="3.75" r="1.1"/></pattern>
-            <pattern id="p-c0" patternUnits="userSpaceOnUse" x="165" y="165" width="3.75" height="3.75"><circle class="f-c0" cx="1.875" cy="1.875" r="0.75"/></pattern>
-          </defs>
-          <rect x="30" y="30" width="360" height="360" fill="url(#p-c2)"/>
-          <rect class="s-c2" x="30" y="30" width="360" height="360"/>
-          <rect class="f-surf" x="120" y="120" width="180" height="180"/>
-          <rect x="120" y="120" width="180" height="180" fill="url(#p-c1)"/>
-          <rect class="s-c1" x="120" y="120" width="180" height="180"/>
-          <rect class="f-surf" x="165" y="165" width="90" height="90"/>
-          <rect x="165" y="165" width="90" height="90" fill="url(#p-c0)"/>
-          <rect class="s-c0" x="165" y="165" width="90" height="90"/>
-          <polygon class="f-ray" points="210,200 218,216 202,216"/>
-          <text class="tv halo" x="34" y="22">C2  8 m 간격, ±96 m</text>
-          <text class="tv halo" x="124" y="113">C1  4 m, ±48 m</text>
-          <text class="tv halo" x="169" y="158">C0  2 m, ±24 m</text>
-          <text class="ts halo" x="222" y="232">camera</text>
-          <line class="ln" x1="30" y1="406" x2="120" y2="406"/>
-          <line class="ln" x1="30" y1="401" x2="30" y2="411"/>
-          <line class="ln" x1="120" y1="401" x2="120" y2="411"/>
-          <text class="tm" x="128" y="410">48 m</text>
-        </svg>
-      </div>
-      <figcaption>위에서 본 배치이고 축척이 맞다. 점 하나가 probe 하나다 (C0 는 2 m 간격이라 촘촘하다). camera 가 움직이면 세 격자가 각자의 간격 단위로 따라간다. 세로 방향은 12 층이라 범위가 절반이다.</figcaption>
-    </figure>
-    <div class="calc">
-      <div class="tbl">
-        <table>
-          <thead><tr><th></th><th>C0</th><th>C1</th><th>C2</th></tr></thead>
-          <tbody>
-            <tr><td>probe 간격</td><td class="num">2 m</td><td class="num">4 m</td><td class="num">8 m</td></tr>
-            <tr><td>probe 수</td><td class="num">24×12×24</td><td class="num">24×12×24</td><td class="num">24×12×24</td></tr>
-            <tr><td>수평 범위</td><td class="num">±24 m</td><td class="num">±48 m</td><td class="num">±96 m</td></tr>
-            <tr><td>갱신 주기</td><td class="num">매 frame</td><td class="num">2 frame</td><td class="num">4 frame</td></tr>
-            <tr><td>frame 당 probe</td><td class="num">6,912</td><td class="num">3,456</td><td class="num">1,728</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <ul class="list">
-        <li>probe 당 ray 128개 (그중 fixed ray 32개). RTXGI 기본값 256 의 절반이다. RTXGI 는 64의 배수를 권한다 (<code>references/RTXGI-DDGI/ChangeLog.md:81</code>).</li>
-        <li>texel 수는 RTXGI test harness 설정과 같게 irradiance 8×8, distance 16×16 (각각 border 1 texel 포함) 으로 한다.</li>
-        <li>memory 계산: probe 하나가 irradiance 512 B + distance 1 KiB + probe data 8 B 로 약 1.5 KiB, cascade 하나가 약 10.2 MiB 다. ray buffer 는 volume 전체가 아니라 frame 당 갱신하는 probe 수만큼만 잡는다.</li>
-      </ul>
-    </div>
+  <h3 id="s5-3"><span class="n">5.3</span>기본 volume 설정</h3>
+  <div class="tbl">
+    <table>
+      <tbody>
+        <tr><td>probe 수</td><td class="num">22 × 22 × 22 = 10,648</td><td>RTXGI-DDGI test harness 의 Sponza 설정과 같은 수 (idea 출처: RTXGI-DDGI)</td></tr>
+        <tr><td>probe 간격</td><td class="num">약 1.8 m, 0.75 m, 1.1 m</td><td>Sponza 범위 (37.2 × 15.6 × 22.9 m) 를 21칸으로 나눈 값. M3-1 에서 정한다</td></tr>
+        <tr><td>probe 당 ray</td><td class="num">256</td><td>RTXGI-DDGI 의 기본값과 같은 수 (idea 출처: RTXGI-DDGI). Majercik 2019 는 64 ray 를 썼다</td></tr>
+        <tr><td>texel 수</td><td class="num">irradiance 8×8, distance 16×16</td><td>Majercik 2021 Table 2. border texel 을 포함할지는 M3-1 에서 정한다</td></tr>
+        <tr><td>surface bias</td><td class="num">self-shadow bias</td><td>Majercik 2021 §4.1. probe 간격에 비례하므로 장면 단위와 무관하다. 계수는 M3-4 에서 정한다</td></tr>
+        <tr><td>max ray 거리</td><td class="num">volume 대각선 이상</td><td>M3-1 에서 정한다</td></tr>
+      </tbody>
+    </table>
   </div>
-
+  <ul class="list">
+    <li>frame 당 probe ray 는 10,648 × 256 = 2,725,888 개다 (계산값). 여기에 앞면 hit 마다 shadow ray 가 하나씩 더해진다. 이 GPU 에서의 비용은 아직 모르고, <a class="ref" href="#m3-2">M3-2</a> 의 trace timer 로 처음 잰다.</li>
+    <li>distance format 계산: distance atlas 는 거리와 거리² 의 평균을 저장한다 (Majercik 2019). fp16 최대값 65,504 는 약 256 unit (2.56 m) 의 제곱이다. 그래서 1 m = 100 unit 인 이 장면에서 거리² 를 fp16 에 담으면 probe 간격 (0.75 ~ 1.8 m) 보다 조금 먼 거리부터 넘친다. distance 를 <code>R32G32_FLOAT</code> 로 시작하는 이유다 (<a class="ref" href="#d-4">D-4</a>).</li>
+  </ul>
   <figure class="fig">
-    <div class="legend"><span><i class="sw-c0"></i>C0</span><span><i class="sw-c1"></i>C1</span><span><i class="sw-c2"></i>C2</span><span><i class="sw-ref"></i>RTXGI Sponza 설정 (비교용)</span></div>
+    <div class="legend"><span><i class="sw-c1"></i>atlas (irradiance, distance, probe data)</span><span><i class="sw-ray"></i>ray data</span></div>
     <div class="fig-scroll w-mid">
-      <svg viewBox="0 0 760 142" role="img" aria-label="frame 당 probe ray 수. 이 계획은 C0 884,736, C1 442,368, C2 221,184 로 합계 1,548,288 개이고, RTXGI Sponza 설정은 2,725,888 개다.">
-        <line class="gl" x1="150" y1="12" x2="150" y2="108"/>
-        <line class="gl" x1="336.7" y1="12" x2="336.7" y2="108"/>
-        <line class="gl" x1="523.3" y1="12" x2="523.3" y2="108"/>
-        <line class="gl" x1="710" y1="12" x2="710" y2="108"/>
-        <text class="ts" x="140" y="38" text-anchor="end">이 계획 (3 cascade)</text>
-        <rect class="f-c0" x="150" y="20" width="163.2" height="28" rx="2"><title>C0: 884,736 ray</title></rect>
-        <rect class="f-c1" x="315.2" y="20" width="80.6" height="28" rx="2"><title>C1: 442,368 ray</title></rect>
-        <rect class="f-c2" x="397.8" y="20" width="41.3" height="28" rx="2"><title>C2: 221,184 ray</title></rect>
-        <text class="tv" x="447" y="39">1,548,288</text>
-        <text class="ts" x="140" y="86" text-anchor="end">RTXGI Sponza 설정</text>
-        <rect class="f-ref" x="150" y="68" width="508.8" height="28" rx="2"><title>22³ probe × 256 ray = 2,725,888 ray</title></rect>
-        <text class="tv" x="666" y="87">2,725,888</text>
+      <svg viewBox="0 0 760 92" role="img" aria-label="기본 volume 의 memory 는 atlas 26.1 MiB 와 ray data 41.6 MiB 로 67.7 MiB 이고, OW2 상한 64 MiB 를 넘는다.">
+        <line class="gl" x1="150" y1="14" x2="150" y2="58"/>
+        <line class="gl" x1="262" y1="14" x2="262" y2="58"/>
+        <line class="gl" x1="374" y1="14" x2="374" y2="58"/>
+        <line class="gl" x1="486" y1="14" x2="486" y2="58"/>
+        <line class="gl" x1="710" y1="14" x2="710" y2="58"/>
+        <line class="dl" x1="598" y1="14" x2="598" y2="58"/>
+        <text class="tv" x="594" y="10" text-anchor="end">상한 64 MiB (OW2)</text>
+        <text class="ts" x="140" y="40" text-anchor="end">기본 volume</text>
+        <rect class="f-c1" x="150" y="22" width="180.6" height="28" rx="2"><title>atlas 26.1 MiB (10,648 probe × 2,568 B)</title></rect>
+        <rect class="f-ray" x="332.6" y="22" width="291.1" height="28" rx="2"><title>ray data 41.6 MiB (10,648 probe × 256 ray × 16 B)</title></rect>
+        <text class="tv" x="632" y="41">67.7 MiB</text>
         <g class="tm">
-          <text x="150" y="128" text-anchor="middle">0</text>
-          <text x="336.7" y="128" text-anchor="middle">100만</text>
-          <text x="523.3" y="128" text-anchor="middle">200만</text>
-          <text x="710" y="128" text-anchor="middle">300만</text>
+          <text x="150" y="80" text-anchor="middle">0</text>
+          <text x="262" y="80" text-anchor="middle">16</text>
+          <text x="374" y="80" text-anchor="middle">32</text>
+          <text x="486" y="80" text-anchor="middle">48</text>
+          <text x="598" y="80" text-anchor="middle">64</text>
+          <text x="710" y="80" text-anchor="middle">80 MiB</text>
         </g>
       </svg>
     </div>
-    <figcaption>frame 당 probe ray 수 (계산값, classification 전, shadow ray 제외). hit 마다 shadow ray 가 하나씩 더해진다. 이 GPU 에서의 실제 비용은 아직 모르고, M3 에서 측정한다.</figcaption>
-  </figure>
-
-  <figure class="fig">
-    <div class="legend"><span><i class="sw-c0"></i>C0 atlas</span><span><i class="sw-c1"></i>C1 atlas</span><span><i class="sw-c2"></i>C2 atlas</span><span><i class="sw-ray"></i>ray buffer</span></div>
-    <div class="fig-scroll w-mid">
-      <svg viewBox="0 0 760 142" role="img" aria-label="DDGI memory. ray data 를 16 B 로 저장하면 cascade atlas 30.5 MiB 와 ray buffer 23.6 MiB 로 54.2 MiB, 8 B 로 저장하면 42.3 MiB 이고, 둘 다 상한 64 MiB 안이다.">
-        <line class="gl" x1="150" y1="12" x2="150" y2="108"/>
-        <line class="gl" x1="278" y1="12" x2="278" y2="108"/>
-        <line class="gl" x1="406" y1="12" x2="406" y2="108"/>
-        <line class="gl" x1="534" y1="12" x2="534" y2="108"/>
-        <line class="dl" x1="662" y1="12" x2="662" y2="108"/>
-        <text class="tv" x="656" y="10" text-anchor="end">상한 64 MiB (OW2)</text>
-        <text class="ts" x="140" y="38" text-anchor="end">ray data 16 B</text>
-        <rect class="f-c0" x="150" y="20" width="79.4" height="28" rx="2"><title>C0 atlas 10.2 MiB</title></rect>
-        <rect class="f-c1" x="231.4" y="20" width="79.4" height="28" rx="2"><title>C1 atlas 10.2 MiB</title></rect>
-        <rect class="f-c2" x="312.8" y="20" width="79.4" height="28" rx="2"><title>C2 atlas 10.2 MiB</title></rect>
-        <rect class="f-ray" x="394.2" y="20" width="189" height="28" rx="2"><title>ray buffer 23.6 MiB (12,096 probe × 128 ray × 16 B)</title></rect>
-        <text class="tv" x="591" y="39">54.2 MiB</text>
-        <text class="ts" x="140" y="86" text-anchor="end">ray data 8 B</text>
-        <rect class="f-c0" x="150" y="68" width="79.4" height="28" rx="2"><title>C0 atlas 10.2 MiB</title></rect>
-        <rect class="f-c1" x="231.4" y="68" width="79.4" height="28" rx="2"><title>C1 atlas 10.2 MiB</title></rect>
-        <rect class="f-c2" x="312.8" y="68" width="79.4" height="28" rx="2"><title>C2 atlas 10.2 MiB</title></rect>
-        <rect class="f-ray" x="394.2" y="68" width="94.5" height="28" rx="2"><title>ray buffer 11.8 MiB (radiance R11G11B10 packing + hit 거리)</title></rect>
-        <text class="tv" x="496" y="87">42.3 MiB</text>
-        <g class="tm">
-          <text x="150" y="128" text-anchor="middle">0</text>
-          <text x="278" y="128" text-anchor="middle">16</text>
-          <text x="406" y="128" text-anchor="middle">32</text>
-          <text x="534" y="128" text-anchor="middle">48</text>
-          <text x="662" y="128" text-anchor="middle">64 MiB</text>
-        </g>
-      </svg>
-    </div>
-    <figcaption>DDGI resource memory (계산값). ray data 를 8 B (radiance 를 <code>R11G11B10</code> 으로 packing + hit 거리) 로 줄이면 ray buffer 가 절반이 된다. 압축은 <a class="ref" href="#d-4">D-4</a> 에 따라 측정 후 정한다.</figcaption>
+    <figcaption>기본 volume 의 resource memory (계산값). probe 하나가 irradiance 512 B + distance 2 KiB + probe data 8 B 이고, ray data 는 ray 하나에 16 B 다. 기본 구현은 OW2 의 memory 상한을 넘는다. 줄이는 일은 측정 뒤 개선 후보로 다룬다 (<a class="ref" href="#i9">I9</a>, <a class="ref" href="#i10">I10</a>).</figcaption>
   </figure>
 
   <h3 id="s5-4"><span class="n">5.4</span>모듈 구성 (제안)</h3>
@@ -941,7 +850,7 @@ details .refs code { font-size: 11.5px; }
         <text class="ts" x="478" y="180" text-anchor="middle">geometry, material 복원</text>
         <rect class="b-acc" x="392" y="242" width="172" height="52" rx="8"/>
         <text class="t" x="478" y="264" text-anchor="middle">DDGISampling</text>
-        <text class="ts" x="478" y="282" text-anchor="middle">cascade 선택, 8 probe 보간</text>
+        <text class="ts" x="478" y="282" text-anchor="middle">8 probe 보간, Chebyshev</text>
         <rect class="b-acc" x="594" y="140" width="172" height="52" rx="8"/>
         <text class="t" x="680" y="162" text-anchor="middle">HitLighting</text>
         <text class="ts" x="680" y="180" text-anchor="middle">직접광, sky, DDGI 간접광</text>
@@ -980,7 +889,7 @@ details .refs code { font-size: 11.5px; }
       <tbody>
         <tr><td><code>MiniEngine/Core</code></td><td>AS buffer 전용 타입, <code>ID3D12GraphicsCommandList4</code> helper (<a class="ref" href="#m1-1">M1-1</a> 의 결정에 따라)</td></tr>
         <tr><td><code>MiniEngine/Model</code> 의 ray tracing 부분</td><td><code>RaytracingScene</code> (BLAS, TLAS, geometry table), shader <code>RayQueryCommon.hlsli</code>, <code>HitSurface.hlsli</code>, <code>HitLighting.hlsli</code></td></tr>
-        <tr><td><code>MiniEngine/Model</code> 의 DDGI 부분</td><td><code>DDGISystem</code> (cascade, scroll, scheduler), shader <code>DDGIProbeTraceCS.hlsl</code>, <code>DDGIBlendCS.hlsl</code>, <code>DDGIRelocationCS.hlsl</code>, <code>DDGIClassificationCS.hlsl</code>, <code>DDGISampling.hlsli</code>, probe 시각화 shader</td></tr>
+        <tr><td><code>MiniEngine/Model</code> 의 DDGI 부분</td><td><code>DDGIVolume</code> (resource, constants, update), shader <code>DDGIProbeTraceCS.hlsl</code>, <code>DDGIBlendCS.hlsl</code>, <code>DDGISampling.hlsli</code>, probe 시각화 shader</td></tr>
         <tr><td><code>MiniEngine/Model</code> 의 reference 부분</td><td><code>PathTracer</code>, debug view shader</td></tr>
         <tr><td><code>scripts/</code></td><td>HDR capture 비교 script, 측정 결과 집계 script</td></tr>
       </tbody>
@@ -991,41 +900,46 @@ details .refs code { font-size: 11.5px; }
 
 <section id="s6" aria-labelledby="h-s6">
   <h2 id="h-s6"><span class="n">6</span>Milestone</h2>
-  <ol class="chain" aria-label="milestone 순서와 다음 단계로 넘겨주는 것">
-    <li><a href="#m1"><span class="mid">M1</span><span class="mt">Ray Query Infra</span><span class="wk">W2 sprint, 4일</span><span class="give">TLAS, HitSurface, debug view</span></a></li>
-    <li><a href="#m2"><span class="mid">M2</span><span class="mt">Hit Lighting, Reference</span><span class="wk">W3 sprint, 3일</span><span class="give">HitLighting, 정답 이미지, 비교 script</span></a></li>
-    <li><a href="#m3"><span class="mid">M3</span><span class="mt">DDGI Core</span><span class="wk">W3 ~ W4 sprint, 5일</span><span class="give">trace, blend, sampling 이 도는 loop</span></a></li>
-    <li><a href="#m4"><span class="mid">M4</span><span class="mt">품질과 Light Leak</span><span class="wk">W4 sprint, 4일</span><span class="give">relocation, classification, leak 측정값</span></a></li>
-    <li><a href="#m5"><span class="mid">M5</span><span class="mt">Open World 확장</span><span class="wk">W5 sprint, 6일</span><span class="give">scrolling cascade, OW 측정표</span></a></li>
-    <li class="next"><a href="#s9"><span class="mt">RT Reflection</span><span class="wk">W6, W7 sprint</span></a></li>
+
+  <h3 id="s6-1"><span class="n">6.1</span>진행 방식</h3>
+  <ol class="chain" aria-label="두 단계의 진행 순서">
+    <li><a href="#m1"><span class="ph">1단계 기본 구현</span><span class="mid">M1</span><span class="mt">Ray Query Infra</span><span class="wk">W2 sprint, 4일</span><span class="give">TLAS, HitSurface, debug view</span></a></li>
+    <li><a href="#m2"><span class="ph">1단계 기본 구현</span><span class="mid">M2</span><span class="mt">Hit Lighting, Reference</span><span class="wk">W3 sprint, 5일</span><span class="give">HitLighting, 정답 이미지, capture 와 비교 도구</span></a></li>
+    <li><a href="#m3"><span class="ph">1단계 기본 구현</span><span class="mid">M3</span><span class="mt">DDGI Core</span><span class="wk">W3 ~ W4 sprint, 7일</span><span class="give">논문 수준의 DDGI</span></a></li>
+    <li class="gate"><a href="#gate"><span class="ph">검증</span><span class="mid">Gate</span><span class="mt">기본 완성 검증</span><span class="wk">11/5 (목)</span><span class="give">통과하면 2단계로</span></a></li>
+    <li class="p2"><a href="#p"><span class="ph">2단계 개선</span><span class="mid">P</span><span class="mt">측정, 우선순위, 개선</span><span class="wk">W5 sprint, 6일</span><span class="give">OW 측정표, 순위, 개선 전후 비교</span></a></li>
+    <li class="next"><a href="#s9"><span class="ph">다음 단계</span><span class="mt">RT Reflection</span><span class="wk">W6, W7 sprint</span></a></li>
   </ol>
-  <p class="note">각 milestone 은 앞 단계가 넘겨준 것 위에서 시작한다. <span class="pri must">필수</span> 는 다음 milestone 의 전제이거나 DDGI 최소 완성 (<a href="#s7-2">7.2</a>) 에 포함된다. <span class="pri should">권장</span> 은 일정 안에 하려는 것, <span class="pri could">선택</span> 은 시간이 남으면 하는 것이다.</p>
+  <div class="prose">
+    <p>1단계는 <a href="#s2-2">2.2</a> 의 기본 기능만 이 엔진에 구현한다. 이 엔진에 맞추느라 새로 정하는 것은 inline RayQuery 구조, 장면 단위, HDR format 이다. 그 밖의 개선은 넣지 않는다.</p>
+    <p>기본 완성 검증을 통과하면 2단계에서 기본 구현을 측정하고, <a href="#cands">개선 후보</a>의 우선순위를 정해 순서대로 개선한다. 11/12 까지 못 한 후보는 RT Reflection 이후의 목록으로 남는다.</p>
+  </div>
+  <p class="note"><span class="pri must">필수</span> 는 그 sprint 의 목요일까지 끝내야 하는 작업이고, <span class="pri should">권장</span> 은 조건이 맞으면 하는 작업이다.</p>
   <div class="toolbar" role="group" aria-label="작업 보기">
     <span>보기</span>
     <button type="button" id="filter-all" data-filter="all" aria-pressed="true">모든 작업</button>
     <button type="button" id="filter-must" data-filter="must" aria-pressed="false">필수만</button>
   </div>
 
-  <div id="milestones" style="display:grid; gap:18px;">
+  <div id="milestones" class="ms-list">
+
+  <p class="phase-label">1단계 기본 구현</p>
 
   <article class="ms" id="m1">
     <header><span class="big">M1</span><h3>Ray Query Infra</h3><span class="when">W2 sprint 10/19 ~ 10/22</span><p class="goal">장면 전체를 담은 TLAS 에 RayQuery 를 쏘고, hit 지점의 surface 를 복원한다.</p></header>
     <div class="tasks">
-      <div class="task" id="m1-1" data-pri="must"><span class="id">M1-1</span><p>ray query infra 의 세부 설계를 <code>docs/ray-query-infra-design.md</code> 에 기록한다. 정할 항목: infra 가 돌려줄 범위, AS buffer 표현과 state 관리, BLAS 단위와 geometry 구성, TLAS 갱신 시점과 queue, instance 내용 (InstanceID, mask, flags, transform), alpha test 와 two-sided 정책, HLSL API 모양, bindless 방식과 shader model, 동기화와 수명, 지원 범위. open world 조건을 반영한다: 같은 Model 의 여러 instance, 움직이는 instance 때문에 TLAS 를 매 frame 갱신, instance mask 범주 (<a class="ref" href="#d-9">D-9</a>), 돌려줄 범위는 material 까지 (DDGI 와 RT Reflection 모두 필요).</p><span class="pri must">필수</span></div>
+      <div class="task" id="m1-1" data-pri="must"><span class="id">M1-1</span><p>ray query infra 의 세부 설계를 <code>docs/ray-query-infra-design.md</code> 에 기록한다. 정할 항목: infra 가 돌려줄 범위, AS buffer 표현과 state 관리, BLAS 단위와 geometry 구성, TLAS 갱신 시점과 queue, instance 내용 (InstanceID, mask, flags, transform), alpha test 와 two-sided 정책 (기본 구현은 모두 opaque), HLSL API 모양, bindless 방식과 shader model (<a href="#s4-3">4.3</a>), 동기화와 수명, 지원 범위 (<code>Draw</code> 가 여럿인 <code>Mesh</code> 와 skinned mesh 는 assert 로 막는다). 나중에 넣을 것의 자리를 남긴다: 같은 Model 의 여러 instance, 움직이는 instance, instance mask 범주 (<a class="ref" href="#d-9">D-9</a>).</p><span class="pri must">필수</span></div>
       <div class="task" id="m1-2" data-pri="must"><span class="id">M1-2</span><p>AS buffer 타입, BLAS build (load 후 1회), TLAS build (매 frame), scratch, 수명 관리.</p><span class="pri must">필수</span></div>
-      <div class="task" id="m1-3" data-pri="must"><span class="id">M1-3</span><p>geometry table 과 bindless (방식은 M1-1 에서 정함, <a href="#s4-3">4.3</a> 의 제약 참고) 로 VB, IB, material constant, texture 접근. <code>HitSurface</code> 복원: position, geometric normal, shading normal (normal map), UV, base color, metallic, roughness, emissive.</p><span class="pri must">필수</span></div>
-      <div class="task" id="m1-4" data-pri="must"><span class="id">M1-4</span><p><code>RayQueryCommon.hlsli</code> 의 두 질문: closest hit, visibility. self-intersection offset 규칙.</p><span class="pri must">필수</span></div>
-      <div class="task" id="m1-5" data-pri="must"><span class="id">M1-5</span><p>debug view: camera ray 로 hit t, instance, front face, base color, normal 표시. ray depth 와 raster depth 의 불일치 pixel 비율 자동 계산.</p><span class="pri must">필수</span></div>
+      <div class="task" id="m1-3" data-pri="must"><span class="id">M1-3</span><p>geometry table 과 bindless 로 VB, IB, material constant, texture 접근. <code>HitSurface</code> 복원: position, geometric normal, vertex normal, UV, base color, emissive. metallic, roughness, normal map 은 struct 에 자리만 두고 RT Reflection 에서 채운다. texture LOD 를 인자로 받는다.</p><span class="pri must">필수</span></div>
+      <div class="task" id="m1-4" data-pri="must"><span class="id">M1-4</span><p><code>RayQueryCommon.hlsli</code> 의 두 질문: closest hit, visibility. self-intersection offset 은 장면 단위와 무관한 방법으로 정한다.</p><span class="pri must">필수</span></div>
+      <div class="task" id="m1-5" data-pri="must"><span class="id">M1-5</span><p>debug view: camera ray 로 hit t, instance, front face, normal, base color 를 표시한다. TAA 를 끄고 ray depth 와 raster depth 를 비교해 허용 오차를 넘는 pixel 의 mask 와 비율을 낸다.</p><span class="pri must">필수</span></div>
       <div class="task" id="m1-6" data-pri="must"><span class="id">M1-6</span><p>측정 기록 파일 <code>docs/ddgi-measurements.md</code> 와 형식.</p><span class="pri must">필수</span></div>
-      <div class="task" id="m1-7" data-pri="should"><span class="id">M1-7</span><p><code>ModelInstance</code> 이동, 회전 setter. 여러 instance 를 raster 와 TLAS 에 함께 넣기 (M5 test layout 의 전제).</p><span class="pri should">권장</span></div>
-      <div class="task" id="m1-8" data-pri="should"><span class="id">M1-8</span><p>alpha test (non-opaque geometry + <code>Proceed()</code> loop, mip 명시).</p><span class="pri should">권장</span></div>
-      <div class="task" id="m1-9" data-pri="could"><span class="id">M1-9</span><p>BLAS compaction.</p><span class="pri could">선택</span></div>
     </div>
     <p class="sub">완료 기준</p>
     <ul class="done-list">
-      <li><span><code>-gpu_debug 1</code> 로 실행해 debug layer, GPU-based validation 경고가 없다. 숨겨진 descriptor 메시지 (<a href="#s4-3">4.3</a>) 를 한 번은 풀고 확인한다.</span></li>
-      <li><span>depth 불일치 pixel 비율이 0.1% 이하다 (alpha test 영역 제외).</span></li>
-      <li><span>base color, normal debug view 가 raster 결과와 일치한다.</span></li>
+      <li><span>Debug 구성, 또는 <code>-debug 1 -gpu_debug 1</code> 로 실행해 debug layer, GPU-based validation 경고가 없다. 숨겨진 descriptor 메시지 (<a href="#s4-3">4.3</a>) 를 Debug 구성에서 한 번은 풀고 확인한다.</span></li>
+      <li><span>depth 불일치 pixel 은 alpha test 재질 (leaf, chain 등) 영역에만 있다 (mask view 로 확인). 그 밖의 불일치 비율은 0.1% 이하다.</span></li>
+      <li><span>base color, normal view 가 raster 화면과 눈으로 보아 일치한다. glTF 경로에는 G-buffer 가 없어 수치로 비교할 raster 출력이 없다.</span></li>
       <li><span>PIX 로 BLAS, TLAS 형태를 확인하고, TLAS build 와 debug view 의 GPU time 을 기록한다.</span></li>
     </ul>
     <details>
@@ -1033,121 +947,270 @@ details .refs code { font-size: 11.5px; }
       <div class="refs">
         <p>DXR spec 의 Acceleration Structure, Inline Raytracing 장.</p>
         <p>AS build 코드는 D3D12RaytracingMiniEngineSample 의 것을 거의 그대로 옮길 수 있고, hit 데이터 접근은 다시 만들어야 한다 (<a href="#s11">11장</a>).</p>
-        <p>hit 에서 geometry, material 을 찾는 global table 방식: <code>references/RTXGI-DDGI/samples/test-harness/shaders/</code> 의 <code>include/Descriptors.hlsl</code>, <code>include/RayTracing.hlsl</code>, <code>CHS.hlsl</code></p>
+        <p>hit 에서 geometry 와 material 을 global table 로 찾는 방식 (idea 출처: RTXGI-DDGI test harness).</p>
       </div>
     </details>
   </article>
 
   <article class="ms" id="m2">
-    <header><span class="big">M2</span><h3>Hit Lighting 과 Reference Path Tracer</h3><span class="when">W3 sprint 10/24 ~ 10/26</span><p class="goal">ray 가 맞은 지점의 빛을 계산하는 공용 함수와, DDGI 를 비교할 정답 이미지를 만든다.</p></header>
+    <header><span class="big">M2</span><h3>Hit Lighting 과 Reference Path Tracer</h3><span class="when">W3 sprint 10/24 ~ 10/28</span><p class="goal">ray 가 맞은 지점의 빛을 계산하는 공용 함수, DDGI 를 비교할 정답 이미지, 그리고 비교에 쓸 도구를 만든다.</p></header>
     <div class="tasks">
       <div class="task" id="m2-1" data-pri="must"><span class="id">M2-1</span><p>raster 의 sun 직접광 재활성화 (<code>DefaultPS.hlsl:266-268</code> 의 shadow map + <code>ShadeDirectionalLight</code>).</p><span class="pri must">필수</span></div>
-      <div class="task" id="m2-2" data-pri="must"><span class="id">M2-2</span><p><code>HitLighting</code>: sun 직접광 (visibility ray), miss 는 sky (IBL cubemap), emissive. raster 와 같은 sun 강도와 단위. HDR 을 자르지 않는다.</p><span class="pri must">필수</span></div>
-      <div class="task" id="m2-3" data-pri="must"><span class="id">M2-3</span><p>reference path tracer (RayQuery compute): pixel 당 frame 마다 path 1개, camera 가 멈추면 누적. diffuse bounce, sun next event estimation, sky. 출력은 (a) diffuse 조명 전체 (b) primary hit 의 간접 diffuse irradiance.</p><span class="pri must">필수</span></div>
-      <div class="task" id="m2-4" data-pri="must"><span class="id">M2-4</span><p>HDR capture (float texture 를 파일로) 와 비교 script (<code>scripts/</code>): 평균 상대 오차, RMSE, 오차 heatmap. 비교는 사람 눈이 아니라 script 로 한다.</p><span class="pri must">필수</span></div>
-      <div class="task" id="m2-5" data-pri="should"><span class="id">M2-5</span><p>camera 시점 저장과 복원 (같은 시점에서 반복 비교).</p><span class="pri should">권장</span></div>
-      <div class="task" id="m2-6" data-pri="could"><span class="id">M2-6</span><p>specular 를 포함한 BRDF. RT Reflection 단계로 미룬다.</p><span class="pri could">선택</span></div>
+      <div class="task" id="m2-2" data-pri="must"><span class="id">M2-2</span><p><code>HitLighting</code>: sun 직접광 (앞면 hit 에서 visibility ray), miss 는 sky (IBL cubemap, mip 을 정해 둔다), emissive. raster 와 같은 sun 강도와 단위. HDR 을 자르지 않는다.</p><span class="pri must">필수</span></div>
+      <div class="task" id="m2-3" data-pri="must"><span class="id">M2-3</span><p>reference path tracer (RayQuery compute): pixel 당 frame 마다 path 1개, camera 가 멈추면 누적. diffuse bounce, sun next event estimation, sky. albedo 처리는 probe trace 와 같게 한다 (<a class="ref" href="#d-11">D-11</a>). 출력은 (a) diffuse 조명 전체 (b) primary hit 에 들어오는 간접 diffuse irradiance. (b) 는 sky 를 포함하고 albedo 와 SSAO 를 빼서, DDGI 가 sampling 하는 양과 정의를 같게 한다.</p><span class="pri must">필수</span></div>
+      <div class="task" id="m2-4" data-pri="must"><span class="id">M2-4</span><p>capture 와 비교 script: <code>PixelBuffer::ExportToFile</code> 을 바탕으로 float texture 를 파일로 쓰고, <code>scripts/</code> 의 script 로 relative RMSE 와 오차 heatmap 을 낸다. furnace mode (secondary ray 를 강제로 miss 시키고 sky 를 상수 L 로) 를 만든다.</p><span class="pri must">필수</span></div>
+      <div class="task" id="m2-5" data-pri="must"><span class="id">M2-5</span><p>camera 시점 저장과 복원. 고정 시점 비교와 leak 측정 위치에 쓴다.</p><span class="pri must">필수</span></div>
+      <div class="task" id="m2-6" data-pri="must"><span class="id">M2-6</span><p>raster debug 출력: Lambert diffuse 만, glTF occlusion 끔. path tracer 의 직접광과 수치로 비교하기 위해서다 (raster 는 Burley diffuse 와 GGX specular 를 쓴다).</p><span class="pri must">필수</span></div>
     </div>
     <p class="sub">완료 기준</p>
     <ul class="done-list">
-      <li><span>균일한 sky radiance L 아래의 막힌 곳 없는 평면에서 path tracer 의 irradiance 가 πL 과 1% 안에서 일치한다 (furnace test).</span></li>
-      <li><span>같은 시점에서 독립적으로 두 번 누적한 결과의 차이가 DDGI 비교에서 볼 오차보다 충분히 작다. 그때의 sample 수를 기록한다.</span></li>
-      <li><span>path tracer 의 직접광과 raster 의 sun 직접광이 같은 pixel 에서 일치한다 (강도, 단위 확인).</span></li>
+      <li><span>furnace mode 에서 path tracer 의 irradiance 가 πL 과 1% 안에서 일치한다.</span></li>
+      <li><span>같은 시점에서 독립적으로 두 번 누적한 결과의 relative RMSE 가 1% 이하다. 그때의 sample 수를 기록한다.</span></li>
+      <li><span>M2-6 의 raster 출력과 path tracer 의 직접광이 그림자 경계와 alpha test 재질을 뺀 pixel 에서 2% 안에서 일치한다.</span></li>
     </ul>
     <details>
       <summary>참고 자료</summary>
       <div class="refs">
-        <p><code>references/RTXGI-DDGI/samples/test-harness/shaders/</code> 의 <code>PathTraceRGS.hlsl</code>, <code>include/Lighting.hlsl</code></p>
-        <p><code>Lighting.hlsl</code> 에는 옮기면 안 되는 버그가 있다: point light index 에 <code>+ lightIndex</code> 가 빠짐 (<code>:126</code>), loop 안에서 <code>continue</code> 대신 <code>return</code> (<code>:91</code>, <code>:135</code>, <code>:141</code>).</p>
+        <p>path tracer 를 probe trace 와 같은 광원 model 로 두어 DDGI 와 같은 조건에서 비교하는 구성 (idea 출처: RTXGI-DDGI test harness, <a class="ref" href="#d-11">D-11</a>).</p>
       </div>
     </details>
   </article>
 
   <article class="ms" id="m3">
-    <header><span class="big">M3</span><h3>DDGI Core</h3><span class="when">W3 ~ W4 sprint 10/27 ~ 11/1</span><p class="goal">Sponza 를 덮는 고정 cascade 하나로 trace, blend, sampling 의 전체 loop 를 돌린다.</p></header>
+    <header><span class="big">M3</span><h3>DDGI Core</h3><span class="when">W3 ~ W4 sprint 10/29, 10/31 ~ 11/5</span><p class="goal">Sponza 를 덮는 고정 volume 하나로 2.2 의 기본 기능을 돌린다.</p></header>
     <div class="tasks">
-      <div class="task" id="m3-1" data-pri="must"><span class="id">M3-1</span><p>data 구조: cascade 배열 (지금은 1개), ring buffer indexing (scroll offset 0), <code>Texture2DArray</code> atlas (<a class="ref" href="#d-6">D-6</a>), probe data, ray buffer, constants.</p><span class="pri must">필수</span></div>
-      <div class="task" id="m3-2" data-pri="must"><span class="id">M3-2</span><p>probe trace CS: spherical Fibonacci 방향과 frame 마다 random rotation. <code>HitLighting</code> 에 multi-bounce 항 (이전 frame 의 volume 을 hit 지점에서 sampling) 추가. backface 는 음수 거리, miss 는 sky 와 큰 거리.</p><span class="pri must">필수</span></div>
-      <div class="task" id="m3-3" data-pri="must"><span class="id">M3-3</span><p>blend CS: irradiance (cosine weight), distance (pow weight, 평균과 제곱 평균), hysteresis, 같은 dispatch 안의 border texel 갱신.</p><span class="pri must">필수</span></div>
-      <div class="task" id="m3-4" data-pri="must"><span class="id">M3-4</span><p><code>DDGISampling.hlsli</code>: 8 probe trilinear, Chebyshev visibility, wrap shading weight, surface bias. <code>DefaultPS</code> 에 적용 (<a class="ref" href="#d-5">D-5</a>). compute shader 에서도 호출할 수 있게 미분 함수를 쓰지 않는다.</p><span class="pri must">필수</span></div>
-      <div class="task" id="m3-5" data-pri="must"><span class="id">M3-5</span><p>debug: probe sphere (raster instanced draw), atlas view, 간접광만 보기, DDGI on/off (EngineTuning).</p><span class="pri must">필수</span></div>
-      <div class="task" id="m3-6" data-pri="must"><span class="id">M3-6</span><p>pass 별 GPU timer (trace, blend, shading 추가분) 와 memory 집계.</p><span class="pri must">필수</span></div>
-      <div class="task" id="m3-7" data-pri="could"><span class="id">M3-7</span><p>blend 의 groupshared memory 최적화.</p><span class="pri could">선택</span></div>
+      <div class="task" id="m3-1" data-pri="must"><span class="id">M3-1</span><p>data 구조: volume 하나, resource 마다 <code>Texture2DArray</code> (slice 하나가 probe 한 층, idea 출처: RTXGI-DDGI), circular buffer indexing (Majercik 2021 §7.3, scroll offset 은 0), constants. 길이 parameter 는 probe 간격 기준으로 정한다 (<a href="#s5-3">5.3</a>).</p><span class="pri must">필수</span></div>
+      <div class="task" id="m3-2" data-pri="must"><span class="id">M3-2</span><p>probe trace CS: <a class="ref" href="#d-2">D-2</a> 의 배치와 ray data 규약, spherical Fibonacci 방향과 frame 마다 random rotation (Majercik 2019). hit 은 <code>HitLighting</code> 으로 single bounce 를 계산한다. trace 의 GPU timer 를 같이 넣는다 (<a class="ref" href="#r2">R2</a>).</p><span class="pri must">필수</span></div>
+      <div class="task" id="m3-3" data-pri="must"><span class="id">M3-3</span><p>blend CS: irradiance (cosine weight), distance (power-cosine weight, 평균과 제곱 평균) (Majercik 2019), perceptual encoding (Majercik 2021 §4.2), hysteresis 와 수렴 heuristic (<a class="ref" href="#d-12">D-12</a>), 같은 compute pass 안의 border texel 갱신.</p><span class="pri must">필수</span></div>
+      <div class="task" id="m3-4" data-pri="must"><span class="id">M3-4</span><p><code>DDGISampling.hlsli</code> (8 probe trilinear, Chebyshev visibility 와 backface weight (Majercik 2019), self-shadow bias (Majercik 2021 §4.1), volume 경계 fade (<a class="ref" href="#d-5">D-5</a>)) 와 <code>DefaultPS</code> 적용 (<a class="ref" href="#d-5">D-5</a>). compute shader 에서도 호출할 수 있게 미분 함수를 쓰지 않고, view 방향 대신 입사 방향을 인자로 받는다.</p><span class="pri must">필수</span></div>
+      <div class="task" id="m3-5" data-pri="must"><span class="id">M3-5</span><p>multi-bounce: probe trace 의 hit 에서 M3-4 의 함수로 이전 frame 의 atlas 를 sampling 한다. volume 밖은 0 으로 둔다.</p><span class="pri must">필수</span></div>
+      <div class="task" id="m3-6" data-pri="must"><span class="id">M3-6</span><p>debug: probe sphere (raster instanced draw), atlas view, 간접광만 보기, DDGI on/off, multi-bounce on/off (EngineTuning).</p><span class="pri must">필수</span></div>
+      <div class="task" id="m3-7" data-pri="must"><span class="id">M3-7</span><p>pass 별 GPU timer (trace, blend, shading 추가분) 와 resource memory 집계.</p><span class="pri must">필수</span></div>
     </div>
     <p class="sub">완료 기준</p>
     <ul class="done-list">
-      <li><span>DDGI 를 켜면 color bleeding 이 보이고, reference (M2-3 의 b) 와의 오차를 기록한다.</span></li>
-      <li><span>정지 상태의 <a class="ref" href="#ow5">OW5</a> 지표를 기록한다.</span></li>
-      <li><span>pass 별 GPU time 을 기록하고 <a class="ref" href="#ow2">OW2</a> 목표와 <a href="#s5-3">5.3</a> 초기값을 다시 정한다.</span></li>
+      <li><span>아래 <a href="#gate">기본 완성 검증</a>을 통과한다.</span></li>
     </ul>
     <details>
       <summary>참고 자료</summary>
       <div class="refs">
-        <p><code>references/RTXGI-DDGI/rtxgi-sdk/shaders/ddgi/</code> 의 <code>ProbeBlendingCS.hlsl</code>, <code>Irradiance.hlsl</code>, <code>include/ProbeIndexing.hlsl</code>, <code>include/ProbeOctahedral.hlsl</code>, <code>include/ProbeRayCommon.hlsl</code></p>
-        <p><code>references/RTXGI-DDGI/rtxgi-sdk/shaders/Common.hlsl</code> (spherical Fibonacci), <code>references/RTXGI-DDGI/rtxgi-sdk/src/ddgi/DDGIVolume.cpp</code> (<code>ComputeRandomRotation</code>, <code>GetDDGIVolumeTextureDimensions</code>)</p>
-        <p><code>references/RTXGI-DDGI/samples/test-harness/shaders/ddgi/ProbeTraceRGS.hlsl</code>, <code>references/RTXGI-DDGI/docs/Math.md</code> (blend 의 1/2 와 2π 정규화)</p>
+        <p>Majercik 2019: 전체 algorithm (probe update, octahedral atlas, sampling).</p>
+        <p>Majercik 2021: §2 전체 흐름, §4 품질 개선, Table 2 texel 수.</p>
       </div>
     </details>
   </article>
 
-  <article class="ms" id="m4">
-    <header><span class="big">M4</span><h3>품질과 Light Leak</h3><span class="when">W4 sprint 11/2 ~ 11/5</span><p class="goal">probe 가 벽 속이나 빈 공간에 있을 때의 문제를 줄이고 reference 와의 차이를 줄인다. scrolling 하면 probe 가 지형과 건물 속 임의의 위치에 놓이므로, 이 단계는 M5 의 전제다.</p></header>
-    <div class="tasks">
-      <div class="task" id="m4-1" data-pri="must"><span class="id">M4-1</span><p>fixed ray (32개) 와 probe relocation.</p><span class="pri must">필수</span></div>
-      <div class="task" id="m4-2" data-pri="must"><span class="id">M4-2</span><p>probe classification. inactive probe 는 fixed ray 만 trace 한다.</p><span class="pri must">필수</span></div>
-      <div class="task" id="m4-3" data-pri="must"><span class="id">M4-3</span><p>view bias, normal bias 를 장면 단위 (1 m = 100 unit) 에 맞게 정하고 근거를 기록한다. RTXGI 기본값 0.1 은 장면 단위에 따라 맞지 않는다 (<code>references/RTXGI-DDGI/docs/DDGIVolume.md</code> rules of thumb).</p><span class="pri must">필수</span></div>
-      <div class="task" id="m4-4" data-pri="must"><span class="id">M4-4</span><p>leak 측정 위치 고정 (회랑 안쪽, 벽 너머 등) 과 reference 대비 오차 기록.</p><span class="pri must">필수</span></div>
-      <div class="task" id="m4-5" data-pri="should"><span class="id">M4-5</span><p>alpha test material 의 probe ray 처리 정책. alpha test 와 opaque 취급을 비용과 오차로 비교해 정한다. open world 는 식생이 많아 비용 영향이 크다.</p><span class="pri should">권장</span></div>
-      <div class="task" id="m4-6" data-pri="should"><span class="id">M4-6</span><p>two-sided material 의 뒷면 hit 해석 (backface 비율 계산에서 제외할지).</p><span class="pri should">권장</span></div>
-    </div>
-    <p class="sub">완료 기준</p>
+  <article class="ms gate-box" id="gate">
+    <header><span class="big">Gate</span><h3>기본 완성 검증</h3><span class="when">11/5 (목)</span><p class="goal">기본 구현이 정상 동작하는지 확인한다. 정확도의 목표치는 이 측정 뒤 OW6 에서 정한다.</p></header>
     <ul class="done-list">
-      <li><span>relocation, classification 전후의 오차, active probe 비율, GPU time 을 기록한다.</span></li>
+      <li><span>Debug 구성, 또는 <code>-debug 1 -gpu_debug 1</code> 로 실행해 debug layer, GPU-based validation 경고가 없다.</span></li>
+      <li><span>irradiance, distance atlas 에 NaN, Inf 가 없다 (atlas view 와 readback 검사).</span></li>
+      <li><span>DDGI 를 끄면 지금의 IBL 경로와 같은 화면이 나오고, 켜면 Sponza 의 color bleeding 이 보인다.</span></li>
+      <li><span>고정 시점 3곳에서 reference (<a class="ref" href="#m2-3">M2-3</a> 의 b) 대비 간접 irradiance 의 relative RMSE 를 측정했다. 오차가 큰 영역마다 원인을 분류했다 (probe 가 geometry 안, leak, probe 해상도, bias). 이 분류가 <a class="ref" href="#p-2">P-2</a> 의 입력이 된다.</span></li>
+      <li><span>probe trace, blend, shading 추가분의 GPU time 과 resource memory 를 기록했다.</span></li>
     </ul>
-    <details>
-      <summary>참고 자료</summary>
-      <div class="refs">
-        <p><code>references/RTXGI-DDGI/rtxgi-sdk/shaders/ddgi/ProbeRelocationCS.hlsl</code>, <code>ProbeClassificationCS.hlsl</code></p>
-        <p><code>references/RTXGI-DDGI/docs/DDGIVolume.md</code> (relocation, classification, fixed rays)</p>
-        <p>Majercik et al., "Scaling Probe-Based Real-Time Dynamic Global Illumination for Production", JCGT 2021</p>
-      </div>
-    </details>
   </article>
 
-  <article class="ms" id="m5">
-    <header><span class="big">M5</span><h3>Open World 확장</h3><span class="when">W5 sprint 11/7 ~ 11/12</span><p class="goal">camera 를 따라가는 cascade 로 넓은 world 를 고정 비용으로 덮고, 빠른 이동과 조명 변화에 대응한다.</p></header>
+  <p class="phase-label">2단계 측정과 개선</p>
+
+  <article class="ms p2" id="p">
+    <header><span class="big">P</span><h3>측정, 우선순위, 개선</h3><span class="when">W5 sprint 11/7 ~ 11/12</span><p class="goal">기본 구현을 3장 기준으로 측정하고, 개선 후보에 순위를 매겨 순서대로 개선한다.</p></header>
     <div class="tasks">
-      <div class="task" id="m5-1" data-pri="must"><span class="id">M5-1</span><p>open world test layout: Sponza 를 격자로 여러 개 배치 (예: 3×3) 하고 그 사이를 지면으로 잇는다. M1-7 이 남아 있으면 여기서 한다. sun shadow camera 를 camera 중심으로 옮긴다. camera 속도 조절 (EngineTuning) 과 속도를 인자로 받는 고정 경로 자동 비행.</p><span class="pri must">필수</span></div>
-      <div class="task" id="m5-2" data-pri="must"><span class="id">M5-2</span><p>infinite scrolling: anchor 는 camera, probe 간격 단위로 offset 이동, 새로 들어온 plane 초기화. 한 frame 에 여러 plane 을 넘으면 (빠른 이동, teleport) 넘은 plane 을 모두 초기화하고 probe data 도 reset 한다. RTXGI 는 축마다 plane 하나만 초기화한다 (<code>references/RTXGI-DDGI/rtxgi-sdk/shaders/ddgi/include/ProbeIndexing.hlsl:295-311</code>).</p><span class="pri must">필수</span></div>
-      <div class="task" id="m5-3" data-pri="must"><span class="id">M5-3</span><p>time of day: sun 각도 자동 회전 (속도 인자), <a class="ref" href="#d-12">D-12</a> 의 hysteresis 규칙. OW4, OW5 측정.</p><span class="pri must">필수</span></div>
-      <div class="task" id="m5-4" data-pri="should"><span class="id">M5-4</span><p>cascade 2~3개 (<a href="#s5-3">5.3</a>), cascade 경계 blend (<code>DDGIGetVolumeBlendWeight</code> 방식의 경계 fade), 마지막 cascade 밖은 IBL fallback. 새로 들어와 아직 수렴하지 않은 probe 는 바깥 cascade 값을 쓰도록 probe 별 누적 횟수 (신뢰도) 를 둔다.</p><span class="pri should">권장</span></div>
-      <div class="task" id="m5-5" data-pri="should"><span class="id">M5-5</span><p>ray 예산 기반 scheduler (<a class="ref" href="#d-10">D-10</a>).</p><span class="pri should">권장</span></div>
-      <div class="task" id="m5-6" data-pri="should"><span class="id">M5-6</span><p>움직이는 rigid 물체의 GI 기여와 latency 측정. skinned mesh 는 TLAS 에서 빼고 sampling 만 한다 (<a class="ref" href="#d-9">D-9</a>).</p><span class="pri should">권장</span></div>
-      <div class="task" id="m5-7" data-pri="could"><span class="id">M5-7</span><p>probe variability 기반 수렴 판단, async compute, quality preset (<a class="ref" href="#ow8">OW8</a>), sun 각도를 따르는 procedural sky.</p><span class="pri could">선택</span></div>
+      <div class="task" id="p-1" data-pri="must"><span class="id">P-1</span><p>측정 환경: 간접광 전용 HDR 출력 (노출 적용 전), tile 별 frame 간 변화 p95 와 수렴 시간 계산, camera 속도 조절과 고정 경로 자동 비행, sun 각도 자동 회전.</p><span class="pri must">필수</span></div>
+      <div class="task" id="p-2" data-pri="must"><span class="id">P-2</span><p>측정과 우선순위: <a href="#s3-1">3.1</a> 의 방법으로 기본 구현을 측정해 <code>docs/ddgi-measurements.md</code> 에 기록한다. <a href="#cands">후보 표</a>의 비용과 효과를 고치고, <a href="#s6-3">6.3</a> 의 규칙으로 순위를 정해 후보 표의 순위 칸에 적는다.</p><span class="pri must">필수</span></div>
+      <div class="task" id="p-3" data-pri="must"><span class="id">P-3</span><p>순위대로 개선: 위에서부터 하나씩 진행한다. 개선마다 전후 OW 값을 측정하고 commit body 에 적는다. 11/12 까지 못 한 후보는 RT Reflection 이후 목록에 남긴다.</p><span class="pri must">필수</span></div>
+      <div class="task" id="p-4" data-pri="should"><span class="id">P-4</span><p>open world test layout: Sponza 를 격자로 배치 (<code>ModelInstance</code> 이동 setter 포함), 그 사이 지면, sun shadow camera 를 camera 중심으로. <a class="ref" href="#i3">I3</a>, <a class="ref" href="#i5">I5</a> 처럼 넓은 범위를 봐야 하는 후보를 고르면 필요하다.</p><span class="pri should">권장</span></div>
     </div>
     <p class="sub">완료 기준</p>
     <ul class="done-list">
-      <li><span>OW1~OW5, OW7 측정값을 기록한다.</span></li>
-      <li><span>30 m/s 비행 capture 를 남긴다.</span></li>
+      <li><span>이 문서의 후보 표에 순위와 그 근거가 있다.</span></li>
+      <li><span>P-3 에서 적용한 개선마다 전후 측정값이 있다.</span></li>
+      <li><span>개선을 적용한 상태에서 기본 완성 검증의 처음 세 항목이 계속 성립한다 (회귀 없음).</span></li>
     </ul>
-    <details>
-      <summary>참고 자료</summary>
-      <div class="refs">
-        <p><code>references/RTXGI-DDGI/rtxgi-sdk/src/ddgi/DDGIVolume.cpp</code> (<code>ComputeScrolling</code>, <code>ScrollReset</code>), <code>references/RTXGI-DDGI/rtxgi-sdk/shaders/ddgi/ProbeBlendingCS.hlsl:361-387</code> (scroll 된 plane 초기화), <code>references/RTXGI-DDGI/docs/DDGIVolume.md</code> (movement, scrolling)</p>
-        <p>UE4 plugin 의 volume 정렬과 blend: <code>references/RTXGI-DDGI/ue4-plugin/4.27/RTXGI/Source/RTXGI/Private/DDGIVolumeComponent.cpp:409-442</code>, <code>references/RTXGI-DDGI/ue4-plugin/4.27/RTXGI/Shaders/Private/ApplyLightingDeferred.usf:126-131</code>, <code>:196-240</code></p>
-        <p>ray budget: <code>DDGIVolumeUpdate.cpp:586-602</code>, <code>:803-823</code></p>
-      </div>
-    </details>
   </article>
 
   </div>
+
+  <h3 id="s6-3"><span class="n">6.3</span>우선순위 규칙</h3>
+  <ol class="rules">
+    <li>목표를 가장 크게 벗어난 OW 를 개선하는 후보를 먼저 본다. 3.1 에서 "구조적으로 만족하지 못함" 으로 기록한 OW 는 가장 크게 벗어난 것으로 본다.</li>
+    <li>같은 OW 를 개선하는 후보끼리는 예상 비용이 작은 것을 먼저 한다.</li>
+    <li>의존이 있으면 의존 순서를 따른다.</li>
+    <li>남은 일수 안에 끝나지 않는 후보는 쪼개거나 다음으로 넘긴다. W5 발표에서 전후 비교를 보일 수 있는지도 고려한다.</li>
+  </ol>
+  <p class="note">측정 전 판단: 고정 volume 은 OW1, OW3 를 구조적으로 만족하지 못하므로 <a class="ref" href="#i3">I3</a> 는 측정과 무관하게 상위 후보가 될 가능성이 높다. 기본 volume 의 memory 가 64 MiB 를 넘으므로 (<a href="#s5-3">5.3</a>) <a class="ref" href="#i9">I9</a> 도 그렇다. 순위는 P-2 에서 측정으로 정한다.</p>
+
+  <h3 id="cands"><span class="n">6.4</span>개선 후보</h3>
+  <p class="note">비용은 작업량 추정이다 <span class="guess">(추측)</span>. 합계가 약 23일이라 2단계의 개선 시간 (약 4일) 에는 일부만 들어간다. 순위 칸은 <a class="ref" href="#p-2">P-2</a> 에서 채운다.</p>
+  <div class="tbl cands">
+    <table>
+      <thead><tr><th>ID</th><th>개선</th><th>출처</th><th>대상</th><th>의존</th><th>비용</th><th>순위</th></tr></thead>
+      <tbody>
+        <tr id="i1"><td><span class="id">I1</span></td><td>probe relocation: 매 frame 고정 방향 ray 로 probe 를 geometry 밖으로 옮긴다</td><td>Majercik 2021 §5 (초기화 때 조정). 매 frame 조정과 고정 방향 ray 는 idea 출처: RTXGI-DDGI</td><td>OW6</td><td></td><td class="num">1.5일</td><td class="rank">-</td></tr>
+        <tr id="i2"><td><span class="id">I2</span></td><td>probe classification (probe state): 쓰이지 않는 probe 의 trace 를 줄인다</td><td>Majercik 2021 §6</td><td>OW2, OW6</td><td>I1 의 고정 방향 ray</td><td class="num">1일</td><td class="rank">-</td></tr>
+        <tr id="i3"><td><span class="id">I3</span></td><td>camera 를 따라가는 단일 volume (tracking window)</td><td>Majercik 2021 §7.3</td><td>OW1, OW3</td><td></td><td class="num">1.5일</td><td class="rank">-</td></tr>
+        <tr id="i4"><td><span class="id">I4</span></td><td>scroll 된 plane 의 완전한 초기화: 한 frame 에 넘은 plane 전부, probe data 까지, trace 전에 실행</td><td>이 문서</td><td>OW3</td><td>I3</td><td class="num">0.5일</td><td class="rank">-</td></tr>
+        <tr id="i5"><td><span class="id">I5</span></td><td>camera 중심 다중 cascade. cascade 경계 weight 는 anchor 와의 연속 거리로 계산하고, fine 부터 sampling 해서 weight 합이 1 이 되면 멈춘다. 출발점은 <a href="#i5-start">6.5</a></td><td>Majercik 2021 (cascaded volumes, §7.4 volume blend). volume 우선순위와 경계 blend 는 idea 출처: RTXGI-DDGI UE4 plugin</td><td>OW1, OW3</td><td>I3, I9</td><td class="num">2.5일</td><td class="rank">-</td></tr>
+        <tr id="i6"><td><span class="id">I6</span></td><td>새로 나타난 probe 의 hysteresis 조정 (age 기반 ramp)</td><td>Majercik 2021 §6, 리뷰</td><td>OW3, OW4</td><td></td><td class="num">0.5일</td><td class="rank">-</td></tr>
+        <tr id="i7"><td><span class="id">I7</span></td><td>양방향 조명 변화 감지, cascade 별 hysteresis, 밝기 급변 시 변화량 제한</td><td>리뷰. 변화량 제한은 idea 출처: RTXGI-DDGI</td><td>OW4, OW5</td><td></td><td class="num">1일</td><td class="rank">-</td></tr>
+        <tr id="i8"><td><span class="id">I8</span></td><td>sampling fallback: 주변 probe 가 모두 inactive 이거나 범위 밖이면 다음 cascade, 그다음 IBL</td><td>리뷰</td><td>OW7</td><td>I2</td><td class="num">0.5일</td><td class="rank">-</td></tr>
+        <tr id="i9"><td><span class="id">I9</span></td><td>memory 압축: distance 를 정규화해 <code>R16G16_FLOAT</code>, ray data 8 B packing, BLAS compaction</td><td>Majercik 2019 Figure 12 (format 비교), 리뷰</td><td>OW2</td><td></td><td class="num">1일</td><td class="rank">-</td></tr>
+        <tr id="i10"><td><span class="id">I10</span></td><td>ray 예산 scheduler: volume 별 갱신 주기, round-robin, 새 probe 우선</td><td>Majercik 2021 (향후 과제의 per-frame ray budget). round-robin 은 idea 출처: RTXGI-DDGI UE4 plugin</td><td>OW2, OW3</td><td></td><td class="num">1.5일</td><td class="rank">-</td></tr>
+        <tr id="i11"><td><span class="id">I11</span></td><td>probe trace 와 blend 성능: dispatch 배치 A/B (같은 ray index × 이웃 probe), blend 의 groupshared memory</td><td>리뷰, Majercik 2021 의 blend compute shader</td><td>OW2</td><td></td><td class="num">1일</td><td class="rank">-</td></tr>
+        <tr id="i12"><td><span class="id">I12</span></td><td>alpha test 와 two-sided 정책: MASK geometry 를 non-opaque 로 두고 ray 종류별로 <code>FORCE_OPAQUE</code> 를 고름, 뒷면 hit 처리</td><td>probe update 에서 material 을 끄는 방식은 idea 출처: RTXGI-DDGI UE4 plugin, 리뷰</td><td>OW6, OW2</td><td></td><td class="num">1.5일</td><td class="rank">-</td></tr>
+        <tr id="i13"><td><span class="id">I13</span></td><td>동적 물체: instance 이동, rigid 물체의 GI 기여, skinned test asset 과 공중 경로</td><td>이 문서</td><td>OW7</td><td></td><td class="num">2일</td><td class="rank">-</td></tr>
+        <tr id="i14"><td><span class="id">I14</span></td><td>sky 를 sun 각도에 맞춤 (밝기 scale 또는 procedural sky)</td><td>이 문서</td><td>OW4</td><td></td><td class="num">1일</td><td class="rank">-</td></tr>
+        <tr id="i15"><td><span class="id">I15</span></td><td>far-field: far clip 확장, 저빈도 바깥 cascade 또는 sky visibility</td><td>리뷰</td><td>OW1</td><td>I5</td><td class="num">1일</td><td class="rank">-</td></tr>
+        <tr id="i16"><td><span class="id">I16</span></td><td>probe variability 기반 수렴 판단, async compute</td><td>idea 출처: RTXGI-DDGI</td><td>OW2</td><td></td><td class="num">1.5일</td><td class="rank">-</td></tr>
+        <tr id="i17"><td><span class="id">I17</span></td><td>quality preset 과 runtime parameter (ray 수, probe 수, 갱신 주기)</td><td>이 문서</td><td>OW8</td><td></td><td class="num">1일</td><td class="rank">-</td></tr>
+        <tr id="i18"><td><span class="id">I18</span></td><td>실내와 동굴용 local volume 을 cascade 보다 먼저 쓰는 구조</td><td>Majercik 2021 §7.4, idea 출처: RTXGI-DDGI</td><td>OW6</td><td></td><td class="num">2일</td><td class="rank">-</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 id="i5-start"><span class="n">6.5</span>I5 를 고를 때의 출발점</h3>
+  <p class="note">I5 (다중 cascade) 를 고르면 아래 값에서 시작한다. 고르지 않으면 이 절은 참고 자료다.</p>
+  <div class="tbl">
+    <table>
+      <thead><tr><th></th><th>C0</th><th>C1</th><th>C2</th></tr></thead>
+      <tbody>
+        <tr><td>probe 간격</td><td class="num">2 m</td><td class="num">4 m</td><td class="num">8 m</td></tr>
+        <tr><td>probe 수</td><td class="num">24×12×24</td><td class="num">24×12×24</td><td class="num">24×12×24</td></tr>
+        <tr><td>수평 범위 (양 끝 probe 사이)</td><td class="num">±23 m</td><td class="num">±46 m</td><td class="num">±92 m</td></tr>
+        <tr><td>갱신 주기 (I10 을 쓸 때)</td><td class="num">매 frame</td><td class="num">2 frame</td><td class="num">4 frame</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <figure class="fig">
+    <div class="fig-scroll" style="max-width: 440px;">
+      <svg viewBox="0 0 420 424" role="img" aria-label="위에서 본 cascade 배치. camera 를 중심으로 C0 는 2 m 간격, C1 은 4 m 간격, C2 는 8 m 간격의 probe 를 24 × 24 개씩 둔다.">
+        <defs>
+          <pattern id="p-c2" patternUnits="userSpaceOnUse" x="30" y="30" width="15" height="15"><circle class="f-c2" cx="7.5" cy="7.5" r="1.6"/></pattern>
+          <pattern id="p-c1" patternUnits="userSpaceOnUse" x="120" y="120" width="7.5" height="7.5"><circle class="f-c1" cx="3.75" cy="3.75" r="1.1"/></pattern>
+          <pattern id="p-c0" patternUnits="userSpaceOnUse" x="165" y="165" width="3.75" height="3.75"><circle class="f-c0" cx="1.875" cy="1.875" r="0.75"/></pattern>
+        </defs>
+        <rect x="30" y="30" width="360" height="360" fill="url(#p-c2)"/>
+        <rect class="s-c2" x="30" y="30" width="360" height="360"/>
+        <rect class="f-surf" x="120" y="120" width="180" height="180"/>
+        <rect x="120" y="120" width="180" height="180" fill="url(#p-c1)"/>
+        <rect class="s-c1" x="120" y="120" width="180" height="180"/>
+        <rect class="f-surf" x="165" y="165" width="90" height="90"/>
+        <rect x="165" y="165" width="90" height="90" fill="url(#p-c0)"/>
+        <rect class="s-c0" x="165" y="165" width="90" height="90"/>
+        <polygon class="f-ray" points="210,200 218,216 202,216"/>
+        <text class="tv halo" x="34" y="22">C2  8 m 간격</text>
+        <text class="tv halo" x="124" y="113">C1  4 m</text>
+        <text class="tv halo" x="169" y="158">C0  2 m</text>
+        <text class="ts halo" x="222" y="232">camera</text>
+        <line class="ln" x1="30" y1="406" x2="120" y2="406"/>
+        <line class="ln" x1="30" y1="401" x2="30" y2="411"/>
+        <line class="ln" x1="120" y1="401" x2="120" y2="411"/>
+        <text class="tm" x="128" y="410">48 m</text>
+      </svg>
+    </div>
+    <figcaption>위에서 본 배치이고 축척이 맞다. 점 하나가 probe 하나이고, 사각형은 probe 24개가 차지하는 칸의 경계다. camera 가 움직이면 세 격자가 각자의 간격 단위로 따라간다. 세로 방향은 12 층이라 범위가 절반이다.</figcaption>
+  </figure>
+  <figure class="fig">
+    <div class="legend"><span><i class="sw-c0"></i>C0</span><span><i class="sw-c1"></i>C1</span><span><i class="sw-c2"></i>C2</span><span><i class="sw-ref"></i>기본 volume (비교용)</span></div>
+    <div class="fig-scroll w-mid">
+      <svg viewBox="0 0 760 186" role="img" aria-label="frame 당 probe ray 수. I5 를 매 frame 전체 갱신하면 2,654,208 개, I10 으로 갱신 주기를 1, 2, 4 frame 으로 나누면 1,548,288 개, 기본 volume 은 2,725,888 개다.">
+        <line class="gl" x1="150" y1="12" x2="150" y2="150"/>
+        <line class="gl" x1="336.7" y1="12" x2="336.7" y2="150"/>
+        <line class="gl" x1="523.3" y1="12" x2="523.3" y2="150"/>
+        <line class="gl" x1="710" y1="12" x2="710" y2="150"/>
+        <text class="ts" x="140" y="38" text-anchor="end">I5, 매 frame 갱신</text>
+        <rect class="f-c0" x="150" y="20" width="163.2" height="28" rx="2"><title>C0: 884,736 ray</title></rect>
+        <rect class="f-c1" x="315.2" y="20" width="163.2" height="28" rx="2"><title>C1: 884,736 ray</title></rect>
+        <rect class="f-c2" x="480.3" y="20" width="165.2" height="28" rx="2"><title>C2: 884,736 ray</title></rect>
+        <text class="tv" x="653" y="39">2,654,208</text>
+        <text class="ts" x="140" y="82" text-anchor="end">I5 + I10</text>
+        <rect class="f-c0" x="150" y="64" width="163.2" height="28" rx="2"><title>C0: 884,736 ray</title></rect>
+        <rect class="f-c1" x="315.2" y="64" width="80.6" height="28" rx="2"><title>C1: 442,368 ray</title></rect>
+        <rect class="f-c2" x="397.7" y="64" width="41.3" height="28" rx="2"><title>C2: 221,184 ray</title></rect>
+        <text class="tv" x="447" y="83">1,548,288</text>
+        <text class="ts" x="140" y="126" text-anchor="end">기본 volume</text>
+        <rect class="f-ref" x="150" y="108" width="508.8" height="28" rx="2"><title>22³ probe × 256 ray = 2,725,888 ray</title></rect>
+        <text class="tv" x="666" y="127">2,725,888</text>
+        <g class="tm">
+          <text x="150" y="170" text-anchor="middle">0</text>
+          <text x="336.7" y="170" text-anchor="middle">100만</text>
+          <text x="523.3" y="170" text-anchor="middle">200만</text>
+          <text x="710" y="170" text-anchor="middle">300만</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption>frame 당 probe ray 수 (계산값, probe 당 128 ray, shadow ray 제외). 앞면 hit 마다 shadow ray 가 하나씩 더해진다.</figcaption>
+  </figure>
+  <figure class="fig">
+    <div class="legend"><span><i class="sw-c0"></i>C0 atlas</span><span><i class="sw-c1"></i>C1 atlas</span><span><i class="sw-c2"></i>C2 atlas</span><span><i class="sw-ray"></i>ray buffer</span></div>
+    <div class="fig-scroll w-mid">
+      <svg viewBox="0 0 760 186" role="img" aria-label="I5 의 memory. 기본 format 이면 cascade atlas 50.8 MiB 와 ray buffer 23.6 MiB 로 74.4 MiB 라 상한 64 MiB 를 넘는다. I9 로 distance 를 정규화하면 54.2 MiB, ray data 를 8 B 로 줄이면 42.3 MiB 다.">
+        <line class="gl" x1="150" y1="14" x2="150" y2="150"/>
+        <line class="gl" x1="262" y1="14" x2="262" y2="150"/>
+        <line class="gl" x1="374" y1="14" x2="374" y2="150"/>
+        <line class="gl" x1="486" y1="14" x2="486" y2="150"/>
+        <line class="gl" x1="710" y1="14" x2="710" y2="150"/>
+        <line class="dl" x1="598" y1="14" x2="598" y2="150"/>
+        <text class="tv" x="594" y="10" text-anchor="end">상한 64 MiB (OW2)</text>
+        <text class="ts" x="140" y="38" text-anchor="end">기본 format</text>
+        <rect class="f-c0" x="150" y="20" width="116.5" height="28" rx="2"><title>C0 atlas 16.9 MiB (distance R32G32)</title></rect>
+        <rect class="f-c1" x="268.5" y="20" width="116.5" height="28" rx="2"><title>C1 atlas 16.9 MiB</title></rect>
+        <rect class="f-c2" x="387" y="20" width="116.5" height="28" rx="2"><title>C2 atlas 16.9 MiB</title></rect>
+        <rect class="f-ray" x="505.5" y="20" width="165.4" height="28" rx="2"><title>ray buffer 23.6 MiB (12,096 probe × 128 ray × 16 B)</title></rect>
+        <text class="tv" x="679" y="39">74.4 MiB</text>
+        <text class="ts" x="140" y="82" text-anchor="end">I9 distance 정규화</text>
+        <rect class="f-c0" x="150" y="64" width="69.3" height="28" rx="2"><title>C0 atlas 10.2 MiB (distance R16G16)</title></rect>
+        <rect class="f-c1" x="221.3" y="64" width="69.3" height="28" rx="2"><title>C1 atlas 10.2 MiB</title></rect>
+        <rect class="f-c2" x="292.5" y="64" width="69.3" height="28" rx="2"><title>C2 atlas 10.2 MiB</title></rect>
+        <rect class="f-ray" x="363.8" y="64" width="165.4" height="28" rx="2"><title>ray buffer 23.6 MiB</title></rect>
+        <text class="tv" x="537" y="83">54.2 MiB</text>
+        <text class="ts" x="140" y="126" text-anchor="end">I9 + ray data 8 B</text>
+        <rect class="f-c0" x="150" y="108" width="69.3" height="28" rx="2"><title>C0 atlas 10.2 MiB</title></rect>
+        <rect class="f-c1" x="221.3" y="108" width="69.3" height="28" rx="2"><title>C1 atlas 10.2 MiB</title></rect>
+        <rect class="f-c2" x="292.5" y="108" width="69.3" height="28" rx="2"><title>C2 atlas 10.2 MiB</title></rect>
+        <rect class="f-ray" x="363.8" y="108" width="82.7" height="28" rx="2"><title>ray buffer 11.8 MiB (radiance R11G11B10 packing + hit 거리)</title></rect>
+        <text class="tv" x="454" y="127">42.3 MiB</text>
+        <g class="tm">
+          <text x="150" y="170" text-anchor="middle">0</text>
+          <text x="262" y="170" text-anchor="middle">16</text>
+          <text x="374" y="170" text-anchor="middle">32</text>
+          <text x="486" y="170" text-anchor="middle">48</text>
+          <text x="598" y="170" text-anchor="middle">64</text>
+          <text x="710" y="170" text-anchor="middle">80 MiB</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption>I5 의 resource memory (계산값). ray buffer 는 volume 전체가 아니라 I10 의 주기로 frame 당 갱신하는 probe 12,096 개만큼 잡는다. 기본 format (distance <code>R32G32_FLOAT</code>) 그대로면 상한을 넘으므로 I5 는 I9 에 의존한다.</figcaption>
+  </figure>
+  <figure class="fig">
+    <div class="fig-scroll w-mid w-cap">
+      <svg viewBox="0 0 640 132" role="img" aria-label="cascade 셋을 Texture2DArray 하나에 쌓으면 slice 36장 중 0부터 11은 C0, 12부터 23은 C1, 24부터 35는 C2 다.">
+        <g class="f-c0">
+          <rect x="24" y="34" width="10" height="64" rx="1"/><rect x="38" y="34" width="10" height="64" rx="1"/><rect x="52" y="34" width="10" height="64" rx="1"/><rect x="66" y="34" width="10" height="64" rx="1"/><rect x="80" y="34" width="10" height="64" rx="1"/><rect x="94" y="34" width="10" height="64" rx="1"/><rect x="108" y="34" width="10" height="64" rx="1"/><rect x="122" y="34" width="10" height="64" rx="1"/><rect x="136" y="34" width="10" height="64" rx="1"/><rect x="150" y="34" width="10" height="64" rx="1"/><rect x="164" y="34" width="10" height="64" rx="1"/><rect x="178" y="34" width="10" height="64" rx="1"/>
+        </g>
+        <g class="f-c1">
+          <rect x="236" y="34" width="10" height="64" rx="1"/><rect x="250" y="34" width="10" height="64" rx="1"/><rect x="264" y="34" width="10" height="64" rx="1"/><rect x="278" y="34" width="10" height="64" rx="1"/><rect x="292" y="34" width="10" height="64" rx="1"/><rect x="306" y="34" width="10" height="64" rx="1"/><rect x="320" y="34" width="10" height="64" rx="1"/><rect x="334" y="34" width="10" height="64" rx="1"/><rect x="348" y="34" width="10" height="64" rx="1"/><rect x="362" y="34" width="10" height="64" rx="1"/><rect x="376" y="34" width="10" height="64" rx="1"/><rect x="390" y="34" width="10" height="64" rx="1"/>
+        </g>
+        <g class="f-c2">
+          <rect x="448" y="34" width="10" height="64" rx="1"/><rect x="462" y="34" width="10" height="64" rx="1"/><rect x="476" y="34" width="10" height="64" rx="1"/><rect x="490" y="34" width="10" height="64" rx="1"/><rect x="504" y="34" width="10" height="64" rx="1"/><rect x="518" y="34" width="10" height="64" rx="1"/><rect x="532" y="34" width="10" height="64" rx="1"/><rect x="546" y="34" width="10" height="64" rx="1"/><rect x="560" y="34" width="10" height="64" rx="1"/><rect x="574" y="34" width="10" height="64" rx="1"/><rect x="588" y="34" width="10" height="64" rx="1"/><rect x="602" y="34" width="10" height="64" rx="1"/>
+        </g>
+        <text class="t" x="24" y="24">C0 (2 m)</text>
+        <text class="t" x="236" y="24">C1 (4 m)</text>
+        <text class="t" x="448" y="24">C2 (8 m)</text>
+        <text class="tm" x="24" y="118">slice 0 ~ 11</text>
+        <text class="tm" x="236" y="118">slice 12 ~ 23</text>
+        <text class="tm" x="448" y="118">slice 24 ~ 35</text>
+      </svg>
+    </div>
+    <figcaption>cascade 가 모두 같은 probe 수를 쓰면 한 <code>Texture2DArray</code> 안에 cascade 별 slice 범위를 둘 수 있다. 그러면 cascade 수와 무관하게 DefaultPS 가 받는 SRV 는 3개로 유지된다 (<a class="ref" href="#d-6">D-6</a>). slice 한 장이 probe 한 층 (24 × 24) 이고 irradiance 는 192 × 192 texel 이다.</figcaption>
+  </figure>
 </section>
 
 <section id="s7" aria-labelledby="h-s7">
   <h2 id="h-s7"><span class="n">7</span>일정</h2>
   <div class="prose">
     <p>매주 금요일이 발표일이다. 금요일 발표가 끝나면 다음 sprint 를 계획하고, 토요일부터 목요일까지 6일 동안 개발해 목요일에 그 주의 개발을 끝낸다. 첫 sprint 만 10/19 (월) 에 시작해 4일이다. 기간은 <a href="#overview">한눈에 보기</a> 그림에 있다.</p>
-    <p>11/26 까지 개발 가능일은 34일이다. DDGI 에 22일 (M1 4일, M2 3일, M3 5일, M4 4일, M5 6일), RT Reflection 에 12일 (W6, W7 sprint) 을 쓴다. 11/28 ~ 12/3 은 buffer 로 두고 계획된 작업을 넣지 않는다.</p>
+    <p>11/26 까지 개발 가능일은 34일이다. 1단계 기본 구현에 16일 (M1 4일, M2 5일, M3 7일), 2단계 측정과 개선에 6일, RT Reflection 에 12일 (W6, W7 sprint) 을 쓴다. 11/28 ~ 12/3 은 buffer 로 두고 계획된 작업을 넣지 않는다.</p>
   </div>
 
   <h3 id="s7-1"><span class="n">7.1</span>주간 계획</h3>
@@ -1155,28 +1218,27 @@ details .refs code { font-size: 11.5px; }
     <table>
       <thead><tr><th>발표</th><th>개발 기간</th><th>그 주에 끝낼 작업</th><th>발표에서 보여줄 것</th><th>상태</th></tr></thead>
       <tbody>
-        <tr><td class="num">W2 10/23</td><td class="num">10/19 ~ 10/22<br>4일</td><td><a class="ref" href="#m1">M1</a> 필수 (M1-1 ~ M1-6)</td><td>RayQuery 로 그린 Sponza debug view (hit 거리, instance, normal, base color, front face), raster 와의 depth 불일치 비율, PIX 로 본 AS</td><td><span class="status doing">진행</span></td></tr>
-        <tr><td class="num">W3 10/30</td><td class="num">10/24 ~ 10/29<br>6일</td><td><a class="ref" href="#m2">M2</a> (M2-1 ~ M2-5), <a class="ref" href="#m3-1">M3-1</a>, <a class="ref" href="#m3-2">M3-2</a>, <a class="ref" href="#m3-3">M3-3</a>, <a class="ref" href="#m3-5">M3-5</a></td><td>sun 직접광이 돌아온 raster 화면, path tracer 정답 이미지 (간접광 유무 비교), probe sphere 로 본 첫 irradiance</td><td><span class="status todo">예정</span></td></tr>
-        <tr><td class="num">W4 11/6</td><td class="num">10/31 ~ 11/5<br>6일</td><td><a class="ref" href="#m3-4">M3-4</a>, <a class="ref" href="#m3-6">M3-6</a>, <a class="ref" href="#m4">M4</a> (M4-1 ~ M4-6), 남았으면 <a class="ref" href="#m1-8">M1-8</a></td><td>Sponza 의 DDGI on/off 비교, reference 대비 오차, relocation 과 classification 전후의 leak, pass 별 GPU time</td><td><span class="status todo">예정</span></td></tr>
-        <tr><td class="num">W5 11/13</td><td class="num">11/7 ~ 11/12<br>6일</td><td><a class="ref" href="#m5">M5</a> (M5-1 ~ M5-6), 남았으면 <a class="ref" href="#m1-7">M1-7</a></td><td>open world layout 의 30 m/s 비행, time of day, OW 측정표. DDGI 개발 완료</td><td><span class="status todo">예정</span></td></tr>
+        <tr><td class="num">W2 10/23</td><td class="num">10/19 ~ 10/22<br>4일</td><td><p><span class="lbl">필수</span><a class="ref" href="#m1-1">M1-1</a> <a class="ref" href="#m1-2">M1-2</a> <a class="ref" href="#m1-3">M1-3</a> <a class="ref" href="#m1-4">M1-4</a> <a class="ref" href="#m1-5">M1-5</a> <a class="ref" href="#m1-6">M1-6</a></p></td><td><p><span class="lbl">최소</span>RayQuery 로 그린 Sponza debug view (hit 거리, instance, front face, normal), depth 불일치 mask 와 비율, PIX 로 본 AS</p><p><span class="lbl">목표</span>base color view 추가</p></td><td><span class="status doing">진행</span></td></tr>
+        <tr><td class="num">W3 10/30</td><td class="num">10/24 ~ 10/29<br>6일</td><td><p><span class="lbl">필수</span><a class="ref" href="#m2-1">M2-1</a> <a class="ref" href="#m2-2">M2-2</a> <a class="ref" href="#m2-3">M2-3</a> <a class="ref" href="#m2-4">M2-4</a> <a class="ref" href="#m2-5">M2-5</a> <a class="ref" href="#m2-6">M2-6</a> <a class="ref" href="#m3-1">M3-1</a></p><p><span class="lbl">시간 나면</span><a class="ref" href="#m3-2">M3-2</a></p></td><td><p><span class="lbl">최소</span>sun 직접광이 돌아온 raster 화면, path tracer 정답 이미지 (간접광 유무 비교), furnace 수치</p><p><span class="lbl">목표</span>첫 probe trace 결과 (ray data view)</p></td><td><span class="status todo">예정</span></td></tr>
+        <tr><td class="num">W4 11/6</td><td class="num">10/31 ~ 11/5<br>6일</td><td><p><span class="lbl">필수</span><a class="ref" href="#m3-2">M3-2</a> <a class="ref" href="#m3-3">M3-3</a> <a class="ref" href="#m3-4">M3-4</a> <a class="ref" href="#m3-5">M3-5</a> <a class="ref" href="#m3-6">M3-6</a> <a class="ref" href="#m3-7">M3-7</a>, <a href="#gate">기본 완성 검증</a></p></td><td><p><span class="lbl">최소</span>기본 DDGI on/off 비교, probe sphere, reference 대비 오차와 원인 분류 (검증 결과)</p><p><span class="lbl">목표</span>pass 별 GPU time, memory</p></td><td><span class="status todo">예정</span></td></tr>
+        <tr><td class="num">W5 11/13</td><td class="num">11/7 ~ 11/12<br>6일</td><td><p><span class="lbl">필수</span><a class="ref" href="#p-1">P-1</a> <a class="ref" href="#p-2">P-2</a>, <a class="ref" href="#p-3">P-3</a> (순위대로)</p><p><span class="lbl">필요하면</span><a class="ref" href="#p-4">P-4</a></p></td><td><p><span class="lbl">최소</span>기본 구현의 OW 측정표, 개선 우선순위와 근거, 적용한 개선의 전후 비교</p><p>DDGI 개발 완료</p></td><td><span class="status todo">예정</span></td></tr>
         <tr><td class="num">W6 11/20</td><td class="num">11/14 ~ 11/19<br>6일</td><td>RT Reflection (이 문서 범위 밖)</td><td>RT Reflection 계획에서 정한다</td><td></td></tr>
-        <tr><td class="num">W7 11/27</td><td class="num">11/21 ~ 11/26<br>6일</td><td>RT Reflection (이 문서 범위 밖)</td><td>모든 개발 완료</td><td></td></tr>
-        <tr><td class="num">W8 12/4</td><td class="num">11/28 ~ 12/3</td><td>buffer. 계획된 작업 없음</td><td>최종 발표</td><td></td></tr>
+        <tr><td class="num">W7 11/27</td><td class="num">11/21 ~ 11/26<br>6일</td><td>RT Reflection (이 문서 범위 밖)</td><td>DDGI 와 RT Reflection 을 함께 켠 화면</td><td></td></tr>
+        <tr><td class="num">W8 12/4</td><td class="num">buffer<br>11/28 ~ 12/3</td><td>계획된 작업 없음</td><td>최종 발표</td><td></td></tr>
       </tbody>
     </table>
   </div>
-  <p class="note">권장 작업은 표의 sprint 에서 시간이 남을 때 하고, 남지 않으면 그 작업이 필요한 sprint 로 넘긴다. M1-7 은 M5-1 의 전제이고, M1-8 은 M4-5 의 전제다. 선택 작업 (M1-9, M3-7, M5-7) 은 표에 넣지 않았다.</p>
+  <p class="note">작업량은 W2 와 W4 가 가장 빡빡하다. 일정 리뷰의 추정으로는 1단계 필수 작업이 가용일보다 2~3일 많다 <span class="guess">(추측)</span>. 넘칠 때는 7.2 의 규칙을 따른다.</p>
 
-  <h3 id="s7-2"><span class="n">7.2</span>DDGI 최소 완성과 일정 조정</h3>
+  <h3 id="s7-2"><span class="n">7.2</span>일정 조정 규칙</h3>
   <div class="prose">
-    <p>11/12 (목) 까지 반드시 있어야 하는 것은 모든 <span class="pri must">필수</span> 작업이다 (<a href="#s6">6장</a>에서 "필수만" 보기). 요약하면 "scrolling 하는 cascade 하나가 relocation, classification, time of day 대응과 함께 동작하고, reference 와 비교한 수치가 있는 상태" 다. 권장과 선택 작업은 남는 시간에 하거나, RT Reflection 이후의 개선 목록으로 옮긴다.</p>
-    <p>목요일에 그 주의 개발이 끝나면 아래 조건을 확인하고, 금요일 발표 뒤 다음 sprint 계획에 반영한다.</p>
+    <p>목요일에 그 주의 개발이 끝나면 아래 조건을 확인하고, 금요일 발표 뒤 다음 sprint 계획에 반영한다. 규칙마다 실제로 빼거나 미루는 작업을 적었다.</p>
   </div>
   <ol class="checks">
-    <li><time>10/22 목</time><div class="c"><p class="if">M1 필수가 끝나지 않았으면</p><p>남은 M1 필수를 W3 sprint 첫날에 끝낸다. <a class="ref" href="#m1-7">M1-7</a>, <a class="ref" href="#m1-8">M1-8</a> 은 W5, W4 sprint 로 넘기고, <a class="ref" href="#m2-3">M2-3</a> 의 출력을 (b) 간접 irradiance 하나로 줄인다.</p></div></li>
-    <li><time>10/29 목</time><div class="c"><p class="if">M2 나 M3-3 이 끝나지 않았으면</p><p><code>HitLighting</code> (<a class="ref" href="#m2-2">M2-2</a>) 을 먼저 끝내고, reference (<a class="ref" href="#m2-3">M2-3</a>, <a class="ref" href="#m2-4">M2-4</a>) 는 W4 sprint 에서 M4 와 병행한다. 남은 M3 작업은 W4 sprint 의 첫 작업으로 둔다.</p></div></li>
-    <li><time>11/5 목</time><div class="c"><p class="if">M4 필수가 끝나지 않았으면</p><p>M5 의 cascade 를 1개로 고정하고 <a class="ref" href="#m5-4">M5-4</a>, <a class="ref" href="#m5-5">M5-5</a> 를 미룬다.</p></div></li>
-    <li><time>11/12 목</time><div class="c"><p class="if">DDGI 최소 완성이 안 됐으면</p><p>W6 sprint 의 첫 2일 (11/14, 11/15) 까지 연장하고, 줄어든 기간은 RT Reflection 계획에서 반영한다.</p></div></li>
+    <li><time>10/22 목</time><div class="c"><p class="if">M1 필수가 끝나지 않았으면</p><p>W2 발표는 최소 내용으로 한다. 남은 M1 을 W3 sprint 첫날에 끝내고, 그만큼 <a class="ref" href="#m2-3">M2-3</a> 의 출력을 (b) 하나로 줄인다.</p></div></li>
+    <li><time>10/29 목</time><div class="c"><p class="if">M2 가 끝나지 않았으면</p><p>남은 M2 를 W4 sprint 첫날에 끝낸다. 그만큼 <a class="ref" href="#m3-6">M3-6</a> 에서 atlas view 와 multi-bounce on/off 를 빼고 probe sphere 와 DDGI on/off 만 남긴다.</p></div></li>
+    <li><time>11/5 목</time><div class="c"><p class="if">기본 완성 검증을 통과하지 못했으면</p><p>W5 sprint 첫 2일 (11/7, 11/8) 을 기본 완성에 쓴다. <a class="ref" href="#p-1">P-1</a> 은 간접광 tile 지표만 만들고, <a class="ref" href="#p-3">P-3</a> 는 남은 날짜에 들어가는 상위 후보만 한다. W5 발표는 기본 DDGI 검증 결과와 측정표가 된다.</p></div></li>
+    <li><time>11/12 목</time><div class="c"><p class="if">DDGI 개발 완료일</p><p>P-3 에서 못 한 후보는 RT Reflection 이후 목록에 남긴다. 기본 완성이 이날까지도 안 됐으면 11/14, 11/15 까지 연장하고, 줄어든 기간은 RT Reflection 계획에서 반영한다.</p></div></li>
     <li><time>11/26 목</time><div class="c"><p class="if">모든 개발이 끝나지 않았으면</p><p>남은 필수 작업만 buffer 주 (11/28 ~ 12/3) 에서 끝낸다. buffer 주에는 새 작업을 시작하지 않는다.</p></div></li>
   </ol>
 </section>
@@ -1184,15 +1246,15 @@ details .refs code { font-size: 11.5px; }
 <section id="s8" aria-labelledby="h-s8">
   <h2 id="h-s8"><span class="n">8</span>검증과 측정</h2>
   <div class="rows">
-    <div class="row"><span class="k">API 사용의 정확성</span><p>debug layer, GPU-based validation (<code>-gpu_debug 1</code>), PIX 의 AS viewer</p></div>
-    <div class="row"><span class="k">화질</span><p><a class="ref" href="#m2-4">M2-4</a> 의 capture 와 비교 script. 고정 시점 목록 (<a class="ref" href="#m2-5">M2-5</a>) 과 leak 측정 위치 (<a class="ref" href="#m4-4">M4-4</a>) 에서 reference 와 비교</p></div>
-    <div class="row"><span class="k">시간 특성</span><p>연속 frame capture 의 변화량으로 <a class="ref" href="#ow3">OW3</a> (수렴 시간), <a class="ref" href="#ow4">OW4</a> (반응 시간), <a class="ref" href="#ow5">OW5</a> (정지 안정성) 를 계산</p></div>
-    <div class="row"><span class="k">성능</span><p>Profile 구성, 1080p, <code>ScopedTimer</code> 의 pass 별 GPU time. 고정 경로 비행의 평균과 최대</p></div>
+    <div class="row"><span class="k">API 사용의 정확성</span><p>Debug 구성, 또는 <code>-debug 1 -gpu_debug 1</code> (<a href="#s4-3">4.3</a>). PIX 의 AS viewer</p></div>
+    <div class="row"><span class="k">화질</span><p><a class="ref" href="#m2-4">M2-4</a> 의 capture 와 비교 script. 고정 시점 (<a class="ref" href="#m2-5">M2-5</a>) 과 leak 측정 위치에서 reference 와 비교</p></div>
+    <div class="row"><span class="k">시간 특성</span><p><a class="ref" href="#p-1">P-1</a> 의 간접광 tile 지표로 OW3 (수렴 시간), OW4 (반응 시간), OW5 (정지 안정성) 를 계산</p></div>
+    <div class="row"><span class="k">성능</span><p>Profile 구성, 1080p, <code>ScopedTimer</code> 의 pass 별 GPU time (<a class="ref" href="#m3-7">M3-7</a>). 고정 경로 비행의 평균과 최대</p></div>
     <div class="row"><span class="k">기록</span><p><code>docs/ddgi-measurements.md</code> (<a class="ref" href="#m1-6">M1-6</a>). 측정 날짜, commit, 설정, 값</p></div>
   </div>
   <ul class="list">
     <li>capture 비교와 측정 집계처럼 규칙으로 처리할 수 있는 일은 <code>scripts/</code> 의 script 로 한다.</li>
-    <li>비교할 때는 TAA jitter 를 끄고 같은 시점, 같은 sun 방향을 쓴다.</li>
+    <li>비교할 때는 TAA jitter 를 끄고 같은 시점, 같은 sun 방향을 쓴다. 시간 지표는 노출을 적용하기 전의 HDR 로 잰다.</li>
   </ul>
 </section>
 
@@ -1200,10 +1262,11 @@ details .refs code { font-size: 11.5px; }
   <h2 id="h-s9"><span class="n">9</span>RT Reflection 과의 연결점</h2>
   <p class="note">RT Reflection 은 이 문서 범위 밖이다. 아래는 DDGI 단계에서 미리 지켜야 그 단계가 다시 만들지 않아도 되는 것이다. 왼쪽이 DDGI 단계의 산출물, 오른쪽이 RT Reflection 에서의 쓰임이다.</p>
   <div class="handoff">
-    <div class="ho"><div><b>TLAS, geometry table, bindless</b><span class="ref-wrap"><a class="ref" href="#m1">M1</a></span><p class="keep"><b>지킬 것</b> instance mask 에 "반사에 보임" 범주를 넣을 자리를 남긴다.</p></div><div class="arrow">→</div><div class="future">reflection ray 가 같은 장면을 trace 한다</div></div>
-    <div class="ho"><div><b><code>HitSurface</code></b><span><a class="ref" href="#m1-3">M1-3</a></span><p class="keep"><b>지킬 것</b> DDGI 가 쓰지 않는 roughness, metallic, normal map 까지 복원한다.</p></div><div class="arrow">→</div><div class="future">reflection hit 의 material</div></div>
+    <div class="ho"><div><b>TLAS, geometry table, bindless</b><span><a class="ref" href="#m1">M1</a></span><p class="keep"><b>지킬 것</b> instance mask 에 "반사에 보임" 범주를 넣을 자리를 남긴다. alpha test 를 ray 종류별로 고를 수 있게 둔다 (<a class="ref" href="#i12">I12</a>).</p></div><div class="arrow">→</div><div class="future">reflection ray 가 같은 장면을 trace 한다</div></div>
+    <div class="ho"><div><b><code>HitSurface</code></b><span><a class="ref" href="#m1-3">M1-3</a></span><p class="keep"><b>지킬 것</b> metallic, roughness, normal map 의 자리를 struct 에 두고, texture LOD 를 인자로 받는다.</p></div><div class="arrow">→</div><div class="future">reflection hit 의 material. 채우는 일은 RT Reflection 에서</div></div>
     <div class="ho"><div><b><code>HitLighting</code></b><span><a class="ref" href="#m2-2">M2-2</a></span><p class="keep"><b>지킬 것</b> 직접광 부분과 DDGI 간접광 부분을 분리된 함수로 둔다.</p></div><div class="arrow">→</div><div class="future">reflection hit 의 직접광과 그림자</div></div>
-    <div class="ho"><div><b><code>DDGISampling.hlsli</code></b><span><a class="ref" href="#m3-4">M3-4</a></span><p class="keep"><b>지킬 것</b> compute shader 에서 호출할 수 있고, hit 위치에 맞는 cascade 를 고른다.</p></div><div class="arrow">→</div><div class="future">reflection hit 의 간접광 (WEEK 1 계획)</div></div>
+    <div class="ho"><div><b><code>DDGISampling.hlsli</code></b><span><a class="ref" href="#m3-4">M3-4</a></span><p class="keep"><b>지킬 것</b> compute shader 에서 호출할 수 있고, view 방향 대신 입사 방향을 인자로 받는다.</p></div><div class="arrow">→</div><div class="future">reflection hit 의 간접광 (WEEK 1 계획)</div></div>
+    <div class="ho"><div><b>DefaultPS 의 합성</b><span><a class="ref" href="#m3-4">M3-4</a></span><p class="keep"><b>지킬 것</b> M3-4 에서 DefaultPS 를 고칠 때 specular IBL 을 더하는 자리를 따로 떼어 둔다.</p></div><div class="arrow">→</div><div class="future">specular IBL 을 reflection 결과로 교체</div></div>
     <div class="ho"><div><b>reference path tracer</b><span><a class="ref" href="#m2-3">M2-3</a></span><p class="keep"><b>지킬 것</b> BRDF 를 교체할 수 있는 구조로 둔다.</p></div><div class="arrow">→</div><div class="future">specular 검증</div></div>
     <div class="ho"><div><b>OW2 예산</b><span><a class="ref" href="#ow2">OW2</a></span><p class="keep"><b>지킬 것</b> DDGI 를 2 ms 상한 안에 묶는다.</p></div><div class="arrow">→</div><div class="future">reflection 에 쓸 GPU time</div></div>
   </div>
@@ -1213,52 +1276,59 @@ details .refs code { font-size: 11.5px; }
     <span>물체별 motion vector</span>
     <span>denoiser</span>
     <span><code>Specular_IBL</code> 교체</span>
+    <span>path tracer 의 specular BRDF</span>
+    <span>skinned mesh 의 BLAS</span>
   </div>
-  <p class="note">지금 velocity buffer 는 camera 움직임만 반영한다 (<code>MiniEngine/Core/MotionBlur.cpp:99-143</code>).</p>
+  <p class="note">지금 velocity buffer 는 camera 움직임만 반영한다 (<code>MiniEngine/Core/MotionBlur.cpp:99-143</code>). skinned mesh 가 TLAS 에 없으면 반사에도 보이지 않는다 (<a class="ref" href="#d-9">D-9</a>).</p>
 </section>
 
 <section id="s10" aria-labelledby="h-s10">
   <h2 id="h-s10"><span class="n">10</span>위험</h2>
   <div class="risk-grid">
-    <article class="risk" id="r1"><header><span class="id">R1</span><b>DXR 첫 경험</b></header><p>DX12, DXR 을 처음 다뤄 디버깅 시간이 길어진다.</p><p class="fix">단계마다 debug view 와 자동 검증을 붙이고, <code>-gpu_debug 1</code> 과 PIX 를 일찍 쓴다.</p></article>
-    <article class="risk" id="r2"><header><span class="id">R2</span><b>Ray 비용</b></header><p>laptop GPU 에서 incoherent probe ray 비용이 예산을 넘는다.</p><p class="fix">M3 에서 일찍 측정하고 ray 수, probe 수, 갱신 주기를 조정한다 (<a class="ref" href="#d-10">D-10</a>).</p></article>
+    <article class="risk" id="r1"><header><span class="id">R1</span><b>DXR 첫 경험</b></header><p>DX12, DXR 을 처음 다뤄 디버깅 시간이 길어진다.</p><p class="fix">단계마다 debug view 와 자동 검증을 붙이고, <code>-debug 1 -gpu_debug 1</code> 과 PIX 를 일찍 쓴다.</p></article>
+    <article class="risk" id="r2"><header><span class="id">R2</span><b>Ray 비용</b></header><p>기본 volume 은 frame 당 약 273만 ray 다 (<a href="#s5-3">5.3</a>). laptop GPU 에서 예산을 크게 넘을 수 있다.</p><p class="fix">M3-2 의 trace timer 로 W4 초에 잰다. 기본 구현이 진행되지 않을 만큼 느리면 ray 수를 줄이고, 예산 맞추기는 개선 후보 (<a class="ref" href="#i10">I10</a>, <a class="ref" href="#i11">I11</a>) 로 다룬다.</p></article>
     <article class="risk" id="r3"><header><span class="id">R3</span><b>HDR 잘림</b></header><p>HDR 이 잘리는 format, encoding 을 따라 써서 야외 간접광이 틀린다.</p><p class="fix"><a class="ref" href="#d-4">D-4</a></p></article>
-    <article class="risk" id="r4"><header><span class="id">R4</span><b>장면 단위</b></header><p>장면 단위 때문에 bias, epsilon 이 틀어진다.</p><p class="fix">값을 unit 이 아니라 m 기준으로 정하고 변환한다 (<a class="ref" href="#m4-3">M4-3</a>).</p></article>
-    <article class="risk" id="r5"><header><span class="id">R5</span><b>Test 장면의 한계</b></header><p>Sponza 는 open world 가 아니다. 식생, 지형 같은 대표 요소가 부족하다.</p><p class="fix"><a class="ref" href="#m5-1">M5-1</a> test layout. 부족한 요소는 측정의 한계로 기록한다.</p></article>
-    <article class="risk" id="r6"><header><span class="id">R6</span><b>Multi-draw Mesh 버그</b></header><p>다른 glTF 를 쓰면 multi-draw Mesh 버그가 BLAS 입력을 틀리게 만든다.</p><p class="fix"><a href="#s4-1">4.1</a> 의 버그 (<code>MiniEngine/Model/ModelConvert.cpp:152-155</code>) 를 먼저 고친다.</p></article>
-    <article class="risk" id="r7"><header><span class="id">R7</span><b>Skinned mesh</b></header><p>skinned mesh 는 ray 에 보이지 않는다.</p><p class="fix">의도한 범위다 (<a class="ref" href="#d-9">D-9</a>). character 가 만드는 간접 그림자는 없다.</p></article>
-    <article class="risk" id="r8"><header><span class="id">R8</span><b>일정</b></header><p>sprint 안에 여유일이 없고, 첫 sprint 는 4일뿐이다.</p><p class="fix"><a href="#s7-2">7.2</a> 의 조정 규칙. 그래도 남으면 buffer 주 (11/28 ~ 12/3) 에서 필수 작업만 끝낸다.</p></article>
+    <article class="risk" id="r4"><header><span class="id">R4</span><b>장면 단위</b></header><p>m 단위를 전제로 한 길이 값을 그대로 쓰면 bias, 거리 상한, distance 정밀도가 틀어진다.</p><p class="fix">길이 parameter 는 probe 간격 기준으로 정하고 (<a class="ref" href="#m3-1">M3-1</a>), distance 는 <code>R32G32_FLOAT</code> 로 둔다 (<a class="ref" href="#d-4">D-4</a>).</p></article>
+    <article class="risk" id="r5"><header><span class="id">R5</span><b>Test 장면의 한계</b></header><p>Sponza 는 open world 가 아니다. 식생, 지형 같은 대표 요소가 부족하다.</p><p class="fix">넓은 범위가 필요하면 <a class="ref" href="#p-4">P-4</a> 의 layout 을 쓴다. 부족한 요소는 측정의 한계로 기록한다.</p></article>
+    <article class="risk" id="r6"><header><span class="id">R6</span><b>Multi-draw Mesh 버그</b></header><p>다른 glTF 를 쓰면 multi-draw Mesh 버그가 BLAS 입력을 틀리게 만든다.</p><p class="fix"><a class="ref" href="#m1-1">M1-1</a> 의 지원 범위에서 assert 로 막고, 다른 glTF 를 쓰기 전에 <a href="#s4-1">4.1</a> 의 버그 (<code>MiniEngine/Model/ModelConvert.cpp:152-155</code>) 를 고친다.</p></article>
+    <article class="risk" id="r7"><header><span class="id">R7</span><b>Skinned mesh</b></header><p>skinned mesh 는 probe ray 와 reflection ray 에 보이지 않는다.</p><p class="fix">의도한 범위다 (<a class="ref" href="#d-9">D-9</a>). 수신 쪽 문제는 <a class="ref" href="#i8">I8</a>, <a class="ref" href="#i13">I13</a> 후보로 다룬다.</p></article>
+    <article class="risk" id="r8"><header><span class="id">R8</span><b>1단계 일정</b></header><p>1단계 필수 작업이 가용일보다 많을 수 있고, 첫 sprint 는 4일뿐이다.</p><p class="fix"><a href="#s7-2">7.2</a> 의 조정 규칙. 그래도 남으면 buffer 주 (11/28 ~ 12/3) 에서 필수 작업만 끝낸다.</p></article>
+    <article class="risk" id="r9"><header><span class="id">R9</span><b>정적 sky</b></header><p>sky 가 정적 cubemap 이라 time of day 의 sun 과 어긋난다.</p><p class="fix">개선 후보 <a class="ref" href="#i14">I14</a></p></article>
     <article class="risk" id="r10"><header><span class="id">R10</span><b>쉬는 날 없는 6주</b></header><p>주말 없이 6주를 이어서 개발하므로 후반 sprint 의 속도가 계획보다 떨어질 수 있다.</p><p class="fix">금요일은 개발 일수에 넣지 않았다. 속도가 떨어지면 <a href="#s7-2">7.2</a> 의 규칙으로 범위를 줄인다.</p></article>
-    <article class="risk" id="r9"><header><span class="id">R9</span><b>정적 sky</b></header><p>sky 가 정적 cubemap 이라 time of day 의 sun 과 어긋난다.</p><p class="fix">처음에는 sky 밝기를 sun 고도에 맞춰 scale 하고, procedural sky 는 선택 작업으로 둔다 (<a class="ref" href="#m5-7">M5-7</a>).</p></article>
+    <article class="risk" id="r11"><header><span class="id">R11</span><b>짧은 개선 기간</b></header><p>2단계의 개선 시간은 약 4일이라 후보 대부분은 RT Reflection 뒤로 간다.</p><p class="fix"><a class="ref" href="#p-2">P-2</a> 에서 W5 발표에 전후 비교를 보일 수 있는 상위 1~3개에 집중한다.</p></article>
   </div>
 </section>
 
 <section id="s11" aria-labelledby="h-s11">
   <h2 id="h-s11"><span class="n">11</span>Reference 지도</h2>
+  <p class="note">references 에 있는 자료는 논문 PDF 2편과 DirectX-Graphics-Samples 다 (README 의 참고 범위). RTXGI-DDGI 는 idea 만 참고하므로 코드 위치를 적지 않는다.</p>
   <div class="tbl tbl-ref">
     <table>
-      <thead><tr><th>주제</th><th>RTXGI-DDGI</th><th>D3D12RaytracingMiniEngineSample</th><th>논문, 문서</th></tr></thead>
+      <thead><tr><th>주제</th><th>논문, spec</th><th>코드 참고 (MIT)</th><th>idea 출처: RTXGI-DDGI</th></tr></thead>
       <tbody>
-        <tr><td>BLAS, TLAS build</td><td>(inline 경로 없음)</td><td><code>ModelViewer.cpp:720-872</code> (mesh 마다 BLAS 하나, 모두 opaque, 시작 때 한 번 build), <code>:854-855</code> (<code>ID3D12GraphicsCommandList4</code> 얻기)</td><td>DXR spec</td></tr>
-        <tr><td>hit 의 geometry, material</td><td><code>samples/test-harness/shaders/include/Descriptors.hlsl</code>, <code>RayTracing.hlsl</code>, <code>samples/test-harness/shaders/CHS.hlsl</code></td><td><code>DiffuseHitShaderLib.hlsl:36-59</code> (16-bit index 읽기). material 은 shader table 의 local root signature 로 찾으므로 inline 으로는 옮길 수 없다</td><td>DXR spec 의 RayQuery API, HLSL SM 6.6 spec 의 Dynamic Resources (bindless)</td></tr>
+        <tr><td>BLAS, TLAS build</td><td>DXR spec</td><td><code>ModelViewer.cpp:720-872</code> (mesh 마다 BLAS 하나, 모두 opaque, 시작 때 한 번 build), <code>:854-855</code> (<code>ID3D12GraphicsCommandList4</code> 얻기)</td><td></td></tr>
+        <tr><td>hit 의 geometry, material</td><td>DXR spec 의 RayQuery API, HLSL SM 6.6 spec 의 Dynamic Resources</td><td><code>DiffuseHitShaderLib.hlsl:36-59</code> (16-bit index 읽기). material 은 shader table 의 local root signature 로 찾으므로 inline 으로는 옮길 수 없다</td><td>geometry 와 material 을 global table 로 찾는 방식</td></tr>
         <tr><td>debug view 의 camera ray</td><td></td><td><code>ModelViewerRayTracing.h:48-61</code> (<code>GenerateCameraRay</code>)</td><td></td></tr>
-        <tr><td>hit lighting</td><td><code>samples/test-harness/shaders/include/Lighting.hlsl</code> (버그 주의, <a class="ref" href="#m2">M2</a>)</td><td></td><td></td></tr>
-        <tr><td>reference path tracer</td><td><code>samples/test-harness/shaders/PathTraceRGS.hlsl</code></td><td></td><td></td></tr>
-        <tr><td>probe trace</td><td><code>samples/test-harness/shaders/ddgi/ProbeTraceRGS.hlsl</code></td><td></td><td>Majercik 2019</td></tr>
-        <tr><td>blend, border</td><td><code>rtxgi-sdk/shaders/ddgi/ProbeBlendingCS.hlsl</code></td><td></td><td><code>docs/Math.md</code></td></tr>
-        <tr><td>sampling</td><td><code>rtxgi-sdk/shaders/ddgi/Irradiance.hlsl</code></td><td></td><td>Majercik 2019</td></tr>
-        <tr><td>relocation, classification</td><td><code>rtxgi-sdk/shaders/ddgi/ProbeRelocationCS.hlsl</code>, <code>ProbeClassificationCS.hlsl</code></td><td></td><td>Majercik 2021</td></tr>
-        <tr><td>scrolling</td><td><code>rtxgi-sdk/src/ddgi/DDGIVolume.cpp</code>, <code>rtxgi-sdk/shaders/ddgi/include/ProbeIndexing.hlsl</code></td><td></td><td><code>docs/DDGIVolume.md</code></td></tr>
-        <tr><td>여러 volume, 예산</td><td><code>ue4-plugin/4.27/RTXGI/</code></td><td></td><td><code>docs/Integration.md</code></td></tr>
-        <tr><td>probe 시각화</td><td><code>samples/test-harness/shaders/ddgi/visualizations/</code></td><td></td><td></td></tr>
+        <tr><td>hit lighting, reference path tracer</td><td></td><td></td><td>probe trace 와 path tracer 가 같은 광원 model 과 albedo 상한 (0.9) 을 쓰는 구성</td></tr>
+        <tr><td>probe trace</td><td>Majercik 2019, Majercik 2021 §2.3, §4.1</td><td></td><td>음수 거리로 뒷면 hit 표시</td></tr>
+        <tr><td>blend, border</td><td>Majercik 2019, Majercik 2021 §4.2, §4.3, Table 2</td><td></td><td>resource 마다 Texture2DArray, slice 하나가 probe 한 층</td></tr>
+        <tr><td>sampling</td><td>Majercik 2019, Majercik 2021 §4.1</td><td></td><td>volume 경계 fade, AO 와 함께 쓰는 구성</td></tr>
+        <tr><td>relocation, classification (I1, I2)</td><td>Majercik 2021 §5, §6</td><td></td><td>매 frame 조정, 고정 방향 ray</td></tr>
+        <tr><td>scrolling (I3, I4)</td><td>Majercik 2021 §7.3</td><td></td><td></td></tr>
+        <tr><td>여러 volume, 예산 (I5, I10, I18)</td><td>Majercik 2021 §7.4, 향후 과제의 ray budget</td><td></td><td>UE4 plugin 의 volume 우선순위, 경계 blend, ray budget round-robin</td></tr>
+        <tr><td>수렴 판단 (I16)</td><td></td><td></td><td>probe variability</td></tr>
+        <tr><td>기본 volume 설정 (5.3)</td><td>Majercik 2021 Table 2</td><td></td><td>Sponza 설정의 probe 수, 기본 ray 수</td></tr>
       </tbody>
     </table>
   </div>
   <ul class="list">
-    <li>외부 자료: <a href="https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html">DXR spec</a>, <a href="https://microsoft.github.io/DirectX-Specs/d3d/HLSL_SM_6_6_DynamicResources.html">HLSL SM 6.6 Dynamic Resources</a>, Majercik et al., <a href="https://jcgt.org/published/0008/02/01/">Dynamic Diffuse Global Illumination with Ray-Traced Irradiance Fields</a>, JCGT 2019 (Majercik 2019), Majercik et al., "Scaling Probe-Based Real-Time Dynamic Global Illumination for Production", JCGT 2021 (Majercik 2021).</li>
-    <li>RTXGI-DDGI 경로는 <code>references/RTXGI-DDGI/</code>, D3D12RaytracingMiniEngineSample 경로는 <code>references/DirectX-Graphics-Samples/Samples/Desktop/D3D12Raytracing/src/D3D12RaytracingMiniEngineSample/</code> 기준이다.</li>
+    <li>Majercik et al., <a href="https://jcgt.org/published/0008/02/01/">Dynamic Diffuse Global Illumination with Ray-Traced Irradiance Fields</a>, JCGT 2019 (Majercik 2019, <code>references/Majercik2019-DDGI.pdf</code>).</li>
+    <li>Majercik et al., <a href="https://jcgt.org/published/0010/02/01/">Scaling Probe-Based Real-Time Dynamic Global Illumination for Production</a>, JCGT 2021 (Majercik 2021, <code>references/Majercik2021-ScalingDDGI.pdf</code>).</li>
+    <li><a href="https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html">DXR spec</a>, <a href="https://microsoft.github.io/DirectX-Specs/d3d/HLSL_SM_6_6_DynamicResources.html">HLSL SM 6.6 Dynamic Resources</a>.</li>
+    <li>D3D12RaytracingMiniEngineSample 경로는 <code>references/DirectX-Graphics-Samples/Samples/Desktop/D3D12Raytracing/src/D3D12RaytracingMiniEngineSample/</code> 기준이다. MIT 이므로 코드를 가져올 때는 copyright 와 license 문구를 남긴다.</li>
     <li>D3D12RaytracingMiniEngineSample 은 legacy H3D model 을 쓴다. 이 repo 의 glTF <code>Mesh</code> 는 node 의 world 행렬, 압축된 normal 과 UV, <code>Draw</code> 단위 offset 이 달라서 geometry desc 를 채우는 loop 와 hit 데이터 접근은 다시 써야 한다.</li>
     <li>이 sample 의 shader 는 <code>-Zpr</code> (row-major packing) 로 compile 된다 (<code>ModelViewer_VS16.vcxproj:183</code>). 이 repo 는 column-major 라서 행렬 코드를 옮길 때 transpose 여부를 확인한다.</li>
+    <li><a href="https://github.com/NVIDIAGameWorks/RTXGI-DDGI">RTXGI-DDGI</a>: commit f33e496 시점의 idea 만 참고했다. 코드는 참고하지 않는다 (<a class="ref" href="#d-1">D-1</a>).</li>
   </ul>
 </section>
 
@@ -1270,12 +1340,22 @@ details .refs code { font-size: 11.5px; }
   var root = document.getElementById("milestones");
   var buttons = document.querySelectorAll("[data-filter]");
   if (!root) return;
-  buttons.forEach(function (button) {
-    button.addEventListener("click", function () {
-      var mustOnly = button.getAttribute("data-filter") === "must";
-      root.classList.toggle("only-must", mustOnly);
-      buttons.forEach(function (other) { other.setAttribute("aria-pressed", String(other === button)); });
+  function setFilter(mustOnly) {
+    root.classList.toggle("only-must", mustOnly);
+    buttons.forEach(function (button) {
+      button.setAttribute("aria-pressed", String((button.getAttribute("data-filter") === "must") === mustOnly));
     });
+  }
+  buttons.forEach(function (button) {
+    button.addEventListener("click", function () { setFilter(button.getAttribute("data-filter") === "must"); });
+  });
+  // 숨겨진 작업으로 가는 link 를 누르면 전체 보기로 돌아간다
+  window.addEventListener("hashchange", function () {
+    var target = document.getElementById(location.hash.slice(1));
+    if (target && root.contains(target) && target.offsetParent === null) {
+      setFilter(false);
+      target.scrollIntoView();
+    }
   });
 })();
 </script>
