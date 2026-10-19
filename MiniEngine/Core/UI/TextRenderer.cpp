@@ -211,7 +211,7 @@ void TextRenderer::Initialize( void )
     s_TextPSO[0].SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
     s_TextPSO[0].SetVertexShader( g_pTextVS, sizeof(g_pTextVS) );
     s_TextPSO[0].SetPixelShader( g_pTextAntialiasPS, sizeof(g_pTextAntialiasPS) );
-    s_TextPSO[0].SetRenderTargetFormats(1, &g_OverlayBuffer.GetFormat(), DXGI_FORMAT_UNKNOWN);
+    s_TextPSO[0].SetRenderTargetFormats(1, &g_SceneOverlayBuffer.GetFormat(), DXGI_FORMAT_UNKNOWN);
     s_TextPSO[0].Finalize();
 
     s_TextPSO[1] = s_TextPSO[0];

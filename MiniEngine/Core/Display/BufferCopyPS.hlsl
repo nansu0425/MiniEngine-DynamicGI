@@ -14,17 +14,11 @@
 #include "Core/Display/PresentRS.hlsli"
 
 Texture2D ColorTex : register(t0);
-SamplerState BilinearSampler : register(s0);
-
-cbuffer Constants : register(b0)
-{
-    float2 RcpDestDim;
-}
+SamplerState PointSampler : register(s1);
 
 [RootSignature(Present_RootSig)]
-float4 main( float4 position : SV_Position ) : SV_Target0
+float4 main( float4 position : SV_Position, float2 uv : TexCoord0 ) : SV_Target0
 {
-    //float2 UV = saturate(RcpDestDim * position.xy);
-    //return ColorTex.SampleLevel(BilinearSampler, UV, 0);
-    return ColorTex[(int2)position.xy];
+    // scene overlay는 scene viewport에 합성되므로 PresentSDRPS와 같은 이유로 viewport 기준 uv로 읽는다.
+    return ColorTex.SampleLevel(PointSampler, uv, 0);
 }

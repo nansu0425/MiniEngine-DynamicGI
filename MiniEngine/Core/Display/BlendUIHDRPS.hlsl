@@ -15,6 +15,7 @@
 #include "Core/Shaders/ColorSpaceUtility.hlsli"
 
 Texture2D<float4> Overlay : register(t0);
+SamplerState PointSampler : register(s1);
 
 cbuffer CB0 : register(b0)
 {
@@ -23,9 +24,10 @@ cbuffer CB0 : register(b0)
 }
 
 [RootSignature(Present_RootSig)]
-float4 main( float4 position : SV_Position ) : SV_Target0
+float4 main( float4 position : SV_Position, float2 uv : TexCoord0 ) : SV_Target0
 {
-    float4 UI = Overlay[(int2)position.xy];
+    // BufferCopyPS와 같은 이유로 viewport 기준 uv로 읽는다.
+    float4 UI = Overlay.SampleLevel(PointSampler, uv, 0);
     UI.rgb = RemoveSRGBCurve(UI.rgb);
     UI.rgb = REC709toREC2020(UI.rgb / (UI.a == 0.0 ? 1.0 : UI.a));
     UI.rgb = ApplyREC2084Curve(UI.rgb * PaperWhiteRatio);

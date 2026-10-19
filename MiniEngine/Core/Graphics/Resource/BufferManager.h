@@ -25,7 +25,10 @@ namespace Graphics
     extern ColorBuffer g_SceneColorBuffer;  // R11G11B10_FLOAT
     extern ColorBuffer g_SceneNormalBuffer; // R16G16B16A16_FLOAT
     extern ColorBuffer g_PostEffectsBuffer; // R32_UINT (to support Read-Modify-Write with a UAV)
-    extern ColorBuffer g_OverlayBuffer;     // R8G8B8A8_UNORM
+    // scene 위에 겹치는 debug UI. scene과 크기가 같고 scene 영역에만 합성되므로 scene이 보이면 함께 보인다.
+    extern ColorBuffer g_SceneOverlayBuffer;     // R8G8B8A8_UNORM
+    // window 전체에 합성되는 UI(ImGui). scene overlay보다 위에 그려진다.
+    extern ColorBuffer g_WindowOverlayBuffer;    // R8G8B8A8_UNORM
     extern ColorBuffer g_HorizontalBuffer;  // For separable (bicubic) upsampling
 
     extern ColorBuffer g_VelocityBuffer;    // R10G10B10  (3D velocity)

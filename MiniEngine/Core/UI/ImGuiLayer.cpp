@@ -128,7 +128,7 @@ void ImGuiLayer::Initialize(void)
     initInfo.Device = g_Device;
     initInfo.CommandQueue = g_CommandManager.GetCommandQueue();
     initInfo.NumFramesInFlight = kNumFramesInFlight;
-    initInfo.RTVFormat = g_OverlayBuffer.GetFormat();
+    initInfo.RTVFormat = g_WindowOverlayBuffer.GetFormat();
     initInfo.DSVFormat = DXGI_FORMAT_UNKNOWN;
     initInfo.SrvDescriptorHeap = s_SrvHeap.GetHeapPointer();
     initInfo.SrvDescriptorAllocFn = AllocSrvDescriptor;
@@ -196,14 +196,17 @@ RECT ImGuiLayer::GetSceneViewport(void)
 void ImGuiLayer::Render(void)
 {
     ImGui::Render();
-    if (!s_Visible)
-        return;
 
+    // window overlay는 매 frame 합성되므로 UI를 숨긴 frame에도 지워야 이전 UI가 남지 않는다.
     GraphicsContext& context = GraphicsContext::Begin(L"Render ImGui");
-    context.TransitionResource(g_OverlayBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
-    context.SetRenderTarget(g_OverlayBuffer.GetRTV());
-    context.SetDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, s_SrvHeap.GetHeapPointer());
-    ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), context.GetCommandList());
+    context.TransitionResource(g_WindowOverlayBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
+    context.ClearColor(g_WindowOverlayBuffer);
+    if (s_Visible)
+    {
+        context.SetRenderTarget(g_WindowOverlayBuffer.GetRTV());
+        context.SetDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, s_SrvHeap.GetHeapPointer());
+        ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), context.GetCommandList());
+    }
     context.Finish();
 }
 

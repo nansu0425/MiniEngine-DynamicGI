@@ -300,7 +300,7 @@ void GraphRenderer::Initialize( void )
     s_RenderPerfGraphPSO.SetBlendState(BlendTraditional);
     s_RenderPerfGraphPSO.SetDepthStencilState(Graphics::DepthStateReadOnly);
     s_RenderPerfGraphPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE);
-    s_RenderPerfGraphPSO.SetRenderTargetFormats(1, &g_OverlayBuffer.GetFormat(), g_OverlayBuffer.GetFormat());
+    s_RenderPerfGraphPSO.SetRenderTargetFormats(1, &g_SceneOverlayBuffer.GetFormat(), g_SceneOverlayBuffer.GetFormat());
     s_RenderPerfGraphPSO.SetVertexShader(g_pPerfGraphVS, sizeof(g_pPerfGraphVS));
     s_RenderPerfGraphPSO.SetPixelShader(g_pPerfGraphPS, sizeof(g_pPerfGraphPS));
     s_RenderPerfGraphPSO.Finalize();
@@ -440,10 +440,10 @@ void GraphRenderer::RenderGraphs(GraphicsContext& Context, GraphType Type)
     if (Type == GraphType::Profile && ProfileGraphs.GetActiveGraphCount() > 0)
     {
         D3D12_VIEWPORT viewport;
-        viewport.TopLeftX = (float)g_OverlayBuffer.GetWidth() / 1.3525f;
+        viewport.TopLeftX = (float)g_SceneOverlayBuffer.GetWidth() / 1.3525f;
         viewport.TopLeftY = 0.0f;
-        viewport.Width = (float)g_OverlayBuffer.GetWidth() / 4.0f;
-        viewport.Height = (float)g_OverlayBuffer.GetHeight() / (PROFILE_DEBUG_VAR_COUNT + 1);	
+        viewport.Width = (float)g_SceneOverlayBuffer.GetWidth() / 4.0f;
+        viewport.Height = (float)g_SceneOverlayBuffer.GetHeight() / (PROFILE_DEBUG_VAR_COUNT + 1);	
         viewport.MinDepth = 0.0;
         viewport.MaxDepth = 1.0;	
 
@@ -454,8 +454,8 @@ void GraphRenderer::RenderGraphs(GraphicsContext& Context, GraphType Type)
             ProfileGraphs.GetMax(), ProfileGraphs.GetPresetMax(), false, PROFILE_DEBUG_VAR_COUNT, graphTitles);
         
         Context.SetRootSignature(s_RootSignature);
-        Context.TransitionResource(g_OverlayBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET);
-        Context.SetRenderTarget(g_OverlayBuffer.GetRTV());
+        Context.TransitionResource(g_SceneOverlayBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET);
+        Context.SetRenderTarget(g_SceneOverlayBuffer.GetRTV());
         Context.SetPipelineState(s_GraphBackgroundPSO);
         Context.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 
@@ -476,10 +476,10 @@ void GraphRenderer::RenderGraphs(GraphicsContext& Context, GraphType Type)
     else if (Type == GraphType::Global)
     {
         D3D12_VIEWPORT viewport;
-        viewport.TopLeftX = (float)g_OverlayBuffer.GetWidth() / 4.0f;
-        viewport.TopLeftY = (float)g_OverlayBuffer.GetHeight() / 1.3f;
-        viewport.Width = (float)g_OverlayBuffer.GetWidth() / 2.0f;
-        viewport.Height = (float)g_OverlayBuffer.GetHeight() / 8.0f;
+        viewport.TopLeftX = (float)g_SceneOverlayBuffer.GetWidth() / 4.0f;
+        viewport.TopLeftY = (float)g_SceneOverlayBuffer.GetHeight() / 1.3f;
+        viewport.Width = (float)g_SceneOverlayBuffer.GetWidth() / 2.0f;
+        viewport.Height = (float)g_SceneOverlayBuffer.GetHeight() / 8.0f;
         viewport.MinDepth = 0.0f;
         viewport.MaxDepth = 1.0f;
     
@@ -490,8 +490,8 @@ void GraphRenderer::RenderGraphs(GraphicsContext& Context, GraphType Type)
                                         GlobalGraphs.GetMinAbs(), GlobalGraphs.GetMaxAbs(), GlobalGraphs.GetPresetMax(), true, 1, graphTitles);
 
         Context.SetRootSignature(s_RootSignature);
-        Context.TransitionResource(g_OverlayBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET);
-        Context.SetRenderTarget(g_OverlayBuffer.GetRTV());
+        Context.TransitionResource(g_SceneOverlayBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET);
+        Context.SetRenderTarget(g_SceneOverlayBuffer.GetRTV());
         Context.SetPipelineState(s_GraphBackgroundPSO);
         Context.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
         
@@ -507,7 +507,7 @@ void GraphRenderer::RenderGraphs(GraphicsContext& Context, GraphType Type)
     }
     s_FrameID++;
     Text.End();
-    Context.SetViewport(0, 0, 1920, 1080);
+    Context.SetViewport(0, 0, (float)g_SceneOverlayBuffer.GetWidth(), (float)g_SceneOverlayBuffer.GetHeight());
 }
 
 void GraphRenderer::SetSelectedIndex(uint32_t selectedIndex)

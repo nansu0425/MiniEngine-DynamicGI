@@ -18,6 +18,7 @@
 #include "Core/Math/Color.h"
 #include "Core/Display/Display.h"
 #include "Core/Graphics/Command/CommandContext.h"
+#include "Core/Graphics/Resource/BufferManager.h"
 #include "Core/Profiling/GraphRenderer.h"
 
 using namespace std;
@@ -660,8 +661,8 @@ void EngineTuning::Display( GraphicsContext& Context, float x, float y, float w,
     s_ScrollTopTrigger = y + h * 0.2f;
     s_ScrollBottomTrigger = y + h * 0.8f;
 
-    float hScale = g_DisplayWidth / 1920.0f;
-    float vScale = g_DisplayHeight / 1080.0f;
+    float hScale = g_SceneOverlayBuffer.GetWidth() / 1920.0f;
+    float vScale = g_SceneOverlayBuffer.GetHeight() / 1080.0f;
 
     Context.SetScissor((uint32_t)Floor(x * hScale), (uint32_t)Floor(y * vScale), 
         (uint32_t)Ceiling((x + w) * hScale), (uint32_t)Ceiling((y + h) * vScale));
@@ -676,7 +677,7 @@ void EngineTuning::Display( GraphicsContext& Context, float x, float y, float w,
     EngineProfiling::DisplayPerfGraph(Context);
 
     Text.End();
-    Context.SetScissor(0, 0, g_DisplayWidth, g_DisplayHeight);
+    Context.SetScissor(0, 0, g_SceneOverlayBuffer.GetWidth(), g_SceneOverlayBuffer.GetHeight());
 }
 
 void EngineTuning::AddToVariableGraph( const string& path, EngineVar& var )

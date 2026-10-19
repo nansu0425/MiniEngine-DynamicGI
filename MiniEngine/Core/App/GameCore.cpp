@@ -79,14 +79,14 @@ namespace GameCore
         PostEffects::Render();
 
         GraphicsContext& UiContext = GraphicsContext::Begin(L"Render UI");
-        UiContext.TransitionResource(g_OverlayBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
-        UiContext.ClearColor(g_OverlayBuffer);
-        UiContext.SetRenderTarget(g_OverlayBuffer.GetRTV());
-        UiContext.SetViewportAndScissor(0, 0, g_OverlayBuffer.GetWidth(), g_OverlayBuffer.GetHeight());
+        UiContext.TransitionResource(g_SceneOverlayBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
+        UiContext.ClearColor(g_SceneOverlayBuffer);
+        UiContext.SetRenderTarget(g_SceneOverlayBuffer.GetRTV());
+        UiContext.SetViewportAndScissor(0, 0, g_SceneOverlayBuffer.GetWidth(), g_SceneOverlayBuffer.GetHeight());
         game.RenderUI(UiContext);
 
-        UiContext.SetRenderTarget(g_OverlayBuffer.GetRTV());
-        UiContext.SetViewportAndScissor(0, 0, g_OverlayBuffer.GetWidth(), g_OverlayBuffer.GetHeight());
+        UiContext.SetRenderTarget(g_SceneOverlayBuffer.GetRTV());
+        UiContext.SetViewportAndScissor(0, 0, g_SceneOverlayBuffer.GetWidth(), g_SceneOverlayBuffer.GetHeight());
         EngineTuning::Display( UiContext, 10.0f, 40.0f, 1900.0f, 1040.0f );
 
         UiContext.Finish();

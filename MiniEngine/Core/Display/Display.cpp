@@ -378,12 +378,17 @@ void Graphics::PreparePresent(void)
 
 void Graphics::CompositeOverlays( GraphicsContext& Context )
 {
-    // Now blend (or write) the UI overlay
     Context.SetRootSignature(s_PresentRS);
-    Context.TransitionResource(g_OverlayBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-    Context.SetDynamicDescriptor(0, 0, g_OverlayBuffer.GetSRV());
     Context.SetPipelineState(g_bEnableHDROutput ? s_BlendUIHDRPSO : s_BlendUIPSO);
     Context.SetConstants(1, (float)g_HDRPaperWhite / 10000.0f, (float)g_MaxDisplayLuminance);
+
+    Context.TransitionResource(g_SceneOverlayBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    Context.SetDynamicDescriptor(0, 0, g_SceneOverlayBuffer.GetSRV());
+    Context.SetViewportAndScissor(g_SceneViewportX, g_SceneViewportY, g_NativeWidth, g_NativeHeight);
+    Context.Draw(3);
+
+    Context.TransitionResource(g_WindowOverlayBuffer, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+    Context.SetDynamicDescriptor(0, 0, g_WindowOverlayBuffer.GetSRV());
     Context.SetViewportAndScissor(0, 0, g_DisplayWidth, g_DisplayHeight);
     Context.Draw(3);
 }

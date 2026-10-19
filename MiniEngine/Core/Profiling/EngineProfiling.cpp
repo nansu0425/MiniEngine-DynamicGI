@@ -19,6 +19,7 @@
 #include "Core/App/GameInput.h"
 #include "Core/Profiling/GpuTimeManager.h"
 #include "Core/Graphics/Command/CommandContext.h"
+#include "Core/Graphics/Resource/BufferManager.h"
 #include <vector>
 #include <unordered_map>
 #include <array>
@@ -493,7 +494,7 @@ namespace EngineProfiling
             NestedTimingTree::Display( Text, x );
         }
 
-        Text.GetCommandContext().SetScissor(0, 0, g_DisplayWidth, g_DisplayHeight);
+        Text.GetCommandContext().SetScissor(0, 0, g_SceneOverlayBuffer.GetWidth(), g_SceneOverlayBuffer.GetHeight());
     }
 
 } // EngineProfiling

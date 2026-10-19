@@ -25,7 +25,8 @@ namespace Graphics
     ColorBuffer g_SceneNormalBuffer;
     ColorBuffer g_PostEffectsBuffer;
     ColorBuffer g_VelocityBuffer;
-    ColorBuffer g_OverlayBuffer;
+    ColorBuffer g_SceneOverlayBuffer;
+    ColorBuffer g_WindowOverlayBuffer;
     ColorBuffer g_HorizontalBuffer;
 
     ShadowBuffer g_ShadowBuffer;
@@ -226,7 +227,8 @@ void Graphics::InitializeRenderingBuffers( uint32_t bufferWidth, uint32_t buffer
             g_GenMipsBuffer.Create(L"GenMips", bufferWidth, bufferHeight, 0, DXGI_FORMAT_R11G11B10_FLOAT, esram );
         esram.PopStack();
 
-        g_OverlayBuffer.Create( L"UI Overlay", g_DisplayWidth, g_DisplayHeight, 1, DXGI_FORMAT_R8G8B8A8_UNORM, esram );
+        g_SceneOverlayBuffer.Create( L"Scene UI Overlay", bufferWidth, bufferHeight, 1, DXGI_FORMAT_R8G8B8A8_UNORM, esram );
+        g_WindowOverlayBuffer.Create( L"Window UI Overlay", g_DisplayWidth, g_DisplayHeight, 1, DXGI_FORMAT_R8G8B8A8_UNORM, esram );
         g_HorizontalBuffer.Create( L"Bicubic Intermediate", g_DisplayWidth, bufferHeight, 1, DefaultHdrColorFormat, esram );
 
     esram.PopStack(); // End final image
@@ -237,7 +239,7 @@ void Graphics::InitializeRenderingBuffers( uint32_t bufferWidth, uint32_t buffer
 void Graphics::ResizeDisplayDependentBuffers(uint32_t NativeWidth, uint32_t NativeHeight)
 {
     (NativeWidth);
-    g_OverlayBuffer.Create( L"UI Overlay", g_DisplayWidth, g_DisplayHeight, 1, DXGI_FORMAT_R8G8B8A8_UNORM );
+    g_WindowOverlayBuffer.Create( L"Window UI Overlay", g_DisplayWidth, g_DisplayHeight, 1, DXGI_FORMAT_R8G8B8A8_UNORM );
     g_HorizontalBuffer.Create( L"Bicubic Intermediate", g_DisplayWidth, NativeHeight, 1, DefaultHdrColorFormat );
 }
 
@@ -247,7 +249,8 @@ void Graphics::DestroyRenderingBuffers()
     g_SceneColorBuffer.Destroy();
     g_SceneNormalBuffer.Destroy();
     g_VelocityBuffer.Destroy();
-    g_OverlayBuffer.Destroy();
+    g_SceneOverlayBuffer.Destroy();
+    g_WindowOverlayBuffer.Destroy();
     g_HorizontalBuffer.Destroy();
     g_PostEffectsBuffer.Destroy();
 
