@@ -45,6 +45,7 @@
     <GenerateManifest>false</GenerateManifest>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <Import Project="$([MSBuild]::GetDirectoryNameOfFileAbove('$(MSBuildThisFileDirectory)', 'vcpkg.json'))\vcpkg\DirectX.vcpkg.props" />
   <ImportGroup Label="ExtensionSettings" />
   <ImportGroup Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
@@ -127,6 +128,7 @@
     <ClInclude Include="Graphics\Resource\PixelBuffer.h" />
     <ClInclude Include="Effects\PostEffects\PostEffects.h" />
     <ClInclude Include="UI\EngineTuning.h" />
+    <ClInclude Include="UI\ImGuiLayer.h" />
     <ClInclude Include="Display\Display.h" />
     <ClInclude Include="Graphics\Resource\ReadbackBuffer.h" />
     <ClInclude Include="Graphics\Pipeline\RootSignature.h" />
@@ -163,6 +165,7 @@
     <ClCompile Include="Graphics\Descriptor\DescriptorHeap.cpp" />
     <ClCompile Include="Profiling\EngineProfiling.cpp" />
     <ClCompile Include="UI\EngineTuning.cpp" />
+    <ClCompile Include="UI\ImGuiLayer.cpp" />
     <ClCompile Include="Utility\FileUtility.cpp" />
     <ClCompile Include="Effects\FXAA\FXAA.cpp" />
     <ClCompile Include="App\Input.cpp" />
@@ -447,6 +450,7 @@
     <None Include="UI\TextRS.hlsli" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Import Project="$([MSBuild]::GetDirectoryNameOfFileAbove('$(MSBuildThisFileDirectory)', 'vcpkg.json'))\vcpkg\DirectX.vcpkg.targets" />
   <ItemDefinitionGroup>
     <ClCompile>
       <AdditionalIncludeDirectories>..\Packages\WinPixEventRuntime.1.0.210209001\Include\WinPixEventRuntime;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>

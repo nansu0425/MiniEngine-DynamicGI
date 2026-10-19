@@ -5,6 +5,9 @@
 /MiniEngine/Packages/
 /MiniEngine/vcpkg_installed/
 
+# ImGui 가 실행 중에 저장하는 window 배치
+imgui.ini
+
 # scripts/fetch-assets.ps1 가 받아 오는 upstream asset
 /MiniEngine/ModelViewer/Sponza/
 /MiniEngine/ModelViewer/Textures/

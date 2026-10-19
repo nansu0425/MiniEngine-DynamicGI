@@ -20,6 +20,7 @@
 #include "Core/Graphics/Command/CommandContext.h"
 #include "Core/Effects/PostEffects/PostEffects.h"
 #include "Core/Display/Display.h"
+#include "Core/UI/ImGuiLayer.h"
 #include "Core/Utility/CommandLineArg.h"
 #include <shellapi.h>
 
@@ -41,6 +42,7 @@ namespace GameCore
         SystemTime::Initialize();
         GameInput::Initialize();
         EngineTuning::Initialize();
+        ImGuiLayer::Initialize();
 
         game.Startup();
     }
@@ -51,6 +53,8 @@ namespace GameCore
 
         game.Cleanup();
 
+        ImGuiLayer::Shutdown();
+
         GameInput::Shutdown();
     }
 
@@ -59,7 +63,9 @@ namespace GameCore
         EngineProfiling::Update();
 
         float DeltaTime = Graphics::GetFrameTime();
-    
+
+        // GameInput이 UI가 가져간 입력을 걸러낼 수 있게 ImGui frame을 먼저 연다.
+        ImGuiLayer::BeginFrame();
         GameInput::Update(DeltaTime);
         EngineTuning::Update(DeltaTime);
         
@@ -80,6 +86,8 @@ namespace GameCore
         EngineTuning::Display( UiContext, 10.0f, 40.0f, 1900.0f, 1040.0f );
 
         UiContext.Finish();
+
+        ImGuiLayer::Render();
 
         Display::Present();
 
@@ -104,6 +112,9 @@ namespace GameCore
         Microsoft::WRL::Wrappers::RoInitializeWrapper InitializeWinRT(RO_INIT_MULTITHREADED);
         ASSERT_SUCCEEDED(InitializeWinRT);
 
+        // 이 설정이 없으면 Windows가 저해상도로 그린 화면을 DPI scale만큼 늘려서 흐리게 보여 준다.
+        SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+
         // Register class
         WNDCLASSEX wcex;
         wcex.cbSize = sizeof(WNDCLASSEX);
@@ -122,7 +133,7 @@ namespace GameCore
 
         // Create window
         RECT rc = { 0, 0, (LONG)g_DisplayWidth, (LONG)g_DisplayHeight };
-        AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, FALSE);
+        AdjustWindowRectExForDpi(&rc, WS_OVERLAPPEDWINDOW, FALSE, 0, GetDpiForSystem());
 
         g_hWnd = CreateWindow(className, className, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
             rc.right - rc.left, rc.bottom - rc.top, nullptr, nullptr, hInst, nullptr);
@@ -161,11 +172,24 @@ namespace GameCore
     //--------------------------------------------------------------------------------------
     LRESULT CALLBACK WndProc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
     {
+        if (ImGuiLayer::HandleWindowMessage(hWnd, message, wParam, lParam))
+            return TRUE;
+
         switch( message )
         {
         case WM_SIZE:
             Display::Resize((UINT)(UINT64)lParam & 0xFFFF, (UINT)(UINT64)lParam >> 16);
             break;
+
+        case WM_DPICHANGED:
+        {
+            // 옮겨 간 monitor에서도 같은 크기로 보이도록 Windows가 제안한 크기로 바꾼다.
+            const RECT* suggested = reinterpret_cast<const RECT*>(lParam);
+            SetWindowPos(hWnd, nullptr, suggested->left, suggested->top,
+                suggested->right - suggested->left, suggested->bottom - suggested->top,
+                SWP_NOZORDER | SWP_NOACTIVATE);
+            break;
+        }
 
         case WM_DESTROY:
             PostQuitMessage(0);

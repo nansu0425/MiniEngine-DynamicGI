@@ -50,7 +50,13 @@ namespace
     float s_Analogs[GameInput::kNumAnalogInputs];
     float s_AnalogsTC[GameInput::kNumAnalogInputs];
 
+    bool s_MouseCapturedByUI = false;
+    bool s_KeyboardCapturedByUI = false;
+    bool s_MouseLookActive = false;
+
 #ifdef USE_KEYBOARD_MOUSE
+
+    POINT s_MouseLookCursorPos;
 
     IDirectInput8A* s_DI;
     IDirectInputDevice8A* s_Keyboard;
@@ -222,7 +228,8 @@ namespace
             ASSERT(false, "Mouse CreateDevice failed.");
         if (FAILED(s_Mouse->SetDataFormat(&c_dfDIMouse2)))
             ASSERT(false, "Mouse SetDataFormat failed.");
-        if (FAILED(s_Mouse->SetCooperativeLevel(GameCore::g_hWnd, DISCL_FOREGROUND | DISCL_EXCLUSIVE)))
+        // exclusive로 잡으면 cursor가 사라지고 window가 mouse message를 받지 못해 UI를 조작할 수 없다.
+        if (FAILED(s_Mouse->SetCooperativeLevel(GameCore::g_hWnd, DISCL_FOREGROUND | DISCL_NONEXCLUSIVE)))
             ASSERT(false, "Mouse SetCooperativeLevel failed.");
 
         KbmZeroInputs();
@@ -249,6 +256,41 @@ namespace
         }
     }
 
+    // 오른쪽 button을 누르고 있는 동안만 mouse 이동을 camera에 전달하고 cursor를 그 자리에 고정한다.
+    // 그 밖에는 cursor가 자유롭게 움직이며 UI를 조작한다.
+    void KbmApplyMouseLookAndUICapture()
+    {
+        const bool rightButtonDown = (s_MouseState.rgbButtons[1] & 0x80) != 0;
+        if (!s_MouseLookActive && rightButtonDown && !s_MouseCapturedByUI)
+        {
+            s_MouseLookActive = true;
+            GetCursorPos(&s_MouseLookCursorPos);
+        }
+        else if (s_MouseLookActive && !rightButtonDown)
+        {
+            s_MouseLookActive = false;
+        }
+
+        if (s_MouseLookActive)
+        {
+            SetCursorPos(s_MouseLookCursorPos.x, s_MouseLookCursorPos.y);
+        }
+        else
+        {
+            s_MouseState.lX = 0;
+            s_MouseState.lY = 0;
+
+            if (s_MouseCapturedByUI)
+            {
+                memset(s_MouseState.rgbButtons, 0, sizeof(s_MouseState.rgbButtons));
+                s_MouseState.lZ = 0;
+            }
+        }
+
+        if (s_KeyboardCapturedByUI)
+            memset(s_Keybuffer, 0, sizeof(s_Keybuffer));
+    }
+
     void KbmUpdate()
     {
         HWND foreground = GetForegroundWindow();
@@ -258,6 +300,7 @@ namespace
             || !visible)
         {
             KbmZeroInputs();
+            s_MouseLookActive = false;
         }
         else
         {
@@ -265,6 +308,7 @@ namespace
             s_Mouse->GetDeviceState(sizeof(DIMOUSESTATE2), &s_MouseState);
             s_Keyboard->Acquire();
             s_Keyboard->GetDeviceState(sizeof(s_Keybuffer), s_Keybuffer);
+            KbmApplyMouseLookAndUICapture();
         }
     }
 
@@ -403,6 +447,17 @@ void GameInput::Update( float frameDelta )
         s_AnalogsTC[i] = s_Analogs[i] * frameDelta;
     }
 
+}
+
+void GameInput::SetCapturedByUI( bool mouse, bool keyboard )
+{
+    s_MouseCapturedByUI = mouse;
+    s_KeyboardCapturedByUI = keyboard;
+}
+
+bool GameInput::IsMouseLookActive( void )
+{
+    return s_MouseLookActive;
 }
 
 bool GameInput::IsAnyPressed( void )

@@ -8,7 +8,8 @@
 ## Controls:
 * forward/backward/strafe: left thumbstick or WASD (FPS controls)
 * up/down: triggers or E/Q
-* yaw/pitch: right thumbstick or mouse
+* yaw/pitch: right thumbstick or mouse while holding the right mouse button
+* toggle ImGui: F1
 * toggle slow movement: click left thumbstick or lshift
 * open debug menu: back button or backspace
 * navigate debug menu: dpad or arrow keys

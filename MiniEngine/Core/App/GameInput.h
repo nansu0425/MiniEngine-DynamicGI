@@ -19,6 +19,11 @@ namespace GameInput
     void Shutdown();
     void Update( float frameDelta );
 
+    // UI가 가져간 입력은 game 쪽에 전달하지 않는다. Update 전에 호출한다.
+    void SetCapturedByUI( bool mouse, bool keyboard );
+    // mouse 오른쪽 button을 누른 채 camera를 조작하는 중인지
+    bool IsMouseLookActive( void );
+
     enum DigitalInput
     {
         // keyboard
