@@ -181,8 +181,8 @@ std::wstring Utility::UTF8ToWideString( const std::string& str )
 std::string Utility::WideStringToUTF8( const std::wstring& wstr )
 {
     char str[MAX_PATH];
-    if ( !WideCharToMultiByte(CP_ACP, MB_PRECOMPOSED, wstr.c_str(), -1, str, MAX_PATH, nullptr, nullptr) )
-        str[0] = L'\0';
+    if ( !WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, str, MAX_PATH, nullptr, nullptr) )
+        str[0] = '\0';
     return str;
 }
 
