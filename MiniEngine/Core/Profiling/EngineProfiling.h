@@ -25,7 +25,8 @@ namespace EngineProfiling
     void BeginBlock(const std::wstring& name, CommandContext* Context = nullptr);
     void EndBlock(CommandContext* Context = nullptr);
 
-    void DisplayFrameRate(TextContext& Text);
+    // ImGuiLayer::BeginFrame과 Render 사이에서 부른다.
+    void ShowFrameRate(void);
     void DisplayPerfGraph(GraphicsContext& Text);
     void Display(TextContext& Text, float x, float y, float w, float h);
     bool IsPaused();

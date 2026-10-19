@@ -35,6 +35,7 @@ namespace
     float s_DpiScale = 0.0f;
     bool s_Visible = true;
     bool s_ShowDemoWindow = false;
+    bool s_ShowSceneOverlay = true;
     RECT s_SceneViewport = {};
 
     void AllocSrvDescriptor(ImGui_ImplDX12_InitInfo*, D3D12_CPU_DESCRIPTOR_HANDLE* outCpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE* outGpuHandle)
@@ -87,6 +88,7 @@ namespace
         {
             if (ImGui::BeginMenu("View"))
             {
+                ImGui::MenuItem("Scene Overlay", nullptr, &s_ShowSceneOverlay);
                 ImGui::MenuItem("ImGui Demo", nullptr, &s_ShowDemoWindow);
                 ImGui::EndMenu();
             }
@@ -197,17 +199,43 @@ void ImGuiLayer::Render(void)
 {
     ImGui::Render();
 
-    // window overlay는 매 frame 합성되므로 UI를 숨긴 frame에도 지워야 이전 UI가 남지 않는다.
+    // UI를 숨긴 frame에도 scene overlay는 그려야 하므로 draw data는 항상 그린다.
     GraphicsContext& context = GraphicsContext::Begin(L"Render ImGui");
     context.TransitionResource(g_WindowOverlayBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
     context.ClearColor(g_WindowOverlayBuffer);
-    if (s_Visible)
-    {
-        context.SetRenderTarget(g_WindowOverlayBuffer.GetRTV());
-        context.SetDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, s_SrvHeap.GetHeapPointer());
-        ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), context.GetCommandList());
-    }
+    context.SetRenderTarget(g_WindowOverlayBuffer.GetRTV());
+    context.SetDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, s_SrvHeap.GetHeapPointer());
+    ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), context.GetCommandList());
     context.Finish();
+}
+
+bool ImGuiLayer::BeginSceneOverlay(void)
+{
+    if (!s_ShowSceneOverlay)
+        return false;
+
+    // scene 영역과 같은 크기의 투명한 창을 scene 영역에 고정해, 그 안의 widget이 scene 밖으로 나가지 않게 clip한다.
+    const ImVec2 scenePos((float)s_SceneViewport.left, (float)s_SceneViewport.top);
+    const ImVec2 sceneSize((float)(s_SceneViewport.right - s_SceneViewport.left), (float)(s_SceneViewport.bottom - s_SceneViewport.top));
+    ImGui::SetNextWindowPos(scenePos);
+    ImGui::SetNextWindowSize(sceneSize);
+    ImGui::Begin("##SceneOverlay", nullptr,
+        ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoInputs |
+        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking |
+        ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoBringToFrontOnFocus);
+
+    // scene이 밝아도 글자가 보이게 내용 크기만큼 반투명한 배경을 깐다.
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.0f, 0.0f, 0.0f, 0.5f));
+    ImGui::BeginChild("##Content", ImVec2(0.0f, 0.0f),
+        ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysUseWindowPadding);
+    return true;
+}
+
+void ImGuiLayer::EndSceneOverlay(void)
+{
+    ImGui::EndChild();
+    ImGui::PopStyleColor();
+    ImGui::End();
 }
 
 bool ImGuiLayer::HandleWindowMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)

@@ -648,8 +648,6 @@ void EngineTuning::Display( GraphicsContext& Context, float x, float y, float w,
     TextContext Text(Context);
     Text.Begin();
 
-    EngineProfiling::DisplayFrameRate(Text);
-
     Text.ResetCursor( x, y );
 
     if (!sm_IsVisible)

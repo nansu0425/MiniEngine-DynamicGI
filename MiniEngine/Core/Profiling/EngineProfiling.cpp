@@ -20,6 +20,8 @@
 #include "Core/Profiling/GpuTimeManager.h"
 #include "Core/Graphics/Command/CommandContext.h"
 #include "Core/Graphics/Resource/BufferManager.h"
+#include "Core/UI/ImGuiLayer.h"
+#include <imgui.h>
 #include <vector>
 #include <unordered_map>
 #include <array>
@@ -452,17 +454,28 @@ namespace EngineProfiling
         return Paused;
     }
 
-    void DisplayFrameRate( TextContext& Text )
+    void ShowFrameRate( void )
     {
-        if (!DrawFrameRate)
+        if (!DrawFrameRate || !ImGuiLayer::BeginSceneOverlay())
             return;
-        
+
         float cpuTime = NestedTimingTree::GetTotalCpuTime();
         float gpuTime = NestedTimingTree::GetTotalGpuTime();
         float frameRate = 1.0f / NestedTimingTree::GetFrameDelta();
 
-        Text.DrawFormattedString( "CPU %7.3f ms, GPU %7.3f ms, %3u Hz\n",
-            cpuTime, gpuTime, (uint32_t)(frameRate + 0.5f));
+        // font의 글자 폭이 제각각이라 공백 대신 가장 긴 label 폭으로 값의 시작 위치를 맞춘다.
+        const float valueX = ImGui::GetCursorPosX() + ImGui::CalcTextSize("Frame Rate").x + ImGui::GetStyle().ItemSpacing.x * 2.0f;
+        auto row = [valueX]( const char* label, const char* format, auto value )
+        {
+            ImGui::TextUnformatted(label);
+            ImGui::SameLine(valueX);
+            ImGui::Text(format, value);
+        };
+        row("CPU", "%.3f ms", cpuTime);
+        row("GPU", "%.3f ms", gpuTime);
+        row("Frame Rate", "%u Hz", (uint32_t)(frameRate + 0.5f));
+
+        ImGuiLayer::EndSceneOverlay();
     }
 
     void DisplayPerfGraph( GraphicsContext& Context )
