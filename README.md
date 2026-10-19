@@ -22,16 +22,26 @@
 
 ## Reference
 
-구현할 때 참고하는 외부 repo 는 `references/` 아래에 받는다. git 은 [references/manifest.json](references/manifest.json) 만 tracking 하고, 받은 repo 는 tracking 하지 않는다.
+구현할 때 참고하는 외부 자료는 `references/` 아래에 받는다. git 은 [references/manifest.json](references/manifest.json) 만 tracking 하고, 받은 자료는 tracking 하지 않는다.
 
 ```powershell
 .\scripts\fetch-references.ps1
 ```
 
-- reference 를 추가하거나 버전을 바꿀 때는 `manifest.json` 에 `name`, `url`, `commit` 을 적고 script 를 다시 실행한다. commit 을 고정해서 어느 버전을 참고했는지 git history 에 남긴다.
+- git repo 는 `manifest.json` 에 `name`, `url`, `commit` 을 적고 script 를 다시 실행한다. commit 을 고정해서 어느 버전을 참고했는지 git history 에 남긴다.
 - repo 의 일부만 필요하면 `sparse` 에 [non-cone sparse-checkout pattern](https://git-scm.com/docs/git-sparse-checkout#_non_cone_problems) 목록을 적는다. 이 pattern 에 맞는 파일만 받는다. `sparse` 를 지우면 다음 실행 때 전체를 받는다.
 - 받은 repo 안에서 수정한 내용이 있으면 script 는 그 repo 를 건너뛴다.
+- 논문 같은 단일 파일은 `name`, `url`, `sha256` 을 적는다. 받은 파일의 sha256 이 다르면 script 가 실패한다.
+- manifest 에서 뺀 항목은 script 가 지우지 않는다. `references/` 아래의 해당 폴더나 파일을 직접 지운다.
 - `git clean -fdx` 는 `references/` 도 지운다. 지워지면 script 로 다시 받는다.
+
+### 참고 범위
+
+이 repo 는 MIT 로 공개한다. 그래서 `references/` 에는 이 repo 에서 자유롭게 참고할 수 있는 자료만 둔다.
+
+- 논문은 알고리즘과 수식을 참고해 구현한다. 본문과 그림은 repo 에 옮기지 않는다.
+- MIT 처럼 허용하는 license 의 코드는 가져다 쓸 수 있다. 가져온 코드에는 원래의 copyright 와 license 문구를 남긴다.
+- license 가 없거나 재배포를 막는 코드는 두지 않는다. [RTXGI-DDGI](https://github.com/NVIDIAGameWorks/RTXGI-DDGI) 는 NVIDIA RTX SDKs License 라서, 그 코드나 파생물을 이 repo 에 넣을 수 없다. RTXGI-DDGI 는 idea 만 참고하고 소스 코드는 받거나 열어 보지 않는다. RTXGI-DDGI 의 idea 를 쓴 곳에는 출처를 남긴다.
 
 ## 코드 규칙
 

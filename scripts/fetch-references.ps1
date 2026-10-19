@@ -24,8 +24,33 @@ function Set-SparseCheckout($Dir, $Patterns) {
     }
 }
 
+function Get-FileReference($Reference, $Destination) {
+    if ((Test-Path $Destination) -and (Get-FileHash -Algorithm SHA256 $Destination).Hash -eq $Reference.sha256) {
+        Write-Host "$($Reference.name) already matches sha256"
+        return
+    }
+
+    # 받다가 실패하거나 hash 가 다르면 기존 파일을 건드리지 않도록 임시 파일에 받는다
+    $Download = "$Destination.download"
+    $ProgressPreference = 'SilentlyContinue'
+    Invoke-WebRequest -UseBasicParsing -Uri $Reference.url -OutFile $Download
+    $Hash = (Get-FileHash -Algorithm SHA256 $Download).Hash
+    if ($Hash -ne $Reference.sha256) {
+        Remove-Item $Download
+        throw "$($Reference.name) sha256 mismatch: expected $($Reference.sha256), got $Hash"
+    }
+    Move-Item -Force $Download $Destination
+    Write-Host "Fetched $($Reference.name)"
+}
+
 foreach ($Reference in $Manifest) {
     $Destination = Join-Path $ReferencesDir $Reference.name
+
+    if ($Reference.sha256) {
+        Get-FileReference $Reference $Destination
+        continue
+    }
+
     $IsNewClone = -not (Test-Path $Destination)
 
     if ($IsNewClone) {
