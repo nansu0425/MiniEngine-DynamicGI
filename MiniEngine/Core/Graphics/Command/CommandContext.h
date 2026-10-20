@@ -151,7 +151,7 @@ public:
     inline void FlushResourceBarriers(void);
 
     void InsertTimeStamp( ID3D12QueryHeap* pQueryHeap, uint32_t QueryIdx );
-    // query heap의 StartIndex부터 NumQueries개를 readback buffer의 같은 위치에 복사한다.
+    // readback buffer에도 query heap과 같은 index 위치에 쓴다.
     void ResolveTimeStamps( ID3D12Resource* pReadbackHeap, ID3D12QueryHeap* pQueryHeap, uint32_t StartIndex, uint32_t NumQueries );
     void PIXBeginEvent(const wchar_t* label);
     void PIXEndEvent(void);
@@ -189,7 +189,6 @@ protected:
     std::wstring m_ID;
     void SetID(const std::wstring& ID) { m_ID = ID; }
 
-    // GPU busy 시간을 재려고 Begin부터 Finish까지의 GPU 실행 구간을 기록하는 GpuTimeManager span
     uint32_t m_GpuSpan;
 
     D3D12_COMMAND_LIST_TYPE m_Type;

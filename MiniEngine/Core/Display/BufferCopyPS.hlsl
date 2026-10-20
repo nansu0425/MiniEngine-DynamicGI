@@ -19,6 +19,5 @@ SamplerState PointSampler : register(s1);
 [RootSignature(Present_RootSig)]
 float4 main( float4 position : SV_Position, float2 uv : TexCoord0 ) : SV_Target0
 {
-    // scene overlay는 scene viewport에 합성되므로 PresentSDRPS와 같은 이유로 viewport 기준 uv로 읽는다.
     return ColorTex.SampleLevel(PointSampler, uv, 0);
 }

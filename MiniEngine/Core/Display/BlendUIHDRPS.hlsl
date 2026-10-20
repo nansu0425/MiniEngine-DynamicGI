@@ -26,7 +26,6 @@ cbuffer CB0 : register(b0)
 [RootSignature(Present_RootSig)]
 float4 main( float4 position : SV_Position, float2 uv : TexCoord0 ) : SV_Target0
 {
-    // BufferCopyPS와 같은 이유로 viewport 기준 uv로 읽는다.
     float4 UI = Overlay.SampleLevel(PointSampler, uv, 0);
     UI.rgb = RemoveSRGBCurve(UI.rgb);
     UI.rgb = REC709toREC2020(UI.rgb / (UI.a == 0.0 ? 1.0 : UI.a));

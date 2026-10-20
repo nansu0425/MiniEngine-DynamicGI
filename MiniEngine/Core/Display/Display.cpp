@@ -416,12 +416,11 @@ void Display::Present(void)
 
     int64_t CurrentTick = SystemTime::GetCurrentTick();
 
-    // 이 engine에서는 GPU를 앞질러 가지 않으려는 대기가 Present보다 frame 중간의 fence 대기에서 주로 일어나므로,
-    // Present 대기와 함께 fence 대기도 CPU busy에서 뺀다.
+    // 이 engine에서 VSync나 GPU를 기다리는 대기는 Present 안보다 frame 중간의 fence 대기에서 주로 일어난다.
     const int64_t FenceWaitTicks = g_CommandManager.TakeFenceWaitTicks();
 
-    // 첫 frame은 앞 frame의 Present가 없어서 잴 수 없다.
-    if (s_FrameStartTick != 0)
+    const bool HasPreviousPresent = s_FrameStartTick != 0;
+    if (HasPreviousPresent)
     {
         s_CpuWaitTime = (float)SystemTime::TicksToSeconds(FenceWaitTicks);
         s_CpuBusyTime = std::max(0.0f, (float)SystemTime::TimeBetweenTicks(s_FrameStartTick, PresentCallTick) - s_CpuWaitTime);

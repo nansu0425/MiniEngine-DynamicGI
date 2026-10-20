@@ -286,7 +286,6 @@ public:
         GraphRenderer::Update(XMFLOAT2(TotalCpuTime, TotalGpuTime), 0, GraphType::Global);
     }
 
-    // 최근 frame들의 평균(ms)
     static float GetFrameTime(void) { return s_FrameTime.GetAvg(); }
     static float GetCpuBusyTime(void) { return s_CpuBusyTime.GetAvg(); }
     static float GetCpuWaitTime(void) { return s_CpuWaitTime.GetAvg(); }
@@ -404,7 +403,6 @@ namespace EngineProfiling
         ImGuiLayer::ShowPanel("Profiler", s_ShowProfiler, []
         {
             ImGui::Checkbox("Pause (Space)", &Paused);
-            // overlay의 CPU busy에서 뺀 시간이다.
             ImGui::Text("CPU fence wait: %.3f ms", NestedTimingTree::GetCpuWaitTime());
             NestedTimingTree::ShowTree();
         });

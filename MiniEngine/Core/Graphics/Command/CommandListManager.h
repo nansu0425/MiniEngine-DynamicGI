@@ -121,8 +121,7 @@ public:
         m_CopyQueue.WaitForIdle();
     }
 
-    // 지난 호출 이후 CPU가 fence를 기다리며 막혀 있던 시간(tick)을 돌려주고 0으로 되돌린다.
-    // frame의 CPU busy 시간에서 GPU를 기다린 시간을 빼는 데 쓴다.
+    // 지난 호출 이후 누적된 대기 시간을 돌려주고 0으로 되돌린다.
     int64_t TakeFenceWaitTicks(void);
 
 private:

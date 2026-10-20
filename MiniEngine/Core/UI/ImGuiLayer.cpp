@@ -199,7 +199,7 @@ void ImGuiLayer::Render(void)
 {
     ImGui::Render();
 
-    // UI를 숨긴 frame에도 scene overlay는 그려야 하므로 draw data는 항상 그린다.
+    // UI를 숨겨도 scene overlay는 보여야 하므로 숨김 여부와 관계없이 그린다.
     GraphicsContext& context = GraphicsContext::Begin(L"Render ImGui");
     context.TransitionResource(g_WindowOverlayBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
     context.ClearColor(g_WindowOverlayBuffer);
@@ -214,7 +214,7 @@ bool ImGuiLayer::BeginSceneOverlay(void)
     if (!s_ShowSceneOverlay)
         return false;
 
-    // scene 영역과 같은 크기의 투명한 창을 scene 영역에 고정해, 그 안의 widget이 scene 밖으로 나가지 않게 clip한다.
+    // 창을 scene 영역에 맞춰 두면 그 안의 widget은 scene 밖으로 나가지 않게 clip된다.
     const ImVec2 scenePos((float)s_SceneViewport.left, (float)s_SceneViewport.top);
     const ImVec2 sceneSize((float)(s_SceneViewport.right - s_SceneViewport.left), (float)(s_SceneViewport.bottom - s_SceneViewport.top));
     ImGui::SetNextWindowPos(scenePos);
@@ -224,7 +224,6 @@ bool ImGuiLayer::BeginSceneOverlay(void)
         ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking |
         ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoBringToFrontOnFocus);
 
-    // scene이 밝아도 글자가 보이게 내용 크기만큼 반투명한 배경을 깐다.
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.0f, 0.0f, 0.0f, 0.5f));
     ImGui::BeginChild("##Content", ImVec2(0.0f, 0.0f),
         ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysUseWindowPadding);

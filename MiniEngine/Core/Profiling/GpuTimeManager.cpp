@@ -31,8 +31,8 @@ namespace
     uint64_t sm_ValidTimeEnd = 0;
     double sm_GpuTickDelta = 0.0;
 
-    // span query는 timer query 뒤에 frame마다 번갈아 쓰는 두 영역에 둔다. resolve를 기록하는
-    // context도 새 영역에 span을 남기므로, 아직 resolve하지 않은 이전 영역을 덮어쓰지 않는다.
+    // resolve를 기록하는 context도 span을 남긴다. 영역을 frame마다 바꿔야 그 span이 아직 resolve하지 않은
+    // 이전 frame의 span을 덮어쓰지 않는다.
     constexpr uint32_t kMaxSpansPerFrame = 1024;
     uint32_t sm_SpanRegionStart[2] = {};
     uint32_t sm_CurrentSpanRegion = 0;
@@ -136,7 +136,6 @@ void GpuTimeManager::EndReadBack(void)
     sm_ReadBackBuffer->Unmap(0, &EmptyRange);
     sm_TimeStampBuffer = nullptr;
 
-    // 여기까지 기록된 span이 이번 frame의 것이다. 이후의 span은 다른 영역에 쌓는다.
     sm_ResolvedSpanStart = sm_SpanRegionStart[sm_CurrentSpanRegion];
     sm_NumResolvedSpans = std::min(sm_NumSpans.exchange(0), kMaxSpansPerFrame);
     sm_CurrentSpanRegion ^= 1;
@@ -180,7 +179,7 @@ float GpuTimeManager::GetBusyTime(void)
     {
         const uint64_t Start = sm_TimeStampBuffer[sm_ResolvedSpanStart + i * 2];
         const uint64_t End = sm_TimeStampBuffer[sm_ResolvedSpanStart + i * 2 + 1];
-        // GetTime과 같은 기준으로, 이번 resolve 구간 밖에서 찍힌 값은 다른 frame의 것으로 보고 버린다.
+        // resolve 구간 밖의 값은 다른 frame에서 찍혔거나 아직 덮어쓰이지 않은 예전 값이다.
         if (Start >= sm_ValidTimeStart && End <= sm_ValidTimeEnd && Start < End)
             Spans.emplace_back(Start, End);
     }

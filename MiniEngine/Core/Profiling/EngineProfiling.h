@@ -25,8 +25,6 @@ namespace EngineProfiling
     void BeginBlock(const std::wstring& name, CommandContext* Context = nullptr);
     void EndBlock(CommandContext* Context = nullptr);
 
-    // ImGuiLayer::BeginFrame과 Render 사이에서 부른다.
-    // overlay의 Frame은 Present 간격, CPU는 CPU busy, GPU는 GPU busy 시간이다.
     void ShowFrameStats(void);
     void ShowProfiler(void);
     void DisplayPerfGraph(GraphicsContext& Text);
