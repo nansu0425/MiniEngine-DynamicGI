@@ -11,6 +11,35 @@
         ]
     },
     {
+        "name": "DirectX-Specs",
+        "url": "https://github.com/microsoft/DirectX-Specs.git",
+        "commit": "dba214668aa72c2ad0ae342a469633b8c8a4f121",
+        "sparse": [
+            "/LICENSE",
+            "/d3d/Raytracing.md",
+            "/d3d/images/raytracing/"
+        ]
+    },
+    {
+        "name": "Capsaicin",
+        "url": "https://github.com/GPUOpen-LibrariesAndSDKs/Capsaicin.git",
+        "commit": "914b91596cd119eda85fbc1d3c7ee6ac391b1452",
+        "sparse": [
+            "/LICENSE",
+            "/README.md",
+            "/src/core/src/",
+            "!/src/core/src/components/blue_noise_sampler/blue_noise_sampler_samples.h",
+            "!/src/core/src/render_techniques/atmosphere/",
+            "!/src/core/src/render_techniques/auto_exposure/",
+            "!/src/core/src/render_techniques/bloom/",
+            "!/src/core/src/render_techniques/color_grading/",
+            "!/src/core/src/render_techniques/fsr/",
+            "!/src/core/src/render_techniques/image_metrics/",
+            "!/src/core/src/render_techniques/lens/",
+            "!/src/core/src/render_techniques/tone_mapping/"
+        ]
+    },
+    {
         "name": "Majercik2019-DDGI.pdf",
         "url": "https://jcgt.org/published/0008/02/01/paper-lowres.pdf",
         "sha256": "4571db6e48ae3f4feaf1fd99b06e45d515672d82daba98dc402ae24d6769ce90"
