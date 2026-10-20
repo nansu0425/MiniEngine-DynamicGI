@@ -64,6 +64,11 @@ namespace
     BoolVar s_EnableVSync("Timing/VSync", true);
     BoolVar s_LimitTo30Hz("Timing/Limit To 30Hz", false);
     BoolVar s_DropRandomFrames("Timing/Drop Random Frames", false);
+
+    bool IsMinimized(uint32_t width, uint32_t height)
+    {
+        return width == 0 || height == 0;
+    }
 }
 
 namespace Graphics
@@ -168,6 +173,9 @@ namespace Graphics
 
 void Display::Resize(uint32_t width, uint32_t height)
 {
+    if (IsMinimized(width, height))
+        return;
+
     g_CommandManager.IdleGPU();
 
     g_DisplayWidth = width;
@@ -197,8 +205,7 @@ void Display::Resize(uint32_t width, uint32_t height)
 
 void Display::SetSceneViewport(uint32_t x, uint32_t y, uint32_t width, uint32_t height)
 {
-    // window를 최소화하면 크기가 0이 된다. 그동안은 이전 buffer를 그대로 둔다.
-    if (width == 0 || height == 0)
+    if (IsMinimized(width, height))
         return;
 
     g_SceneViewportX = x;
