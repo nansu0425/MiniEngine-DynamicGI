@@ -92,6 +92,7 @@
     <ClInclude Include="Graphics\Descriptor\DynamicDescriptorHeap.h" />
     <ClInclude Include="Graphics\Descriptor\DescriptorHeap.h" />
     <ClInclude Include="Graphics\Resource\GpuBuffer.h" />
+    <ClInclude Include="Graphics\Resource\AccelerationStructureBuffer.h" />
     <ClInclude Include="Profiling\EngineProfiling.h" />
     <ClInclude Include="Graphics\Resource\EsramAllocator.h" />
     <ClInclude Include="Utility\FileUtility.h" />
@@ -169,6 +170,7 @@
     <ClCompile Include="App\Input.cpp" />
     <ClCompile Include="App\GameCore.cpp" />
     <ClCompile Include="Graphics\Resource\GpuBuffer.cpp" />
+    <ClCompile Include="Graphics\Resource\AccelerationStructureBuffer.cpp" />
     <ClCompile Include="Profiling\GpuTimeManager.cpp" />
     <ClCompile Include="Graphics\GraphicsCommon.cpp" />
     <ClCompile Include="Graphics\GraphicsCore.cpp" />

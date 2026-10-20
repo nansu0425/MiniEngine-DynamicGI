@@ -471,6 +471,15 @@ void CommandContext::FillBuffer( GpuResource& Dest, size_t DestOffset, DWParam V
     CopyBufferRegion(Dest, DestOffset, TempSpace.Buffer, TempSpace.Offset, NumBytes );
 }
 
+void CommandContext::BuildRaytracingAccelerationStructure( const D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC& Desc )
+{
+    Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList4> RaytracingCommandList;
+    ASSERT_SUCCEEDED(m_CommandList->QueryInterface(MY_IID_PPV_ARGS(&RaytracingCommandList)));
+
+    FlushResourceBarriers();
+    RaytracingCommandList->BuildRaytracingAccelerationStructure(&Desc, 0, nullptr);
+}
+
 void CommandContext::InitializeTexture( GpuResource& Dest, UINT NumSubresources, D3D12_SUBRESOURCE_DATA SubData[] )
 {
     UINT64 uploadBufferSize = GetRequiredIntermediateSize(Dest.GetResource(), 0, NumSubresources);

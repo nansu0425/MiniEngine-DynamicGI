@@ -144,6 +144,9 @@ public:
     void WriteBuffer( GpuResource& Dest, size_t DestOffset, const void* Data, size_t NumBytes );
     void FillBuffer( GpuResource& Dest, size_t DestOffset, DWParam Value, size_t NumBytes );
 
+    // ID3D12GraphicsCommandList4가 필요하므로 app이 inline raytracing을 요구할 때만 쓸 수 있다.
+    void BuildRaytracingAccelerationStructure( const D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC& Desc );
+
     void TransitionResource(GpuResource& Resource, D3D12_RESOURCE_STATES NewState, bool FlushImmediate = false);
     void BeginResourceTransition(GpuResource& Resource, D3D12_RESOURCE_STATES NewState, bool FlushImmediate = false);
     void InsertUAVBarrier(GpuResource& Resource, bool FlushImmediate = false);

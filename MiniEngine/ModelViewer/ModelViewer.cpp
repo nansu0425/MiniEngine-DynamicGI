@@ -27,6 +27,7 @@
 #include "Core/App/GameInput.h"
 #include "Model/Sponza/SponzaRenderer.h"
 #include "Model/Raytracing/RayQuerySmokeTest.h"
+#include "Model/Raytracing/RaytracingScene.h"
 #include "Model/Loader/glTF.h"
 #include "Model/Renderer/Renderer.h"
 #include "Model/Model.h"
@@ -69,6 +70,7 @@ private:
     D3D12_RECT m_MainScissor;
 
     ModelInstance m_ModelInst;
+    RaytracingScene m_RaytracingScene;
     ShadowCamera m_SunShadowCamera;
 };
 
@@ -201,6 +203,7 @@ void ModelViewer::Startup( void )
 
 void ModelViewer::Cleanup( void )
 {
+    m_RaytracingScene.Destroy();
     m_ModelInst = nullptr;
 
     g_IBLTextures.clear();
@@ -233,6 +236,8 @@ void ModelViewer::Update( float deltaT )
     GraphicsContext& gfxContext = GraphicsContext::Begin(L"Scene Update");
 
     m_ModelInst.Update(gfxContext, deltaT);
+    m_RaytracingScene.AddModelInstance(m_ModelInst);
+    m_RaytracingScene.Build(gfxContext);
 
     gfxContext.Finish();
 

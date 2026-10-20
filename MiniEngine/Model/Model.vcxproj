@@ -83,6 +83,8 @@
     <ClInclude Include="Loader\ModelLoader.h" />
     <ClInclude Include="Loader\ModelH3D.h" />
     <ClInclude Include="Sponza\ParticleEffects.h" />
+    <ClInclude Include="Raytracing\BottomLevelAS.h" />
+    <ClInclude Include="Raytracing\RaytracingScene.h" />
     <ClInclude Include="Raytracing\RayQuerySmokeTest.h" />
     <ClInclude Include="Renderer\Renderer.h" />
     <ClInclude Include="Sponza\SponzaRenderer.h" />
@@ -100,6 +102,8 @@
     <ClCompile Include="Loader\ModelH3D.cpp" />
     <ClCompile Include="Loader\ModelLoader.cpp" />
     <ClCompile Include="Sponza\ParticleEffects.cpp" />
+    <ClCompile Include="Raytracing\BottomLevelAS.cpp" />
+    <ClCompile Include="Raytracing\RaytracingScene.cpp" />
     <ClCompile Include="Raytracing\RayQuerySmokeTest.cpp" />
     <ClCompile Include="Renderer\Renderer.cpp" />
     <ClCompile Include="Sponza\SponzaRenderer.cpp" />

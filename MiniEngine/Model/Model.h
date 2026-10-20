@@ -15,6 +15,7 @@
 
 #include "Model/Animation.h"
 #include "Core/Graphics/Resource/GpuBuffer.h"
+#include "Core/Graphics/Resource/AccelerationStructureBuffer.h"
 #include "Core/Math/VectorMath.h"
 #include "Core/Camera/Camera.h"
 #include "Core/Graphics/Command/CommandContext.h"
@@ -126,6 +127,11 @@ public:
     std::unique_ptr<uint16_t[]> m_JointIndices;
     std::unique_ptr<Math::Matrix4[]> m_JointIBMs;
 
+    // 모든 mesh의 BLAS를 m_BLASBuffer 하나에 나눠 담는다.
+    // m_MeshBLAS는 mesh 순서대로 BLAS의 주소이고, BLAS가 없는 mesh는 0이다.
+    AccelerationStructureBuffer m_BLASBuffer;
+    std::vector<D3D12_GPU_VIRTUAL_ADDRESS> m_MeshBLAS;
+
 protected:
     void Destroy();
 };
@@ -144,6 +150,9 @@ public:
     ModelInstance& operator=( std::shared_ptr<const Model> sourceModel );
 
     bool IsNull(void) const { return m_Model == nullptr; }
+    const Model& GetModel(void) const { return *m_Model; }
+    // node 순서대로 world transform을 담는다. mesh는 Mesh::meshCBV로 자기 node를 가리킨다.
+    const Math::AffineTransform* GetNodeWorldTransforms(void) const { return m_BoundingSphereTransforms.get(); }
 
     void Update(GraphicsContext& gfxContext, float deltaTime);
     void Render(Renderer::MeshSorter& sorter) const;

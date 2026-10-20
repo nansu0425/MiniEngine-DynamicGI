@@ -21,7 +21,9 @@
 #include "Model/Loader/ModelH3D.h"
 #include "Core/Graphics/Texture/TextureManager.h"
 #include "Model/Loader/TextureConvert.h"
+#include "Model/Raytracing/BottomLevelAS.h"
 #include "Core/Graphics/GraphicsCommon.h"
+#include "Core/Graphics/GraphicsCore.h"
 
 #include <fstream>
 #include <unordered_map>
@@ -269,6 +271,9 @@ std::shared_ptr<Model> Renderer::LoadModel(const std::wstring& filePath, bool fo
     inFile.read((char*)textureOptions.data(), header.numTextures * sizeof(uint8_t));
 
     LoadMaterials(*model, materialTextures, textureNames, textureOptions, basePath);
+
+    if (g_DXRDevice != nullptr)
+        BuildBottomLevelAS(*model);
 
     model->m_BoundingSphere = BoundingSphere(*(XMFLOAT4*)header.boundingSphere);
     model->m_BoundingBox = AxisAlignedBox(Vector3(*(XMFLOAT3*)header.minPos), Vector3(*(XMFLOAT3*)header.maxPos));
