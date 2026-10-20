@@ -125,13 +125,16 @@ namespace Utility
         }
 
     #define ASSERT_SUCCEEDED( hr, ... ) \
-        if (FAILED(hr)) { \
+    { \
+        const HRESULT assertSucceededHr = static_cast<HRESULT>(hr); \
+        if (FAILED(assertSucceededHr)) { \
             Utility::Print("\nHRESULT failed in " STRINGIFY_BUILTIN(__FILE__) " @ " STRINGIFY_BUILTIN(__LINE__) "\n"); \
-            Utility::PrintSubMessage("hr = 0x%08X", hr); \
+            Utility::PrintSubMessage("hr = 0x%08X", assertSucceededHr); \
             Utility::PrintSubMessage(__VA_ARGS__); \
             Utility::Print("\n"); \
             __debugbreak(); \
-        }
+        } \
+    }
 
 
     #define WARN_ONCE_IF( isTrue, ... ) \
