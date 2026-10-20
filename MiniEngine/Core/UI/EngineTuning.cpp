@@ -13,13 +13,10 @@
 
 
 #include "Core/pch.h"
-#include "Core/UI/TextRenderer.h"
-#include "Core/App/GameInput.h"
-#include "Core/Math/Color.h"
-#include "Core/Display/Display.h"
 #include "Core/Graphics/Command/CommandContext.h"
-#include "Core/Graphics/Resource/BufferManager.h"
 #include "Core/Profiling/GraphRenderer.h"
+#include "Core/UI/ImGuiLayer.h"
+#include <imgui.h>
 
 using namespace std;
 using namespace Math;
@@ -34,58 +31,39 @@ namespace EngineTuning
     EngineVar* s_UnregisteredVariable[kMaxUnregisteredTweaks] = { nullptr };
     int32_t s_UnregisteredCount = 0;
 
-    float s_ScrollOffset = 0.0f;
-    float s_ScrollTopTrigger = 1080.0f * 0.2f;
-    float s_ScrollBottomTrigger = 1080.0f * 0.8f;
-
     // Internal functions
     void AddToVariableGraph( const string& path, EngineVar& var );
     void RegisterVariable( const string& path, EngineVar& var );
 
-    EngineVar* sm_SelectedVariable = nullptr;
-    bool sm_IsVisible = false;
+    bool s_ShowPanel = false;
 }
 
 // Not open to the public.  Groups are auto-created when a tweaker's path includes the group name.
 class VariableGroup : public EngineVar
 {
 public:
-    VariableGroup() : m_IsExpanded(false) {}
-
     EngineVar* FindChild( const string& name )
     {
         auto iter = m_Children.find(name);
         return iter == m_Children.end() ? nullptr : iter->second;
     }
-     
+
     void AddChild( const string& name, EngineVar& child )
     {
         m_Children[name] = &child;
         child.m_GroupPtr = this;
     }
 
-    void Display( TextContext& Text, float leftMargin, EngineVar* highlightedTweak );
+    void ShowChildren( void );
 
     void SaveToFile( FILE* file, int fileMargin );
     void LoadSettingsFromFile( FILE* file );
 
-    EngineVar* NextVariable( EngineVar* currentVariable );
-    EngineVar* PrevVariable( EngineVar* currentVariable );
-    EngineVar* FirstVariable( void );
-    EngineVar* LastVariable( void );
-
-    bool IsExpanded( void ) const { return m_IsExpanded; }
-
-    virtual void Increment( void ) override { m_IsExpanded = true; }
-    virtual void Decrement( void ) override { m_IsExpanded = false; }
-    virtual void Bang( void ) override { m_IsExpanded = !m_IsExpanded; }
-
     virtual void SetValue( FILE*, const std::string& ) override {}
-    
+
     static VariableGroup sm_RootGroup;
 
 private:
-    bool m_IsExpanded;
     std::map<string, EngineVar*> m_Children;
 };
 
@@ -94,63 +72,27 @@ VariableGroup VariableGroup::sm_RootGroup;
 //=====================================================================================================================
 // VariableGroup implementation
 
-void VariableGroup::Display( TextContext& Text, float leftMargin, EngineVar* highlightedTweak )
+void VariableGroup::ShowChildren( void )
 {
-    Text.SetLeftMargin(leftMargin);
-    Text.SetCursorX(leftMargin);
-
     for (auto iter = m_Children.begin(); iter != m_Children.end(); ++iter)
     {
-        
-        if (iter->second == highlightedTweak)
-        {
-            Text.SetColor( Color(1.0f, 1.0f, 0.25f) );
-            float temp1 = Text.GetCursorY() - EngineTuning::s_ScrollBottomTrigger;
-            float temp2 = Text.GetCursorY() - EngineTuning::s_ScrollTopTrigger;
-            if (temp1 > 0.0f)
-            {
-                EngineTuning::s_ScrollOffset += 0.2f * temp1; 
-            }
-            else if (temp2 < 0.0f)
-            {
-                EngineTuning::s_ScrollOffset = max(0.0f, EngineTuning::s_ScrollOffset + 0.2f * temp2);
-            }
-        }
-        else
-            Text.SetColor( Color(1.0f, 1.0f, 1.0f) );
+        ImGui::PushID(iter->second);
 
         VariableGroup* subGroup = dynamic_cast<VariableGroup*>(iter->second);
         if (subGroup != nullptr)
         {
-
-            if (subGroup->IsExpanded())
+            if (ImGui::TreeNode(iter->first.c_str()))
             {
-                Text.DrawString("- ");
+                subGroup->ShowChildren();
+                ImGui::TreePop();
             }
-            else
-            {
-                Text.DrawString("+ ");				
-            }
-            Text.DrawString(iter->first);
-            Text.DrawString("/...\n");
-
-            if (subGroup->IsExpanded())
-            {
-                subGroup->Display(Text, leftMargin + 30.0f, highlightedTweak);
-                Text.SetLeftMargin(leftMargin);
-                Text.SetCursorX(leftMargin);
-            }
-            
         }
         else
         {
-            
-            iter->second->DisplayValue(Text);
-            Text.SetCursorX(leftMargin + 200.0f);
-            Text.DrawString(iter->first);
-            Text.NewLine();
+            iter->second->Edit(iter->first.c_str());
         }
-        
+
+        ImGui::PopID();
     }
 }
 
@@ -191,70 +133,6 @@ void VariableGroup::LoadSettingsFromFile( FILE* file )
     }
 }
 
-EngineVar* VariableGroup::FirstVariable( void )
-{
-    return m_Children.size() == 0 ? nullptr : m_Children.begin()->second;
-}
-
-EngineVar* VariableGroup::LastVariable( void )
-{
-    if (m_Children.size() == 0)
-        return this;
-
-    auto LastVariable = m_Children.end();
-    --LastVariable;
-
-    VariableGroup* isGroup = dynamic_cast<VariableGroup*>(LastVariable->second);
-    if (isGroup && isGroup->IsExpanded())
-        return isGroup->LastVariable();
-
-    return LastVariable->second;
-}
-
-EngineVar* VariableGroup::NextVariable( EngineVar* curVar )
-{
-    auto iter = m_Children.begin();
-    for (; iter != m_Children.end(); ++iter)
-    {
-        if (curVar == iter->second)
-            break;
-    }
-
-    ASSERT( iter != m_Children.end(), "Did not find engine variable in its designated group" );
-
-    auto nextIter = iter;
-    ++nextIter;
-
-    if (nextIter == m_Children.end())
-        return m_GroupPtr ? m_GroupPtr->NextVariable(this) : nullptr;
-    else
-        return nextIter->second;
-}
-
-EngineVar* VariableGroup::PrevVariable( EngineVar* curVar )
-{
-    auto iter = m_Children.begin();
-    for (; iter != m_Children.end(); ++iter)
-    {
-        if (curVar == iter->second)
-            break;
-    }
-
-    ASSERT( iter != m_Children.end(), "Did not find engine variable in its designated group" );
-
-    if (iter == m_Children.begin())
-        return this;
-
-    auto prevIter = iter;
-    --prevIter;
-
-    VariableGroup* isGroup = dynamic_cast<VariableGroup*>(prevIter->second);
-    if (isGroup && isGroup->IsExpanded())
-        return isGroup->LastVariable();
-
-    return prevIter->second;
-}
-
 //=====================================================================================================================
 // EngineVar implementations
 
@@ -267,30 +145,28 @@ EngineVar::EngineVar( const std::string& path, ActionCallback pfnCallback) : m_G
     EngineTuning::RegisterVariable(path, *this);
 }
 
-
-EngineVar* EngineVar::NextVar( void )
+namespace
 {
-    EngineVar* next = nullptr;
-    VariableGroup* isGroup = dynamic_cast<VariableGroup*>(this);
-    if (isGroup != nullptr && isGroup->IsExpanded())
-        next = isGroup->FirstVariable();
-
-    if (next == nullptr)
-        next = m_GroupPtr->NextVariable(this);
-
-    return next != nullptr ? next : this;
-}
-
-EngineVar* EngineVar::PrevVar( void )
-{
-    EngineVar* prev = m_GroupPtr->PrevVariable(this);
-    if (prev != nullptr && prev != m_GroupPtr)
+    // ImGui는 format의 자릿수로 값을 반올림하므로 step을 표현할 만큼 자릿수가 있어야 한다.
+    std::string FloatFormat( float stepSize )
     {
-        VariableGroup* isGroup = dynamic_cast<VariableGroup*>(prev);
-        if (isGroup != nullptr && isGroup->IsExpanded())
-            prev = isGroup->LastVariable();
+        int decimals = 1;
+        while (decimals < 6)
+        {
+            const float scaled = stepSize * powf(10.0f, (float)decimals);
+            if (fabsf(scaled - roundf(scaled)) < 1e-3f)
+                break;
+            ++decimals;
+        }
+        return "%." + std::to_string(decimals) + "f";
     }
-    return prev != nullptr ? prev : this;
+
+    constexpr float kDragPixelsPerStep = 10.0f;
+
+    float DragSpeed( float stepSize )
+    {
+        return stepSize / kDragPixelsPerStep;
+    }
 }
 
 BoolVar::BoolVar( const std::string& path, bool val, ActionCallback pfnCallback )
@@ -299,9 +175,11 @@ BoolVar::BoolVar( const std::string& path, bool val, ActionCallback pfnCallback 
     m_Flag = val;
 }
 
-void BoolVar::DisplayValue( TextContext& Text ) const
+void BoolVar::Edit( const char* label )
 {
-    Text.DrawFormattedString("[%c]", m_Flag ? 'X' : '-');
+    bool flag = m_Flag;
+    if (ImGui::Checkbox(label, &flag))
+        flag ? Increment() : Decrement();
 }
 
 std::string BoolVar::ToString( void ) const
@@ -335,9 +213,16 @@ NumVar::NumVar( const std::string& path, float val, float minVal, float maxVal, 
     m_StepSize = stepSize;
 }
 
-void NumVar::DisplayValue( TextContext& Text ) const
+void NumVar::Edit( const char* label )
 {
-    Text.DrawFormattedString("%-11f", m_Value);
+    float value = m_Value;
+    if (!ImGui::DragFloat(label, &value, DragSpeed(m_StepSize), m_MinValue, m_MaxValue, FloatFormat(m_StepSize).c_str(),
+        ImGuiSliderFlags_AlwaysClamp))
+        return;
+
+    const float oldValue = m_Value;
+    m_Value = Clamp(value);
+    m_Value > oldValue ? EngineVar::Increment() : EngineVar::Decrement();
 }
 
 std::string NumVar::ToString( void ) const
@@ -378,9 +263,21 @@ ExpVar::operator float() const
     return exp2f(m_Value);
 }
 
-void ExpVar::DisplayValue( TextContext& Text ) const
+void ExpVar::Edit( const char* label )
 {
-    Text.DrawFormattedString("%-11f", (float)*this);
+    // 지수를 끌되 실제 값을 보여 주려고, %가 없으면 그대로 표시되는 ImGui format에 실제 값을 넣는다.
+    // 직접 입력한 값은 지수로 해석되므로 입력은 막는다.
+    char display[64];
+    sprintf_s(display, "%g", (float)*this);
+
+    float exponent = m_Value;
+    if (!ImGui::DragFloat(label, &exponent, DragSpeed(m_StepSize), m_MinValue, m_MaxValue, display,
+        ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_NoInput))
+        return;
+
+    const float oldExponent = m_Value;
+    m_Value = Clamp(exponent);
+    m_Value > oldExponent ? EngineVar::Increment() : EngineVar::Decrement();
 }
 
 std::string ExpVar::ToString( void ) const
@@ -410,9 +307,16 @@ IntVar::IntVar( const std::string& path, int32_t val, int32_t minVal, int32_t ma
     m_StepSize = stepSize;
 }
 
-void IntVar::DisplayValue( TextContext& Text ) const
+void IntVar::Edit( const char* label )
 {
-    Text.DrawFormattedString("%-11d", m_Value);
+    int value = m_Value;
+    if (!ImGui::DragInt(label, &value, DragSpeed((float)m_StepSize), m_MinValue, m_MaxValue, "%d",
+        ImGuiSliderFlags_AlwaysClamp))
+        return;
+
+    const int32_t oldValue = m_Value;
+    m_Value = Clamp(value);
+    m_Value > oldValue ? EngineVar::Increment() : EngineVar::Decrement();
 }
 
 std::string IntVar::ToString( void ) const
@@ -441,9 +345,14 @@ EnumVar::EnumVar( const std::string& path, int32_t initialVal, int32_t listLengt
     m_Value = Clamp(initialVal);
 }
 
-void EnumVar::DisplayValue( TextContext& Text ) const
+void EnumVar::Edit( const char* label )
 {
-    Text.DrawString(m_EnumLabels[m_Value]);
+    int value = m_Value;
+    if (!ImGui::Combo(label, &value, m_EnumLabels, m_EnumLength))
+        return;
+
+    m_Value = Clamp(value);
+    EngineVar::Bang();
 }
 
 std::string EnumVar::ToString( void ) const
@@ -480,9 +389,24 @@ DynamicEnumVar::DynamicEnumVar( const std::string& path, ActionCallback pfnCallb
     m_Value = 0;
 }
 
-void DynamicEnumVar::DisplayValue( TextContext& Text ) const
+void DynamicEnumVar::Edit( const char* label )
 {
-    Text.DrawString(m_EnumLabels[m_Value]);
+    if (m_EnumCount == 0)
+        return;
+
+    if (!ImGui::BeginCombo(label, Utility::WideStringToUTF8(m_EnumLabels[m_Value]).c_str()))
+        return;
+
+    for (int32_t i = 0; i < m_EnumCount; ++i)
+    {
+        const bool isSelected = (i == m_Value);
+        if (ImGui::Selectable(Utility::WideStringToUTF8(m_EnumLabels[i]).c_str(), isSelected) && !isSelected)
+        {
+            m_Value = i;
+            EngineVar::Bang();
+        }
+    }
+    ImGui::EndCombo();
 }
 
 std::string DynamicEnumVar::ToString( void ) const
@@ -520,16 +444,12 @@ CallbackTrigger::CallbackTrigger( const std::string& path, std::function<void (v
 {
     m_Callback = callback;
     m_Arguments = args;
-    m_BangDisplay = 0;
 }
 
-void CallbackTrigger::DisplayValue( TextContext& Text ) const
+void CallbackTrigger::Edit( const char* label )
 {
-    static const char s_animation[] = { '-', '\\', '|', '/' };
-    Text.DrawFormattedString("[%c]", s_animation[(m_BangDisplay >> 3) & 3]);
-
-    if (m_BangDisplay > 0)
-        --m_BangDisplay;
+    if (ImGui::Button(label))
+        Bang();
 }
 
 void CallbackTrigger::SetValue(FILE* file, const std::string& setting) 
@@ -556,61 +476,12 @@ void EngineTuning::Initialize( void )
 
 }
 
-void HandleDigitalButtonPress( GameInput::DigitalInput button, float timeDelta, std::function<void ()> action )
+void EngineTuning::Update( void )
 {
-    if (!GameInput::IsPressed(button))
-        return;
-
-    float durationHeld = GameInput::GetDurationPressed(button);
-
-    // Tick on the first press
-    if (durationHeld == 0.0f)
+    ImGuiLayer::ShowPanel("Engine Tuning", s_ShowPanel, []
     {
-        action();
-        return;
-    }
-
-    // After ward, tick at fixed intervals
-    float oldDuration = durationHeld - timeDelta;
-
-    // Before 2 seconds, use slow scale (200ms/tick), afterward use fast scale (50ms/tick).
-    float timeStretch = durationHeld < 2.0f ? 5.0f : 20.0f;
-
-    if (Floor(durationHeld * timeStretch) > Floor(oldDuration * timeStretch))
-        action();
-}
-
-void EngineTuning::Update( float frameTime )
-{
-    if (GameInput::IsFirstPressed( GameInput::kBackButton )
-        || GameInput::IsFirstPressed( GameInput::kKey_back ))
-        sm_IsVisible = !sm_IsVisible;
-
-    if (!sm_IsVisible)
-        return;
-
-    if (sm_SelectedVariable == nullptr || sm_SelectedVariable == &VariableGroup::sm_RootGroup)
-        sm_SelectedVariable = VariableGroup::sm_RootGroup.FirstVariable();
-
-    if (sm_SelectedVariable == nullptr)
-        return;
-
-    // Detect a DPad button press
-    HandleDigitalButtonPress(GameInput::kDPadRight, frameTime, []{ sm_SelectedVariable->Increment(); } );
-    HandleDigitalButtonPress(GameInput::kDPadLeft,	frameTime, []{ sm_SelectedVariable->Decrement(); } );
-    HandleDigitalButtonPress(GameInput::kDPadDown,	frameTime, []{ sm_SelectedVariable = sm_SelectedVariable->NextVar(); } );
-    HandleDigitalButtonPress(GameInput::kDPadUp,	frameTime, []{ sm_SelectedVariable = sm_SelectedVariable->PrevVar(); } );
-
-    HandleDigitalButtonPress(GameInput::kKey_right, frameTime, []{ sm_SelectedVariable->Increment(); } );
-    HandleDigitalButtonPress(GameInput::kKey_left,	frameTime, []{ sm_SelectedVariable->Decrement(); } );
-    HandleDigitalButtonPress(GameInput::kKey_down,	frameTime, []{ sm_SelectedVariable = sm_SelectedVariable->NextVar(); } );
-    HandleDigitalButtonPress(GameInput::kKey_up,	frameTime, []{ sm_SelectedVariable = sm_SelectedVariable->PrevVar(); } );
-
-    if (GameInput::IsFirstPressed( GameInput::kAButton )
-        || GameInput::IsFirstPressed( GameInput::kKey_return ))
-    {
-        sm_SelectedVariable->Bang();
-    }
+        VariableGroup::sm_RootGroup.ShowChildren();
+    });
 }
 
 /*
@@ -641,38 +512,10 @@ std::function<void(void*)> StartLoadFunc = StartLoad;
 static CallbackTrigger Load("Load Settings", StartLoadFunc, nullptr); 
 */
 
-void EngineTuning::Display( GraphicsContext& Context, float x, float y, float w, float h )
+void EngineTuning::Display( GraphicsContext& Context )
 {
     GraphRenderer::RenderGraphs(Context, GraphRenderer::GraphType::Profile);
-
-    TextContext Text(Context);
-    Text.Begin();
-
-    Text.ResetCursor( x, y );
-
-    if (!sm_IsVisible)
-        return;
-
-    s_ScrollTopTrigger = y + h * 0.2f;
-    s_ScrollBottomTrigger = y + h * 0.8f;
-
-    float hScale = g_SceneOverlayBuffer.GetWidth() / 1920.0f;
-    float vScale = g_SceneOverlayBuffer.GetHeight() / 1080.0f;
-
-    Context.SetScissor((uint32_t)Floor(x * hScale), (uint32_t)Floor(y * vScale), 
-        (uint32_t)Ceiling((x + w) * hScale), (uint32_t)Ceiling((y + h) * vScale));
-
-    Text.ResetCursor(x, y - s_ScrollOffset );
-    Text.SetColor( Color(0.5f, 1.0f, 1.0f) );
-    Text.DrawString("Engine Tuning\n");
-    Text.SetTextSize(20.0f);
-
-    VariableGroup::sm_RootGroup.Display( Text, x, sm_SelectedVariable );
-    
     EngineProfiling::DisplayPerfGraph(Context);
-
-    Text.End();
-    Context.SetScissor(0, 0, g_SceneOverlayBuffer.GetWidth(), g_SceneOverlayBuffer.GetHeight());
 }
 
 void EngineTuning::AddToVariableGraph( const string& path, EngineVar& var )
@@ -731,9 +574,4 @@ void EngineTuning::RegisterVariable( const std::string& path, EngineVar& var )
     {
         AddToVariableGraph( path, var );
     }
-}
-
-bool EngineTuning::IsFocused( void )
-{
-    return sm_IsVisible;
 }

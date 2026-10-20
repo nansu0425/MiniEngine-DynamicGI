@@ -337,7 +337,7 @@ NestedTimingTree NestedTimingTree::sm_RootScope(L"");
 NestedTimingTree* NestedTimingTree::sm_CurrentNode = &NestedTimingTree::sm_RootScope;
 namespace EngineProfiling
 {
-    BoolVar DrawFrameStats("Display Frame Stats", true);
+    BoolVar DrawFrameStats("Profiling/Display Frame Stats", true);
     bool s_ShowProfiler = false;
     //BoolVar DrawPerfGraph("Display Performance Graph", false);
     const bool DrawPerfGraph = false;

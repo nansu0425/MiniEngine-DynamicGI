@@ -71,8 +71,8 @@ namespace GameCore
         Display::SetSceneViewport(sceneViewport.left, sceneViewport.top,
             sceneViewport.right - sceneViewport.left, sceneViewport.bottom - sceneViewport.top);
         GameInput::Update(DeltaTime);
-        EngineTuning::Update(DeltaTime);
-        
+        EngineTuning::Update();
+
         game.Update(DeltaTime);
         game.RenderScene();
 
@@ -87,7 +87,7 @@ namespace GameCore
 
         UiContext.SetRenderTarget(g_SceneOverlayBuffer.GetRTV());
         UiContext.SetViewportAndScissor(0, 0, g_SceneOverlayBuffer.GetWidth(), g_SceneOverlayBuffer.GetHeight());
-        EngineTuning::Display( UiContext, 10.0f, 40.0f, 1900.0f, 1040.0f );
+        EngineTuning::Display( UiContext );
 
         UiContext.Finish();
 

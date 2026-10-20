@@ -11,10 +11,7 @@
 * yaw/pitch: right thumbstick or mouse while holding the right mouse button
 * toggle ImGui: F1
 * toggle slow movement: click left thumbstick or lshift
-* open debug menu: back button or backspace
-* navigate debug menu: dpad or arrow keys
-* toggle debug menu item: A button or return
-* adjust debug menu value: dpad left/right or left/right arrow keys
+* engine tuning, profiler, scene overlay: ImGui View menu
 
 ## glTF 2.0 Support:
 

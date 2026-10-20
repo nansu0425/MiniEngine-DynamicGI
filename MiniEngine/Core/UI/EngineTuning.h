@@ -20,7 +20,6 @@
 #include <set>
 
 class VariableGroup;
-class TextContext;
 
 class EngineVar
 {
@@ -28,16 +27,14 @@ public:
 
     virtual ~EngineVar() {}
 
-    virtual void Increment( void ) { m_ActionCallback(ActionType::Increment); }	// DPad Right
-    virtual void Decrement( void ) { m_ActionCallback(ActionType::Decrement); }	// DPad Left
-    virtual void Bang( void ) { m_ActionCallback(ActionType::Bang); }		// A Button
+    virtual void Increment( void ) { m_ActionCallback(ActionType::Increment); }
+    virtual void Decrement( void ) { m_ActionCallback(ActionType::Decrement); }
+    virtual void Bang( void ) { m_ActionCallback(ActionType::Bang); }
 
-    virtual void DisplayValue( TextContext& ) const {}
+    // 구현은 값을 바꿨으면 Increment, Decrement, Bang 중 하나를 거쳐 action callback을 불러야 한다.
+    virtual void Edit( const char* /*label*/ ) {}
     virtual std::string ToString( void ) const { return ""; }
     virtual void SetValue( FILE* file, const std::string& setting) = 0; //set value read from file
-
-    EngineVar* NextVar( void );
-    EngineVar* PrevVar( void );
 
     enum class ActionType
     {
@@ -76,7 +73,7 @@ public:
     virtual void Decrement( void ) override { m_Flag = false; EngineVar::Decrement(); }
     virtual void Bang( void ) override { m_Flag = !m_Flag;  EngineVar::Bang(); }
 
-    virtual void DisplayValue( TextContext& Text ) const override;
+    virtual void Edit( const char* label ) override;
     virtual std::string ToString( void ) const override;
     virtual void SetValue( FILE* file, const std::string& setting) override;
 
@@ -94,7 +91,7 @@ public:
     virtual void Increment( void ) override { m_Value = Clamp(m_Value + m_StepSize); EngineVar::Increment(); }
     virtual void Decrement( void ) override { m_Value = Clamp(m_Value - m_StepSize); EngineVar::Decrement(); }
 
-    virtual void DisplayValue( TextContext& Text ) const override;
+    virtual void Edit( const char* label ) override;
     virtual std::string ToString( void ) const override;
     virtual void SetValue( FILE* file, const std::string& setting)  override;
 
@@ -114,7 +111,7 @@ public:
     ExpVar& operator=( float val );	// m_Value = log2(val)
     operator float() const;			// returns exp2(m_Value)
 
-    virtual void DisplayValue( TextContext& Text ) const override;
+    virtual void Edit( const char* label ) override;
     virtual std::string ToString( void ) const override;
     virtual void SetValue( FILE* file, const std::string& setting ) override;
 
@@ -130,7 +127,7 @@ public:
     virtual void Increment( void ) override { m_Value = Clamp(m_Value + m_StepSize); EngineVar::Increment(); }
     virtual void Decrement( void ) override { m_Value = Clamp(m_Value - m_StepSize); EngineVar::Decrement(); }
 
-    virtual void DisplayValue( TextContext& Text ) const override;
+    virtual void Edit( const char* label ) override;
     virtual std::string ToString( void ) const override;
     virtual void SetValue( FILE* file, const std::string& setting ) override;
 
@@ -153,7 +150,7 @@ public:
     virtual void Increment( void ) override { m_Value = (m_Value + 1) % m_EnumLength; EngineVar::Increment(); }
     virtual void Decrement( void ) override { m_Value = (m_Value + m_EnumLength - 1) % m_EnumLength; EngineVar::Decrement(); }
 
-    virtual void DisplayValue( TextContext& Text ) const override;
+    virtual void Edit( const char* label ) override;
     virtual std::string ToString( void ) const override;
     virtual void SetValue( FILE* file, const std::string& setting ) override;
 
@@ -177,7 +174,7 @@ public:
     virtual void Increment( void ) override { m_Value = (m_Value + 1) % m_EnumCount; EngineVar::Increment(); }
     virtual void Decrement( void ) override { m_Value = (m_Value + m_EnumCount - 1) % m_EnumCount; EngineVar::Decrement(); }
 
-    virtual void DisplayValue( TextContext& Text ) const override;
+    virtual void Edit( const char* label ) override;
     virtual std::string ToString( void ) const override;
     virtual void SetValue( FILE* file, const std::string& setting ) override;
 
@@ -196,15 +193,14 @@ class CallbackTrigger : public EngineVar
 public:
     CallbackTrigger( const std::string& path, std::function<void (void*)> callback, void* args = nullptr );
 
-    virtual void Bang( void ) override { m_Callback(m_Arguments); m_BangDisplay = 64; }
+    virtual void Bang( void ) override { m_Callback(m_Arguments); }
 
-    virtual void DisplayValue( TextContext& Text ) const override;
+    virtual void Edit( const char* label ) override;
     virtual void SetValue( FILE* file, const std::string& setting ) override;
 
 private:
     std::function<void (void*)> m_Callback;
     void* m_Arguments;
-    mutable uint32_t m_BangDisplay;
 };
 
 class GraphicsContext;
@@ -212,8 +208,7 @@ class GraphicsContext;
 namespace EngineTuning
 {
     void Initialize( void );
-    void Update( float frameTime );
-    void Display( GraphicsContext& Context, float x, float y, float w, float h );
-    bool IsFocused( void );
+    void Update( void );
+    void Display( GraphicsContext& Context );
 
 } // namespace EngineTuning
