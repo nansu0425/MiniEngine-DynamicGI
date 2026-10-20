@@ -75,6 +75,9 @@ foreach ($Reference in $Manifest) {
         Invoke-Git -C $Destination fetch --quiet --filter=blob:none origin $Reference.commit
     }
     Invoke-Git -C $Destination checkout --quiet --detach $Reference.commit
-    Invoke-Git -C $Destination submodule update --quiet --init --recursive
+    # sparse-checkout 은 submodule 에 적용되지 않아서 manifest 에 적은 submodule 만 받는다
+    if ($Reference.submodules) {
+        Invoke-Git -C $Destination submodule update --quiet --init --recursive -- @($Reference.submodules)
+    }
     Write-Host "Fetched $($Reference.name) at $($Reference.commit)"
 }

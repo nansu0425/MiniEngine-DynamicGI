@@ -30,6 +30,7 @@
 
 - git repo 는 `manifest.json` 에 `name`, `url`, `commit` 을 적고 script 를 다시 실행한다. commit 을 고정해서 어느 버전을 참고했는지 git history 에 남긴다.
 - repo 의 일부만 필요하면 `sparse` 에 [non-cone sparse-checkout pattern](https://git-scm.com/docs/git-sparse-checkout#_non_cone_problems) 목록을 적는다. 이 pattern 에 맞는 파일만 받는다. `sparse` 를 지우면 다음 실행 때 전체를 받는다.
+- submodule 은 `submodules` 에 경로를 적은 것만 받는다. `sparse` 는 submodule 에 적용되지 않는다.
 - 받은 repo 안에서 수정한 내용이 있으면 script 는 그 repo 를 건너뛴다.
 - 논문 같은 단일 파일은 `name`, `url`, `sha256` 을 적는다. 받은 파일의 sha256 이 다르면 script 가 실패한다.
 - manifest 에서 뺀 항목은 script 가 지우지 않는다. `references/` 아래의 해당 폴더나 파일을 직접 지운다.
