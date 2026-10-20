@@ -15,6 +15,8 @@
 
 #include "Core/pch.h"
 
+class GraphicsContext;
+
 namespace GameCore
 {
     extern bool gIsSupending;
@@ -39,7 +41,7 @@ namespace GameCore
         virtual void RenderScene( void ) = 0;
 
         // Optional UI (overlay) rendering pass.  This is LDR.  The buffer is already cleared.
-        virtual void RenderUI( class GraphicsContext& ) {};
+        virtual void RenderUI( GraphicsContext& ) {};
 
         // Inline raytracing을 쓰는 app은 override해서 이를 지원하는 device를 요구한다.
         virtual bool RequiresInlineRaytracing() const { return false; }

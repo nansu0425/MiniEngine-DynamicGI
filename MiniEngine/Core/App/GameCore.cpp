@@ -84,11 +84,6 @@ namespace GameCore
         UiContext.SetRenderTarget(g_SceneOverlayBuffer.GetRTV());
         UiContext.SetViewportAndScissor(0, 0, g_SceneOverlayBuffer.GetWidth(), g_SceneOverlayBuffer.GetHeight());
         game.RenderUI(UiContext);
-
-        UiContext.SetRenderTarget(g_SceneOverlayBuffer.GetRTV());
-        UiContext.SetViewportAndScissor(0, 0, g_SceneOverlayBuffer.GetWidth(), g_SceneOverlayBuffer.GetHeight());
-        EngineTuning::Display( UiContext );
-
         UiContext.Finish();
 
         EngineProfiling::ShowFrameStats();

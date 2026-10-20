@@ -18,7 +18,6 @@
 #include "Core/Profiling/GpuTimeManager.h"
 #include "Core/Effects/PostEffects/PostEffects.h"
 #include "Core/Effects/SSAO/SSAO.h"
-#include "Core/UI/TextRenderer.h"
 #include "Core/Graphics/Resource/ColorBuffer.h"
 #include "Core/App/SystemTime.h"
 #include "Core/Graphics/Descriptor/SamplerManager.h"
@@ -28,7 +27,6 @@
 #include "Core/Graphics/Pipeline/RootSignature.h"
 #include "Core/Graphics/Command/CommandSignature.h"
 #include "Core/Particles/ParticleEffectManager.h"
-#include "Core/Profiling/GraphRenderer.h"
 #include "Core/Effects/TemporalEffects/TemporalEffects.h"
 #include "Core/Display/Display.h"
 
@@ -429,8 +427,6 @@ void Graphics::Initialize(bool RequireInlineRaytracing)
     TemporalEffects::Initialize();
     PostEffects::Initialize();
     SSAO::Initialize();
-    TextRenderer::Initialize();
-    GraphRenderer::Initialize();
     ParticleEffectManager::Initialize(3840, 2160);
 }
 
@@ -450,8 +446,6 @@ void Graphics::Shutdown( void )
     TemporalEffects::Shutdown();
     PostEffects::Shutdown();
     SSAO::Shutdown();
-    TextRenderer::Shutdown();
-    GraphRenderer::Shutdown();
     ParticleEffectManager::Shutdown();
     Display::Shutdown();
 

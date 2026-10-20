@@ -16,7 +16,6 @@
 #include <string>
 
 class CommandContext;
-class GraphicsContext;
 
 namespace EngineProfiling
 {
@@ -27,7 +26,6 @@ namespace EngineProfiling
 
     void ShowFrameStats(void);
     void ShowProfiler(void);
-    void DisplayPerfGraph(GraphicsContext& Text);
     bool IsPaused();
 }
 

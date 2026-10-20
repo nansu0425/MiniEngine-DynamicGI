@@ -13,14 +13,10 @@
 
 
 #include "Core/pch.h"
-#include "Core/Graphics/Command/CommandContext.h"
-#include "Core/Profiling/GraphRenderer.h"
 #include "Core/UI/ImGuiLayer.h"
 #include <imgui.h>
 
 using namespace std;
-using namespace Math;
-using namespace Graphics;
 
 namespace EngineTuning
 {
@@ -511,12 +507,6 @@ void StartLoad(void*)
 std::function<void(void*)> StartLoadFunc = StartLoad;
 static CallbackTrigger Load("Load Settings", StartLoadFunc, nullptr); 
 */
-
-void EngineTuning::Display( GraphicsContext& Context )
-{
-    GraphRenderer::RenderGraphs(Context, GraphRenderer::GraphType::Profile);
-    EngineProfiling::DisplayPerfGraph(Context);
-}
 
 void EngineTuning::AddToVariableGraph( const string& path, EngineVar& var )
 {

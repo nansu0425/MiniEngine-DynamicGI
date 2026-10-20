@@ -102,7 +102,6 @@
     <ClInclude Include="App\GameCore.h" />
     <ClInclude Include="Graphics\GraphicsCommon.h" />
     <ClInclude Include="Graphics\GraphicsCore.h" />
-    <ClInclude Include="Profiling\GraphRenderer.h" />
     <ClInclude Include="Utility\Hash.h" />
     <ClInclude Include="Display\ImageScaling\ImageScaling.h" />
     <ClInclude Include="Graphics\Command\LinearAllocator.h" />
@@ -138,7 +137,6 @@
     <ClInclude Include="Effects\SSAO\SSAO.h" />
     <ClInclude Include="App\SystemTime.h" />
     <ClInclude Include="Effects\TemporalEffects\TemporalEffects.h" />
-    <ClInclude Include="UI\TextRenderer.h" />
     <ClInclude Include="Graphics\Texture\Texture.h" />
     <ClInclude Include="Graphics\Texture\TextureManager.h" />
     <ClInclude Include="Graphics\Resource\UploadBuffer.h" />
@@ -174,7 +172,6 @@
     <ClCompile Include="Profiling\GpuTimeManager.cpp" />
     <ClCompile Include="Graphics\GraphicsCommon.cpp" />
     <ClCompile Include="Graphics\GraphicsCore.cpp" />
-    <ClCompile Include="Profiling\GraphRenderer.cpp" />
     <ClCompile Include="Display\ImageScaling\ImageScaling.cpp" />
     <ClCompile Include="Graphics\Command\LinearAllocator.cpp" />
     <ClCompile Include="Math\BoundingSphere.cpp" />
@@ -199,7 +196,6 @@
     <ClCompile Include="Effects\SSAO\SSAO.cpp" />
     <ClCompile Include="App\SystemTime.cpp" />
     <ClCompile Include="Effects\TemporalEffects\TemporalEffects.cpp" />
-    <ClCompile Include="UI\TextRenderer.cpp" />
     <ClCompile Include="Graphics\Texture\Texture.cpp" />
     <ClCompile Include="Graphics\Texture\TextureManager.cpp" />
     <ClCompile Include="Graphics\Resource\UploadBuffer.cpp" />
@@ -363,15 +359,6 @@
     <FxCompile Include="Particles\ParticleVS.hlsl">
       <ShaderType>Vertex</ShaderType>
     </FxCompile>
-    <FxCompile Include="Profiling\PerfGraphBackgroundVS.hlsl">
-      <ShaderType>Vertex</ShaderType>
-    </FxCompile>
-    <FxCompile Include="Profiling\PerfGraphPS.hlsl">
-      <ShaderType>Pixel</ShaderType>
-    </FxCompile>
-    <FxCompile Include="Profiling\PerfGraphVS.hlsl">
-      <ShaderType>Vertex</ShaderType>
-    </FxCompile>
     <FxCompile Include="Display\PresentHDRPS.hlsl">
       <ShaderType>Pixel</ShaderType>
     </FxCompile>
@@ -393,15 +380,6 @@
     </FxCompile>
     <FxCompile Include="Effects\TemporalEffects\SharpenTAACS.hlsl" />
     <FxCompile Include="Effects\TemporalEffects\TemporalBlendCS.hlsl" />
-    <FxCompile Include="UI\TextAntialiasPS.hlsl">
-      <ShaderType>Pixel</ShaderType>
-    </FxCompile>
-    <FxCompile Include="UI\TextShadowPS.hlsl">
-      <ShaderType>Pixel</ShaderType>
-    </FxCompile>
-    <FxCompile Include="UI\TextVS.hlsl">
-      <ShaderType>Vertex</ShaderType>
-    </FxCompile>
     <FxCompile Include="Effects\PostEffects\ToneMapHDR2CS.hlsl" />
     <FxCompile Include="Effects\PostEffects\ToneMapHDRCS.hlsl" />
     <None Include="Math\Functions.inl" />
@@ -423,7 +401,6 @@
     <None Include="Particles\ParticleRS.hlsli" />
     <None Include="Particles\ParticleUpdateCommon.hlsli" />
     <None Include="Particles\ParticleUtility.hlsli" />
-    <None Include="Profiling\PerfGraphRS.hlsli" />
     <None Include="Shaders\PixelPacking_R11G11B10.hlsli" />
     <None Include="Shaders\PixelPacking_RGBE.hlsli" />
     <None Include="Shaders\PixelPacking_RGBM.hlsli" />
@@ -435,7 +412,6 @@
     <FxCompile Include="Effects\PostEffects\UpsampleAndBlurCS.hlsl" />
     <None Include="Shaders\PixelPacking.hlsli" />
     <None Include="Effects\SSAO\SSAORS.hlsli" />
-    <None Include="UI\TextRS.hlsli" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <Import Project="$([MSBuild]::GetDirectoryNameOfFileAbove('$(MSBuildThisFileDirectory)', 'vcpkg.json'))\vcpkg\DirectX.vcpkg.targets" />

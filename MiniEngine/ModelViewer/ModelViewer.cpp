@@ -23,7 +23,6 @@
 #include "Core/Effects/SSAO/SSAO.h"
 #include "Core/Effects/FXAA/FXAA.h"
 #include "Core/App/SystemTime.h"
-#include "Core/UI/TextRenderer.h"
 #include "Core/Particles/ParticleEffectManager.h"
 #include "Core/App/GameInput.h"
 #include "Model/Sponza/SponzaRenderer.h"

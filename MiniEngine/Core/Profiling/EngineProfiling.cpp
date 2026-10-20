@@ -14,12 +14,9 @@
 #include "Core/pch.h"
 #include "Core/App/SystemTime.h"
 #include "Core/Display/Display.h"
-#include "Core/UI/TextRenderer.h"
-#include "Core/Profiling/GraphRenderer.h"
 #include "Core/App/GameInput.h"
 #include "Core/Profiling/GpuTimeManager.h"
 #include "Core/Graphics/Command/CommandContext.h"
-#include "Core/Graphics/Resource/BufferManager.h"
 #include "Core/UI/ImGuiLayer.h"
 #include <imgui.h>
 #include <vector>
@@ -27,11 +24,9 @@
 #include <array>
 
 using namespace Graphics;
-using namespace GraphRenderer;
 using namespace Math;
 using namespace std;
 
-#define PERF_GRAPH_ERROR uint32_t(0xFFFFFFFF)
 namespace EngineProfiling
 {
     bool Paused = false;
@@ -44,8 +39,6 @@ public:
     {
         for (uint32_t i = 0; i < kHistorySize; ++i)
             m_RecentHistory[i] = 0.0f;
-        for (uint32_t i = 0; i < kExtendedHistorySize; ++i)
-            m_ExtendedHistory[i] = 0.0f;
         m_Average = 0.0f;
         m_Minimum = 0.0f;
         m_Maximum = 0.0f;
@@ -54,7 +47,6 @@ public:
     void RecordStat( uint32_t FrameIndex, float Value )
     {
         m_RecentHistory[FrameIndex % kHistorySize] = Value;
-        m_ExtendedHistory[FrameIndex % kExtendedHistorySize] = Value;
         m_Recent = Value;
 
         uint32_t ValidCount = 0;
@@ -84,81 +76,13 @@ public:
     float GetMin(void) const { return m_Minimum; }
     float GetAvg(void) const { return m_Average; }
 
-    const float* GetHistory(void) const { return m_ExtendedHistory; }
-    uint32_t GetHistoryLength(void) const { return kExtendedHistorySize; }
-
 private:
     static const uint32_t kHistorySize = 64;
-    static const uint32_t kExtendedHistorySize = 256;
     float m_RecentHistory[kHistorySize];
-    float m_ExtendedHistory[kExtendedHistorySize];
     float m_Recent;
     float m_Average;
     float m_Minimum;
     float m_Maximum;
-};
-
-class StatPlot
-{
-public:
-    StatPlot(StatHistory& Data, Color Col = Color(1.0f, 1.0f, 1.0f))
-        : m_StatData(Data), m_PlotColor(Col)
-    {
-    }
-
-    void SetColor( Color Col )
-    {
-        m_PlotColor = Col;
-    }
-
-private:
-    StatHistory& m_StatData;
-    Color m_PlotColor;
-};
-
-class StatGraph
-{
-public:
-    StatGraph(const wstring& Label, D3D12_RECT Window)
-        : m_Label(Label), m_Window(Window), m_BGColor(0.0f, 0.0f, 0.0f, 0.2f)
-    {
-    }
-
-    void SetLabel(const wstring& Label)
-    {
-        m_Label = Label;
-    }
-
-    void SetWindow(D3D12_RECT Window)
-    {
-        m_Window = Window;
-    }
-
-    uint32_t AddPlot( const StatPlot& P )
-    {
-        uint32_t Idx = (uint32_t)m_Stats.size();
-        m_Stats.push_back(P);
-        return Idx;
-    }
-
-    StatPlot& GetPlot( uint32_t Handle );
-
-    void Draw( GraphicsContext& Context );
-
-private:
-    wstring m_Label;
-    D3D12_RECT m_Window;
-    vector<StatPlot> m_Stats;
-    Color m_BGColor;
-    float m_PeakValue;
-};
-
-class GraphManager
-{
-public:
-
-private:
-    vector<StatGraph> m_Graphs;
 };
 
 class GpuTimer
@@ -198,7 +122,7 @@ class NestedTimingTree
 {
 public:
     NestedTimingTree( const wstring& name, NestedTimingTree* parent = nullptr )
-        : m_Name(name), m_Parent(parent), m_IsGraphed(false), m_GraphHandle(PERF_GRAPH_ERROR) {}
+        : m_Name(name), m_Parent(parent) {}
 
     NestedTimingTree* GetChild( const wstring& name )
     {
@@ -252,17 +176,6 @@ public:
         m_EndTick = 0;
     }
 
-    void SumInclusiveTimes(float& cpuTime, float& gpuTime)
-    {
-        cpuTime = 0.0f;
-        gpuTime = 0.0f;
-        for (auto iter = m_Children.begin(); iter != m_Children.end(); ++iter)
-        {
-            cpuTime += (*iter)->m_CpuTime.GetLast();
-            gpuTime += (*iter)->m_GpuTime.GetLast();
-        }
-    }
-
     static void PushProfilingMarker( const wstring& name, CommandContext* Context );
     static void PopProfilingMarker( CommandContext* Context );
     static void UpdateTimes( void )
@@ -277,13 +190,6 @@ public:
         s_FrameTime.RecordStat(FrameIndex, 1000.0f * Graphics::GetMeasuredFrameTime());
         s_CpuBusyTime.RecordStat(FrameIndex, 1000.0f * Graphics::GetCpuBusyTime());
         s_CpuWaitTime.RecordStat(FrameIndex, 1000.0f * Graphics::GetCpuWaitTime());
-
-        float TotalCpuTime, TotalGpuTime;
-        sm_RootScope.SumInclusiveTimes(TotalCpuTime, TotalGpuTime);
-        s_TotalCpuTime.RecordStat(FrameIndex, TotalCpuTime);
-        s_TotalGpuTime.RecordStat(FrameIndex, TotalGpuTime);
-
-        GraphRenderer::Update(XMFLOAT2(TotalCpuTime, TotalGpuTime), 0, GraphType::Global);
     }
 
     static float GetFrameTime(void) { return s_FrameTime.GetAvg(); }
@@ -293,12 +199,9 @@ public:
 
     static void ShowTree( void );
 
-    bool IsGraphed(){ return m_IsGraphed;}
-
 private:
 
     void ShowNode( void );
-    void StoreToGraph(void);
     void DeleteChildren( void )
     {
         for (auto node : m_Children)
@@ -315,10 +218,6 @@ private:
     StatHistory m_CpuTime;
     StatHistory m_GpuTime;
     GpuTimer m_GpuTimer;
-    bool m_IsGraphed;
-    GraphHandle m_GraphHandle;
-    static StatHistory s_TotalCpuTime;
-    static StatHistory s_TotalGpuTime;
     static StatHistory s_FrameTime;
     static StatHistory s_CpuBusyTime;
     static StatHistory s_CpuWaitTime;
@@ -327,8 +226,6 @@ private:
     static NestedTimingTree* sm_CurrentNode;
 };
 
-StatHistory NestedTimingTree::s_TotalCpuTime;
-StatHistory NestedTimingTree::s_TotalGpuTime;
 StatHistory NestedTimingTree::s_FrameTime;
 StatHistory NestedTimingTree::s_CpuBusyTime;
 StatHistory NestedTimingTree::s_CpuWaitTime;
@@ -339,9 +236,7 @@ namespace EngineProfiling
 {
     BoolVar DrawFrameStats("Profiling/Display Frame Stats", true);
     bool s_ShowProfiler = false;
-    //BoolVar DrawPerfGraph("Display Performance Graph", false);
-    const bool DrawPerfGraph = false;
-    
+
     void Update( void )
     {
         if (GameInput::IsFirstPressed( GameInput::kStartButton ) 
@@ -392,12 +287,6 @@ namespace EngineProfiling
         ImGuiLayer::EndSceneOverlay();
     }
 
-    void DisplayPerfGraph( GraphicsContext& Context )
-    {
-        if (DrawPerfGraph)
-            GraphRenderer::RenderGraphs(Context, GraphType::Global );
-    }
-
     void ShowProfiler( void )
     {
         ImGuiLayer::ShowPanel("Profiler", s_ShowProfiler, []
@@ -439,8 +328,6 @@ void NestedTimingTree::ShowTree( void )
 
         ImGui::EndTable();
     }
-
-    sm_RootScope.StoreToGraph();
 }
 
 void NestedTimingTree::ShowNode( void )
@@ -466,13 +353,4 @@ void NestedTimingTree::ShowNode( void )
     for (auto node : m_Children)
         node->ShowNode();
     ImGui::TreePop();
-}
-
-void NestedTimingTree::StoreToGraph(void)
-{
-    if (m_GraphHandle != PERF_GRAPH_ERROR)
-        GraphRenderer::Update( XMFLOAT2(m_CpuTime.GetLast(), m_GpuTime.GetLast()), m_GraphHandle, GraphType::Profile);
-
-    for (auto node : m_Children)
-        node->StoreToGraph();
 }

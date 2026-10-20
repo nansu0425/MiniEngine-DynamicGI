@@ -203,12 +203,9 @@ private:
     void* m_Arguments;
 };
 
-class GraphicsContext;
-
 namespace EngineTuning
 {
     void Initialize( void );
     void Update( void );
-    void Display( GraphicsContext& Context );
 
 } // namespace EngineTuning
