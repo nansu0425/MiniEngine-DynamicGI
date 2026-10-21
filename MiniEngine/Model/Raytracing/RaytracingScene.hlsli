@@ -26,6 +26,124 @@ ByteAddressBuffer SceneBuffers[] : register(t0, space2);
 Texture2D<float4> SceneTextures[] : register(t0, space3);
 SamplerState SceneSamplers[] : register(s0, space1);
 
+// BLAS geometry 하나, 즉 Mesh::Draw 하나의 triangle과 material을 읽을 위치. BottomLevelAS.cpp의 BLASGeometry와 같은 layout이다.
+struct BLASGeometry
+{
+    // data buffer에서 draw의 첫 index의 byte 위치
+    uint indexOffset;
+    // index 하나의 byte 수. 2 또는 4다.
+    uint indexSize;
+    // data buffer에서 draw의 첫 vertex의 byte 위치
+    uint vertexOffset;
+    uint vertexStride;
+    // vertex 안에서 attribute의 byte 위치. position이 0에 있으므로 0이면 vertex에 그 attribute가 없다.
+    uint normalOffset;
+    uint tangentOffset;
+    uint uv0Offset;
+    uint uv1Offset;
+    // material constants 안에서 material의 순서
+    uint material;
+    // SceneTextures와 SceneSamplers에서 material의 texture 5개가 시작하는 위치
+    uint textures;
+    uint samplers;
+};
+static const uint kBLASGeometryStride = 44;
+
+// ConstantBuffers.h의 texture 순서와 같다.
+static const uint kBaseColorTexture = 0;
+static const uint kMetallicRoughnessTexture = 1;
+static const uint kEmissiveTexture = 3;
+static const uint kNormalTexture = 4;
+
+// ConstantBuffers.h의 MaterialConstants와 같은 layout이다.
+struct MaterialConstants
+{
+    float4 baseColorFactor;
+    float3 emissiveFactor;
+    float normalTextureScale;
+    float metallicFactor;
+    float roughnessFactor;
+    // texture 순서번째 bit가 그 texture에 UV1을 쓸지 고른다.
+    uint flags;
+};
+static const uint kMaterialConstantsStride = 256;
+
+// ray가 맞은 triangle의 vertex와 material을 읽을 위치와 맞은 곳의 UV
+struct HitTriangle
+{
+    // SceneBuffers에서 triangle이 속한 model의 data buffer 위치
+    uint dataSRV;
+    BLASGeometry geometry;
+    MaterialConstants material;
+    // data buffer에서 triangle의 세 vertex의 byte 위치
+    uint3 vertexAddresses;
+    // 맞은 곳에서 세 vertex의 값을 섞는 비율
+    float3 weights;
+    float2 uv0;
+    float2 uv1;
+};
+
+// 2 byte index는 4 byte 단위로만 읽을 수 있으므로 index 3개를 감싸는 두 word를 읽어 나눈다.
+uint3 LoadTriangleIndices(ByteAddressBuffer data, BLASGeometry geometry, uint primitiveIndex)
+{
+    const uint address = geometry.indexOffset + primitiveIndex * 3 * geometry.indexSize;
+    if (geometry.indexSize == 4)
+        return data.Load3(address);
+
+    const uint alignedAddress = address & ~3;
+    const uint2 words = data.Load2(alignedAddress);
+    if (address == alignedAddress)
+        return uint3(words.x & 0xFFFF, words.x >> 16, words.y & 0xFFFF);
+    return uint3(words.x >> 16, words.y & 0xFFFF, words.y >> 16);
+}
+
+float2 UnpackR16G16Float(uint packed)
+{
+    return f16tof32(uint2(packed & 0xFFFF, packed >> 16));
+}
+
+uint3 LoadPackedAttribute(ByteAddressBuffer data, uint3 vertexAddresses, uint offset)
+{
+    return uint3(data.Load(vertexAddresses.x + offset), data.Load(vertexAddresses.y + offset), data.Load(vertexAddresses.z + offset));
+}
+
+float2 InterpolateUV(ByteAddressBuffer data, uint3 vertexAddresses, uint offset, float3 weights)
+{
+    const uint3 packed = LoadPackedAttribute(data, vertexAddresses, offset);
+    return UnpackR16G16Float(packed.x) * weights.x + UnpackR16G16Float(packed.y) * weights.y + UnpackR16G16Float(packed.z) * weights.z;
+}
+
+// committed hit와 traversal 중의 candidate가 같은 값으로 triangle을 가리키므로 둘 다 이 함수로 읽는다.
+HitTriangle GetHitTriangle(uint instanceIndex, uint geometryIndex, uint primitiveIndex, float2 barycentrics)
+{
+    const BLASInstance instance = BLASInstances[instanceIndex];
+    ByteAddressBuffer materials = SceneBuffers[NonUniformResourceIndex(instance.modelSRVs + kModelMaterialsSRV)];
+    ByteAddressBuffer geometries = SceneBuffers[NonUniformResourceIndex(instance.modelSRVs + kModelBLASGeometriesSRV)];
+
+    HitTriangle hitTriangle;
+    hitTriangle.dataSRV = instance.modelSRVs + kModelDataSRV;
+    ByteAddressBuffer data = SceneBuffers[NonUniformResourceIndex(hitTriangle.dataSRV)];
+    hitTriangle.geometry = geometries.Load<BLASGeometry>((instance.firstGeometry + geometryIndex) * kBLASGeometryStride);
+    hitTriangle.material = materials.Load<MaterialConstants>(hitTriangle.geometry.material * kMaterialConstantsStride);
+
+    const BLASGeometry geometry = hitTriangle.geometry;
+    hitTriangle.vertexAddresses = geometry.vertexOffset + LoadTriangleIndices(data, geometry, primitiveIndex) * geometry.vertexStride;
+    hitTriangle.weights = float3(1.0 - barycentrics.x - barycentrics.y, barycentrics.x, barycentrics.y);
+
+    // raster처럼 UV1이 없는 vertex는 모든 texture에 UV0을 쓴다.
+    hitTriangle.uv0 = geometry.uv0Offset != 0 ? InterpolateUV(data, hitTriangle.vertexAddresses, geometry.uv0Offset, hitTriangle.weights) : float2(0.0, 0.0);
+    hitTriangle.uv1 = geometry.uv1Offset != 0 ? InterpolateUV(data, hitTriangle.vertexAddresses, geometry.uv1Offset, hitTriangle.weights) : hitTriangle.uv0;
+    return hitTriangle;
+}
+
+// ray에는 화면 미분이 없으므로 mip 0을 읽는다.
+float4 SampleMaterialTexture(HitTriangle hitTriangle, uint texture)
+{
+    const float2 uv = ((hitTriangle.material.flags >> texture) & 1) != 0 ? hitTriangle.uv1 : hitTriangle.uv0;
+    return SceneTextures[NonUniformResourceIndex(hitTriangle.geometry.textures + texture)]
+        .SampleLevel(SceneSamplers[NonUniformResourceIndex(hitTriangle.geometry.samplers + texture)], uv, 0.0);
+}
+
 // TLAS에서 ray가 맞은 triangle
 struct RayHit
 {

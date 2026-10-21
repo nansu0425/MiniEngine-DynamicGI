@@ -11,7 +11,7 @@ using namespace Graphics;
 
 namespace
 {
-    // HitSurface.hlsli의 BLASGeometry와 같은 layout이다.
+    // RaytracingScene.hlsli의 BLASGeometry와 같은 layout이다.
     struct BLASGeometry
     {
         uint32_t indexOffset;
@@ -26,7 +26,7 @@ namespace
         uint32_t textures;
         uint32_t samplers;
     };
-    static_assert(sizeof(BLASGeometry) == 44, "HitSurface.hlsli의 kBLASGeometryStride와 같아야 한다");
+    static_assert(sizeof(BLASGeometry) == 44, "RaytracingScene.hlsli의 kBLASGeometryStride와 같아야 한다");
 
     // draw 하나가 geometry 하나가 된다. draw의 index는 baseVertex 기준이므로 vertex buffer 시작을 baseVertex로 옮긴다.
     std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> DescribeGeometries(const Mesh& mesh, D3D12_GPU_VIRTUAL_ADDRESS dataBuffer)
