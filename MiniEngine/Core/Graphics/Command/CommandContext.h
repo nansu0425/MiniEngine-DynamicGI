@@ -19,6 +19,7 @@
 #include "Core/Graphics/Pipeline/PipelineState.h"
 #include "Core/Graphics/Pipeline/RootSignature.h"
 #include "Core/Graphics/Resource/GpuBuffer.h"
+#include "Core/Graphics/Resource/AccelerationStructureBuffer.h"
 #include "Core/Graphics/Texture/Texture.h"
 #include "Core/Graphics/Resource/PixelBuffer.h"
 #include "Core/Graphics/Descriptor/DynamicDescriptorHeap.h"
@@ -295,6 +296,8 @@ public:
     void SetDynamicSRV( UINT RootIndex, size_t BufferSize, const void* BufferData ); 
     void SetBufferSRV( UINT RootIndex, const GpuBuffer& SRV, UINT64 Offset = 0);
     void SetBufferUAV( UINT RootIndex, const GpuBuffer& UAV, UINT64 Offset = 0);
+    // 아직 만들지 않은 AS는 주소가 0이고, DXR spec은 주소가 0인 AS에 쏜 ray를 모두 miss로 정한다.
+    void SetAccelerationStructure( UINT RootIndex, const AccelerationStructureBuffer& AS );
     void SetDescriptorTable( UINT RootIndex, D3D12_GPU_DESCRIPTOR_HANDLE FirstHandle );
 
     void SetDynamicDescriptor( UINT RootIndex, UINT Offset, D3D12_CPU_DESCRIPTOR_HANDLE Handle );
@@ -552,6 +555,11 @@ inline void ComputeContext::SetBufferUAV( UINT RootIndex, const GpuBuffer& UAV, 
 {
     ASSERT((UAV.m_UsageState & D3D12_RESOURCE_STATE_UNORDERED_ACCESS) != 0);
     m_CommandList->SetComputeRootUnorderedAccessView(RootIndex, UAV.GetGpuVirtualAddress() + Offset);
+}
+
+inline void ComputeContext::SetAccelerationStructure( UINT RootIndex, const AccelerationStructureBuffer& AS )
+{
+    m_CommandList->SetComputeRootShaderResourceView(RootIndex, AS.GetGpuVirtualAddress());
 }
 
 inline void ComputeContext::Dispatch( size_t GroupCountX, size_t GroupCountY, size_t GroupCountZ )

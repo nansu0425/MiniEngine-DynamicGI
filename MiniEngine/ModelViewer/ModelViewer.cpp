@@ -28,6 +28,7 @@
 #include "Model/Sponza/SponzaRenderer.h"
 #include "Model/Raytracing/RayQuerySmokeTest.h"
 #include "Model/Raytracing/RaytracingScene.h"
+#include "Model/Raytracing/RaytracingDebugView.h"
 #include "Model/Loader/glTF.h"
 #include "Model/Renderer/Renderer.h"
 #include "Model/Model.h"
@@ -58,6 +59,7 @@ public:
 
     virtual void Update( float deltaT ) override;
     virtual void RenderScene( void ) override;
+    virtual void RenderSceneOverlay( GraphicsContext& gfxContext ) override;
 
     virtual bool RequiresInlineRaytracing() const override { return true; }
 
@@ -162,6 +164,7 @@ void ModelViewer::Startup( void )
 
     Renderer::Initialize();
     RayQuerySmokeTest::Run();
+    RaytracingDebugView::Initialize();
 
     LoadIBLTextures();
 
@@ -374,4 +377,9 @@ void ModelViewer::RenderScene( void )
         MotionBlur::RenderObjectBlur(gfxContext, g_VelocityBuffer);
 
     gfxContext.Finish();
+}
+
+void ModelViewer::RenderSceneOverlay( GraphicsContext& gfxContext )
+{
+    RaytracingDebugView::Render(gfxContext.GetComputeContext(), m_Camera, m_RaytracingScene, g_SceneOverlayBuffer);
 }

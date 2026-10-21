@@ -85,6 +85,7 @@
     <ClInclude Include="Sponza\ParticleEffects.h" />
     <ClInclude Include="Raytracing\BottomLevelAS.h" />
     <ClInclude Include="Raytracing\RaytracingScene.h" />
+    <ClInclude Include="Raytracing\RaytracingDebugView.h" />
     <ClInclude Include="Raytracing\RayQuerySmokeTest.h" />
     <ClInclude Include="Renderer\Renderer.h" />
     <ClInclude Include="Sponza\SponzaRenderer.h" />
@@ -104,6 +105,7 @@
     <ClCompile Include="Sponza\ParticleEffects.cpp" />
     <ClCompile Include="Raytracing\BottomLevelAS.cpp" />
     <ClCompile Include="Raytracing\RaytracingScene.cpp" />
+    <ClCompile Include="Raytracing\RaytracingDebugView.cpp" />
     <ClCompile Include="Raytracing\RayQuerySmokeTest.cpp" />
     <ClCompile Include="Renderer\Renderer.cpp" />
     <ClCompile Include="Sponza\SponzaRenderer.cpp" />
@@ -113,6 +115,7 @@
     <None Include="Renderer\Common.hlsli" />
     <None Include="Renderer\FillLightGridCS.hlsli" />
     <None Include="Renderer\LightGrid.hlsli" />
+    <None Include="Raytracing\RaytracingScene.hlsli" />
     <None Include="Sponza\Lighting.hlsli" />
   </ItemGroup>
   <ItemGroup>
@@ -190,6 +193,9 @@
       <ShaderType>Vertex</ShaderType>
     </FxCompile>
     <FxCompile Include="Raytracing\RayQuerySmokeTestCS.hlsl">
+      <ShaderModel>6.5</ShaderModel>
+    </FxCompile>
+    <FxCompile Include="Raytracing\RaytracingDebugViewCS.hlsl">
       <ShaderModel>6.5</ShaderModel>
     </FxCompile>
   </ItemGroup>
