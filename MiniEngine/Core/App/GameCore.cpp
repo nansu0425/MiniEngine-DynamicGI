@@ -78,13 +78,13 @@ namespace GameCore
 
         PostEffects::Render();
 
-        GraphicsContext& UiContext = GraphicsContext::Begin(L"Render UI");
-        UiContext.TransitionResource(g_SceneOverlayBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
-        UiContext.ClearColor(g_SceneOverlayBuffer);
-        UiContext.SetRenderTarget(g_SceneOverlayBuffer.GetRTV());
-        UiContext.SetViewportAndScissor(0, 0, g_SceneOverlayBuffer.GetWidth(), g_SceneOverlayBuffer.GetHeight());
-        game.RenderUI(UiContext);
-        UiContext.Finish();
+        GraphicsContext& OverlayContext = GraphicsContext::Begin(L"Render Scene Overlay");
+        OverlayContext.TransitionResource(g_SceneOverlayBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
+        OverlayContext.ClearColor(g_SceneOverlayBuffer);
+        OverlayContext.SetRenderTarget(g_SceneOverlayBuffer.GetRTV());
+        OverlayContext.SetViewportAndScissor(0, 0, g_SceneOverlayBuffer.GetWidth(), g_SceneOverlayBuffer.GetHeight());
+        game.RenderSceneOverlay(OverlayContext);
+        OverlayContext.Finish();
 
         EngineProfiling::ShowFrameStats();
         EngineProfiling::ShowProfiler();

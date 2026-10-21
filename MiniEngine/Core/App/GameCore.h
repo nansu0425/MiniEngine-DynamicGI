@@ -40,8 +40,9 @@ namespace GameCore
         // Official rendering pass
         virtual void RenderScene( void ) = 0;
 
-        // Optional UI (overlay) rendering pass.  This is LDR.  The buffer is already cleared.
-        virtual void RenderUI( GraphicsContext& ) {};
+        // tone mapping 같은 post effect를 거치면 안 되는 LDR 그림을 scene 위에 덮어 그린다.
+        // 지워진 scene overlay가 render target으로 묶여 있다.
+        virtual void RenderSceneOverlay( GraphicsContext& ) {};
 
         // Inline raytracing을 쓰는 app은 override해서 이를 지원하는 device를 요구한다.
         virtual bool RequiresInlineRaytracing() const { return false; }
