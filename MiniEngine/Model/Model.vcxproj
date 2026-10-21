@@ -87,6 +87,8 @@
     <ClInclude Include="Raytracing\RaytracingScene.h" />
     <ClInclude Include="Raytracing\CameraRays.h" />
     <ClInclude Include="Raytracing\RaytracingDebugView.h" />
+    <ClInclude Include="Raytracing\RaytracingView.h" />
+    <ClInclude Include="Raytracing\RaytracingPanel.h" />
     <ClInclude Include="Raytracing\RayQuerySmokeTest.h" />
     <ClInclude Include="Renderer\Renderer.h" />
     <ClInclude Include="Sponza\SponzaRenderer.h" />
@@ -108,6 +110,8 @@
     <ClCompile Include="Raytracing\RaytracingScene.cpp" />
     <ClCompile Include="Raytracing\CameraRays.cpp" />
     <ClCompile Include="Raytracing\RaytracingDebugView.cpp" />
+    <ClCompile Include="Raytracing\RaytracingView.cpp" />
+    <ClCompile Include="Raytracing\RaytracingPanel.cpp" />
     <ClCompile Include="Raytracing\RayQuerySmokeTest.cpp" />
     <ClCompile Include="Renderer\Renderer.cpp" />
     <ClCompile Include="Sponza\SponzaRenderer.cpp" />

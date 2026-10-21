@@ -28,7 +28,8 @@
 #include "Model/Sponza/SponzaRenderer.h"
 #include "Model/Raytracing/RayQuerySmokeTest.h"
 #include "Model/Raytracing/RaytracingScene.h"
-#include "Model/Raytracing/RaytracingDebugView.h"
+#include "Model/Raytracing/RaytracingView.h"
+#include "Model/Raytracing/RaytracingPanel.h"
 #include "Model/Loader/glTF.h"
 #include "Model/Renderer/Renderer.h"
 #include "Model/Model.h"
@@ -263,7 +264,7 @@ void ModelViewer::Startup( void )
 
     Renderer::Initialize();
     RayQuerySmokeTest::Run();
-    RaytracingDebugView::Initialize();
+    RaytracingView::Initialize();
 
     LoadIBLTextures();
 
@@ -339,6 +340,7 @@ void ModelViewer::Update( float deltaT )
     m_CameraController->Update(deltaT);
 
     SceneEditor::Update(m_Camera);
+    RaytracingPanel::Update();
 
     GraphicsContext& gfxContext = GraphicsContext::Begin(L"Scene Update");
 
@@ -481,5 +483,5 @@ void ModelViewer::RenderScene( void )
 
 void ModelViewer::RenderSceneOverlay( GraphicsContext& gfxContext )
 {
-    RaytracingDebugView::Render(gfxContext.GetComputeContext(), m_Camera, m_MainViewport, m_RaytracingScene, GetSunDirection(), g_SceneOverlayBuffer);
+    RaytracingView::Render(gfxContext.GetComputeContext(), m_Camera, m_MainViewport, m_RaytracingScene, GetSunDirection(), g_SceneOverlayBuffer);
 }

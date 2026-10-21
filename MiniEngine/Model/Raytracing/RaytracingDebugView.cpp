@@ -7,7 +7,6 @@
 #include "Core/Graphics/Command/CommandContext.h"
 #include "Core/Graphics/Descriptor/DescriptorHeap.h"
 #include "Core/Graphics/Resource/ColorBuffer.h"
-#include "Core/UI/EngineTuning.h"
 
 #include "Output/Model/CompiledShaders/RaytracingDebugViewCS.h"
 
@@ -16,23 +15,13 @@ using namespace Graphics;
 
 namespace
 {
-    // RaytracingDebugViewCS.hlsl의 View와 같은 값이다.
-    enum View
-    {
-        kOff, kHitT, kInstance, kFrontFace,
-        kGeometryNormal, kShadingNormal, kUV0, kBaseColor, kMetallic, kRoughness, kEmissive,
-        kSunVisibility, kSunCullingDifference,
-        kNumViews
-    };
     const char* kViewLabels[] =
     {
-        "Off", "Hit T", "Instance", "Front Face",
+        "Hit T", "Instance", "Front Face",
         "Geometry Normal", "Shading Normal", "UV0", "Base Color", "Metallic", "Roughness", "Emissive",
         "Sun Visibility", "Sun Culling Difference"
     };
-    EnumVar s_View("Graphics/Raytracing/Debug View", kOff, kNumViews, kViewLabels);
-    // 끄면 single-sided material의 뒷면도 ray에 맞아서 culling이 ray에 주는 차이를 볼 수 있다.
-    BoolVar s_CullSingleSidedBackFaces("Graphics/Raytracing/Cull Single-Sided Back Faces", true);
+    static_assert(_countof(kViewLabels) == RaytracingDebugView::kNumViews, "view label 개수가 View와 다르다");
 
     enum RootParameter { kConstants, kScene, kOutput = kScene + RaytracingScene::kNumRootParameters, kNumRootParameters };
     RootSignature s_RootSignature;
@@ -78,19 +67,22 @@ void RaytracingDebugView::Initialize(void)
     s_OutputUAV = Renderer::s_TextureHeap.Alloc(1);
 }
 
-void RaytracingDebugView::Render(ComputeContext& context, const Camera& camera, const D3D12_VIEWPORT& rasterViewport, const RaytracingScene& scene, const Vector3& sunDirection, ColorBuffer& target)
+const char* RaytracingDebugView::GetViewLabel(View view)
 {
-    if (s_View == kOff)
-        return;
+    return kViewLabels[view];
+}
 
+void RaytracingDebugView::Render(ComputeContext& context, View view, bool cullSingleSidedBackFaces, const Camera& camera, const D3D12_VIEWPORT& rasterViewport,
+    const RaytracingScene& scene, const Vector3& sunDirection, ColorBuffer& target)
+{
     ScopedTimer _prof(L"Raytracing Debug View", context);
 
     Constants constants;
     constants.Rays = DescribeCameraRays(camera, rasterViewport);
-    constants.View = s_View;
+    constants.View = view;
     constants.NearZ = camera.GetNearClip();
     constants.FarZ = camera.GetFarClip();
-    constants.CullSingleSidedBackFaces = s_CullSingleSidedBackFaces;
+    constants.CullSingleSidedBackFaces = cullSingleSidedBackFaces;
     XMStoreFloat3(&constants.SunDirection, sunDirection);
 
     UpdateOutputUAV(target);

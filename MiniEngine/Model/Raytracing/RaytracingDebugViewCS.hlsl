@@ -3,19 +3,19 @@
 #include "Model/Raytracing/SurfaceRayOrigin.hlsli"
 #include "Core/Shaders/ShaderUtility.hlsli"
 
-// RaytracingDebugView.cpp의 View와 같은 값이다.
-static const uint kHitT = 1;
-static const uint kInstance = 2;
-static const uint kFrontFace = 3;
-static const uint kGeometryNormal = 4;
-static const uint kShadingNormal = 5;
-static const uint kUV0 = 6;
-static const uint kBaseColor = 7;
-static const uint kMetallic = 8;
-static const uint kRoughness = 9;
-static const uint kEmissive = 10;
-static const uint kSunVisibility = 11;
-static const uint kSunCullingDifference = 12;
+// RaytracingDebugView.h의 View와 같은 값이다.
+static const uint kHitT = 0;
+static const uint kInstance = 1;
+static const uint kFrontFace = 2;
+static const uint kGeometryNormal = 3;
+static const uint kShadingNormal = 4;
+static const uint kUV0 = 5;
+static const uint kBaseColor = 6;
+static const uint kMetallic = 7;
+static const uint kRoughness = 8;
+static const uint kEmissive = 9;
+static const uint kSunVisibility = 10;
+static const uint kSunCullingDifference = 11;
 
 cbuffer Constants : register(b0)
 {
@@ -82,7 +82,7 @@ float3 SurfaceColor(HitSurface surface)
     return 0.0;
 }
 
-// Cull Single-Sided Back Faces를 끄면 single-sided material의 뒷면에도 ray가 맞는다.
+// single-sided material의 뒷면을 보여 줄 때는 모든 ray가 따르는 culling을 debug view의 ray에서만 뺀다.
 uint DebugViewRayFlags()
 {
     return CullSingleSidedBackFaces != 0 ? kCullSingleSidedBackFaces : RAY_FLAG_NONE;
