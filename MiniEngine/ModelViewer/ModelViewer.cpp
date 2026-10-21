@@ -36,6 +36,7 @@
 #include "Core/Camera/ShadowCamera.h"
 #include "Core/Display/Display.h"
 #include "Core/Editor/EditorCamera.h"
+#include "Core/Editor/SceneEditor.h"
 
 // Dynamic GI 프로젝트에선 legacy path가 아닌 glTF path를 사용한다.
 // legacy는 Blinn-Phong, glTF는 PBR shading
@@ -48,6 +49,19 @@ using namespace Graphics;
 using namespace std;
 
 using Renderer::MeshSorter;
+
+// sun은 무한히 멀어 위치가 조명에 영향을 주지 않는다. 위치는 scene editor에서 sun을 보고 고르는 자리다.
+class Sun : public SceneEditor::Object
+{
+public:
+    virtual Vector3 GetPosition() const override { return m_Position; }
+    virtual void SetPosition(Vector3 position) override { m_Position = position; }
+    virtual void Draw(const Camera& camera, bool selected) const override;
+    virtual void Rotate(const Camera& camera) override;
+
+private:
+    Vector3 m_Position = Vector3(kZero);
+};
 
 class ModelViewer : public GameCore::IGameApp
 {
@@ -75,6 +89,7 @@ private:
     ModelInstance m_ModelInst;
     RaytracingScene m_RaytracingScene;
     ShadowCamera m_SunShadowCamera;
+    Sun m_Sun;
 };
 
 CREATE_APPLICATION( ModelViewer )
@@ -91,6 +106,79 @@ Vector3 GetSunDirection()
     float cosphi = cosf(g_SunInclination * 3.14159f * 0.5f);
     float sinphi = sinf(g_SunInclination * 3.14159f * 0.5f);
     return Normalize(Vector3( costheta * cosphi, sinphi, sintheta * cosphi ));
+}
+
+void DrawArrow(ImDrawList& drawList, ImVec2 from, ImVec2 to, ImU32 color, float thickness)
+{
+    const float dx = to.x - from.x;
+    const float dy = to.y - from.y;
+    const float length = sqrtf(dx * dx + dy * dy);
+    const float headLength = thickness * 4.0f;
+    if (length < headLength)
+        return;
+
+    const ImVec2 forward(dx / length, dy / length);
+    const ImVec2 headBase(to.x - forward.x * headLength, to.y - forward.y * headLength);
+    const ImVec2 side(-forward.y * headLength * 0.5f, forward.x * headLength * 0.5f);
+    drawList.AddLine(from, headBase, color, thickness);
+    drawList.AddTriangleFilled(to, ImVec2(headBase.x + side.x, headBase.y + side.y), ImVec2(headBase.x - side.x, headBase.y - side.y), color);
+}
+
+void Sun::Draw(const Camera& camera, bool selected) const
+{
+    ImVec2 icon;
+    if (!SceneEditor::ProjectToScene(camera, m_Position, icon))
+        return;
+
+    const ImU32 sunColor = IM_COL32(255, 200, 0, 255);
+    const ImU32 selectedColor = IM_COL32(255, 128, 16, 255);
+    const float radius = SceneEditor::GetIconRadius();
+    const float thickness = radius * 0.15f;
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+    // 화살표는 빛이 나아가는 방향이다.
+    const float arrowLength = radius * 4.0f * SceneEditor::GetWorldLengthPerPixel(camera, m_Position);
+    ImVec2 arrowTip;
+    if (SceneEditor::ProjectToScene(camera, m_Position - GetSunDirection() * arrowLength, arrowTip))
+        DrawArrow(*drawList, icon, arrowTip, sunColor, thickness);
+
+    drawList->AddCircleFilled(icon, radius * 0.45f, sunColor);
+    const int kRayCount = 8;
+    for (int i = 0; i < kRayCount; ++i)
+    {
+        const float angle = XM_2PI * i / kRayCount;
+        const ImVec2 direction(cosf(angle), sinf(angle));
+        drawList->AddLine(
+            ImVec2(icon.x + direction.x * radius * 0.65f, icon.y + direction.y * radius * 0.65f),
+            ImVec2(icon.x + direction.x * radius, icon.y + direction.y * radius),
+            sunColor, thickness);
+    }
+
+    if (selected)
+        drawList->AddCircle(icon, radius * 1.2f, selectedColor, 0, thickness);
+}
+
+void Sun::Rotate(const Camera& camera)
+{
+    // 이 frame의 Y ring은 수평이라 sun의 방위를, X ring은 천정과 sun을 지나는 수직 원이라 sun의 고도를 바꾼다.
+    const float orientation = g_SunOrientation;
+    const float elevation = g_SunInclination * XM_PIDIV2;
+    Matrix4 frame(
+        Vector3(sinf(orientation), 0.0f, -cosf(orientation)),
+        Vector3(kYUnitVector),
+        Vector3(cosf(orientation), 0.0f, sinf(orientation)),
+        m_Position);
+    const Vector3 sunInFrame(0.0f, sinf(elevation), cosf(elevation));
+
+    if (!SceneEditor::Manipulate(camera, ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y, ImGuizmo::LOCAL, frame))
+        return;
+
+    const Vector3 sun = frame.Get3x3() * sunInFrame;
+    const float x = sun.GetX(), y = sun.GetY(), z = sun.GetZ();
+    g_SunInclination = asinf(Clamp(y, -1.0f, 1.0f)) / XM_PIDIV2;
+    // 천정에서는 방위가 정해지지 않으므로 그대로 둔다.
+    if (sqrtf(x * x + z * z) > 1e-4f)
+        g_SunOrientation = atan2f(z, x);
 }
 
 void ChangeIBLSet(EngineVar::ActionType);
@@ -213,10 +301,13 @@ void ModelViewer::Startup( void )
         m_CameraController.reset(new EditorCamera(m_Camera, Vector3(kYUnitVector)));
     else
         m_CameraController.reset(new OrbitCamera(m_Camera, m_ModelInst.GetBoundingSphere(), Vector3(kYUnitVector)));
+
+    SceneEditor::AddObject(m_Sun);
 }
 
 void ModelViewer::Cleanup( void )
 {
+    SceneEditor::RemoveObject(m_Sun);
     m_RaytracingScene.Destroy();
     m_ModelInst = nullptr;
 
@@ -246,6 +337,8 @@ void ModelViewer::Update( float deltaT )
     // scene buffer 크기는 scene viewport를 따라 frame마다 바뀔 수 있다.
     m_Camera.SetAspectRatio((float)g_SceneColorBuffer.GetHeight() / g_SceneColorBuffer.GetWidth());
     m_CameraController->Update(deltaT);
+
+    SceneEditor::Update(m_Camera);
 
     GraphicsContext& gfxContext = GraphicsContext::Begin(L"Scene Update");
 

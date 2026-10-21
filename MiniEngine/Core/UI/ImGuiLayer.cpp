@@ -11,6 +11,7 @@
 #include <imgui_impl_dx12.h>
 #include <imgui_impl_win32.h>
 #include <imgui_internal.h>
+#include <ImGuizmo.h>
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -113,6 +114,20 @@ namespace
         else
             s_SceneViewport = ToPixelRect(ImGui::GetMainViewport()->WorkPos, ImGui::GetMainViewport()->WorkSize);
     }
+
+    // 창을 scene 영역에 맞춰 두면 그 안에 그린 것은 scene 밖으로 나가지 않게 clip된다.
+    // 입력은 받지 않으므로 아래의 scene이나 다른 창으로 그대로 간다.
+    void BeginSceneWindow(const char* name)
+    {
+        const ImVec2 scenePos((float)s_SceneViewport.left, (float)s_SceneViewport.top);
+        const ImVec2 sceneSize((float)(s_SceneViewport.right - s_SceneViewport.left), (float)(s_SceneViewport.bottom - s_SceneViewport.top));
+        ImGui::SetNextWindowPos(scenePos);
+        ImGui::SetNextWindowSize(sceneSize);
+        ImGui::Begin(name, nullptr,
+            ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoInputs |
+            ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking |
+            ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoBringToFrontOnFocus);
+    }
 }
 
 void ImGuiLayer::Initialize(void)
@@ -214,15 +229,7 @@ bool ImGuiLayer::BeginSceneOverlay(void)
     if (!s_ShowSceneOverlay)
         return false;
 
-    // 창을 scene 영역에 맞춰 두면 그 안의 widget은 scene 밖으로 나가지 않게 clip된다.
-    const ImVec2 scenePos((float)s_SceneViewport.left, (float)s_SceneViewport.top);
-    const ImVec2 sceneSize((float)(s_SceneViewport.right - s_SceneViewport.left), (float)(s_SceneViewport.bottom - s_SceneViewport.top));
-    ImGui::SetNextWindowPos(scenePos);
-    ImGui::SetNextWindowSize(sceneSize);
-    ImGui::Begin("##SceneOverlay", nullptr,
-        ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoInputs |
-        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking |
-        ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoBringToFrontOnFocus);
+    BeginSceneWindow("##SceneOverlay");
 
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.0f, 0.0f, 0.0f, 0.5f));
     ImGui::BeginChild("##Content", ImVec2(0.0f, 0.0f),
@@ -234,6 +241,25 @@ void ImGuiLayer::EndSceneOverlay(void)
 {
     ImGui::EndChild();
     ImGui::PopStyleColor();
+    ImGui::End();
+}
+
+bool ImGuiLayer::BeginSceneGizmo(void)
+{
+    if (!s_Visible)
+        return false;
+
+    // ImGuizmo는 mouse가 이 창 위에 있고 다른 창에 가려지지 않았을 때만 입력을 받는다.
+    BeginSceneWindow("##SceneGizmo");
+    ImGuizmo::SetDrawlist();
+    const ImVec2 scenePos = ImGui::GetWindowPos();
+    const ImVec2 sceneSize = ImGui::GetWindowSize();
+    ImGuizmo::SetRect(scenePos.x, scenePos.y, sceneSize.x, sceneSize.y);
+    return true;
+}
+
+void ImGuiLayer::EndSceneGizmo(void)
+{
     ImGui::End();
 }
 

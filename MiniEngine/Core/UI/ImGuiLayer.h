@@ -19,6 +19,11 @@ namespace ImGuiLayer
     bool BeginSceneOverlay(void);
     void EndSceneOverlay(void);
 
+    // 사이에서 ImGuizmo와 ImGui::GetWindowDrawList로 그린 것은 scene 영역 안에만 보이고,
+    // ImGuizmo는 scene 영역을 기준으로 입력을 받는다. UI를 숨기면 false를 반환하고, 이때는 End를 부르지 않는다.
+    bool BeginSceneGizmo(void);
+    void EndSceneGizmo(void);
+
     // View 메뉴의 name 항목으로 여닫는 창이다. UI를 숨기면 메뉴 항목과 창 모두 그리지 않는다.
     void ShowPanel(const char* name, bool& open, const std::function<void()>& drawContent);
 

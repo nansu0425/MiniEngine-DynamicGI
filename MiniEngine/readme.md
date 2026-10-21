@@ -13,6 +13,9 @@
 * pan: drag with the middle mouse button
 * toggle ImGui: F1
 * engine tuning, profiler, scene overlay: ImGui View menu
+* select: click an icon in the scene. Click empty space to deselect
+* gizmo mode of the selected object: W translate, E rotate (without holding the right mouse button)
+* sun direction: select the sun icon and rotate it (green ring: azimuth, red ring: elevation). The arrow shows where the light goes
 
 ## glTF 2.0 Support:
 

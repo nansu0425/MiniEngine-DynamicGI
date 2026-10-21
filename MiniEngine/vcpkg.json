@@ -7,6 +7,7 @@
     { "name": "directxtk12", "default-features": false },
     { "name": "directxtex", "features": [ "dx12" ] },
     { "name": "directxmesh", "features": [ "dx12" ] },
-    { "name": "imgui", "features": [ "docking-experimental", "dx12-binding", "win32-binding" ] }
+    { "name": "imgui", "features": [ "docking-experimental", "dx12-binding", "win32-binding" ] },
+    "imguizmo"
   ]
 }
