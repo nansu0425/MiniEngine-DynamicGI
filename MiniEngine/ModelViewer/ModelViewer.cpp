@@ -295,9 +295,10 @@ void ModelViewer::RenderScene( void )
     {
         // Update global constants
         Vector3 SunDirection = GetSunDirection();
-        Vector3 ShadowBounds = Vector3(m_ModelInst.GetRadius());
-        //m_SunShadowCamera.UpdateMatrix(-SunDirection, m_ModelInst.GetCenter(), ShadowBounds,
-        m_SunShadowCamera.UpdateMatrix(-SunDirection, Vector3(0, -500.0f, 0), Vector3(5000, 3000, 3000),
+        // sun이 어느 방향에 있어도 shadow map이 model 전체를 덮게 bounding sphere를 감싼다.
+        // ShadowCamera는 자기 위치에서 sun 쪽으로만 depth를 담으므로 위치를 sun 반대편 끝에 둔다.
+        Scalar ShadowRadius = m_ModelInst.GetRadius();
+        m_SunShadowCamera.UpdateMatrix(-SunDirection, m_ModelInst.GetCenter() - SunDirection * ShadowRadius, Vector3(ShadowRadius * 2.0f),
             (uint32_t)g_ShadowBuffer.GetWidth(), (uint32_t)g_ShadowBuffer.GetHeight(), 16);
 
         GlobalConstants globals;

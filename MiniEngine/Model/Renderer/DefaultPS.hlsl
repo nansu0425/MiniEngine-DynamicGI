@@ -254,8 +254,8 @@ float4 main(VSOutput vsOutput) : SV_Target0
     Surface.N = normal;
     Surface.V = normalize(ViewerPos - vsOutput.worldPos);
     Surface.NdotV = saturate(dot(Surface.N, Surface.V));
-    Surface.c_diff = baseColor.rgb * (1 - kDielectricSpecular) * (1 - metallicRoughness.x) * occlusion;
-    Surface.c_spec = lerp(kDielectricSpecular, baseColor.rgb, metallicRoughness.x) * occlusion;
+    Surface.c_diff = baseColor.rgb * (1 - kDielectricSpecular) * (1 - metallicRoughness.x);
+    Surface.c_spec = lerp(kDielectricSpecular, baseColor.rgb, metallicRoughness.x);
     Surface.roughness = metallicRoughness.y;
     Surface.alpha = metallicRoughness.y * metallicRoughness.y;
     Surface.alphaSqr = Surface.alpha * Surface.alpha;
@@ -263,31 +263,19 @@ float4 main(VSOutput vsOutput) : SV_Target0
     // Begin accumulating light starting with emissive
     float3 colorAccum = emissive;
 
-#if 0
     float sunShadow = texSunShadow.SampleCmpLevelZero( shadowSampler, vsOutput.sunShadowCoord.xy, vsOutput.sunShadowCoord.z );
     colorAccum += ShadeDirectionalLight(Surface, SunDirection, sunShadow * SunIntensity);
 
+    // occlusion texture와 SSAO는 간접광인 IBL만 가린다.
     uint2 pixelPos = uint2(vsOutput.position.xy);
     float ssao = texSSAO[pixelPos];
 
-    Surface.c_diff *= ssao;
-    Surface.c_spec *= ssao;
-
-    // Old-school ambient light
-    colorAccum += Surface.c_diff * 0.1;
-
-#else
-
-    uint2 pixelPos = uint2(vsOutput.position.xy);
-    float ssao = texSSAO[pixelPos];
-
-    Surface.c_diff *= ssao;
-    Surface.c_spec *= ssao;
+    Surface.c_diff *= occlusion * ssao;
+    Surface.c_spec *= occlusion * ssao;
 
     // Add IBL
     colorAccum += Diffuse_IBL(Surface);
     colorAccum += Specular_IBL(Surface);
-#endif
 
     // TODO: Shade each light using Forward+ tiles
 
