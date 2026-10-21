@@ -481,5 +481,5 @@ void ModelViewer::RenderScene( void )
 
 void ModelViewer::RenderSceneOverlay( GraphicsContext& gfxContext )
 {
-    RaytracingDebugView::Render(gfxContext.GetComputeContext(), m_Camera, m_RaytracingScene, GetSunDirection(), g_SceneOverlayBuffer);
+    RaytracingDebugView::Render(gfxContext.GetComputeContext(), m_Camera, m_MainViewport, m_RaytracingScene, GetSunDirection(), g_SceneOverlayBuffer);
 }

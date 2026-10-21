@@ -1,3 +1,4 @@
+#include "Model/Raytracing/CameraRays.hlsli"
 #include "Model/Raytracing/HitSurface.hlsli"
 #include "Model/Raytracing/SurfaceRayOrigin.hlsli"
 #include "Core/Shaders/ShaderUtility.hlsli"
@@ -18,13 +19,10 @@ static const uint kSunCullingDifference = 12;
 
 cbuffer Constants : register(b0)
 {
-    float3 CameraPosition;
+    CameraRays Rays;
     uint View;
-    float3 TopLeftRayDirection;
     float NearZ;
-    float3 PixelStepRight;
     float FarZ;
-    float3 PixelStepDown;
     uint CullSingleSidedBackFaces;
     float3 SunDirection;
 };
@@ -142,15 +140,9 @@ float3 HitColor(RayHit hit)
 [numthreads(8, 8, 1)]
 void main(uint2 pixel : SV_DispatchThreadID)
 {
-    RayDesc ray;
-    ray.Origin = CameraPosition;
-    ray.Direction = normalize(TopLeftRayDirection + (pixel.x + 0.5) * PixelStepRight + (pixel.y + 0.5) * PixelStepDown);
-    ray.TMin = 0.0;
-    ray.TMax = 1e30;
-
     float3 color = 0.0;
     RayHit hit;
-    if (TraceClosestHit(ray, DebugViewRayFlags(), hit))
+    if (TraceClosestHit(GetCameraRay(Rays, pixel), DebugViewRayFlags(), hit))
         color = HitColor(hit);
     Output[pixel] = float4(color, 1.0);
 }

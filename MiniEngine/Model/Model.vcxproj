@@ -85,6 +85,7 @@
     <ClInclude Include="Sponza\ParticleEffects.h" />
     <ClInclude Include="Raytracing\BottomLevelAS.h" />
     <ClInclude Include="Raytracing\RaytracingScene.h" />
+    <ClInclude Include="Raytracing\CameraRays.h" />
     <ClInclude Include="Raytracing\RaytracingDebugView.h" />
     <ClInclude Include="Raytracing\RayQuerySmokeTest.h" />
     <ClInclude Include="Renderer\Renderer.h" />
@@ -105,6 +106,7 @@
     <ClCompile Include="Sponza\ParticleEffects.cpp" />
     <ClCompile Include="Raytracing\BottomLevelAS.cpp" />
     <ClCompile Include="Raytracing\RaytracingScene.cpp" />
+    <ClCompile Include="Raytracing\CameraRays.cpp" />
     <ClCompile Include="Raytracing\RaytracingDebugView.cpp" />
     <ClCompile Include="Raytracing\RayQuerySmokeTest.cpp" />
     <ClCompile Include="Renderer\Renderer.cpp" />
@@ -118,6 +120,7 @@
     <None Include="Raytracing\RaytracingScene.hlsli" />
     <None Include="Raytracing\HitSurface.hlsli" />
     <None Include="Raytracing\SurfaceRayOrigin.hlsli" />
+    <None Include="Raytracing\CameraRays.hlsli" />
     <None Include="Sponza\Lighting.hlsli" />
   </ItemGroup>
   <ItemGroup>

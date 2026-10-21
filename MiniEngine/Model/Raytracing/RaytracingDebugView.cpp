@@ -1,4 +1,5 @@
 #include "Model/Raytracing/RaytracingDebugView.h"
+#include "Model/Raytracing/CameraRays.h"
 #include "Model/Raytracing/RaytracingScene.h"
 #include "Model/Renderer/Renderer.h"
 #include "Core/Camera/Camera.h"
@@ -43,32 +44,13 @@ namespace
 
     __declspec(align(16)) struct Constants
     {
-        XMFLOAT3 CameraPosition;
+        CameraRays Rays;
         uint32_t View;
-        XMFLOAT3 TopLeftRayDirection;
         float NearZ;
-        XMFLOAT3 PixelStepRight;
         float FarZ;
-        XMFLOAT3 PixelStepDown;
         uint32_t CullSingleSidedBackFaces;
         XMFLOAT3 SunDirection;
     };
-
-    // raster와 같은 시야가 되도록 camera의 FOV로 화면의 각 pixel을 지나는 ray 방향을 만든다.
-    void DescribeCameraRays(const Camera& camera, const ColorBuffer& target, Constants& constants)
-    {
-        const float width = (float)target.GetWidth();
-        const float height = (float)target.GetHeight();
-        const float halfScreenHeight = tanf(camera.GetFOV() * 0.5f);
-        const float halfScreenWidth = halfScreenHeight * width / height;
-        const Vector3 right = camera.GetRightVec();
-        const Vector3 up = camera.GetUpVec();
-
-        XMStoreFloat3(&constants.CameraPosition, camera.GetPosition());
-        XMStoreFloat3(&constants.TopLeftRayDirection, camera.GetForwardVec() - right * halfScreenWidth + up * halfScreenHeight);
-        XMStoreFloat3(&constants.PixelStepRight, right * (2.0f * halfScreenWidth / width));
-        XMStoreFloat3(&constants.PixelStepDown, up * (-2.0f * halfScreenHeight / height));
-    }
 
     // target은 GPU가 멈춘 동안에만 다시 만들어지므로, 그때 heap의 descriptor를 바로 덮어써도 된다.
     void UpdateOutputUAV(const ColorBuffer& target)
@@ -96,7 +78,7 @@ void RaytracingDebugView::Initialize(void)
     s_OutputUAV = Renderer::s_TextureHeap.Alloc(1);
 }
 
-void RaytracingDebugView::Render(ComputeContext& context, const Camera& camera, const RaytracingScene& scene, const Vector3& sunDirection, ColorBuffer& target)
+void RaytracingDebugView::Render(ComputeContext& context, const Camera& camera, const D3D12_VIEWPORT& rasterViewport, const RaytracingScene& scene, const Vector3& sunDirection, ColorBuffer& target)
 {
     if (s_View == kOff)
         return;
@@ -104,7 +86,7 @@ void RaytracingDebugView::Render(ComputeContext& context, const Camera& camera, 
     ScopedTimer _prof(L"Raytracing Debug View", context);
 
     Constants constants;
-    DescribeCameraRays(camera, target, constants);
+    constants.Rays = DescribeCameraRays(camera, rasterViewport);
     constants.View = s_View;
     constants.NearZ = camera.GetNearClip();
     constants.FarZ = camera.GetFarClip();
