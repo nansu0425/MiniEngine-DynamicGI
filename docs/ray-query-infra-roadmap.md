@@ -19,8 +19,11 @@ hit 지점의 조명 계산은 Reference Path Tracer 에서 한다.
    1. GBV: Debug build 를 `-gpu_debug 1` 로 VS debugger 에서 실행하고 Output 창의 D3D12 message 를 본다. D3D12 message 는 실행을 멈추지 않는다. GBV 는 실행된 shader 경로만 검사하므로 모든 debug view, Cull Single-Sided Back Faces 의 on/off, window 크기 변경, sun 회전, leaf 와 chain 이 보이는 화면을 거친다. ERROR 와 CORRUPTION 이 없어야 한다.
    2. 검증 pass 의 기반: 3 ~ 5 를 mode 로 갖는 compute pass 를 만든다.
       - camera ray 를 raster 와 같은 sample 위치로 쏜다. raster 는 viewport 를 jitter 만큼 옮기고 TAA 를 꺼도 jitter 가 0.5 라서, pixel 중심을 쏘는 지금의 debug view 는 raster 와 반 pixel 어긋난다. debug view 도 이 camera ray 를 쓴다.
+      - debug view 와 검증 mode 는 같은 overlay 에 그리므로 한 panel 의 view 하나로 고른다. view 목록을 Debug 와 Validation 으로 나누고, 하나만 고를 수 있게 UI 가 강제한다. 검증 mode 는 culling 을 PT 가 쓸 `kCullSingleSidedBackFaces` 로 고정하고, 고정한 설정은 숨기지 않고 비활성으로 보여 준다.
       - pixel 마다의 결과는 overlay 에 heatmap 으로 그리고, stats buffer 에 category 별 count, log2 scale 의 error histogram, max 로 모은다.
-      - panel 의 Capture 로 stats 를 읽어 비율과 p50, p99, max 를 보여 준다. 같은 곳에서 다시 잴 수 있게 Log 는 수치를 camera pose, sun 방향과 함께 찍는다.
+      - panel 의 Capture 로 stats 를 읽어 비율과 p50, p99, max 를 보여 준다. Log 는 수치를 camera pose, sun 방향, TAA, 해상도와 함께 한 줄로 찍는다.
+      - 고친 뒤 같은 곳에서 다시 잴 수 있게, panel 에 붙여 넣은 Log 한 줄로 camera pose, sun 방향, TAA 를 되돌린다. app 을 다시 실행해도 되돌릴 수 있어야 한다. 해상도와 TAA 를 켰을 때의 jitter 는 되돌릴 수 없으므로 Log 와 다르면 panel 에 표시한다.
+      - 집계가 맞는지는 정답을 아는 Ray Hit mode 로 확인한다. hit 와 miss 의 합이 pixel 수와 같고, 멈춘 화면에서 Capture 를 반복하면 같은 값이 나와야 한다. 3 의 category 도 합이 pixel 수와 같아 같은 확인이 되므로 3 에서 Ray Hit mode 를 지운다.
    3. depth 비교: pixel 마다 raster depth 와 ray depth (`t * dot(D, forward)`) 를 비교한다. ray 의 TMin, TMax 는 raster 의 near, far plane 에 맞춘다.
       - 둘 다 miss, raster 만 hit, ray 만 hit, depth 일치, depth 불일치로 나눈다.
       - 불일치한 pixel 은 `RAY_FLAG_FORCE_OPAQUE` 로 다시 쏴서 결과가 바뀌면 alpha test 불일치로 따로 센다. raster 의 cutout 은 mip chain 을, ray 는 mip 0 을 읽으므로 alpha test 불일치는 보고만 한다.
