@@ -1,4 +1,5 @@
 #include "Model/Raytracing/HitSurface.hlsli"
+#include "Model/Raytracing/SurfaceRayOrigin.hlsli"
 #include "Core/Shaders/ShaderUtility.hlsli"
 
 // RaytracingDebugView.cpp의 View와 같은 값이다.
@@ -12,6 +13,8 @@ static const uint kBaseColor = 7;
 static const uint kMetallic = 8;
 static const uint kRoughness = 9;
 static const uint kEmissive = 10;
+static const uint kSunVisibility = 11;
+static const uint kSunCullingDifference = 12;
 
 cbuffer Constants : register(b0)
 {
@@ -22,6 +25,8 @@ cbuffer Constants : register(b0)
     float3 PixelStepRight;
     float FarZ;
     float3 PixelStepDown;
+    uint CullSingleSidedBackFaces;
+    float3 SunDirection;
 };
 
 RWTexture2D<float4> Output : register(u0);
@@ -79,6 +84,46 @@ float3 SurfaceColor(HitSurface surface)
     return 0.0;
 }
 
+// Cull Single-Sided Back Faces를 끄면 single-sided material의 뒷면에도 ray가 맞는다.
+uint DebugViewRayFlags()
+{
+    return CullSingleSidedBackFaces != 0 ? kCullSingleSidedBackFaces : RAY_FLAG_NONE;
+}
+
+// 면이 sun을 등지면 그 면이 sun을 가리므로 ray를 쏠 필요가 없어 false를 돌려준다.
+bool DescribeSunRay(HitSurface surface, out RayDesc ray)
+{
+    ray.Origin = SurfaceRayOrigin(surface.position, surface.geometryNormal);
+    ray.Direction = SunDirection;
+    ray.TMin = 0.0;
+    ray.TMax = 1e30;
+    return dot(surface.geometryNormal, SunDirection) > 0.0;
+}
+
+// sun이 보이면 흰색, 가려지면 검정이다.
+float3 SunVisibilityColor(RayHit hit)
+{
+    RayDesc ray;
+    if (!DescribeSunRay(GetHitSurface(hit), ray))
+        return 0.0;
+    return IsOccluded(ray, DebugViewRayFlags()) ? 0.0 : 1.0;
+}
+
+// sun을 향한 ray가 single-sided material의 뒷면을 cull할 때와 하지 않을 때 결과가 다른 곳을 빨강으로 칠한다.
+// 빨강은 ray가 single-sided 면을 뒤에서 만나 지나가고, 그 뒤에 sun을 가리는 다른 면이 없는 곳이다.
+// 나머지는 Sun Visibility와 같다.
+float3 SunCullingDifferenceColor(RayHit hit)
+{
+    RayDesc ray;
+    if (!DescribeSunRay(GetHitSurface(hit), ray))
+        return 0.0;
+
+    const bool occludedWithCulling = IsOccluded(ray, kCullSingleSidedBackFaces);
+    if (occludedWithCulling != IsOccluded(ray, RAY_FLAG_NONE))
+        return float3(1.0, 0.0, 0.0);
+    return occludedWithCulling ? 0.0 : 1.0;
+}
+
 float3 HitColor(RayHit hit)
 {
     if (View == kHitT)
@@ -87,6 +132,10 @@ float3 HitColor(RayHit hit)
         return InstanceColor(hit.instanceIndex);
     if (View == kFrontFace)
         return FrontFaceColor(hit.frontFace);
+    if (View == kSunVisibility)
+        return SunVisibilityColor(hit);
+    if (View == kSunCullingDifference)
+        return SunCullingDifferenceColor(hit);
     return SurfaceColor(GetHitSurface(hit));
 }
 
@@ -101,7 +150,7 @@ void main(uint2 pixel : SV_DispatchThreadID)
 
     float3 color = 0.0;
     RayHit hit;
-    if (TraceClosestHit(ray, hit))
+    if (TraceClosestHit(ray, DebugViewRayFlags(), hit))
         color = HitColor(hit);
     Output[pixel] = float4(color, 1.0);
 }

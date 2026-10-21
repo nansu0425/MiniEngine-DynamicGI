@@ -3,7 +3,7 @@
 class Model;
 
 // mesh마다 BLAS를 하나씩 build해 model에 둔다.
-// skinned mesh는 vertex가 animation을 따라 바뀌므로 BLAS를 만들지 않는다.
+// skinned mesh는 vertex가 animation을 따라 바뀌므로, alpha blend mesh는 ray가 보지 않으므로 BLAS를 만들지 않는다.
 void BuildBottomLevelAS(Model& model);
 
 // ray가 맞은 BLAS geometry의 triangle과 material을 RaytracingScene.hlsli가 읽을 수 있도록

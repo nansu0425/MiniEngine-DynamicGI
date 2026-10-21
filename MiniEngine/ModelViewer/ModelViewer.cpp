@@ -82,6 +82,16 @@ ExpVar g_SunLightIntensity("Viewer/Lighting/Sun Light Intensity", 4.0f, 0.0f, 16
 NumVar g_SunOrientation("Viewer/Lighting/Sun Orientation", -0.5f, -100.0f, 100.0f, 0.1f );
 NumVar g_SunInclination("Viewer/Lighting/Sun Inclination", 0.75f, 0.0f, 1.0f, 0.01f );
 
+// surface에서 sun을 향하는 방향. raster의 조명과 ray tracing debug view가 같은 sun을 보게 한다.
+Vector3 GetSunDirection()
+{
+    float costheta = cosf(g_SunOrientation);
+    float sintheta = sinf(g_SunOrientation);
+    float cosphi = cosf(g_SunInclination * 3.14159f * 0.5f);
+    float sinphi = sinf(g_SunInclination * 3.14159f * 0.5f);
+    return Normalize(Vector3( costheta * cosphi, sinphi, sintheta * cosphi ));
+}
+
 void ChangeIBLSet(EngineVar::ActionType);
 void ChangeIBLBias(EngineVar::ActionType);
 
@@ -284,12 +294,7 @@ void ModelViewer::RenderScene( void )
     else
     {
         // Update global constants
-        float costheta = cosf(g_SunOrientation);
-        float sintheta = sinf(g_SunOrientation);
-        float cosphi = cosf(g_SunInclination * 3.14159f * 0.5f);
-        float sinphi = sinf(g_SunInclination * 3.14159f * 0.5f);
-
-        Vector3 SunDirection = Normalize(Vector3( costheta * cosphi, sinphi, sintheta * cosphi ));
+        Vector3 SunDirection = GetSunDirection();
         Vector3 ShadowBounds = Vector3(m_ModelInst.GetRadius());
         //m_SunShadowCamera.UpdateMatrix(-SunDirection, m_ModelInst.GetCenter(), ShadowBounds,
         m_SunShadowCamera.UpdateMatrix(-SunDirection, Vector3(0, -500.0f, 0), Vector3(5000, 3000, 3000),
@@ -381,5 +386,5 @@ void ModelViewer::RenderScene( void )
 
 void ModelViewer::RenderSceneOverlay( GraphicsContext& gfxContext )
 {
-    RaytracingDebugView::Render(gfxContext.GetComputeContext(), m_Camera, m_RaytracingScene, g_SceneOverlayBuffer);
+    RaytracingDebugView::Render(gfxContext.GetComputeContext(), m_Camera, m_RaytracingScene, GetSunDirection(), g_SceneOverlayBuffer);
 }

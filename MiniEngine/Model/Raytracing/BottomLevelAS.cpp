@@ -42,8 +42,9 @@ namespace
             D3D12_RAYTRACING_GEOMETRY_TRIANGLES_DESC& triangles = geometry.Triangles;
 
             geometry.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-            // alpha test material도 아직은 ray가 통과하지 못하는 opaque로 둔다.
-            geometry.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
+            // alpha test material은 OPAQUE flag를 빼서 traversal 중에 shader가 alpha로 hit인지 정하게 한다.
+            // 같은 triangle을 여러 번 판정해도 결과가 같으므로 NO_DUPLICATE_ANYHIT_INVOCATION은 쓰지 않는다.
+            geometry.Flags = (mesh.psoFlags & PSOFlags::kAlphaTest) ? D3D12_RAYTRACING_GEOMETRY_FLAG_NONE : D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
 
             // position은 vertex의 맨 앞에 있다.
             triangles.VertexBuffer.StartAddress = dataBuffer + mesh.vbOffset + draw.baseVertex * mesh.vbStride;
@@ -113,6 +114,12 @@ void BuildBottomLevelAS(Model& model)
         pMesh += sizeof(Mesh) + (mesh.numDraws - 1) * sizeof(Mesh::Draw);
 
         if (mesh.psoFlags & PSOFlags::kHasSkin)
+            continue;
+
+        // glTF spec과 다르다: BLEND material은 alpha만큼 뒤를 가려야 하지만 ray는 BLEND mesh를 보지 않는다.
+        // 일부만 가리는 hit를 다루려면 closest hit와 visibility가 돌려주는 값의 형태가 바뀌므로 투명한 물체를 shading할 때 정한다.
+        // 그때까지는 BLEND mesh를 depth와 shadow map에 그리지 않는 raster와 같게 둔다.
+        if (mesh.psoFlags & PSOFlags::kAlphaBlend)
             continue;
 
         geometries[i] = DescribeGeometries(mesh, dataBuffer);

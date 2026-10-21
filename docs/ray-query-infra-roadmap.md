@@ -21,3 +21,4 @@ hit 지점의 조명 계산은 Reference Path Tracer 에서 한다.
 
 - 조명 (sun, sky, BRDF)
 - skinned mesh, BLAS compaction, TLAS refit, 여러 ModelInstance
+- 투명한 물체 (alpha blend material). 투명한 물체를 shading 할 때 ray 가 어떻게 볼지 정한다.

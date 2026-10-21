@@ -63,7 +63,7 @@ struct MaterialConstants
     float normalTextureScale;
     float metallicFactor;
     float roughnessFactor;
-    // texture 순서번째 bit가 그 texture에 UV1을 쓸지 고른다.
+    // texture 순서번째 bit가 그 texture에 UV1을 쓸지 고른다. 위 16 bit는 alpha cutoff를 half로 담는다.
     uint flags;
 };
 static const uint kMaterialConstantsStride = 256;
@@ -144,6 +144,35 @@ float4 SampleMaterialTexture(HitTriangle hitTriangle, uint texture)
         .SampleLevel(SceneSamplers[NonUniformResourceIndex(hitTriangle.geometry.samplers + texture)], uv, 0.0);
 }
 
+// glTF처럼 base color의 alpha가 alpha cutoff 이상인 곳만 ray를 막는다.
+// OPAQUE flag가 없는 BLAS geometry는 alpha test material뿐이므로 traversal 중의 candidate는 모두 이 판정을 받는다.
+bool IsOpaqueAt(uint instanceIndex, uint geometryIndex, uint primitiveIndex, float2 barycentrics)
+{
+    const HitTriangle hitTriangle = GetHitTriangle(instanceIndex, geometryIndex, primitiveIndex, barycentrics);
+    const float alpha = hitTriangle.material.baseColorFactor.a * SampleMaterialTexture(hitTriangle, kBaseColorTexture).a;
+    return alpha >= f16tof32(hitTriangle.material.flags >> 16);
+}
+
+// glTF spec은 doubleSided가 아닌 material의 뒷면을 그리지 않는다. 이 culling을 모든 ray에 적용해 그런 뒷면은 ray가 지나가게 한다.
+// spec은 camera에서 본 결과만 정하므로 camera ray가 아닌 ray에까지 적용하는 것은 이 repo의 선택이다.
+// doubleSided material의 BLAS instance는 RaytracingScene이 culling을 끈다. DDGI의 probe처럼 뒷면에 맞았는지 알아야 하는 query는 이 flag를 빼고 쏜다.
+static const uint kCullSingleSidedBackFaces = RAY_FLAG_CULL_BACK_FACING_TRIANGLES;
+
+// rayFlags는 kCullSingleSidedBackFaces처럼 query마다 고르는 ray flag다.
+// scene에 procedural primitive가 없으므로 RayQueryType은 RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES를 갖는다.
+template<typename RayQueryType>
+RayQueryType TraceScene(RayDesc ray, uint rayFlags)
+{
+    RayQueryType query;
+    query.TraceRayInline(Scene, rayFlags, 0xFF, ray);
+    while (query.Proceed())
+    {
+        if (IsOpaqueAt(query.CandidateInstanceIndex(), query.CandidateGeometryIndex(), query.CandidatePrimitiveIndex(), query.CandidateTriangleBarycentrics()))
+            query.CommitNonOpaqueTriangleHit();
+    }
+    return query;
+}
+
 // TLAS에서 ray가 맞은 triangle
 struct RayHit
 {
@@ -160,11 +189,10 @@ struct RayHit
     float3x4 worldToObject;
 };
 
-bool TraceClosestHit(RayDesc ray, out RayHit hit)
+bool TraceClosestHit(RayDesc ray, uint rayFlags, out RayHit hit)
 {
-    RayQuery<RAY_FLAG_NONE> query;
-    query.TraceRayInline(Scene, RAY_FLAG_NONE, 0xFF, ray);
-    while (query.Proceed()) {}
+    typedef RayQuery<RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> ClosestHitQuery;
+    ClosestHitQuery query = TraceScene<ClosestHitQuery>(ray, rayFlags);
 
     hit = (RayHit)0;
     if (query.CommittedStatus() != COMMITTED_TRIANGLE_HIT)
@@ -179,6 +207,13 @@ bool TraceClosestHit(RayDesc ray, out RayHit hit)
     hit.objectToWorld = query.CommittedObjectToWorld3x4();
     hit.worldToObject = query.CommittedWorldToObject3x4();
     return true;
+}
+
+// ray의 TMin과 TMax 사이에 ray를 막는 것이 있는지 알려 준다. 두 점 사이를 볼 때는 TMax를 두 점의 거리로 둔다.
+bool IsOccluded(RayDesc ray, uint rayFlags)
+{
+    typedef RayQuery<RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH> OcclusionQuery;
+    return TraceScene<OcclusionQuery>(ray, rayFlags).CommittedStatus() != COMMITTED_NOTHING;
 }
 
 #endif

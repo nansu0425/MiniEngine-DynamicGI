@@ -45,6 +45,10 @@ void RaytracingScene::AddModelInstance(const ModelInstance& modelInstance)
         D3D12_RAYTRACING_INSTANCE_DESC desc = {};
         XMStoreFloat3x4((XMFLOAT3X4*)desc.Transform, nodeWorldTransforms[mesh.meshCBV]);
         desc.InstanceMask = 0xFF;
+        // doubleSided material은 뒷면도 그리므로 그 mesh의 BLAS instance는 ray의 back face culling을 받지 않는다.
+        // mesh 하나가 material 하나를 쓰므로 instance flag로 material마다 정할 수 있다.
+        if (mesh.psoFlags & PSOFlags::kTwoSided)
+            desc.Flags = D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_CULL_DISABLE;
         desc.AccelerationStructure = model.m_MeshBLAS[i];
         m_InstanceDescs.push_back(desc);
 

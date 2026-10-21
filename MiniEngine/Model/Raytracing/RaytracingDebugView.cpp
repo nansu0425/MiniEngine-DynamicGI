@@ -20,14 +20,18 @@ namespace
     {
         kOff, kHitT, kInstance, kFrontFace,
         kGeometryNormal, kShadingNormal, kUV0, kBaseColor, kMetallic, kRoughness, kEmissive,
+        kSunVisibility, kSunCullingDifference,
         kNumViews
     };
     const char* kViewLabels[] =
     {
         "Off", "Hit T", "Instance", "Front Face",
-        "Geometry Normal", "Shading Normal", "UV0", "Base Color", "Metallic", "Roughness", "Emissive"
+        "Geometry Normal", "Shading Normal", "UV0", "Base Color", "Metallic", "Roughness", "Emissive",
+        "Sun Visibility", "Sun Culling Difference"
     };
     EnumVar s_View("Graphics/Raytracing/Debug View", kOff, kNumViews, kViewLabels);
+    // 끄면 single-sided material의 뒷면도 ray에 맞아서 culling이 ray에 주는 차이를 볼 수 있다.
+    BoolVar s_CullSingleSidedBackFaces("Graphics/Raytracing/Cull Single-Sided Back Faces", true);
 
     enum RootParameter { kConstants, kScene, kOutput = kScene + RaytracingScene::kNumRootParameters, kNumRootParameters };
     RootSignature s_RootSignature;
@@ -46,6 +50,8 @@ namespace
         XMFLOAT3 PixelStepRight;
         float FarZ;
         XMFLOAT3 PixelStepDown;
+        uint32_t CullSingleSidedBackFaces;
+        XMFLOAT3 SunDirection;
     };
 
     // raster와 같은 시야가 되도록 camera의 FOV로 화면의 각 pixel을 지나는 ray 방향을 만든다.
@@ -90,7 +96,7 @@ void RaytracingDebugView::Initialize(void)
     s_OutputUAV = Renderer::s_TextureHeap.Alloc(1);
 }
 
-void RaytracingDebugView::Render(ComputeContext& context, const Camera& camera, const RaytracingScene& scene, ColorBuffer& target)
+void RaytracingDebugView::Render(ComputeContext& context, const Camera& camera, const RaytracingScene& scene, const Vector3& sunDirection, ColorBuffer& target)
 {
     if (s_View == kOff)
         return;
@@ -102,6 +108,8 @@ void RaytracingDebugView::Render(ComputeContext& context, const Camera& camera, 
     constants.View = s_View;
     constants.NearZ = camera.GetNearClip();
     constants.FarZ = camera.GetFarClip();
+    constants.CullSingleSidedBackFaces = s_CullSingleSidedBackFaces;
+    XMStoreFloat3(&constants.SunDirection, sunDirection);
 
     UpdateOutputUAV(target);
 
