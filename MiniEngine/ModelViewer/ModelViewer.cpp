@@ -35,6 +35,7 @@
 #include "Model/Loader/ModelLoader.h"
 #include "Core/Camera/ShadowCamera.h"
 #include "Core/Display/Display.h"
+#include "Core/Editor/EditorCamera.h"
 
 // Dynamic GI 프로젝트에선 legacy path가 아닌 glTF path를 사용한다.
 // legacy는 Blinn-Phong, glTF는 PBR shading
@@ -209,7 +210,7 @@ void ModelViewer::Startup( void )
 
     m_Camera.SetZRange(1.0f, 10000.0f);
     if (gltfFileName.size() == 0)
-        m_CameraController.reset(new FlyingFPSCamera(m_Camera, Vector3(kYUnitVector)));
+        m_CameraController.reset(new EditorCamera(m_Camera, Vector3(kYUnitVector)));
     else
         m_CameraController.reset(new OrbitCamera(m_Camera, m_ModelInst.GetBoundingSphere(), Vector3(kYUnitVector)));
 }

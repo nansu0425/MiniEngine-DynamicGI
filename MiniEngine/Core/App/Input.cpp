@@ -52,11 +52,11 @@ namespace
 
     bool s_MouseCapturedByUI = false;
     bool s_KeyboardCapturedByUI = false;
-    bool s_MouseLookActive = false;
+    bool s_MouseCapturedByCamera = false;
 
 #ifdef USE_KEYBOARD_MOUSE
 
-    POINT s_MouseLookCursorPos;
+    POINT s_CameraCaptureCursorPos;
 
     IDirectInput8A* s_DI;
     IDirectInputDevice8A* s_Keyboard;
@@ -256,24 +256,24 @@ namespace
         }
     }
 
-    // 오른쪽 button을 누르고 있는 동안만 mouse 이동을 camera에 전달하고 cursor를 그 자리에 고정한다.
+    // 오른쪽이나 가운데 button을 누르고 있는 동안만 mouse 이동을 camera에 전달하고 cursor를 그 자리에 고정한다.
     // 그 밖에는 cursor가 자유롭게 움직이며 UI를 조작한다.
-    void KbmApplyMouseLookAndUICapture()
+    void KbmApplyCameraAndUICapture()
     {
-        const bool rightButtonDown = (s_MouseState.rgbButtons[1] & 0x80) != 0;
-        if (!s_MouseLookActive && rightButtonDown && !s_MouseCapturedByUI)
+        const bool cameraButtonDown = (s_MouseState.rgbButtons[1] & 0x80) != 0 || (s_MouseState.rgbButtons[2] & 0x80) != 0;
+        if (!s_MouseCapturedByCamera && cameraButtonDown && !s_MouseCapturedByUI)
         {
-            s_MouseLookActive = true;
-            GetCursorPos(&s_MouseLookCursorPos);
+            s_MouseCapturedByCamera = true;
+            GetCursorPos(&s_CameraCaptureCursorPos);
         }
-        else if (s_MouseLookActive && !rightButtonDown)
+        else if (s_MouseCapturedByCamera && !cameraButtonDown)
         {
-            s_MouseLookActive = false;
+            s_MouseCapturedByCamera = false;
         }
 
-        if (s_MouseLookActive)
+        if (s_MouseCapturedByCamera)
         {
-            SetCursorPos(s_MouseLookCursorPos.x, s_MouseLookCursorPos.y);
+            SetCursorPos(s_CameraCaptureCursorPos.x, s_CameraCaptureCursorPos.y);
         }
         else
         {
@@ -300,7 +300,7 @@ namespace
             || !visible)
         {
             KbmZeroInputs();
-            s_MouseLookActive = false;
+            s_MouseCapturedByCamera = false;
         }
         else
         {
@@ -308,7 +308,7 @@ namespace
             s_Mouse->GetDeviceState(sizeof(DIMOUSESTATE2), &s_MouseState);
             s_Keyboard->Acquire();
             s_Keyboard->GetDeviceState(sizeof(s_Keybuffer), s_Keybuffer);
-            KbmApplyMouseLookAndUICapture();
+            KbmApplyCameraAndUICapture();
         }
     }
 
@@ -455,9 +455,9 @@ void GameInput::SetCapturedByUI( bool mouse, bool keyboard )
     s_KeyboardCapturedByUI = keyboard;
 }
 
-bool GameInput::IsMouseLookActive( void )
+bool GameInput::IsMouseCapturedByCamera( void )
 {
-    return s_MouseLookActive;
+    return s_MouseCapturedByCamera;
 }
 
 bool GameInput::IsAnyPressed( void )

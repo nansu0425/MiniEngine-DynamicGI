@@ -159,11 +159,11 @@ void ImGuiLayer::BeginFrame(void)
     }
 
     ImGuiIO& io = ImGui::GetIO();
-    const bool mouseLook = GameInput::IsMouseLookActive();
+    const bool cameraCapturesMouse = GameInput::IsMouseCapturedByCamera();
 
     // UI가 숨겨져 있거나 camera를 조작하는 중에는 ImGui가 입력에 반응하지 않게 한다.
     const ImGuiConfigFlags inputBlockFlags = ImGuiConfigFlags_NoMouse | ImGuiConfigFlags_NoKeyboard;
-    if (!s_Visible || mouseLook)
+    if (!s_Visible || cameraCapturesMouse)
         io.ConfigFlags |= inputBlockFlags;
     else
         io.ConfigFlags &= ~inputBlockFlags;
@@ -172,7 +172,7 @@ void ImGuiLayer::BeginFrame(void)
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
 
-    if (mouseLook)
+    if (cameraCapturesMouse)
         ImGui::SetMouseCursor(ImGuiMouseCursor_None);
 
     GameInput::SetCapturedByUI(io.WantCaptureMouse, io.WantCaptureKeyboard);

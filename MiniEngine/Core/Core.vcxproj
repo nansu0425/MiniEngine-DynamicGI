@@ -127,6 +127,7 @@
     <ClInclude Include="Graphics\Pipeline\PipelineState.h" />
     <ClInclude Include="Graphics\Resource\PixelBuffer.h" />
     <ClInclude Include="Effects\PostEffects\PostEffects.h" />
+    <ClInclude Include="Editor\EditorCamera.h" />
     <ClInclude Include="UI\EngineTuning.h" />
     <ClInclude Include="UI\ImGuiLayer.h" />
     <ClInclude Include="Display\Display.h" />
@@ -163,6 +164,7 @@
     <ClCompile Include="Graphics\Descriptor\DynamicDescriptorHeap.cpp" />
     <ClCompile Include="Graphics\Descriptor\DescriptorHeap.cpp" />
     <ClCompile Include="Profiling\EngineProfiling.cpp" />
+    <ClCompile Include="Editor\EditorCamera.cpp" />
     <ClCompile Include="UI\EngineTuning.cpp" />
     <ClCompile Include="UI\ImGuiLayer.cpp" />
     <ClCompile Include="Utility\FileUtility.cpp" />

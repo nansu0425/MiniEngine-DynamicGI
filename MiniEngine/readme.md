@@ -6,11 +6,12 @@
 * Build and run
 
 ## Controls:
-* forward/backward/strafe: left thumbstick or WASD (FPS controls)
-* up/down: triggers or E/Q
-* yaw/pitch: right thumbstick or mouse while holding the right mouse button
+* look around: mouse while holding the right mouse button
+* forward/backward/strafe: WASD while holding the right mouse button
+* up/down in world space: E/Q while holding the right mouse button
+* movement speed: mouse wheel while holding the right mouse button
+* pan: drag with the middle mouse button
 * toggle ImGui: F1
-* toggle slow movement: click left thumbstick or lshift
 * engine tuning, profiler, scene overlay: ImGui View menu
 
 ## glTF 2.0 Support:
