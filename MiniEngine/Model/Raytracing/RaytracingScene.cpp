@@ -1,10 +1,29 @@
 #include "Model/Raytracing/RaytracingScene.h"
 #include "Model/Model.h"
+#include "Model/Renderer/Renderer.h"
 #include "Core/Graphics/GraphicsCore.h"
 #include "Core/Graphics/Command/CommandContext.h"
+#include "Core/Graphics/Descriptor/DescriptorHeap.h"
+#include "Core/Graphics/Pipeline/RootSignature.h"
 
 using namespace Math;
 using namespace Graphics;
+
+namespace
+{
+    enum RootParameter { kScene, kBLASInstances, kBuffers, kTextures, kSamplers, kNumRootParameters };
+    static_assert(kNumRootParameters == RaytracingScene::kNumRootParameters, "root parameter 개수가 RaytracingScene.h와 다르다");
+}
+
+void RaytracingScene::InitRootParameters(RootSignature& rootSignature, UINT firstRootIndex)
+{
+    // register와 space는 RaytracingScene.hlsli의 선언과 같다.
+    rootSignature[firstRootIndex + kScene].InitAsBufferSRV(0, D3D12_SHADER_VISIBILITY_ALL, 1);
+    rootSignature[firstRootIndex + kBLASInstances].InitAsBufferSRV(1, D3D12_SHADER_VISIBILITY_ALL, 1);
+    rootSignature[firstRootIndex + kBuffers].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, UINT_MAX, D3D12_SHADER_VISIBILITY_ALL, 2);
+    rootSignature[firstRootIndex + kTextures].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, UINT_MAX, D3D12_SHADER_VISIBILITY_ALL, 3);
+    rootSignature[firstRootIndex + kSamplers].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, 0, UINT_MAX, D3D12_SHADER_VISIBILITY_ALL, 1);
+}
 
 void RaytracingScene::AddModelInstance(const ModelInstance& modelInstance)
 {
@@ -27,13 +46,15 @@ void RaytracingScene::AddModelInstance(const ModelInstance& modelInstance)
         XMStoreFloat3x4((XMFLOAT3X4*)desc.Transform, nodeWorldTransforms[mesh.meshCBV]);
         desc.InstanceMask = 0xFF;
         desc.AccelerationStructure = model.m_MeshBLAS[i];
-        m_Instances.push_back(desc);
+        m_InstanceDescs.push_back(desc);
+
+        m_BLASInstances.push_back({ model.m_RaytracingSRVs, model.m_MeshFirstBLASGeometry[i] });
     }
 }
 
 void RaytracingScene::Build(CommandContext& context)
 {
-    const uint32_t numInstances = (uint32_t)m_Instances.size();
+    const uint32_t numInstances = (uint32_t)m_InstanceDescs.size();
     if (numInstances == 0)
         return;
 
@@ -49,12 +70,17 @@ void RaytracingScene::Build(CommandContext& context)
         CreateBuffers(inputs);
     ASSERT(numInstances <= m_MaxInstances);
 
+    // 앞 frame이 이 buffer를 읽는 command는 앞선 ExecuteCommandLists에 있으므로 copy 전에 끝난다.
+    context.WriteBuffer(m_BLASInstanceBuffer, 0, m_BLASInstances.data(), numInstances * sizeof(BLASInstance));
+    context.TransitionResource(m_BLASInstanceBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+    m_BLASInstances.clear();
+
     ScopedTimer _prof(L"Build TLAS", context);
 
     const size_t instanceDescsSize = numInstances * sizeof(D3D12_RAYTRACING_INSTANCE_DESC);
     DynAlloc instanceDescs = context.ReserveUploadMemory(instanceDescsSize);
-    std::memcpy(instanceDescs.DataPtr, m_Instances.data(), instanceDescsSize);
-    m_Instances.clear();
+    std::memcpy(instanceDescs.DataPtr, m_InstanceDescs.data(), instanceDescsSize);
+    m_InstanceDescs.clear();
 
     inputs.InstanceDescs = instanceDescs.GpuAddress;
     build.DestAccelerationStructureData = m_TLAS.GetGpuVirtualAddress();
@@ -70,10 +96,24 @@ void RaytracingScene::Build(CommandContext& context)
 
 void RaytracingScene::Destroy()
 {
-    m_Instances.clear();
+    m_InstanceDescs.clear();
+    m_BLASInstances.clear();
     m_TLAS.Destroy();
     m_ScratchBuffer.Destroy();
+    m_BLASInstanceBuffer.Destroy();
     m_MaxInstances = 0;
+}
+
+void RaytracingScene::Bind(ComputeContext& context, UINT firstRootIndex) const
+{
+    context.SetDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, Renderer::s_TextureHeap.GetHeapPointer());
+    context.SetDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, Renderer::s_SamplerHeap.GetHeapPointer());
+
+    context.SetAccelerationStructure(firstRootIndex + kScene, m_TLAS);
+    context.SetBufferSRV(firstRootIndex + kBLASInstances, m_BLASInstanceBuffer);
+    context.SetDescriptorTable(firstRootIndex + kBuffers, Renderer::s_TextureHeap[0]);
+    context.SetDescriptorTable(firstRootIndex + kTextures, Renderer::s_TextureHeap[0]);
+    context.SetDescriptorTable(firstRootIndex + kSamplers, Renderer::s_SamplerHeap[0]);
 }
 
 void RaytracingScene::CreateBuffers(const D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS& inputs)
@@ -83,5 +123,6 @@ void RaytracingScene::CreateBuffers(const D3D12_BUILD_RAYTRACING_ACCELERATION_ST
 
     m_TLAS.Create(L"TLAS", prebuild.ResultDataMaxSizeInBytes);
     m_ScratchBuffer.Create(L"TLAS Scratch", (uint32_t)prebuild.ScratchDataSizeInBytes, 1);
+    m_BLASInstanceBuffer.Create(L"BLAS Instances", inputs.NumDescs, sizeof(BLASInstance));
     m_MaxInstances = inputs.NumDescs;
 }

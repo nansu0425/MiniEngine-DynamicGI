@@ -273,7 +273,10 @@ std::shared_ptr<Model> Renderer::LoadModel(const std::wstring& filePath, bool fo
     LoadMaterials(*model, materialTextures, textureNames, textureOptions, basePath);
 
     if (g_DXRDevice != nullptr)
+    {
         BuildBottomLevelAS(*model);
+        CreateBLASGeometries(*model);
+    }
 
     model->m_BoundingSphere = BoundingSphere(*(XMFLOAT4*)header.boundingSphere);
     model->m_BoundingBox = AxisAlignedBox(Vector3(*(XMFLOAT3*)header.minPos), Vector3(*(XMFLOAT3*)header.maxPos));

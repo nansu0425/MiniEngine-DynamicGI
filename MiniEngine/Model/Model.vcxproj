@@ -116,6 +116,7 @@
     <None Include="Renderer\FillLightGridCS.hlsli" />
     <None Include="Renderer\LightGrid.hlsli" />
     <None Include="Raytracing\RaytracingScene.hlsli" />
+    <None Include="Raytracing\HitSurface.hlsli" />
     <None Include="Sponza\Lighting.hlsli" />
   </ItemGroup>
   <ItemGroup>

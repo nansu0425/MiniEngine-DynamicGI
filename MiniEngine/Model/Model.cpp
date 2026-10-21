@@ -25,6 +25,8 @@ void Model::Destroy()
     m_MaterialConstants.Destroy();
     m_BLASBuffer.Destroy();
     m_MeshBLAS.clear();
+    m_BLASGeometries.Destroy();
+    m_MeshFirstBLASGeometry.clear();
     m_NumNodes = 0;
     m_NumMeshes = 0;
     m_MeshData = nullptr;

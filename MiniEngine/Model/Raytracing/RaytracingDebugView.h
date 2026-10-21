@@ -9,7 +9,7 @@ namespace Math
     class Camera;
 }
 
-// pixel마다 camera ray를 쏴서 처음 맞은 곳의 hit t, instance, front face 중 고른 것을 색으로 그린다.
+// pixel마다 camera ray를 쏴서 처음 맞은 곳의 hit 정보나 HitSurface 중 고른 것을 색으로 그린다.
 namespace RaytracingDebugView
 {
     void Initialize(void);

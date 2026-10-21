@@ -131,6 +131,13 @@ public:
     // m_MeshBLAS는 mesh 순서대로 BLAS의 주소이고, BLAS가 없는 mesh는 0이다.
     AccelerationStructureBuffer m_BLASBuffer;
     std::vector<D3D12_GPU_VIRTUAL_ADDRESS> m_MeshBLAS;
+    // BLAS geometry마다 shader가 그 triangle과 material을 읽을 위치를 mesh 순서, 그 안의 geometry 순서로 담는다.
+    // BLAS가 없는 mesh의 m_MeshFirstBLASGeometry 값은 쓰지 않는다.
+    ByteAddressBuffer m_BLASGeometries;
+    std::vector<uint32_t> m_MeshFirstBLASGeometry;
+    // ray tracing shader가 읽도록 Renderer::s_TextureHeap에 둔 m_DataBuffer, m_MaterialConstants,
+    // m_BLASGeometries SRV 중 첫 번째의 위치. 세 SRV는 이 순서로 붙어 있다.
+    uint32_t m_RaytracingSRVs;
 
 protected:
     void Destroy();

@@ -1,9 +1,17 @@
-#include "Model/Raytracing/RaytracingScene.hlsli"
+#include "Model/Raytracing/HitSurface.hlsli"
+#include "Core/Shaders/ShaderUtility.hlsli"
 
 // RaytracingDebugView.cpp의 View와 같은 값이다.
 static const uint kHitT = 1;
 static const uint kInstance = 2;
 static const uint kFrontFace = 3;
+static const uint kGeometryNormal = 4;
+static const uint kShadingNormal = 5;
+static const uint kUV0 = 6;
+static const uint kBaseColor = 7;
+static const uint kMetallic = 8;
+static const uint kRoughness = 9;
+static const uint kEmissive = 10;
 
 cbuffer Constants : register(b0)
 {
@@ -16,7 +24,6 @@ cbuffer Constants : register(b0)
     float3 PixelStepDown;
 };
 
-RaytracingAccelerationStructure Scene : register(t0);
 RWTexture2D<float4> Output : register(u0);
 
 float3 Hue(float hue)
@@ -42,6 +49,36 @@ float3 FrontFaceColor(bool frontFace)
     return frontFace ? float3(0.0, 1.0, 0.0) : float3(1.0, 0.0, 0.0);
 }
 
+float3 NormalColor(float3 normal)
+{
+    return normal * 0.5 + 0.5;
+}
+
+// scene overlay는 display에 맞게 encode된 화면 위에 섞이므로, linear color는 display처럼 encode해야 texture대로 보인다.
+float3 LinearColor(float3 color)
+{
+    return ApplyDisplayProfile(color, DISPLAY_PLANE_FORMAT);
+}
+
+float3 SurfaceColor(HitSurface surface)
+{
+    if (View == kGeometryNormal)
+        return NormalColor(surface.geometryNormal);
+    if (View == kShadingNormal)
+        return NormalColor(surface.shadingNormal);
+    if (View == kUV0)
+        return float3(frac(surface.uv0), 0.0);
+    if (View == kBaseColor)
+        return LinearColor(surface.baseColor.rgb);
+    if (View == kMetallic)
+        return surface.metallic;
+    if (View == kRoughness)
+        return surface.roughness;
+    if (View == kEmissive)
+        return LinearColor(surface.emissive);
+    return 0.0;
+}
+
 float3 HitColor(RayHit hit)
 {
     if (View == kHitT)
@@ -50,7 +87,7 @@ float3 HitColor(RayHit hit)
         return InstanceColor(hit.instanceIndex);
     if (View == kFrontFace)
         return FrontFaceColor(hit.frontFace);
-    return 0.0;
+    return SurfaceColor(GetHitSurface(hit));
 }
 
 [numthreads(8, 8, 1)]
@@ -64,7 +101,7 @@ void main(uint2 pixel : SV_DispatchThreadID)
 
     float3 color = 0.0;
     RayHit hit;
-    if (TraceClosestHit(Scene, ray, hit))
+    if (TraceClosestHit(ray, hit))
         color = HitColor(hit);
     Output[pixel] = float4(color, 1.0);
 }
