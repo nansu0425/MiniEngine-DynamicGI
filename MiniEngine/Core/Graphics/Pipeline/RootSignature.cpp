@@ -25,6 +25,18 @@ using Microsoft::WRL::ComPtr;
 
 static std::map< size_t, ComPtr<ID3D12RootSignature> > s_RootSignatureHashMap;
 
+// unbounded range가 있는 table은 shader-visible heap을 직접 가리키는 bindless table이다.
+// dynamic descriptor heap은 이런 table을 cache에 담을 수 없으므로 SetDescriptorTable로만 bind한다.
+static bool IsBindlessTable( const D3D12_ROOT_DESCRIPTOR_TABLE& Table )
+{
+    for (UINT Range = 0; Range < Table.NumDescriptorRanges; ++Range)
+    {
+        if (Table.pDescriptorRanges[Range].NumDescriptors == UINT_MAX)
+            return true;
+    }
+    return false;
+}
+
 void RootSignature::DestroyAll(void)
 {
     s_RootSignatureHashMap.clear();
@@ -117,6 +129,9 @@ void RootSignature::Finalize(const std::wstring& name, D3D12_ROOT_SIGNATURE_FLAG
 
             HashCode = Utility::HashState( RootParam.DescriptorTable.pDescriptorRanges,
                 RootParam.DescriptorTable.NumDescriptorRanges, HashCode );
+
+            if (IsBindlessTable(RootParam.DescriptorTable))
+                continue;
 
             // We keep track of sampler descriptor tables separately from CBV_SRV_UAV descriptor tables
             if (RootParam.DescriptorTable.pDescriptorRanges->RangeType == D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER)
