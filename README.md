@@ -44,6 +44,14 @@
 - MIT 처럼 허용하는 license 의 코드는 가져다 쓸 수 있다. 가져온 코드에는 원래의 copyright 와 license 문구를 남긴다.
 - license 가 없거나 재배포를 막는 코드는 사용하지 않는다. 코드가 구현한 idea만 참고한다.
 
+## Rendering 기준
+
+asset 을 해석하고 그리는 방식은 glTF 2.0 spec 을 기준으로 한다. raster, ray tracing, GI 가 같은 기준을 따라야 서로의 결과나 외부 renderer 의 결과를 비교할 때 차이가 기준에서 오지 않는다.
+
+- 기준 spec 은 `references/glTF/specification/2.0/Specification.adoc` 이다. 어느 판인지는 [references/manifest.json](references/manifest.json) 의 `glTF` commit 이 정한다.
+- spec 과 다르게 구현한 곳에는 `glTF spec과 다르다` 로 시작하는 주석으로 무엇이 다른지와 그 이유를 적는다. 이 문구로 검색하면 spec 과 다른 곳을 모두 찾을 수 있다.
+- upstream MiniEngine 의 raster 는 아직 이 기준에 맞추지 않았으므로, raster 에서 spec 과 다른 곳에는 이 주석이 없다.
+
 ## 코드 규칙
 
 - 이 프로젝트에서 작성하거나 수정한 코드의 주석은 한국어로 쓰고, 기술 용어는 영어로 쓴다. upstream 코드의 주석은 그대로 둔다.

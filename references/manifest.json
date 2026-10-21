@@ -40,6 +40,16 @@
         ]
     },
     {
+        "name": "glTF",
+        "url": "https://github.com/KhronosGroup/glTF.git",
+        "commit": "7cee0fcddd5730e90d488bfb5aa2e52171483dde",
+        "sparse": [
+            "/LICENSE.adoc",
+            "/LICENSES/CC-BY-4.0.txt",
+            "/specification/2.0/"
+        ]
+    },
+    {
         "name": "Majercik2019-DDGI.pdf",
         "url": "https://jcgt.org/published/0008/02/01/paper-lowres.pdf",
         "sha256": "4571db6e48ae3f4feaf1fd99b06e45d515672d82daba98dc402ae24d6769ce90"
