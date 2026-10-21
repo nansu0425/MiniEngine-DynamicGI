@@ -35,6 +35,6 @@ cbuffer MaterialConstants : register(b0)
 void main(VSOutput vsOutput)
 {
     float cutoff = f16tof32(flags >> 16);
-    if (baseColorTexture.Sample(baseColorSampler, vsOutput.uv).a < cutoff)
+    if (baseColorFactor.a * baseColorTexture.Sample(baseColorSampler, vsOutput.uv).a < cutoff)
         discard;
 }
