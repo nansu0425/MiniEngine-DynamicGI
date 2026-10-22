@@ -1,5 +1,6 @@
 #include "Model/Raytracing/RaytracingPanel.h"
 #include "Model/Raytracing/RaytracingView.h"
+#include "Model/Raytracing/RayQueryValidation.h"
 #include "Core/pch.h"
 #include "Core/UI/ImGuiLayer.h"
 
@@ -26,5 +27,6 @@ void RaytracingPanel::Update(void)
     ImGuiLayer::ShowPanel("Ray Tracing", s_ShowPanel, []
     {
         ShowSection("View", RaytracingView::ShowSection);
+        ShowSection("Validation", RayQueryValidation::ShowSection);
     });
 }

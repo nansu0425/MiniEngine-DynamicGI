@@ -89,6 +89,7 @@
     <ClInclude Include="Raytracing\RaytracingDebugView.h" />
     <ClInclude Include="Raytracing\RaytracingView.h" />
     <ClInclude Include="Raytracing\RaytracingPanel.h" />
+    <ClInclude Include="Raytracing\RayQueryValidation.h" />
     <ClInclude Include="Raytracing\RayQuerySmokeTest.h" />
     <ClInclude Include="Renderer\Renderer.h" />
     <ClInclude Include="Sponza\SponzaRenderer.h" />
@@ -112,6 +113,7 @@
     <ClCompile Include="Raytracing\RaytracingDebugView.cpp" />
     <ClCompile Include="Raytracing\RaytracingView.cpp" />
     <ClCompile Include="Raytracing\RaytracingPanel.cpp" />
+    <ClCompile Include="Raytracing\RayQueryValidation.cpp" />
     <ClCompile Include="Raytracing\RayQuerySmokeTest.cpp" />
     <ClCompile Include="Renderer\Renderer.cpp" />
     <ClCompile Include="Sponza\SponzaRenderer.cpp" />
@@ -125,6 +127,7 @@
     <None Include="Raytracing\HitSurface.hlsli" />
     <None Include="Raytracing\SurfaceRayOrigin.hlsli" />
     <None Include="Raytracing\CameraRays.hlsli" />
+    <None Include="Raytracing\RayQueryValidationStats.hlsli" />
     <None Include="Sponza\Lighting.hlsli" />
   </ItemGroup>
   <ItemGroup>
@@ -205,6 +208,9 @@
       <ShaderModel>6.5</ShaderModel>
     </FxCompile>
     <FxCompile Include="Raytracing\RaytracingDebugViewCS.hlsl">
+      <ShaderModel>6.5</ShaderModel>
+    </FxCompile>
+    <FxCompile Include="Raytracing\RayQueryValidationCS.hlsl">
       <ShaderModel>6.5</ShaderModel>
     </FxCompile>
   </ItemGroup>

@@ -14,6 +14,7 @@
 * toggle ImGui: F1
 * engine tuning, profiler, scene overlay, ray tracing: ImGui View menu
 * ray tracing debug view: pick one view in the View section of the Ray Tracing panel. Off shows the raster image
+* ray query validation: pick a Validation view and what its Heatmap paints in the View section, then press Capture in the Validation section to read the last frame's counts and p50, p99, max. Fit to Capture sets a metric heatmap's range from the capture
 * select: click an icon in the scene. Click empty space to deselect
 * gizmo mode of the selected object: W translate, E rotate (without holding the right mouse button)
 * sun direction: select the sun icon and rotate it (green ring: azimuth, red ring: elevation). The arrow shows where the light goes

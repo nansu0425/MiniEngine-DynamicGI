@@ -309,6 +309,7 @@ void ModelViewer::Startup( void )
 void ModelViewer::Cleanup( void )
 {
     SceneEditor::RemoveObject(m_Sun);
+    RaytracingView::Shutdown();
     m_RaytracingScene.Destroy();
     m_ModelInst = nullptr;
 
