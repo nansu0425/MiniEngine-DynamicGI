@@ -48,7 +48,7 @@ hit 지점의 조명 계산은 Reference Path Tracer 에서 한다.
 - 조명 (sun, sky, BRDF)
 - skinned mesh, BLAS compaction, TLAS refit, 여러 ModelInstance
 - 투명한 물체 (alpha blend material). 투명한 물체를 shading 할 때 ray 가 어떻게 볼지 정한다.
-- glTF node transform 의 음수 determinant. glTF 는 이때 winding 이 바뀐다고 정하지만 DXR 은 facing 을 object space 에서 정해 instance transform 이 바꾸지 않으므로, mirror 된 single-sided mesh 는 ray 가 반대 면을 cull 한다. Sponza 에는 그런 node 가 없다.
+- glTF node transform 의 음수 determinant. glTF 와 DXR 은 mirror 뒤에도 local 의 front 를 front 로 두지만, raster 는 화면의 winding 으로 정해 mirror 된 mesh 의 앞뒤를 반대로 본다. Sponza 에는 그런 node 가 없다.
 
 ## 뒤로 미룬 검증
 
@@ -56,7 +56,7 @@ PT 전에 하지 않는 검증이다. 그 검증이 필요한 작업을 시작�
 
 - Specular GI: raster depth 로 복원한 위치에서 출발한 ray 의 self-intersection
 - DDGI: 움직이는 instance 에서 매 frame build 한 TLAS 의 depth 비교, ray 종류별 trace 처리량, TLAS 의 PREFER_FAST_TRACE 와 PREFER_FAST_BUILD 비교
-- 두 점 사이의 visibility 를 쓰는 조명 (point light, area light): A 에서 B, B 에서 A 로 본 visibility 의 대칭성
+- 두 점 사이의 visibility 를 쓰는 조명 (point light, area light): single-sided 면이 사이에 없을 때 A 에서 B, B 에서 A 로 본 visibility 의 대칭성
 - PT 와 raster 의 차이가 material 에서 오는지 가려야 할 때: HitSurface 와 raster 의 attribute 비교
 - Sponza 밖의 asset: Khronos glTF-Sample-Assets 로 작업 5 의 3 ~ 5 를 반복
 - 검증 반복이 잦아질 때: command line 실행, report, script 로 자동화
