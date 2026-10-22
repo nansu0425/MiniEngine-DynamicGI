@@ -80,7 +80,7 @@ PixelResult ValidateDepthComparison(uint2 pixel)
     PixelResult result = (PixelResult)0;
 
     // ray를 raster의 near, far plane 사이로 자른다.
-    RayDesc ray = GetCameraRay(Rays, pixel);
+    RayDesc ray = GetRasterSampleRay(Rays, pixel);
     const float cosine = dot(ray.Direction, CameraForward);
     ray.TMin = NearZ / cosine;
     ray.TMax = FarZ / cosine;

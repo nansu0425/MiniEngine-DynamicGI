@@ -142,7 +142,7 @@ void main(uint2 pixel : SV_DispatchThreadID)
 {
     float3 color = 0.0;
     RayHit hit;
-    if (TraceClosestHit(GetCameraRay(Rays, pixel), DebugViewRayFlags(), hit))
+    if (TraceClosestHit(GetRasterSampleRay(Rays, pixel), DebugViewRayFlags(), hit))
         color = HitColor(hit);
     Output[pixel] = float4(color, 1.0);
 }
