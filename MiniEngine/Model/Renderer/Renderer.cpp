@@ -144,7 +144,6 @@ void Renderer::Initialize(void)
     GraphicsPSO CutoutDepthPSO(L"Renderer: Cutout Depth PSO");
     CutoutDepthPSO = DepthOnlyPSO;
     CutoutDepthPSO.SetInputLayout(_countof(posAndUV), posAndUV);
-    CutoutDepthPSO.SetRasterizerState(RasterizerTwoSided);
     CutoutDepthPSO.SetVertexShader(g_pCutoutDepthVS, sizeof(g_pCutoutDepthVS));
     CutoutDepthPSO.SetPixelShader(g_pCutoutDepthPS, sizeof(g_pCutoutDepthPS));
     CutoutDepthPSO.Finalize();
@@ -163,6 +162,26 @@ void Renderer::Initialize(void)
     sm_PSOs.push_back(SkinCutoutDepthPSO);
 
     ASSERT(sm_PSOs.size() == 4);
+
+    // doubleSided material의 Depth PSOs
+
+    DepthOnlyPSO.SetRasterizerState(RasterizerTwoSided);
+    DepthOnlyPSO.Finalize();
+    sm_PSOs.push_back(DepthOnlyPSO);
+
+    CutoutDepthPSO.SetRasterizerState(RasterizerTwoSided);
+    CutoutDepthPSO.Finalize();
+    sm_PSOs.push_back(CutoutDepthPSO);
+
+    SkinDepthOnlyPSO.SetRasterizerState(RasterizerTwoSided);
+    SkinDepthOnlyPSO.Finalize();
+    sm_PSOs.push_back(SkinDepthOnlyPSO);
+
+    SkinCutoutDepthPSO.SetRasterizerState(RasterizerTwoSided);
+    SkinCutoutDepthPSO.Finalize();
+    sm_PSOs.push_back(SkinCutoutDepthPSO);
+
+    ASSERT(sm_PSOs.size() == 8);
 
     // Shadow PSOs
 
@@ -186,7 +205,7 @@ void Renderer::Initialize(void)
     SkinCutoutDepthPSO.Finalize();
     sm_PSOs.push_back(SkinCutoutDepthPSO);
 
-    ASSERT(sm_PSOs.size() == 8);
+    ASSERT(sm_PSOs.size() == 12);
 
     // Default PSO
 
@@ -481,6 +500,7 @@ void MeshSorter::AddMesh( const Mesh& mesh, float distance,
 	bool alphaBlend = (mesh.psoFlags & PSOFlags::kAlphaBlend) == PSOFlags::kAlphaBlend;
     bool alphaTest = (mesh.psoFlags & PSOFlags::kAlphaTest) == PSOFlags::kAlphaTest;
     bool skinned = (mesh.psoFlags & PSOFlags::kHasSkin) == PSOFlags::kHasSkin;
+    bool twoSided = (mesh.psoFlags & PSOFlags::kTwoSided) == PSOFlags::kTwoSided;
     uint64_t depthPSO = (skinned ? 2 : 0) + (alphaTest ? 1 : 0);
 
     union float_or_int { float f; uint32_t u; } dist;
@@ -492,7 +512,7 @@ void MeshSorter::AddMesh( const Mesh& mesh, float distance,
 			return;
 
 		key.passID = kZPass;
-		key.psoIdx = depthPSO + 4;
+		key.psoIdx = depthPSO + 8;
         key.key = dist.u;
 		m_SortKeys.push_back(key.value);
 		m_PassCounts[kZPass]++;
@@ -508,7 +528,7 @@ void MeshSorter::AddMesh( const Mesh& mesh, float distance,
     else if (SeparateZPass || alphaTest)
     {
         key.passID = kZPass;
-        key.psoIdx = depthPSO;
+        key.psoIdx = depthPSO + (twoSided ? 4 : 0);
         key.key = dist.u;
         m_SortKeys.push_back(key.value);
         m_PassCounts[kZPass]++;
