@@ -25,8 +25,9 @@ hit 지점의 조명 계산은 Reference Path Tracer 에서 한다.
       - 고친 뒤 같은 곳에서 다시 잴 수 있게, panel 에 붙여 넣은 Log 한 줄로 camera pose, sun 방향, TAA 를 되돌린다. app 을 다시 실행해도 되돌릴 수 있어야 한다. 해상도와 TAA 를 켰을 때의 jitter 는 되돌릴 수 없으므로 Log 와 다르면 panel 에 표시한다.
       - 집계가 맞는지는 정답을 아는 Ray Hit mode 로 확인한다. hit 와 miss 의 합이 pixel 수와 같고, 멈춘 화면에서 Capture 를 반복하면 같은 값이 나와야 한다. 3 의 category 도 합이 pixel 수와 같아 같은 확인이 되므로 3 에서 Ray Hit mode 를 지운다.
    3. depth 비교: pixel 마다 raster depth 와 ray depth (`t * dot(D, forward)`) 를 비교한다. ray 의 TMin, TMax 는 raster 의 near, far plane 에 맞춘다.
-      - 둘 다 miss, raster 만 hit, ray 만 hit, depth 일치, depth 불일치로 나눈다.
-      - 불일치한 pixel 은 `RAY_FLAG_FORCE_OPAQUE` 로 다시 쏴서 결과가 바뀌면 alpha test 불일치로 따로 센다. raster 의 cutout 은 mip chain 을, ray 는 mip 0 을 읽으므로 alpha test 불일치는 보고만 한다.
+      - 둘 다 miss, raster 만 hit, ray 만 hit, depth 일치, depth 불일치로 나눈다. depth 오차는 raster depth 에 대한 상대 오차다. D32 reverse Z 의 저장 오차와 raster 의 subpixel snap 오차가 거리에 비례하므로, threshold 하나로 가까운 곳과 먼 곳을 같이 판정한다.
+      - hit 가 있는 pixel 은 `RAY_FLAG_FORCE_OPAQUE` 와 `RAY_FLAG_CULL_NON_OPAQUE` 로 한 번씩 더 쏜다. 둘 중 하나라도 맞은 triangle 이 바뀌면 alpha test 가 결과를 정한 pixel 이다. FORCE_OPAQUE 는 ray 가 지나간 cutout 을, CULL_NON_OPAQUE 는 ray 가 맞은 cutout 을 찾는다.
+      - alpha test 가 정한 pixel 은 threshold 를 정할 depth 오차 분포에서 빼고, 그중 불일치는 alpha test 불일치로 따로 센다. raster 의 cutout 은 mip chain 을, ray 는 mip 0 을 읽으므로 alpha test 불일치는 보고만 한다.
       - alpha test 와 무관한 불일치는 raster 의 subpixel snap 때문에 edge 에서 생기는 극소수만 허용한다.
    4. hit 불변식: camera ray 와 5 의 cosine hemisphere ray 가 맞은 곳에서 HitSurface 를 만들고 다음을 어긴 수를 센다. NaN/Inf 와 facing 불일치는 없어야 한다.
       - `surface.position` 과 `O + t * D` 의 거리. hardware 의 t 만 쓰는 3 과 달리 shader 가 vertex 를 읽는 경로를 검증한다. 이 거리의 분포는 `SurfaceRayOrigin` 의 offset 이 position 오차를 덮는지도 보여 준다.

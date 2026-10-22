@@ -9,6 +9,7 @@
 #include "Core/Graphics/Command/CommandContext.h"
 #include "Core/Graphics/Descriptor/DescriptorHeap.h"
 #include "Core/Graphics/Resource/ColorBuffer.h"
+#include "Core/Graphics/Resource/DepthBuffer.h"
 #include "Core/Graphics/Resource/ReadbackBuffer.h"
 
 #include "Output/Model/CompiledShaders/RayQueryValidationCS.h"
@@ -37,10 +38,11 @@ namespace
     };
 
     // category와 metric의 순서는 RayQueryValidationCS.hlsl에서 mode마다 정한 순서와 같다.
+    // Heatmap은 처음에 첫 category를 칠하므로 0이어야 하는 category부터 둔다.
     const ModeDesc kModes[] =
     {
-        // Hit T는 Capture 전에도 값이 범위 밖으로 나가지 않게 ModelViewer camera의 near 1부터 far 10000까지를 칠한다.
-        { "Ray Hit", { "Hit", "Miss" }, { { "Hit T", 0, 14 } } },
+        { "Depth Comparison", { "Depth Mismatch", "Raster Only Hit", "Ray Only Hit", "Alpha Test Mismatch", "Depth Match", "Both Miss" },
+            { { "Depth Error", -24, -8 } } },
     };
     static_assert(_countof(kModes) == RayQueryValidation::kNumModes, "mode 개수가 Mode와 다르다");
 
@@ -102,13 +104,16 @@ namespace
         bool sceneRestored;
     };
 
-    enum RootParameter { kConstants, kScene, kOutputs = kScene + RaytracingScene::kNumRootParameters, kNumRootParameters };
+    enum RootParameter { kConstants, kScene, kRasterDepth = kScene + RaytracingScene::kNumRootParameters, kOutputs, kNumRootParameters };
     RootSignature s_RootSignature;
     ComputePSO s_PSO(L"Ray Query Validation");
 
     ByteAddressBuffer s_Stats;
     ReadbackBuffer s_StatsReadback;
-    // RaytracingScene::Bind가 scene descriptor heap을 bind하므로 output과 stats의 UAV도 그 heap에 이 순서로 둔다.
+    // RaytracingScene::Bind가 scene descriptor heap을 bind하므로 raster depth의 SRV와 output, stats의 UAV도 그 heap에 둔다.
+    // UAV는 output, stats 순서로 붙여 둔다.
+    DescriptorHandle s_RasterDepthSRV;
+    uint32_t s_RasterDepthVersionID = UINT32_MAX;
     DescriptorHandle s_UAVs;
     uint32_t s_OutputVersionID = UINT32_MAX;
 
@@ -134,16 +139,19 @@ namespace
         uint32_t HeatmapItem;
         float HeatmapMinLog2;
         float HeatmapMaxLog2;
+        XMFLOAT3 CameraForward;
+        float NearZ;
+        float FarZ;
     };
 
-    // target은 GPU가 멈춘 동안에만 다시 만들어지므로, 그때 heap의 descriptor를 바로 덮어써도 된다.
-    void UpdateOutputUAV(const ColorBuffer& target)
+    // target과 raster depth는 GPU가 멈춘 동안에만 다시 만들어지므로, 그때 heap의 descriptor를 바로 덮어써도 된다.
+    void UpdateHeapDescriptor(DescriptorHandle heapDescriptor, const GpuResource& resource, D3D12_CPU_DESCRIPTOR_HANDLE view, uint32_t& copiedVersionID)
     {
-        if (s_OutputVersionID == target.GetVersionID())
+        if (copiedVersionID == resource.GetVersionID())
             return;
 
-        g_Device->CopyDescriptorsSimple(1, s_UAVs, target.GetUAV(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-        s_OutputVersionID = target.GetVersionID();
+        g_Device->CopyDescriptorsSimple(1, heapDescriptor, view, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+        copiedVersionID = resource.GetVersionID();
     }
 
     // stats는 Render가 다음에 지울 때까지 바로 앞 frame의 집계를 그대로 갖는다.
@@ -488,6 +496,7 @@ void RayQueryValidation::Initialize(void)
     s_RootSignature.Reset(kNumRootParameters);
     s_RootSignature[kConstants].InitAsConstantBuffer(0);
     RaytracingScene::InitRootParameters(s_RootSignature, kScene);
+    s_RootSignature[kRasterDepth].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 1);
     s_RootSignature[kOutputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 2);
     s_RootSignature.Finalize(L"Ray Query Validation");
 
@@ -498,6 +507,7 @@ void RayQueryValidation::Initialize(void)
     s_Stats.Create(L"Ray Query Validation Stats", sizeof(Stats) / 4, 4);
     s_StatsReadback.Create(L"Ray Query Validation Stats Readback", sizeof(Stats) / 4, 4);
 
+    s_RasterDepthSRV = Renderer::s_TextureHeap.Alloc(1);
     s_UAVs = Renderer::s_TextureHeap.Alloc(2);
     g_Device->CopyDescriptorsSimple(1, s_UAVs + Renderer::s_TextureHeap.GetDescriptorSize(), s_Stats.GetUAV(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 }
@@ -535,9 +545,14 @@ void RayQueryValidation::ShowSection(void)
 }
 
 void RayQueryValidation::Render(ComputeContext& context, Mode mode, const Heatmap& heatmap, const Camera& camera, const D3D12_VIEWPORT& rasterViewport,
-    const RaytracingScene& scene, ColorBuffer& target)
+    DepthBuffer& rasterDepth, const RaytracingScene& scene, ColorBuffer& target)
 {
     ScopedTimer _prof(L"Ray Query Validation", context);
+
+    // shader는 target의 pixel마다 같은 위치의 raster depth를 읽는다.
+    ASSERT(rasterDepth.GetWidth() == target.GetWidth() && rasterDepth.GetHeight() == target.GetHeight());
+    // shader의 depth 식과 miss 판정은 reverse Z와 clear 값 0을 전제로 한다.
+    ASSERT(camera.GetClearDepth() == 0.0f && rasterDepth.GetClearDepth() == 0.0f);
 
     const ModeDesc& desc = kModes[mode];
     Constants constants;
@@ -550,8 +565,12 @@ void RayQueryValidation::Render(ComputeContext& context, Mode mode, const Heatma
     constants.HeatmapItem = heatmap.item;
     constants.HeatmapMinLog2 = (float)heatmap.minExponent;
     constants.HeatmapMaxLog2 = (float)std::max(heatmap.maxExponent, heatmap.minExponent + 1);
+    XMStoreFloat3(&constants.CameraForward, camera.GetForwardVec());
+    constants.NearZ = camera.GetNearClip();
+    constants.FarZ = camera.GetFarClip();
 
-    UpdateOutputUAV(target);
+    UpdateHeapDescriptor(s_RasterDepthSRV, rasterDepth, rasterDepth.GetDepthSRV(), s_RasterDepthVersionID);
+    UpdateHeapDescriptor(s_UAVs, target, target.GetUAV(), s_OutputVersionID);
 
     // ClearUAV는 dynamic descriptor heap을 bind하므로 scene descriptor heap을 bind하는 RaytracingScene::Bind보다 먼저 한다.
     context.TransitionResource(s_Stats, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
@@ -559,11 +578,13 @@ void RayQueryValidation::Render(ComputeContext& context, Mode mode, const Heatma
 
     context.SetRootSignature(s_RootSignature);
     context.SetPipelineState(s_PSO);
+    context.TransitionResource(rasterDepth, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     context.TransitionResource(target, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
     // 이미 UAV state이므로 UAV barrier가 들어가 clear가 끝난 뒤에 shader가 더한다.
     context.TransitionResource(s_Stats, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
     context.SetDynamicConstantBufferView(kConstants, sizeof(constants), &constants);
     scene.Bind(context, kScene);
+    context.SetDescriptorTable(kRasterDepth, s_RasterDepthSRV);
     context.SetDescriptorTable(kOutputs, s_UAVs);
     context.Dispatch2D(target.GetWidth(), target.GetHeight());
 

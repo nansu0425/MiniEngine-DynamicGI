@@ -3,12 +3,19 @@
 #include "Model/Raytracing/RayQueryValidationStats.hlsli"
 
 // RayQueryValidation.h의 Mode와 같은 값이다.
-static const uint kRayHit = 0;
+static const uint kDepthComparison = 0;
 
 // mode마다 category와 metric의 순서는 RayQueryValidation.cpp의 label 순서와 같다.
-static const uint kRayHitHit = 0;
-static const uint kRayHitMiss = 1;
-static const uint kRayHitT = 0;
+static const uint kDepthMismatch = 0;
+static const uint kRasterOnlyHit = 1;
+static const uint kRayOnlyHit = 2;
+static const uint kAlphaTestMismatch = 3;
+static const uint kDepthMatch = 4;
+static const uint kBothMiss = 5;
+static const uint kDepthError = 0;
+
+// 정상적인 raster와 ray의 Depth Error보다 충분히 크면서, 두 sample 위치가 반 pixel 어긋날 때의 오차는 잡는 값이다.
+static const float kDepthMatchTolerance = 1e-4;
 
 cbuffer Constants : register(b0)
 {
@@ -21,7 +28,14 @@ cbuffer Constants : register(b0)
     uint HeatmapItem;
     float HeatmapMinLog2;
     float HeatmapMaxLog2;
+    // raster를 그린 camera
+    float3 CameraForward;
+    float NearZ;
+    float FarZ;
 };
+
+// raster가 그린 depth buffer
+Texture2D<float> RasterDepth : register(t0);
 
 RWTexture2D<float4> Output : register(u0);
 
@@ -35,27 +49,86 @@ struct PixelResult
     float4 metrics;
 };
 
-// camera ray가 맞았는지만 본다. hit와 miss의 합이 pixel 수와 같아야 하므로 집계가 맞는지 확인하는 데 쓴다.
-PixelResult ValidateRayHit(uint2 pixel)
+// Camera.cpp의 reverse Z projection을 거꾸로 풀어, depth buffer 값을 camera의 forward 방향으로 잰 거리로 되돌린다.
+float GetRasterViewDepth(float rasterZ)
+{
+    return NearZ * FarZ / (NearZ + rasterZ * (FarZ - NearZ));
+}
+
+bool HitsSameTriangle(RayDesc ray, uint rayFlags, bool rayHit, RayHit closestHit)
+{
+    RayHit otherHit;
+    if (TraceClosestHit(ray, rayFlags, otherHit) != rayHit)
+        return false;
+    return !rayHit || (otherHit.instanceIndex == closestHit.instanceIndex && otherHit.geometryIndex == closestHit.geometryIndex
+        && otherHit.primitiveIndex == closestHit.primitiveIndex);
+}
+
+// FORCE_OPAQUE는 ray가 지나간 cutout을, CULL_NON_OPAQUE는 ray가 맞은 cutout을 찾는다.
+// 어느 쪽이든 맞은 triangle이 바뀌면 alpha test가 이 ray의 결과를 정한 것이다.
+bool IsDecidedByAlphaTest(RayDesc ray, bool rayHit, RayHit closestHit)
+{
+    return !HitsSameTriangle(ray, kCullSingleSidedBackFaces | RAY_FLAG_FORCE_OPAQUE, rayHit, closestHit)
+        || !HitsSameTriangle(ray, kCullSingleSidedBackFaces | RAY_FLAG_CULL_NON_OPAQUE, rayHit, closestHit);
+}
+
+// raster depth와 ray depth를 같은 pixel에서 비교한다. category는 서로 겹치지 않아 합이 pixel 수와 같다.
+// D32 reverse Z의 저장 오차와 raster의 subpixel snap 오차가 거리에 비례하므로, Depth Error는 raster depth에 대한 상대 오차로 재서
+// threshold 하나로 가까운 곳과 먼 곳을 같이 판정한다.
+PixelResult ValidateDepthComparison(uint2 pixel)
 {
     PixelResult result = (PixelResult)0;
-    RayHit hit;
-    if (!TraceClosestHit(GetCameraRay(Rays, pixel), kCullSingleSidedBackFaces, hit))
+
+    // ray를 raster의 near, far plane 사이로 자른다.
+    RayDesc ray = GetCameraRay(Rays, pixel);
+    const float cosine = dot(ray.Direction, CameraForward);
+    ray.TMin = NearZ / cosine;
+    ray.TMax = FarZ / cosine;
+
+    // depth buffer는 far plane인 0으로 지워진다.
+    const float rasterZ = RasterDepth[pixel];
+    const bool rasterHit = rasterZ != 0.0;
+    RayHit closestHit;
+    const bool rayHit = TraceClosestHit(ray, kCullSingleSidedBackFaces, closestHit);
+    if (!rasterHit && !rayHit)
     {
-        result.categories = 1u << kRayHitMiss;
+        result.categories = 1u << kBothMiss;
         return result;
     }
 
-    result.categories = 1u << kRayHitHit;
-    result.measuredMetrics = 1u << kRayHitT;
-    result.metrics[kRayHitT] = hit.t;
+    const bool decidedByAlphaTest = IsDecidedByAlphaTest(ray, rayHit, closestHit);
+    if (rasterHit && rayHit)
+    {
+        const float rasterDepth = GetRasterViewDepth(rasterZ);
+        const float error = abs(closestHit.t * cosine - rasterDepth) / rasterDepth;
+        // raster의 cutout은 mip chain을, ray는 mip 0을 읽으므로 alpha test가 정한 pixel은 threshold를 정할 분포에서 뺀다.
+        if (!decidedByAlphaTest)
+        {
+            result.measuredMetrics = 1u << kDepthError;
+            result.metrics[kDepthError] = error;
+        }
+        if (error <= kDepthMatchTolerance)
+        {
+            result.categories = 1u << kDepthMatch;
+            return result;
+        }
+    }
+
+    if (decidedByAlphaTest)
+        result.categories = 1u << kAlphaTestMismatch;
+    else if (rasterHit && rayHit)
+        result.categories = 1u << kDepthMismatch;
+    else if (rasterHit)
+        result.categories = 1u << kRasterOnlyHit;
+    else
+        result.categories = 1u << kRayOnlyHit;
     return result;
 }
 
 PixelResult Validate(uint2 pixel)
 {
-    if (Mode == kRayHit)
-        return ValidateRayHit(pixel);
+    if (Mode == kDepthComparison)
+        return ValidateDepthComparison(pixel);
     return (PixelResult)0;
 }
 

@@ -212,7 +212,7 @@ void RaytracingView::ShowSection(void)
     ShowHeatmapOptions();
 }
 
-void RaytracingView::Render(ComputeContext& context, const Math::Camera& camera, const D3D12_VIEWPORT& rasterViewport,
+void RaytracingView::Render(ComputeContext& context, const Math::Camera& camera, const D3D12_VIEWPORT& rasterViewport, DepthBuffer& rasterDepth,
     const RaytracingScene& scene, const Math::Vector3& sunDirection, ColorBuffer& target)
 {
     if (s_Selection.group == kDebug)
@@ -222,6 +222,6 @@ void RaytracingView::Render(ComputeContext& context, const Math::Camera& camera,
     }
     else if (s_Selection.group == kValidation)
     {
-        RayQueryValidation::Render(context, GetValidationMode(), s_Heatmap, camera, rasterViewport, scene, target);
+        RayQueryValidation::Render(context, GetValidationMode(), s_Heatmap, camera, rasterViewport, rasterDepth, scene, target);
     }
 }
