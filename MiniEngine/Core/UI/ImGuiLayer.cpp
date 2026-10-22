@@ -6,6 +6,7 @@
 #include "Core/Graphics/Command/CommandListManager.h"
 #include "Core/Graphics/Descriptor/DescriptorHeap.h"
 #include "Core/Graphics/Resource/BufferManager.h"
+#include "Core/Editor/EditorSettings.h"
 
 #include <imgui.h>
 #include <imgui_impl_dx12.h>
@@ -38,6 +39,43 @@ namespace
     bool s_ShowDemoWindow = false;
     bool s_ShowSceneOverlay = true;
     RECT s_SceneViewport = {};
+
+    // View 메뉴로 여닫는 창의 열림 여부. ShowPanel의 창은 처음 그릴 때 등록된다.
+    std::map<std::string, bool*> s_PanelStates;
+    // editor.ini에서 읽었지만 아직 등록되지 않은 창의 열림 여부
+    std::map<std::string, bool> s_UnregisteredPanelStates;
+
+    void RegisterPanelState(const std::string& name, bool& open)
+    {
+        s_PanelStates[name] = &open;
+        const auto loaded = s_UnregisteredPanelStates.find(name);
+        if (loaded == s_UnregisteredPanelStates.end())
+            return;
+
+        open = loaded->second;
+        s_UnregisteredPanelStates.erase(loaded);
+    }
+
+    void SavePanelStates(EditorSettings::Values& values)
+    {
+        for (const auto& panel : s_UnregisteredPanelStates)
+            values[panel.first] = panel.second ? "1" : "0";
+        for (const auto& panel : s_PanelStates)
+            values[panel.first] = *panel.second ? "1" : "0";
+    }
+
+    void LoadPanelStates(const EditorSettings::Values& values)
+    {
+        for (const auto& value : values)
+        {
+            const bool open = value.second == "1";
+            const auto panel = s_PanelStates.find(value.first);
+            if (panel != s_PanelStates.end())
+                *panel->second = open;
+            else
+                s_UnregisteredPanelStates[value.first] = open;
+        }
+    }
 
     void AllocSrvDescriptor(ImGui_ImplDX12_InitInfo*, D3D12_CPU_DESCRIPTOR_HANDLE* outCpuHandle, D3D12_GPU_DESCRIPTOR_HANDLE* outGpuHandle)
     {
@@ -151,6 +189,9 @@ void ImGuiLayer::Initialize(void)
     initInfo.SrvDescriptorAllocFn = AllocSrvDescriptor;
     initInfo.SrvDescriptorFreeFn = FreeSrvDescriptor;
     ImGui_ImplDX12_Init(&initInfo);
+
+    RegisterPanelState("Scene Overlay", s_ShowSceneOverlay);
+    EditorSettings::Register("Panels", SavePanelStates, LoadPanelStates);
 }
 
 void ImGuiLayer::Shutdown(void)
@@ -265,6 +306,9 @@ void ImGuiLayer::EndSceneGizmo(void)
 
 void ImGuiLayer::ShowPanel(const char* name, bool& open, const std::function<void()>& drawContent)
 {
+    if (s_PanelStates.find(name) == s_PanelStates.end())
+        RegisterPanelState(name, open);
+
     if (!s_Visible)
         return;
 

@@ -2,6 +2,7 @@
 #include "Model/Raytracing/RaytracingDebugView.h"
 #include "Model/Raytracing/RayQueryValidation.h"
 #include "Core/pch.h"
+#include "Core/Editor/EditorSettings.h"
 
 #include <imgui.h>
 
@@ -18,6 +19,8 @@ namespace
         bool operator==(const Selection& other) const { return group == other.group && view == other.view; }
     };
 
+    const char* kSettingsSection = "Ray Tracing View";
+
     Selection s_Selection = { kOff, 0 };
     bool s_ShowSingleSidedBackFaces = false;
     RayQueryValidation::Heatmap s_Heatmap;
@@ -27,13 +30,33 @@ namespace
         return (RayQueryValidation::Mode)s_Selection.view;
     }
 
-    std::string GetSelectionLabel(void)
+    std::string GetSelectionLabel(Selection selection)
     {
-        if (s_Selection.group == kDebug)
-            return std::string("Debug: ") + RaytracingDebugView::GetViewLabel((RaytracingDebugView::View)s_Selection.view);
-        if (s_Selection.group == kValidation)
-            return std::string("Validation: ") + RayQueryValidation::GetModeLabel(GetValidationMode());
+        if (selection.group == kDebug)
+            return std::string("Debug: ") + RaytracingDebugView::GetViewLabel((RaytracingDebugView::View)selection.view);
+        if (selection.group == kValidation)
+            return std::string("Validation: ") + RayQueryValidation::GetModeLabel((RayQueryValidation::Mode)selection.view);
         return "Off";
+    }
+
+    // view의 순서가 바뀌어도 같은 view를 고르도록 label로 찾는다.
+    bool FindSelection(const std::string& label, Selection& selection)
+    {
+        std::vector<Selection> candidates = { { kOff, 0 } };
+        for (int view = 0; view < RaytracingDebugView::kNumViews; ++view)
+            candidates.push_back({ kDebug, view });
+        for (int mode = 0; mode < RayQueryValidation::kNumModes; ++mode)
+            candidates.push_back({ kValidation, mode });
+
+        for (const Selection& candidate : candidates)
+        {
+            if (GetSelectionLabel(candidate) == label)
+            {
+                selection = candidate;
+                return true;
+            }
+        }
+        return false;
     }
 
     void Select(Selection selection)
@@ -57,7 +80,7 @@ namespace
     {
         // section 제목이 이미 View이므로 label 없이 줄 전체를 쓴다.
         ImGui::SetNextItemWidth(-FLT_MIN);
-        if (!ImGui::BeginCombo("##View", GetSelectionLabel().c_str()))
+        if (!ImGui::BeginCombo("##View", GetSelectionLabel(s_Selection).c_str()))
             return;
 
         SelectableView("Off", { kOff, 0 });
@@ -123,16 +146,62 @@ namespace
 
         ImGui::EndDisabled();
     }
+
+    void SaveSettings(EditorSettings::Values& values)
+    {
+        values["View"] = GetSelectionLabel(s_Selection);
+        values["Show Single-Sided Back Faces"] = s_ShowSingleSidedBackFaces ? "1" : "0";
+        if (s_Selection.group != kValidation)
+            return;
+
+        char range[32];
+        sprintf_s(range, "%d,%d", s_Heatmap.minExponent, s_Heatmap.maxExponent);
+        values["Heatmap"] = RayQueryValidation::GetHeatmapItemLabel(GetValidationMode(), s_Heatmap.item);
+        values["Heatmap Range"] = range;
+    }
+
+    void LoadSettings(const EditorSettings::Values& values)
+    {
+        const auto backFaces = values.find("Show Single-Sided Back Faces");
+        if (backFaces != values.end())
+            s_ShowSingleSidedBackFaces = backFaces->second == "1";
+
+        const auto view = values.find("View");
+        Selection selection = { kOff, 0 };
+        if (view == values.end() || !FindSelection(view->second, selection))
+            return;
+        Select(selection);
+        if (selection.group != kValidation)
+            return;
+
+        const RayQueryValidation::Mode mode = GetValidationMode();
+        const auto heatmap = values.find("Heatmap");
+        for (int item = 0; heatmap != values.end() && item < RayQueryValidation::GetNumHeatmapItems(mode); ++item)
+        {
+            if (heatmap->second == RayQueryValidation::GetHeatmapItemLabel(mode, item))
+                s_Heatmap = RayQueryValidation::GetDefaultHeatmap(mode, item);
+        }
+
+        const auto range = values.find("Heatmap Range");
+        int minExponent = 0, maxExponent = 0;
+        if (range != values.end() && sscanf_s(range->second.c_str(), "%d,%d", &minExponent, &maxExponent) == 2)
+        {
+            s_Heatmap.minExponent = minExponent;
+            s_Heatmap.maxExponent = maxExponent;
+        }
+    }
 }
 
 void RaytracingView::Initialize(void)
 {
     RaytracingDebugView::Initialize();
     RayQueryValidation::Initialize();
+    EditorSettings::Register(kSettingsSection, SaveSettings, LoadSettings);
 }
 
 void RaytracingView::Shutdown(void)
 {
+    EditorSettings::Unregister(kSettingsSection);
     RayQueryValidation::Shutdown();
 }
 

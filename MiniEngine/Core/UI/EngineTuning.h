@@ -31,10 +31,11 @@ public:
     virtual void Decrement( void ) { m_ActionCallback(ActionType::Decrement); }
     virtual void Bang( void ) { m_ActionCallback(ActionType::Bang); }
 
-    // 구현은 값을 바꿨으면 Increment, Decrement, Bang 중 하나를 거쳐 action callback을 불러야 한다.
+    // Edit과 SetFromString의 구현은 값을 바꿨으면 Increment, Decrement, Bang 중 하나를 거쳐 action callback을 불러야 한다.
     virtual void Edit( const char* /*label*/ ) {}
+    // ToString이 만든 문자열을 SetFromString이 읽어 editor.ini에 저장한 값을 되돌린다.
     virtual std::string ToString( void ) const { return ""; }
-    virtual void SetValue( FILE* file, const std::string& setting) = 0; //set value read from file
+    virtual void SetFromString( const std::string& text ) = 0;
 
     enum class ActionType
     {
@@ -75,7 +76,7 @@ public:
 
     virtual void Edit( const char* label ) override;
     virtual std::string ToString( void ) const override;
-    virtual void SetValue( FILE* file, const std::string& setting) override;
+    virtual void SetFromString( const std::string& text ) override;
 
 private:
     bool m_Flag;
@@ -93,7 +94,7 @@ public:
 
     virtual void Edit( const char* label ) override;
     virtual std::string ToString( void ) const override;
-    virtual void SetValue( FILE* file, const std::string& setting)  override;
+    virtual void SetFromString( const std::string& text ) override;
 
 protected:
     float Clamp( float val ) { return val > m_MaxValue ? m_MaxValue : val < m_MinValue ? m_MinValue : val; }
@@ -113,7 +114,7 @@ public:
 
     virtual void Edit( const char* label ) override;
     virtual std::string ToString( void ) const override;
-    virtual void SetValue( FILE* file, const std::string& setting ) override;
+    virtual void SetFromString( const std::string& text ) override;
 
 };
 
@@ -129,7 +130,7 @@ public:
 
     virtual void Edit( const char* label ) override;
     virtual std::string ToString( void ) const override;
-    virtual void SetValue( FILE* file, const std::string& setting ) override;
+    virtual void SetFromString( const std::string& text ) override;
 
 protected:
     int32_t Clamp( int32_t val ) { return val > m_MaxValue ? m_MaxValue : val < m_MinValue ? m_MinValue : val; }
@@ -152,7 +153,7 @@ public:
 
     virtual void Edit( const char* label ) override;
     virtual std::string ToString( void ) const override;
-    virtual void SetValue( FILE* file, const std::string& setting ) override;
+    virtual void SetFromString( const std::string& text ) override;
 
     void SetListLength(int32_t listLength) { m_EnumLength = listLength; m_Value = Clamp(m_Value); }
 
@@ -176,7 +177,7 @@ public:
 
     virtual void Edit( const char* label ) override;
     virtual std::string ToString( void ) const override;
-    virtual void SetValue( FILE* file, const std::string& setting ) override;
+    virtual void SetFromString( const std::string& text ) override;
 
     void AddEnum(const std::wstring& enumLabel) { m_EnumLabels.push_back(enumLabel); m_EnumCount++; }
 
@@ -196,7 +197,8 @@ public:
     virtual void Bang( void ) override { m_Callback(m_Arguments); }
 
     virtual void Edit( const char* label ) override;
-    virtual void SetValue( FILE* file, const std::string& setting ) override;
+    // 값이 없으므로 저장하지 않는다.
+    virtual void SetFromString( const std::string& ) override {}
 
 private:
     std::function<void (void*)> m_Callback;

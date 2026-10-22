@@ -19,6 +19,11 @@
 * gizmo mode of the selected object: W translate, E rotate (without holding the right mouse button)
 * sun direction: select the sun icon and rotate it (green ring: azimuth, red ring: elevation). The arrow shows where the light goes
 
+## Editor state:
+On exit, ModelViewer saves its state in the working directory and restores it on the next start.
+* imgui.ini: panel layout, written by ImGui. Delete it to reset the layout
+* editor.ini: window size and position, open panels, engine tuning values, editor camera, ray tracing view. Delete it to reset them
+
 ## glTF 2.0 Support:
 
 Get sample assets from https://github.com/KhronosGroup/glTF-Sample-Models or make your own.

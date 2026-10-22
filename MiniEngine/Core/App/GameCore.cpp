@@ -22,15 +22,65 @@
 #include "Core/Display/Display.h"
 #include "Core/UI/ImGuiLayer.h"
 #include "Core/Utility/CommandLineArg.h"
+#include "Core/Editor/EditorSettings.h"
 #include <shellapi.h>
 
-#pragma comment(lib, "runtimeobject.lib") 
+#pragma comment(lib, "runtimeobject.lib")
 
 namespace GameCore
 {
     using namespace Graphics;
 
     bool gIsSupending = false;
+
+    extern HWND g_hWnd;
+
+    // 창의 크기가 scene 해상도를 정하므로, 다음 실행 때 같은 해상도로 잴 수 있게 창의 배치를 저장한다.
+    namespace WindowSettings
+    {
+        // 창을 닫아 message loop가 끝나면 Save 때 창이 이미 없으므로, 없어지기 직전의 배치를 둔다.
+        WINDOWPLACEMENT s_DestroyedPlacement = { sizeof(WINDOWPLACEMENT) };
+        // editor.ini에서 되돌린, 창이 처음 보일 때의 상태. 없으면 음수다.
+        int s_ShowCommand = -1;
+
+        bool IsMaximized(const WINDOWPLACEMENT& placement)
+        {
+            return placement.showCmd == SW_SHOWMAXIMIZED ||
+                (placement.showCmd == SW_SHOWMINIMIZED && (placement.flags & WPF_RESTORETOMAXIMIZED) != 0);
+        }
+
+        void Save(EditorSettings::Values& values)
+        {
+            WINDOWPLACEMENT placement = { sizeof(placement) };
+            if (!GetWindowPlacement(g_hWnd, &placement))
+                placement = s_DestroyedPlacement;
+
+            const RECT& rect = placement.rcNormalPosition;
+            char text[64];
+            sprintf_s(text, "%ld,%ld,%ld,%ld", rect.left, rect.top, rect.right, rect.bottom);
+            values["Normal Position"] = text;
+            values["Maximized"] = IsMaximized(placement) ? "1" : "0";
+        }
+
+        // 창이 보이기 전에 부르므로 위치만 바꾸고, 최대화는 처음 보일 때 한다.
+        void Load(const EditorSettings::Values& values)
+        {
+            const auto position = values.find("Normal Position");
+            RECT rect = {};
+            if (position == values.end() ||
+                sscanf_s(position->second.c_str(), "%ld,%ld,%ld,%ld", &rect.left, &rect.top, &rect.right, &rect.bottom) != 4)
+                return;
+
+            WINDOWPLACEMENT placement = { sizeof(placement) };
+            GetWindowPlacement(g_hWnd, &placement);
+            placement.rcNormalPosition = rect;
+            placement.showCmd = SW_HIDE;
+            SetWindowPlacement(g_hWnd, &placement);
+
+            const auto maximized = values.find("Maximized");
+            s_ShowCommand = maximized != values.end() && maximized->second == "1" ? SW_SHOWMAXIMIZED : SW_SHOWNORMAL;
+        }
+    }
 
     void InitializeApplication( IGameApp& game )
     {
@@ -43,14 +93,18 @@ namespace GameCore
         GameInput::Initialize();
         EngineTuning::Initialize();
         ImGuiLayer::Initialize();
+        EditorSettings::Register("Window", WindowSettings::Save, WindowSettings::Load);
 
         game.Startup();
+        // Startup이 정한 기본값을 지난 실행의 상태로 덮어쓴다.
+        EditorSettings::Load();
     }
 
     void TerminateApplication( IGameApp& game )
     {
         g_CommandManager.IdleGPU();
 
+        EditorSettings::Save();
         game.Cleanup();
 
         ImGuiLayer::Shutdown();
@@ -144,6 +198,9 @@ namespace GameCore
         InitializeApplication(app);
 
         ShowWindow( g_hWnd, nCmdShow/*SW_SHOWDEFAULT*/ );
+        // 처음 부른 ShowWindow는 app을 실행한 program이 정한 상태를 따를 수 있으므로, 되돌린 상태는 그 뒤에 적용한다.
+        if (WindowSettings::s_ShowCommand >= 0)
+            ShowWindow(g_hWnd, WindowSettings::s_ShowCommand);
 
         do
         {
@@ -193,6 +250,7 @@ namespace GameCore
         }
 
         case WM_DESTROY:
+            GetWindowPlacement(hWnd, &WindowSettings::s_DestroyedPlacement);
             PostQuitMessage(0);
             break;
 

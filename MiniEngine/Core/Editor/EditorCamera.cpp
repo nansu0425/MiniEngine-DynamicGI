@@ -1,5 +1,6 @@
 #include "Core/pch.h"
 #include "Core/Editor/EditorCamera.h"
+#include "Core/Editor/EditorSettings.h"
 #include "Core/Camera/Camera.h"
 #include "Core/App/GameInput.h"
 
@@ -12,9 +13,25 @@ namespace
     constexpr float kMinMoveSpeed = 10.0f;
     constexpr float kMaxMoveSpeed = 100000.0f;
 
+    const char* kSettingsSection = "Editor Camera";
+
     float GetKeyAxis(GameInput::DigitalInput positive, GameInput::DigitalInput negative)
     {
         return (GameInput::IsPressed(positive) ? 1.0f : 0.0f) - (GameInput::IsPressed(negative) ? 1.0f : 0.0f);
+    }
+
+    // float로 다시 읽었을 때 같은 값이 되는 자릿수로 쓴다.
+    std::string FormatFloat(float value)
+    {
+        char text[32];
+        sprintf_s(text, "%.9g", value);
+        return text;
+    }
+
+    bool ReadFloat(const EditorSettings::Values& values, const char* key, float& value)
+    {
+        const auto text = values.find(key);
+        return text != values.end() && sscanf_s(text->second.c_str(), "%f", &value) == 1;
     }
 }
 
@@ -30,6 +47,43 @@ EditorCamera::EditorCamera(Camera& camera, Vector3 worldUp) : CameraController(c
 
     // 처음 속도는 upstream의 FlyingFPSCamera와 같다.
     m_MoveSpeed = 1000.0f;
+
+    EditorSettings::Register(kSettingsSection,
+        [this](EditorSettings::Values& values)
+        {
+            const Vector3 position = m_TargetCamera.GetPosition();
+            values["Position X"] = FormatFloat(position.GetX());
+            values["Position Y"] = FormatFloat(position.GetY());
+            values["Position Z"] = FormatFloat(position.GetZ());
+            values["Heading"] = FormatFloat(m_Heading);
+            values["Pitch"] = FormatFloat(m_Pitch);
+            values["Move Speed"] = FormatFloat(m_MoveSpeed);
+        },
+        [this](const EditorSettings::Values& values)
+        {
+            float x, y, z, heading, pitch, moveSpeed;
+            if (!ReadFloat(values, "Position X", x) || !ReadFloat(values, "Position Y", y) || !ReadFloat(values, "Position Z", z) ||
+                !ReadFloat(values, "Heading", heading) || !ReadFloat(values, "Pitch", pitch) || !ReadFloat(values, "Move Speed", moveSpeed))
+                return;
+
+            m_Heading = heading;
+            m_Pitch = Clamp(pitch, -XM_PIDIV2, XM_PIDIV2);
+            m_MoveSpeed = Clamp(moveSpeed, kMinMoveSpeed, kMaxMoveSpeed);
+            m_TargetCamera.SetTransform(AffineTransform(GetOrientation(), Vector3(x, y, z)));
+            m_TargetCamera.Update();
+        });
+}
+
+EditorCamera::~EditorCamera()
+{
+    EditorSettings::Unregister(kSettingsSection);
+}
+
+Matrix3 EditorCamera::GetOrientation() const
+{
+    return Matrix3(m_WorldEast, m_WorldUp, -m_WorldNorth) *
+        Matrix3::MakeYRotation(m_Heading) *
+        Matrix3::MakeXRotation(m_Pitch);
 }
 
 void EditorCamera::Update(float deltaTime)
@@ -48,10 +102,7 @@ void EditorCamera::Update(float deltaTime)
         m_MoveSpeed = Clamp(m_MoveSpeed * powf(kMoveSpeedStep, scroll), kMinMoveSpeed, kMaxMoveSpeed);
     }
 
-    const Matrix3 orientation =
-        Matrix3(m_WorldEast, m_WorldUp, -m_WorldNorth) *
-        Matrix3::MakeYRotation(m_Heading) *
-        Matrix3::MakeXRotation(m_Pitch);
+    const Matrix3 orientation = GetOrientation();
 
     Vector3 position = m_TargetCamera.GetPosition();
     if (looking)

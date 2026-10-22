@@ -25,6 +25,7 @@ namespace ImGuiLayer
     void EndSceneGizmo(void);
 
     // View 메뉴의 name 항목으로 여닫는 창이다. UI를 숨기면 메뉴 항목과 창 모두 그리지 않는다.
+    // 창이 열려 있는지는 editor.ini에 저장되어 다음 실행 때 되돌아온다.
     void ShowPanel(const char* name, bool& open, const std::function<void()>& drawContent);
 
     // true를 반환하면 window procedure는 그 message를 더 처리하지 않는다.

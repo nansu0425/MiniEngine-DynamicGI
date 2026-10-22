@@ -7,6 +7,8 @@
 
 # ImGui 가 실행 중에 저장하는 window 배치
 imgui.ini
+# 종료할 때 저장하는 editor 상태
+editor.ini
 
 # scripts/fetch-assets.ps1 가 받아 오는 upstream asset
 /MiniEngine/ModelViewer/Sponza/

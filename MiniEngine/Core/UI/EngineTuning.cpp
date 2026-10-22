@@ -14,6 +14,7 @@
 
 #include "Core/pch.h"
 #include "Core/UI/ImGuiLayer.h"
+#include "Core/Editor/EditorSettings.h"
 #include <imgui.h>
 
 using namespace std;
@@ -52,10 +53,11 @@ public:
 
     void ShowChildren( void );
 
-    void SaveToFile( FILE* file, int fileMargin );
-    void LoadSettingsFromFile( FILE* file );
+    // 변수의 key는 root group부터의 경로다. 그래서 변수가 더해지거나 빠져도 나머지 변수의 값은 그대로 되돌린다.
+    void SaveValues( EditorSettings::Values& values, const string& pathPrefix ) const;
+    void LoadValues( const EditorSettings::Values& values, const string& pathPrefix );
 
-    virtual void SetValue( FILE*, const std::string& ) override {}
+    virtual void SetFromString( const std::string& ) override {}
 
     static VariableGroup sm_RootGroup;
 
@@ -92,40 +94,34 @@ void VariableGroup::ShowChildren( void )
     }
 }
 
-void VariableGroup::SaveToFile( FILE* file, int fileMargin )
+void VariableGroup::SaveValues( EditorSettings::Values& values, const string& pathPrefix ) const
 {
-    for (auto iter = m_Children.begin(); iter != m_Children.end(); ++iter)
+    for (const auto& child : m_Children)
     {
-        const char* buffer = (iter->first).c_str();
-
-        VariableGroup* subGroup = dynamic_cast<VariableGroup*>(iter->second);
+        const string path = pathPrefix + child.first;
+        const VariableGroup* subGroup = dynamic_cast<const VariableGroup*>(child.second);
         if (subGroup != nullptr)
-        {		
-            fprintf(file, "%*c + %s ...\r\n", fileMargin, ' ', buffer);
-            subGroup->SaveToFile(file, fileMargin + 5);
-        }
-        else if (dynamic_cast<CallbackTrigger*>(iter->second) == nullptr)
-        {
-            fprintf(file, "%*c %s:  %s\r\n", fileMargin, ' ', buffer, iter->second->ToString().c_str());
-        }		
+            subGroup->SaveValues(values, path + "/");
+        else if (dynamic_cast<const CallbackTrigger*>(child.second) == nullptr)
+            values[path] = child.second->ToString();
     }
 }
 
-void VariableGroup::LoadSettingsFromFile( FILE* file )
+void VariableGroup::LoadValues( const EditorSettings::Values& values, const string& pathPrefix )
 {
-    for (auto iter = m_Children.begin(); iter != m_Children.end(); ++iter)
+    for (const auto& child : m_Children)
     {
-        VariableGroup* subGroup = dynamic_cast<VariableGroup*>(iter->second);
+        const string path = pathPrefix + child.first;
+        VariableGroup* subGroup = dynamic_cast<VariableGroup*>(child.second);
         if (subGroup != nullptr)
         {
-            char skippedLines[100];
-            fscanf_s(file, "%*s %[^\n]", skippedLines, (int)_countof(skippedLines));
-            subGroup->LoadSettingsFromFile(file);
+            subGroup->LoadValues(values, path + "/");
+            continue;
         }
-        else
-        {	
-            iter->second->SetValue(file, iter->first);
-        }
+
+        const auto value = values.find(path);
+        if (value != values.end())
+            child.second->SetFromString(value->second);
     }
 }
 
@@ -183,20 +179,11 @@ std::string BoolVar::ToString( void ) const
     return m_Flag ? "on" : "off";
 } 
 
-void BoolVar::SetValue(FILE* file, const std::string& setting)
-{	
-    std::string pattern = "\n " + setting + ": %s";
-    char valstr[6];
-
-    // Search through the file for an entry that matches this setting's name
-    fscanf_s(file, pattern.c_str(), valstr, _countof(valstr));
-
-    // Look for one of the many affirmations
-    m_Flag = (
-        0 == _stricmp(valstr, "1") ||
-        0 == _stricmp(valstr, "on") ||
-        0 == _stricmp(valstr, "yes") ||
-        0 == _stricmp(valstr, "true") );
+void BoolVar::SetFromString( const std::string& text )
+{
+    const bool flag = text == "on";
+    if (flag != m_Flag)
+        flag ? Increment() : Decrement();
 }
 
 NumVar::NumVar( const std::string& path, float val, float minVal, float maxVal, float stepSize, ActionCallback pfnCallback )
@@ -223,19 +210,22 @@ void NumVar::Edit( const char* label )
 
 std::string NumVar::ToString( void ) const
 {
+    // float로 다시 읽었을 때 같은 값이 되는 자릿수로 쓴다.
     char buf[128];
-    sprintf_s(buf, "%f", m_Value);
+    sprintf_s(buf, "%.9g", m_Value);
     return buf;
-} 
+}
 
-void NumVar::SetValue(FILE* file, const std::string& setting) 
+void NumVar::SetFromString( const std::string& text )
 {
-    std::string scanString = "\n" + setting + ": %f";
-    float valueRead;
-    
-    //If we haven't read correctly, just keep m_Value at default value
-    if (fscanf_s(file, scanString.c_str(), &valueRead))
-        *this = valueRead; 
+    float value;
+    if (sscanf_s(text.c_str(), "%f", &value) != 1)
+        return;
+
+    const float oldValue = m_Value;
+    m_Value = Clamp(value);
+    if (m_Value != oldValue)
+        m_Value > oldValue ? EngineVar::Increment() : EngineVar::Decrement();
 }
 
 #if _MSC_VER < 1800
@@ -279,18 +269,20 @@ void ExpVar::Edit( const char* label )
 std::string ExpVar::ToString( void ) const
 {
     char buf[128];
-    sprintf_s(buf, "%f", (float)*this);
+    sprintf_s(buf, "%.9g", (float)*this);
     return buf;
-} 
+}
 
-void ExpVar::SetValue(FILE* file, const std::string& setting) 
+void ExpVar::SetFromString( const std::string& text )
 {
-    std::string scanString = "\n" + setting + ": %f";
-    float valueRead;
-    
-    //If we haven't read correctly, just keep m_Value at default value
-    if (fscanf_s(file, scanString.c_str(), &valueRead))
-        *this = valueRead;
+    float value;
+    if (sscanf_s(text.c_str(), "%f", &value) != 1)
+        return;
+
+    const float oldExponent = m_Value;
+    *this = value;
+    if (m_Value != oldExponent)
+        m_Value > oldExponent ? EngineVar::Increment() : EngineVar::Decrement();
 }
 
 IntVar::IntVar( const std::string& path, int32_t val, int32_t minVal, int32_t maxVal, int32_t stepSize, ActionCallback pfnCallback )
@@ -322,13 +314,16 @@ std::string IntVar::ToString( void ) const
     return buf;
 } 
 
-void IntVar::SetValue(FILE* file, const std::string& setting) 
+void IntVar::SetFromString( const std::string& text )
 {
-    std::string scanString = "\n" + setting + ": %d";
-    int32_t valueRead;
-    
-    if (fscanf_s(file, scanString.c_str(), &valueRead))
-        *this = valueRead;
+    int32_t value;
+    if (sscanf_s(text.c_str(), "%d", &value) != 1)
+        return;
+
+    const int32_t oldValue = m_Value;
+    m_Value = Clamp(value);
+    if (m_Value != oldValue)
+        m_Value > oldValue ? EngineVar::Increment() : EngineVar::Decrement();
 }
 
 
@@ -356,25 +351,20 @@ std::string EnumVar::ToString( void ) const
     return m_EnumLabels[m_Value];
 } 
 
-void EnumVar::SetValue(FILE* file, const std::string& setting) 
+// 순서가 아닌 label로 찾으므로 항목의 순서가 바뀌어도 같은 항목을 고른다.
+void EnumVar::SetFromString( const std::string& text )
 {
-    std::string scanString = "\n" + setting + ": %[^\n]";
-    char valueRead[14];
-        
-    if (fscanf_s(file, scanString.c_str(), valueRead, _countof(valueRead)) == 1)
+    for (int32_t i = 0; i < m_EnumLength; ++i)
     {
-        std::string valueReadStr = valueRead;
-        valueReadStr = valueReadStr.substr(0, valueReadStr.length() - 1);
+        if (text != m_EnumLabels[i])
+            continue;
 
-        //if we don't find the string, then leave m_EnumLabes[m_Value] as default
-        for(int32_t i = 0; i < m_EnumLength; ++i)
+        if (i != m_Value)
         {
-            if (m_EnumLabels[i] == valueReadStr)
-            {
-                m_Value = i;
-                break;
-            }
+            m_Value = i;
+            EngineVar::Bang();
         }
+        return;
     }
 }
 
@@ -410,27 +400,19 @@ std::string DynamicEnumVar::ToString( void ) const
     return Utility::WideStringToUTF8(m_EnumLabels[m_Value]);
 } 
 
-void DynamicEnumVar::SetValue(FILE* file, const std::string& setting) 
+void DynamicEnumVar::SetFromString( const std::string& text )
 {
-    std::string scanString = "\n" + setting + ": %[^\n]";
-    char valueRead[14];
-
-    if (fscanf_s(file, scanString.c_str(), valueRead, _countof(valueRead)) == 1)
+    for (int32_t i = 0; i < m_EnumCount; ++i)
     {
-        std::string valueReadStr = valueRead;
-        valueReadStr = valueReadStr.substr(0, valueReadStr.length() - 1);
+        if (text != Utility::WideStringToUTF8(m_EnumLabels[i]))
+            continue;
 
-        std::wstring wvalue = Utility::UTF8ToWideString(valueReadStr);
-
-        //if we don't find the string, then leave m_EnumLabes[m_Value] as default
-        for (int32_t i = 0; i < m_EnumCount; ++i)
+        if (i != m_Value)
         {
-            if (m_EnumLabels[i] == wvalue)
-            {
-                m_Value = i;
-                break;
-            }
+            m_Value = i;
+            EngineVar::Bang();
         }
+        return;
     }
 }
 
@@ -448,14 +430,6 @@ void CallbackTrigger::Edit( const char* label )
         Bang();
 }
 
-void CallbackTrigger::SetValue(FILE* file, const std::string& setting) 
-{
-    //Skip over setting without reading anything
-    std::string scanString = "\n" + setting + ": %[^\n]";
-    char skippedLines[100];
-    fscanf_s(file, scanString.c_str(), skippedLines, _countof(skippedLines));
-}
-
 //=====================================================================================================================
 // EngineTuning namespace methods
 
@@ -470,6 +444,9 @@ void EngineTuning::Initialize( void )
     }
     s_UnregisteredCount = -1;
 
+    EditorSettings::Register("Engine Tuning",
+        [](EditorSettings::Values& values) { VariableGroup::sm_RootGroup.SaveValues(values, ""); },
+        [](const EditorSettings::Values& values) { VariableGroup::sm_RootGroup.LoadValues(values, ""); });
 }
 
 void EngineTuning::Update( void )
@@ -479,34 +456,6 @@ void EngineTuning::Update( void )
         VariableGroup::sm_RootGroup.ShowChildren();
     });
 }
-
-/*
-void StartSave(void*)
-{
-    FILE* settingsFile;
-    fopen_s(&settingsFile, "engineTuning.txt", "wb");
-    if (settingsFile != nullptr)
-    {
-        VariableGroup::sm_RootGroup.SaveToFile(settingsFile, 2 );
-        fclose(settingsFile);
-    }
-}
-std::function<void(void*)> StartSaveFunc = StartSave;
-static CallbackTrigger Save("Save Settings", StartSaveFunc, nullptr); 
-
-void StartLoad(void*)
-{
-    FILE* settingsFile;
-    fopen_s(&settingsFile, "engineTuning.txt", "rb");
-    if (settingsFile != nullptr)
-    {
-        VariableGroup::sm_RootGroup.LoadSettingsFromFile(settingsFile);
-        fclose(settingsFile);
-    }
-}
-std::function<void(void*)> StartLoadFunc = StartLoad;
-static CallbackTrigger Load("Load Settings", StartLoadFunc, nullptr); 
-*/
 
 void EngineTuning::AddToVariableGraph( const string& path, EngineVar& var )
 {
