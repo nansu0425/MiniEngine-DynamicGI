@@ -1,11 +1,10 @@
 #include "Model/Raytracing/RaytracingDebugView.h"
 #include "Model/Raytracing/CameraRays.h"
 #include "Model/Raytracing/RaytracingScene.h"
-#include "Model/Renderer/Renderer.h"
+#include "Model/Raytracing/SceneHeapTable.h"
 #include "Core/Camera/Camera.h"
 #include "Core/Graphics/GraphicsCore.h"
 #include "Core/Graphics/Command/CommandContext.h"
-#include "Core/Graphics/Descriptor/DescriptorHeap.h"
 #include "Core/Graphics/Resource/ColorBuffer.h"
 
 #include "Output/Model/CompiledShaders/RaytracingDebugViewCS.h"
@@ -27,9 +26,7 @@ namespace
     RootSignature s_RootSignature;
     ComputePSO s_PSO(L"Raytracing Debug View");
 
-    // RaytracingScene::Bind가 scene descriptor heap을 bind하므로 output UAV도 그 heap에 둔다.
-    DescriptorHandle s_OutputUAV;
-    uint32_t s_OutputVersionID = UINT32_MAX;
+    SceneHeapTable s_OutputUAV;
 
     __declspec(align(16)) struct Constants
     {
@@ -40,16 +37,6 @@ namespace
         uint32_t CullSingleSidedBackFaces;
         XMFLOAT3 SunDirection;
     };
-
-    // target은 GPU가 멈춘 동안에만 다시 만들어지므로, 그때 heap의 descriptor를 바로 덮어써도 된다.
-    void UpdateOutputUAV(const ColorBuffer& target)
-    {
-        if (s_OutputVersionID == target.GetVersionID())
-            return;
-
-        g_Device->CopyDescriptorsSimple(1, s_OutputUAV, target.GetUAV(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-        s_OutputVersionID = target.GetVersionID();
-    }
 }
 
 void RaytracingDebugView::Initialize(void)
@@ -64,7 +51,7 @@ void RaytracingDebugView::Initialize(void)
     s_PSO.SetComputeShader(g_pRaytracingDebugViewCS, sizeof(g_pRaytracingDebugViewCS));
     s_PSO.Finalize();
 
-    s_OutputUAV = Renderer::s_TextureHeap.Alloc(1);
+    s_OutputUAV.Create(1);
 }
 
 const char* RaytracingDebugView::GetViewLabel(View view)
@@ -85,13 +72,13 @@ void RaytracingDebugView::Render(ComputeContext& context, View view, bool cullSi
     constants.CullSingleSidedBackFaces = cullSingleSidedBackFaces;
     XMStoreFloat3(&constants.SunDirection, sunDirection);
 
-    UpdateOutputUAV(target);
+    s_OutputUAV.PointTo(0, target, target.GetUAV());
 
     context.SetRootSignature(s_RootSignature);
     context.SetPipelineState(s_PSO);
     context.TransitionResource(target, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
     context.SetDynamicConstantBufferView(kConstants, sizeof(constants), &constants);
     scene.Bind(context, kScene);
-    context.SetDescriptorTable(kOutput, s_OutputUAV);
+    s_OutputUAV.Bind(context, kOutput);
     context.Dispatch2D(target.GetWidth(), target.GetHeight());
 }

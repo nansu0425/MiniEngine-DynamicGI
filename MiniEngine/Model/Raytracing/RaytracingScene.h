@@ -25,6 +25,7 @@ public:
     void Destroy();
 
     // 이 context의 descriptor heap이 Renderer의 scene descriptor heap으로 바뀌므로 다른 table도 그 heap에서 가리켜야 한다.
+    // ray pass는 자기 resource를 SceneHeapTable로 가리킨다.
     void Bind(ComputeContext& context, UINT firstRootIndex) const;
 
 private:

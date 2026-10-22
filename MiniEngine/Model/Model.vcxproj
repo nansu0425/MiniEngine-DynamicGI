@@ -91,6 +91,7 @@
     <ClInclude Include="Raytracing\RaytracingPanel.h" />
     <ClInclude Include="Raytracing\RayQueryValidation.h" />
     <ClInclude Include="Raytracing\RayQuerySmokeTest.h" />
+    <ClInclude Include="Raytracing\SceneHeapTable.h" />
     <ClInclude Include="Renderer\Renderer.h" />
     <ClInclude Include="Sponza\SponzaRenderer.h" />
     <ClInclude Include="Loader\TextureConvert.h" />
@@ -115,6 +116,7 @@
     <ClCompile Include="Raytracing\RaytracingPanel.cpp" />
     <ClCompile Include="Raytracing\RayQueryValidation.cpp" />
     <ClCompile Include="Raytracing\RayQuerySmokeTest.cpp" />
+    <ClCompile Include="Raytracing\SceneHeapTable.cpp" />
     <ClCompile Include="Renderer\Renderer.cpp" />
     <ClCompile Include="Sponza\SponzaRenderer.cpp" />
     <ClCompile Include="Loader\TextureConvert.cpp" />
