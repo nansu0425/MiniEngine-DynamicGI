@@ -51,12 +51,12 @@ EditorCamera::EditorCamera(Camera& camera, Vector3 worldUp) : CameraController(c
     EditorSettings::Register(kSettingsSection,
         [this](EditorSettings::Values& values)
         {
-            const Vector3 position = m_TargetCamera.GetPosition();
-            values["Position X"] = FormatFloat(position.GetX());
-            values["Position Y"] = FormatFloat(position.GetY());
-            values["Position Z"] = FormatFloat(position.GetZ());
-            values["Heading"] = FormatFloat(m_Heading);
-            values["Pitch"] = FormatFloat(m_Pitch);
+            const Pose pose = GetPose();
+            values["Position X"] = FormatFloat(pose.position.GetX());
+            values["Position Y"] = FormatFloat(pose.position.GetY());
+            values["Position Z"] = FormatFloat(pose.position.GetZ());
+            values["Heading"] = FormatFloat(pose.heading);
+            values["Pitch"] = FormatFloat(pose.pitch);
             values["Move Speed"] = FormatFloat(m_MoveSpeed);
         },
         [this](const EditorSettings::Values& values)
@@ -66,17 +66,27 @@ EditorCamera::EditorCamera(Camera& camera, Vector3 worldUp) : CameraController(c
                 !ReadFloat(values, "Heading", heading) || !ReadFloat(values, "Pitch", pitch) || !ReadFloat(values, "Move Speed", moveSpeed))
                 return;
 
-            m_Heading = heading;
-            m_Pitch = Clamp(pitch, -XM_PIDIV2, XM_PIDIV2);
             m_MoveSpeed = Clamp(moveSpeed, kMinMoveSpeed, kMaxMoveSpeed);
-            m_TargetCamera.SetTransform(AffineTransform(GetOrientation(), Vector3(x, y, z)));
-            m_TargetCamera.Update();
+            SetPose({ Vector3(x, y, z), heading, pitch });
         });
 }
 
 EditorCamera::~EditorCamera()
 {
     EditorSettings::Unregister(kSettingsSection);
+}
+
+EditorCamera::Pose EditorCamera::GetPose() const
+{
+    return { m_TargetCamera.GetPosition(), m_Heading, m_Pitch };
+}
+
+void EditorCamera::SetPose(const Pose& pose)
+{
+    m_Heading = pose.heading;
+    m_Pitch = Clamp(pose.pitch, -XM_PIDIV2, XM_PIDIV2);
+    m_TargetCamera.SetTransform(AffineTransform(GetOrientation(), pose.position));
+    m_TargetCamera.Update();
 }
 
 Matrix3 EditorCamera::GetOrientation() const

@@ -82,12 +82,24 @@ namespace
         float jitterX;
         float jitterY;
         bool taa;
+        // camera와 sun처럼 app이 정한 조건
+        RayQueryValidation::SceneConditions scene;
     };
 
     struct Capture
     {
         ValidatedFrame frame;
         Stats stats;
+    };
+
+    // Restore한 Log 한 줄의 조건 중 Restore가 되돌리지 못하는 것. 지금 상태와 견줘 다른 점을 보여 준다.
+    struct RestoredLine
+    {
+        std::string mode;
+        uint32_t width;
+        uint32_t height;
+        bool taa;
+        bool sceneRestored;
     };
 
     enum RootParameter { kConstants, kScene, kOutputs = kScene + RaytracingScene::kNumRootParameters, kNumRootParameters };
@@ -104,6 +116,13 @@ namespace
     ValidatedFrame s_LastFrame;
     bool s_HasCapture = false;
     Capture s_Capture;
+
+    std::function<void(RayQueryValidation::SceneConditions&)> s_DescribeScene;
+    std::function<bool(const RayQueryValidation::SceneConditions&)> s_RestoreScene;
+    // Restore할 Log 한 줄. Capture하면 그 Capture의 줄로 채운다.
+    char s_RestoreLine[4096] = {};
+    bool s_HasRestored = false;
+    RestoredLine s_Restored;
 
     __declspec(align(16)) struct Constants
     {
@@ -284,6 +303,137 @@ namespace
         ShowCategoryTable(mode, capture.stats);
         ShowMetricTable(mode, capture.stats);
     }
+
+    const char* kLogPrefix = "[Ray Query Validation] ";
+
+    // Capture의 조건과 수치를 "key=value; key=value" 한 줄로 쓴다. 숫자는 다시 읽어도 같은 float가 되는 자릿수로 쓴다.
+    std::string DescribeCapture(const Capture& capture)
+    {
+        const ValidatedFrame& frame = capture.frame;
+        const ModeDesc& mode = kModes[frame.mode];
+        const Stats& stats = capture.stats;
+
+        std::string line = kLogPrefix;
+        const auto add = [&line](const std::string& key, const std::string& value)
+        {
+            if (line.size() > strlen(kLogPrefix))
+                line += "; ";
+            line += key + "=" + value;
+        };
+        char text[256];
+
+        add("mode", mode.label);
+        sprintf_s(text, "%ux%u", frame.width, frame.height);
+        add("size", text);
+        add("taa", frame.taa ? "on" : "off");
+        sprintf_s(text, "%.9g,%.9g", frame.jitterX, frame.jitterY);
+        add("jitter", text);
+        for (const auto& condition : frame.scene)
+            add(condition.first, condition.second);
+
+        add("pixels", std::to_string(stats.pixelCount));
+        for (size_t category = 0; category < mode.categories.size(); ++category)
+            add(mode.categories[category], std::to_string(stats.categoryCounts[category]));
+        for (size_t index = 0; index < mode.metrics.size(); ++index)
+        {
+            const Stats::Metric& metric = stats.metrics[index];
+            const uint64_t samples = CountSamples(metric);
+            float max;
+            std::memcpy(&max, &metric.maxBits, sizeof(max));
+            if (samples == 0)
+                sprintf_s(text, "samples 0");
+            else
+                sprintf_s(text, "samples %llu, p50 %s, p99 %s, max %.9g", samples,
+                    DescribeBin(FindPercentileBin(metric, samples, 0.5)).c_str(), DescribeBin(FindPercentileBin(metric, samples, 0.99)).c_str(), max);
+            add(mode.metrics[index].label, text);
+        }
+        return line;
+    }
+
+    RayQueryValidation::SceneConditions ParseLogLine(const std::string& line)
+    {
+        RayQueryValidation::SceneConditions values;
+        const size_t prefix = line.find(kLogPrefix);
+        size_t start = prefix == std::string::npos ? 0 : prefix + strlen(kLogPrefix);
+        while (start < line.size())
+        {
+            const size_t end = std::min(line.find("; ", start), line.size());
+            const std::string token = line.substr(start, end - start);
+            const size_t separator = token.find('=');
+            if (separator != std::string::npos)
+                values[token.substr(0, separator)] = token.substr(separator + 1);
+            start = end + 2;
+        }
+        return values;
+    }
+
+    // TAA는 직접 되돌리고 camera와 sun은 app에 맡긴다. 해상도와 mode는 사용자가 바꾸도록 차이만 기록한다.
+    void Restore(const std::string& line)
+    {
+        const RayQueryValidation::SceneConditions values = ParseLogLine(line);
+        const auto value = [&values](const char* key)
+        {
+            const auto found = values.find(key);
+            return found != values.end() ? found->second : std::string();
+        };
+
+        s_Restored = {};
+        s_Restored.mode = value("mode");
+        sscanf_s(value("size").c_str(), "%ux%u", &s_Restored.width, &s_Restored.height);
+        s_Restored.taa = value("taa") == "on";
+        if (!value("taa").empty())
+            TemporalEffects::EnableTAA = s_Restored.taa;
+        s_Restored.sceneRestored = s_RestoreScene(values);
+        s_HasRestored = true;
+    }
+
+    // Restore가 되돌리지 못한 조건 중 지금과 다른 것을 알려 준다.
+    void ShowRestoredDifferences(void)
+    {
+        const ImVec4 kWarningColor(1.0f, 0.75f, 0.2f, 1.0f);
+        if (!s_Restored.sceneRestored)
+            ImGui::TextColored(kWarningColor, "Warning: the camera and sun are not restored. The line lacks them.");
+        if (s_Restored.taa)
+            ImGui::TextColored(kWarningColor, "Warning: TAA was on in the line, so its jitter cannot be reproduced.");
+
+        if (!WasLastFrameValidated() || s_Restored.mode != kModes[s_LastFrame.mode].label)
+        {
+            ImGui::TextColored(kWarningColor, "Warning: the line was measured with %s. Pick it in the View section.", s_Restored.mode.c_str());
+            return;
+        }
+        if (s_Restored.width != s_LastFrame.width || s_Restored.height != s_LastFrame.height)
+        {
+            ImGui::TextColored(kWarningColor, "Warning: the resolution is %u x %u in the line but %u x %u now.",
+                s_Restored.width, s_Restored.height, s_LastFrame.width, s_LastFrame.height);
+        }
+    }
+
+    void ShowRestore(void)
+    {
+        ImGui::SeparatorText("Restore");
+        ImGui::SetNextItemWidth(-FLT_MIN);
+        if (ImGui::InputText("##Line", s_RestoreLine, sizeof(s_RestoreLine)))
+            s_HasRestored = false;
+        ImGui::SetItemTooltip("A line printed by Log. Capture fills in its own line.");
+
+        const bool canRestore = s_RestoreScene && s_RestoreLine[0] != '\0';
+        ImGui::BeginDisabled(!canRestore);
+        if (ImGui::Button("Restore"))
+            Restore(s_RestoreLine);
+        ImGui::EndDisabled();
+        ImGui::SetItemTooltip(s_RestoreScene ?
+            "Sets the camera, sun and TAA as in the line. The resolution and the TAA jitter are not restored." :
+            "Needs the editor camera.");
+
+        if (s_HasRestored)
+            ShowRestoredDifferences();
+    }
+}
+
+void RayQueryValidation::SetSceneConditions(const std::function<void(SceneConditions&)>& describe, const std::function<bool(const SceneConditions&)>& restore)
+{
+    s_DescribeScene = describe;
+    s_RestoreScene = restore;
 }
 
 const char* RayQueryValidation::GetModeLabel(Mode mode)
@@ -363,12 +513,25 @@ void RayQueryValidation::ShowSection(void)
     const bool lastFrameValidated = WasLastFrameValidated();
     ImGui::BeginDisabled(!lastFrameValidated);
     if (ImGui::Button("Capture"))
+    {
         CaptureLastFrame();
+        strncpy_s(s_RestoreLine, DescribeCapture(s_Capture).c_str(), _TRUNCATE);
+        s_HasRestored = false;
+    }
     ImGui::EndDisabled();
     ImGui::SetItemTooltip(lastFrameValidated ? "Reads the stats of the last frame." : "Pick a Validation view in the View section.");
 
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!s_HasCapture);
+    if (ImGui::Button("Log"))
+        Utility::Print((DescribeCapture(s_Capture) + "\n").c_str());
+    ImGui::EndDisabled();
+    ImGui::SetItemTooltip("Prints the capture with its camera, sun, TAA and resolution as one line to the Output window.");
+
     if (s_HasCapture)
         ShowCapture(s_Capture);
+
+    ShowRestore();
 }
 
 void RayQueryValidation::Render(ComputeContext& context, Mode mode, const Heatmap& heatmap, const Camera& camera, const D3D12_VIEWPORT& rasterViewport,
@@ -406,5 +569,8 @@ void RayQueryValidation::Render(ComputeContext& context, Mode mode, const Heatma
 
     s_LastFrame = { GetFrameCount(), mode, target.GetWidth(), target.GetHeight(),
         rasterViewport.TopLeftX, rasterViewport.TopLeftY, TemporalEffects::EnableTAA };
+    // Capture는 다음 frame에 읽으므로 그 사이에 camera가 움직여도 이 frame의 조건이 남도록 지금 받아 둔다.
+    if (s_DescribeScene)
+        s_DescribeScene(s_LastFrame.scene);
     s_HasValidatedFrame = true;
 }

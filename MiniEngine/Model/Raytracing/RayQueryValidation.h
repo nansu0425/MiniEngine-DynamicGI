@@ -1,5 +1,9 @@
 #pragma once
 
+#include <functional>
+#include <map>
+#include <string>
+
 class ComputeContext;
 class ColorBuffer;
 class RaytracingScene;
@@ -40,9 +44,16 @@ namespace RayQueryValidation
     // 위 1%는 가장 짙은 색이 되어 눈에 띈다.
     bool FitHeatmapToCapture(Mode mode, Heatmap& heatmap);
 
+    // Log가 수치와 함께 한 줄에 찍고 Restore가 그 줄에서 되돌리는 장면의 조건. key와 value에는 '='와 ';'를 쓰지 않는다.
+    typedef std::map<std::string, std::string> SceneConditions;
+    // camera와 sun처럼 app이 가진 조건은 app이 정한다. restore는 필요한 key가 없으면 false를 돌려준다.
+    // 정하지 않으면 Restore는 비활성이다.
+    void SetSceneConditions(const std::function<void(SceneConditions&)>& describe, const std::function<bool(const SceneConditions&)>& restore);
+
     void Initialize(void);
     void Shutdown(void);
-    // Ray Tracing panel의 Validation section 내용. Capture는 바로 앞 frame의 집계를 읽어 보여 준다.
+    // Ray Tracing panel의 Validation section 내용. Capture는 바로 앞 frame의 집계를 읽어 보여 주고,
+    // Log는 그 수치를 측정 조건과 함께 한 줄로 찍으며, Restore는 그 한 줄의 조건으로 되돌린다.
     void ShowSection(void);
     // camera ray는 rasterViewport로 그린 raster의 sample 위치를 지난다.
     void Render(ComputeContext& context, Mode mode, const Heatmap& heatmap, const Math::Camera& camera, const D3D12_VIEWPORT& rasterViewport,

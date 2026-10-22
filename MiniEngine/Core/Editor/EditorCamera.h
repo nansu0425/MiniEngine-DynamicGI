@@ -14,6 +14,17 @@ public:
 
     virtual void Update(float deltaTime) override;
 
+    // heading은 world up을 축으로 돈 각도, pitch는 수평에서 올려다본 각도다.
+    struct Pose
+    {
+        Math::Vector3 position;
+        float heading;
+        float pitch;
+    };
+    Pose GetPose() const;
+    // Update를 기다리지 않고 camera에 바로 적용해, 같은 frame에 그리는 것부터 새 pose로 보게 한다.
+    void SetPose(const Pose& pose);
+
 private:
     Math::Matrix3 GetOrientation() const;
 

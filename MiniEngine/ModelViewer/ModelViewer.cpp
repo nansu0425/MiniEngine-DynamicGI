@@ -30,6 +30,7 @@
 #include "Model/Raytracing/RaytracingScene.h"
 #include "Model/Raytracing/RaytracingView.h"
 #include "Model/Raytracing/RaytracingPanel.h"
+#include "Model/Raytracing/RayQueryValidation.h"
 #include "Model/Loader/glTF.h"
 #include "Model/Renderer/Renderer.h"
 #include "Model/Model.h"
@@ -107,6 +108,48 @@ Vector3 GetSunDirection()
     float cosphi = cosf(g_SunInclination * 3.14159f * 0.5f);
     float sinphi = sinf(g_SunInclination * 3.14159f * 0.5f);
     return Normalize(Vector3( costheta * cosphi, sinphi, sintheta * cosphi ));
+}
+
+// 검증의 Log 한 줄에 찍는 camera와 sun. 같은 화면으로 되돌릴 수 있게 방향으로 바꾸지 않고 저장된 값을 그대로 쓴다.
+void DescribeScene(const EditorCamera& camera, RayQueryValidation::SceneConditions& conditions)
+{
+    const EditorCamera::Pose pose = camera.GetPose();
+    char text[96];
+    sprintf_s(text, "%.9g,%.9g,%.9g", (float)pose.position.GetX(), (float)pose.position.GetY(), (float)pose.position.GetZ());
+    conditions["camera"] = text;
+    sprintf_s(text, "%.9g", pose.heading);
+    conditions["heading"] = text;
+    sprintf_s(text, "%.9g", pose.pitch);
+    conditions["pitch"] = text;
+    sprintf_s(text, "%.9g", (float)g_SunOrientation);
+    conditions["sun orientation"] = text;
+    sprintf_s(text, "%.9g", (float)g_SunInclination);
+    conditions["sun inclination"] = text;
+}
+
+bool ReadCondition(const RayQueryValidation::SceneConditions& conditions, const char* key, float& value)
+{
+    const auto text = conditions.find(key);
+    return text != conditions.end() && sscanf_s(text->second.c_str(), "%f", &value) == 1;
+}
+
+bool ReadCondition(const RayQueryValidation::SceneConditions& conditions, const char* key, float& x, float& y, float& z)
+{
+    const auto text = conditions.find(key);
+    return text != conditions.end() && sscanf_s(text->second.c_str(), "%f,%f,%f", &x, &y, &z) == 3;
+}
+
+bool RestoreScene(EditorCamera& camera, const RayQueryValidation::SceneConditions& conditions)
+{
+    float x, y, z, heading, pitch, orientation, inclination;
+    if (!ReadCondition(conditions, "camera", x, y, z) || !ReadCondition(conditions, "heading", heading) || !ReadCondition(conditions, "pitch", pitch) ||
+        !ReadCondition(conditions, "sun orientation", orientation) || !ReadCondition(conditions, "sun inclination", inclination))
+        return false;
+
+    camera.SetPose({ Vector3(x, y, z), heading, pitch });
+    g_SunOrientation = orientation;
+    g_SunInclination = inclination;
+    return true;
 }
 
 void DrawArrow(ImDrawList& drawList, ImVec2 from, ImVec2 to, ImU32 color, float thickness)
@@ -299,7 +342,14 @@ void ModelViewer::Startup( void )
 
     m_Camera.SetZRange(1.0f, 10000.0f);
     if (gltfFileName.size() == 0)
-        m_CameraController.reset(new EditorCamera(m_Camera, Vector3(kYUnitVector)));
+    {
+        EditorCamera* editorCamera = new EditorCamera(m_Camera, Vector3(kYUnitVector));
+        m_CameraController.reset(editorCamera);
+        // OrbitCamera는 pose를 정할 수 없으므로 검증의 Restore는 EditorCamera를 쓸 때만 된다.
+        RayQueryValidation::SetSceneConditions(
+            [editorCamera](RayQueryValidation::SceneConditions& conditions) { DescribeScene(*editorCamera, conditions); },
+            [editorCamera](const RayQueryValidation::SceneConditions& conditions) { return RestoreScene(*editorCamera, conditions); });
+    }
     else
         m_CameraController.reset(new OrbitCamera(m_Camera, m_ModelInst.GetBoundingSphere(), Vector3(kYUnitVector)));
 
