@@ -72,6 +72,21 @@ namespace Renderer
     DescriptorHandle m_CommonTextures;
 }
 
+namespace
+{
+    // sm_PSOs의 앞쪽에 고정한 depth와 shadow PSO의 배치다. GetPSO는 color PSO를 그 뒤에 붙인다.
+    enum DepthPass { kDepthPrePass, kShadowPass, kNumDepthPasses };
+    enum CullMode { kCullBack, kCullFront, kCullNone, kNumCullModes };
+    const uint32_t kNumDepthTemplates = 4;
+    const uint32_t kNumDepthPSOs = kNumDepthPasses * kNumCullModes * kNumDepthTemplates;
+
+    uint32_t DepthPSOIndex(DepthPass pass, CullMode cull, bool skinned, bool alphaTest)
+    {
+        uint32_t depthTemplate = (skinned ? 2 : 0) + (alphaTest ? 1 : 0);
+        return (pass * kNumCullModes + cull) * kNumDepthTemplates + depthTemplate;
+    }
+}
+
 void Renderer::Initialize(void)
 {
     if (s_Initialized)
@@ -131,81 +146,58 @@ void Renderer::Initialize(void)
 
     GraphicsPSO DepthOnlyPSO(L"Renderer: Depth Only PSO");
     DepthOnlyPSO.SetRootSignature(m_RootSig);
-    DepthOnlyPSO.SetRasterizerState(RasterizerDefault);
     DepthOnlyPSO.SetBlendState(BlendDisable);
     DepthOnlyPSO.SetDepthStencilState(DepthStateReadWrite);
     DepthOnlyPSO.SetInputLayout(_countof(posOnly), posOnly);
     DepthOnlyPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
-    DepthOnlyPSO.SetRenderTargetFormats(0, nullptr, DepthFormat);
     DepthOnlyPSO.SetVertexShader(g_pDepthOnlyVS, sizeof(g_pDepthOnlyVS));
-    DepthOnlyPSO.Finalize();
-    sm_PSOs.push_back(DepthOnlyPSO);
 
     GraphicsPSO CutoutDepthPSO(L"Renderer: Cutout Depth PSO");
     CutoutDepthPSO = DepthOnlyPSO;
     CutoutDepthPSO.SetInputLayout(_countof(posAndUV), posAndUV);
     CutoutDepthPSO.SetVertexShader(g_pCutoutDepthVS, sizeof(g_pCutoutDepthVS));
     CutoutDepthPSO.SetPixelShader(g_pCutoutDepthPS, sizeof(g_pCutoutDepthPS));
-    CutoutDepthPSO.Finalize();
-    sm_PSOs.push_back(CutoutDepthPSO);
 
     GraphicsPSO SkinDepthOnlyPSO = DepthOnlyPSO;
     SkinDepthOnlyPSO.SetInputLayout(_countof(skinPos), skinPos);
     SkinDepthOnlyPSO.SetVertexShader(g_pDepthOnlySkinVS, sizeof(g_pDepthOnlySkinVS));
-    SkinDepthOnlyPSO.Finalize();
-    sm_PSOs.push_back(SkinDepthOnlyPSO);
 
     GraphicsPSO SkinCutoutDepthPSO = CutoutDepthPSO;
     SkinCutoutDepthPSO.SetInputLayout(_countof(skinPosAndUV), skinPosAndUV);
     SkinCutoutDepthPSO.SetVertexShader(g_pCutoutDepthSkinVS, sizeof(g_pCutoutDepthSkinVS));
-    SkinCutoutDepthPSO.Finalize();
-    sm_PSOs.push_back(SkinCutoutDepthPSO);
 
-    ASSERT(sm_PSOs.size() == 4);
+    const GraphicsPSO* DepthTemplates[2][2] =
+    {
+        { &DepthOnlyPSO, &CutoutDepthPSO },
+        { &SkinDepthOnlyPSO, &SkinCutoutDepthPSO },
+    };
+    const D3D12_RASTERIZER_DESC* DepthRasterizers[kNumDepthPasses][kNumCullModes] =
+    {
+        { &RasterizerDefault, &RasterizerCullFront, &RasterizerTwoSided },
+        { &RasterizerShadow, &RasterizerShadowCullFront, &RasterizerShadowTwoSided },
+    };
+    const DXGI_FORMAT DepthTargetFormats[kNumDepthPasses] = { DepthFormat, g_ShadowBuffer.GetFormat() };
 
-    // doubleSided material의 Depth PSOs
-
-    DepthOnlyPSO.SetRasterizerState(RasterizerTwoSided);
-    DepthOnlyPSO.Finalize();
-    sm_PSOs.push_back(DepthOnlyPSO);
-
-    CutoutDepthPSO.SetRasterizerState(RasterizerTwoSided);
-    CutoutDepthPSO.Finalize();
-    sm_PSOs.push_back(CutoutDepthPSO);
-
-    SkinDepthOnlyPSO.SetRasterizerState(RasterizerTwoSided);
-    SkinDepthOnlyPSO.Finalize();
-    sm_PSOs.push_back(SkinDepthOnlyPSO);
-
-    SkinCutoutDepthPSO.SetRasterizerState(RasterizerTwoSided);
-    SkinCutoutDepthPSO.Finalize();
-    sm_PSOs.push_back(SkinCutoutDepthPSO);
-
-    ASSERT(sm_PSOs.size() == 8);
-
-    // Shadow PSOs
-
-    DepthOnlyPSO.SetRasterizerState(RasterizerShadow);
-    DepthOnlyPSO.SetRenderTargetFormats(0, nullptr, g_ShadowBuffer.GetFormat());
-    DepthOnlyPSO.Finalize();
-    sm_PSOs.push_back(DepthOnlyPSO);
-
-    CutoutDepthPSO.SetRasterizerState(RasterizerShadowTwoSided);
-    CutoutDepthPSO.SetRenderTargetFormats(0, nullptr, g_ShadowBuffer.GetFormat());
-    CutoutDepthPSO.Finalize();
-    sm_PSOs.push_back(CutoutDepthPSO);
-
-    SkinDepthOnlyPSO.SetRasterizerState(RasterizerShadow);
-    SkinDepthOnlyPSO.SetRenderTargetFormats(0, nullptr, g_ShadowBuffer.GetFormat());
-    SkinDepthOnlyPSO.Finalize();
-    sm_PSOs.push_back(SkinDepthOnlyPSO);
-
-    SkinCutoutDepthPSO.SetRasterizerState(RasterizerShadowTwoSided);
-    SkinCutoutDepthPSO.SetRenderTargetFormats(0, nullptr, g_ShadowBuffer.GetFormat());
-    SkinCutoutDepthPSO.Finalize();
-    sm_PSOs.push_back(SkinCutoutDepthPSO);
-
-    ASSERT(sm_PSOs.size() == 12);
+    sm_PSOs.resize(kNumDepthPSOs);
+    for (uint32_t pass = 0; pass < kNumDepthPasses; ++pass)
+    {
+        ASSERT(DepthTargetFormats[pass] != DXGI_FORMAT_UNKNOWN);
+        for (uint32_t cull = 0; cull < kNumCullModes; ++cull)
+        {
+            ASSERT(DepthRasterizers[pass][cull] != nullptr);
+            for (bool skinned : { false, true })
+            {
+                for (bool alphaTest : { false, true })
+                {
+                    GraphicsPSO DepthPSO = *DepthTemplates[skinned][alphaTest];
+                    DepthPSO.SetRasterizerState(*DepthRasterizers[pass][cull]);
+                    DepthPSO.SetRenderTargetFormats(0, nullptr, DepthTargetFormats[pass]);
+                    DepthPSO.Finalize();
+                    sm_PSOs[DepthPSOIndex((DepthPass)pass, (CullMode)cull, skinned, alphaTest)] = DepthPSO;
+                }
+            }
+        }
+    }
 
     // Default PSO
 
@@ -501,7 +493,6 @@ void MeshSorter::AddMesh( const Mesh& mesh, float distance,
     bool alphaTest = (mesh.psoFlags & PSOFlags::kAlphaTest) == PSOFlags::kAlphaTest;
     bool skinned = (mesh.psoFlags & PSOFlags::kHasSkin) == PSOFlags::kHasSkin;
     bool twoSided = (mesh.psoFlags & PSOFlags::kTwoSided) == PSOFlags::kTwoSided;
-    uint64_t depthPSO = (skinned ? 2 : 0) + (alphaTest ? 1 : 0);
 
     union float_or_int { float f; uint32_t u; } dist;
     dist.f = Max(distance, 0.0f);
@@ -512,7 +503,8 @@ void MeshSorter::AddMesh( const Mesh& mesh, float distance,
 			return;
 
 		key.passID = kZPass;
-		key.psoIdx = depthPSO + 8;
+		// single-sided material의 앞면을 cull하는 기준은 README.md의 "camera 밖에서 본 doubleSided"다.
+		key.psoIdx = DepthPSOIndex(kShadowPass, twoSided ? kCullNone : kCullFront, skinned, alphaTest);
         key.key = dist.u;
 		m_SortKeys.push_back(key.value);
 		m_PassCounts[kZPass]++;
@@ -528,7 +520,7 @@ void MeshSorter::AddMesh( const Mesh& mesh, float distance,
     else if (SeparateZPass || alphaTest)
     {
         key.passID = kZPass;
-        key.psoIdx = depthPSO + (twoSided ? 4 : 0);
+        key.psoIdx = DepthPSOIndex(kDepthPrePass, twoSided ? kCullNone : kCullBack, skinned, alphaTest);
         key.key = dist.u;
         m_SortKeys.push_back(key.value);
         m_PassCounts[kZPass]++;

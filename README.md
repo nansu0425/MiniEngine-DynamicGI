@@ -52,6 +52,18 @@ asset 을 해석하고 그리는 방식은 glTF 2.0 spec 을 기준으로 한다
 - spec 과 다르게 구현한 곳에는 `glTF spec과 다르다` 로 시작하는 주석으로 무엇이 다른지와 그 이유를 적는다. 이 문구로 검색하면 spec 과 다른 곳을 모두 찾을 수 있다.
 - upstream MiniEngine 의 raster 는 아직 이 기준에 맞추지 않았으므로, raster 에서 spec 과 다른 곳에는 이 주석이 없다.
 
+### camera 밖에서 본 doubleSided
+
+spec 의 doubleSided 는 camera 에서 그릴 때의 결과만 정하고, shadow 나 GI 처럼 camera 가 아닌 곳에서 본 결과는 정하지 않는다. 이 repo 는 doubleSided 를 한 시점에서 무엇이 보이는지의 규칙으로 읽고, 무엇이 보이는지나 가려졌는지를 구하는 query 의 시점에 같은 규칙을 적용한다.
+
+- ray 를 쏘는 query 의 시점은 ray 의 출발점이다. 출발점에서 본 single-sided material 의 뒷면은 없는 것으로 친다. camera ray, reflection ray, path tracing 의 path ray 가 모두 그렇다.
+- 두 점 사이의 visibility 는 shading 하는 점에서 상대 점이 보이는지이고, ray 는 shading 하는 점에서 쏜다. single-sided 면이 사이에 있으면 반대 방향으로 쏜 결과와 다를 수 있다.
+- shading 하는 점이 놓인 면이 geometric normal 로 상대 점을 등지면 가려진 것으로 친다. 그 점에서 출발한 ray 는 바로 그 면을 앞에서 지나기 때문이다. normal map 을 적용한 shading normal 이 상대 점을 향해도 같다.
+- closest hit 와 visibility 가 같은 규칙을 따르므로 같은 ray 에서 둘이 보는 면이 같다. path tracing 의 MIS 처럼 두 query 의 결과를 섞는 곳이 이것에 기댄다.
+- raster 의 shadow map 은 light 에서 보므로, shading 하는 점에서 본 결과와 같도록 single-sided material 의 앞면을 cull 한다.
+- 뒷면에 맞았는지를 알려는 query 는 cull 하지 않는다. DDGI probe 가 벽 안에 있는지 보는 ray 와, debug view 가 culling 을 끄고 보는 view 가 그렇다.
+- 모든 ray 를 양면으로 두고 camera 에서만 cull 하는 방식은 고르지 않았다. ray 가 single-sided 의 뒷면에 맞으면 그 면을 shading 해야 하는데, spec 은 그 뒷면이 어떻게 보이는지 정하지 않는다.
+
 ## 코드 규칙
 
 - 이 프로젝트에서 작성하거나 수정한 코드의 주석은 한국어로 쓰고, 기술 용어는 영어로 쓴다. upstream 코드의 주석은 그대로 둔다.

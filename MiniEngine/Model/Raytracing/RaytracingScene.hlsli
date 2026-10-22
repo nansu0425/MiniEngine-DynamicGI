@@ -153,9 +153,8 @@ bool IsOpaqueAt(uint instanceIndex, uint geometryIndex, uint primitiveIndex, flo
     return alpha >= f16tof32(hitTriangle.material.flags >> 16);
 }
 
-// glTF spec은 doubleSided가 아닌 material의 뒷면을 그리지 않는다. 이 culling을 모든 ray에 적용해 그런 뒷면은 ray가 지나가게 한다.
-// spec은 camera에서 본 결과만 정하므로 camera ray가 아닌 ray에까지 적용하는 것은 이 repo의 선택이다.
-// doubleSided material의 BLAS instance는 RaytracingScene이 culling을 끈다. DDGI의 probe처럼 뒷면에 맞았는지 알아야 하는 query는 이 flag를 빼고 쏜다.
+// 어느 query가 이 flag로 쏘는지는 README.md의 "camera 밖에서 본 doubleSided"가 정한다.
+// doubleSided material의 BLAS instance는 RaytracingScene이 culling을 끈다.
 static const uint kCullSingleSidedBackFaces = RAY_FLAG_CULL_BACK_FACING_TRIANGLES;
 
 // rayFlags는 kCullSingleSidedBackFaces처럼 query마다 고르는 ray flag다.

@@ -66,9 +66,11 @@ namespace Graphics
     D3D12_RASTERIZER_DESC RasterizerDefaultCwMsaa;
     D3D12_RASTERIZER_DESC RasterizerTwoSided;
     D3D12_RASTERIZER_DESC RasterizerTwoSidedMsaa;
+    D3D12_RASTERIZER_DESC RasterizerCullFront;
     D3D12_RASTERIZER_DESC RasterizerShadow;
     D3D12_RASTERIZER_DESC RasterizerShadowCW;
     D3D12_RASTERIZER_DESC RasterizerShadowTwoSided;
+    D3D12_RASTERIZER_DESC RasterizerShadowCullFront;
 
     D3D12_BLEND_DESC BlendNoColorWrite;
     D3D12_BLEND_DESC BlendDisable;
@@ -189,6 +191,9 @@ void Graphics::InitializeCommonState(void)
     RasterizerTwoSidedMsaa = RasterizerTwoSided;
     RasterizerTwoSidedMsaa.MultisampleEnable = TRUE;
 
+    RasterizerCullFront = RasterizerDefault;
+    RasterizerCullFront.CullMode = D3D12_CULL_MODE_FRONT;
+
     // Shadows need their own rasterizer state so we can reverse the winding of faces
     RasterizerShadow = RasterizerDefault;
     //RasterizerShadow.CullMode = D3D12_CULL_FRONT;  // Hacked here rather than fixing the content
@@ -197,6 +202,9 @@ void Graphics::InitializeCommonState(void)
 
     RasterizerShadowTwoSided = RasterizerShadow;
     RasterizerShadowTwoSided.CullMode = D3D12_CULL_MODE_NONE;
+
+    RasterizerShadowCullFront = RasterizerShadow;
+    RasterizerShadowCullFront.CullMode = D3D12_CULL_MODE_FRONT;
 
     RasterizerShadowCW = RasterizerShadow;
     RasterizerShadowCW.FrontCounterClockwise = FALSE;

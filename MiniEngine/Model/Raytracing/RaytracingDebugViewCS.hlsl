@@ -88,7 +88,7 @@ uint DebugViewRayFlags()
     return CullSingleSidedBackFaces != 0 ? kCullSingleSidedBackFaces : RAY_FLAG_NONE;
 }
 
-// 면이 sun을 등지면 그 면이 sun을 가리므로 ray를 쏠 필요가 없어 false를 돌려준다.
+// 면이 sun을 가리는지는 README.md의 "camera 밖에서 본 doubleSided"가 정한다. 면이 sun을 가리면 ray를 쏠 필요가 없어 false를 돌려준다.
 bool DescribeSunRay(HitSurface surface, out RayDesc ray)
 {
     ray.Origin = SurfaceRayOrigin(surface.position, surface.geometryNormal);

@@ -239,6 +239,16 @@ float3 ComputeNormal(VSOutput vsOutput)
 #endif
 }
 
+// 면이 sun을 가리는지는 README.md의 "camera 밖에서 본 doubleSided"가 정한다.
+// vertex normal은 면을 따라 휘므로 면의 방향은 worldPos의 미분으로 구한다.
+bool SurfaceOccludesSun(float3 worldPos, float3 V)
+{
+    float3 geometryNormal = cross(ddx(worldPos), ddy(worldPos));
+    if (dot(geometryNormal, V) < 0.0)
+        geometryNormal = -geometryNormal;
+    return dot(geometryNormal, SunDirection) <= 0.0;
+}
+
 [RootSignature(Renderer_RootSig)]
 float4 main(VSOutput vsOutput, bool isFrontFace : SV_IsFrontFace) : SV_Target0
 {
@@ -266,6 +276,8 @@ float4 main(VSOutput vsOutput, bool isFrontFace : SV_IsFrontFace) : SV_Target0
     float3 colorAccum = emissive;
 
     float sunShadow = texSunShadow.SampleCmpLevelZero( shadowSampler, vsOutput.sunShadowCoord.xy, vsOutput.sunShadowCoord.z );
+    if (SurfaceOccludesSun(vsOutput.worldPos, Surface.V))
+        sunShadow = 0.0;
     colorAccum += ShadeDirectionalLight(Surface, SunDirection, sunShadow * SunIntensity);
 
     // occlusion texture와 SSAO는 간접광인 IBL만 가린다.
