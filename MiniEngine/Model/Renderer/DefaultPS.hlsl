@@ -240,7 +240,7 @@ float3 ComputeNormal(VSOutput vsOutput)
 }
 
 [RootSignature(Renderer_RootSig)]
-float4 main(VSOutput vsOutput) : SV_Target0
+float4 main(VSOutput vsOutput, bool isFrontFace : SV_IsFrontFace) : SV_Target0
 {
     // Load and modulate textures
     float4 baseColor = baseColorFactor * baseColorTexture.Sample(baseColorSampler, UVSET(BASECOLOR));
@@ -249,6 +249,8 @@ float4 main(VSOutput vsOutput) : SV_Target0
     float occlusion = occlusionTexture.Sample(occlusionSampler, UVSET(OCCLUSION));
     float3 emissive = emissiveFactor * emissiveTexture.Sample(emissiveSampler, UVSET(EMISSIVE));
     float3 normal = ComputeNormal(vsOutput);
+    if (!isFrontFace)
+        normal = -normal;
 
     SurfaceProperties Surface;
     Surface.N = normal;
