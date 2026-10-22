@@ -359,7 +359,18 @@ void glTF::Asset::ProcessMaterials( json& materials )
         material.index = materialIdx++;
         material.flags = 0;
         material.alphaCutoff = floatToHalf(0.5f);
+        material.baseColorFactor[0] = 1.0f;
+        material.baseColorFactor[1] = 1.0f;
+        material.baseColorFactor[2] = 1.0f;
+        material.baseColorFactor[3] = 1.0f;
+        material.metallicFactor = 1.0f;
+        material.roughnessFactor = 1.0f;
+        material.emissiveFactor[0] = 0.0f;
+        material.emissiveFactor[1] = 0.0f;
+        material.emissiveFactor[2] = 0.0f;
         material.normalTextureScale = 1.0f;
+        for (uint32_t i = 0; i < Material::kNumTextures; ++i)
+            material.textures[i] = nullptr;
 
         if (thisMaterial.find("alphaMode") != thisMaterial.end())
         {
@@ -379,15 +390,6 @@ void glTF::Asset::ProcessMaterials( json& materials )
         if (thisMaterial.find("pbrMetallicRoughness") != thisMaterial.end())
         {
             json& metallicRoughness = thisMaterial.at("pbrMetallicRoughness");
-
-            material.baseColorFactor[0] = 1.0f;
-            material.baseColorFactor[1] = 1.0f;
-            material.baseColorFactor[2] = 1.0f;
-            material.baseColorFactor[3] = 1.0f;
-            material.metallicFactor = 1.0f;
-            material.roughnessFactor = 1.0f;
-            for (uint32_t i = 0; i < Material::kNumTextures; ++i)
-                material.textures[i] = nullptr;
 
             if (metallicRoughness.find("baseColorFactor") != metallicRoughness.end())
                 ReadFloats(metallicRoughness.at("baseColorFactor"), material.baseColorFactor);
@@ -410,9 +412,6 @@ void glTF::Asset::ProcessMaterials( json& materials )
         if (thisMaterial.find("doubleSided") != thisMaterial.end())
             material.twoSided = thisMaterial.at("doubleSided");
 
-        if (thisMaterial.find("normalTextureScale") != thisMaterial.end())
-            material.normalTextureScale = thisMaterial.at("normalTextureScale");
-
         if (thisMaterial.find("emissiveFactor") != thisMaterial.end())
             ReadFloats(thisMaterial.at("emissiveFactor"), material.emissiveFactor);
 
@@ -425,8 +424,14 @@ void glTF::Asset::ProcessMaterials( json& materials )
                 material.textures[Material::kEmissive]);
 
         if (thisMaterial.find("normalTexture") != thisMaterial.end())
-            material.normalUV = ReadTextureInfo(thisMaterial.at("normalTexture"),
-                material.textures[Material::kNormal]);
+        {
+            json& normalTexture = thisMaterial.at("normalTexture");
+
+            material.normalUV = ReadTextureInfo(normalTexture, material.textures[Material::kNormal]);
+
+            if (normalTexture.find("scale") != normalTexture.end())
+                material.normalTextureScale = normalTexture.at("scale");
+        }
 
         m_materials.push_back(material);
     }

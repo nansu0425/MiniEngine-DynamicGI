@@ -80,7 +80,7 @@ void LoadMaterials(Model& model,
             GetDefaultTexture(kWhiteOpaque2D),
             GetDefaultTexture(kWhiteOpaque2D),
             GetDefaultTexture(kWhiteOpaque2D),
-            GetDefaultTexture(kBlackTransparent2D),
+            GetDefaultTexture(kWhiteOpaque2D),
             GetDefaultTexture(kDefaultNormalMap)
         };
 

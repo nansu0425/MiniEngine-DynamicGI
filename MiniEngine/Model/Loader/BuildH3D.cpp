@@ -128,9 +128,11 @@ bool ModelH3D::BuildModel(ModelData& model, const std::wstring& basePath) const
         constantData.baseColorFactor[1] = 1.0f;
         constantData.baseColorFactor[2] = 1.0f;
         constantData.baseColorFactor[3] = 1.0f;
-        constantData.emissiveFactor[0] = 1.0f;
-        constantData.emissiveFactor[1] = 1.0f;
-        constantData.emissiveFactor[2] = 1.0f;
+        // 없는 emissive texture는 1.0으로 읽히므로, emissive texture가 없는 material이 빛을 내지 않게 한다.
+        const float emissiveFactor = textureData.stringIdx[kEmissive] == 0xFFFF ? 0.0f : 1.0f;
+        constantData.emissiveFactor[0] = emissiveFactor;
+        constantData.emissiveFactor[1] = emissiveFactor;
+        constantData.emissiveFactor[2] = emissiveFactor;
         constantData.metallicFactor = 1.0f;
         constantData.roughnessFactor = 1.0f;
         constantData.normalTextureScale = 1.0f;
