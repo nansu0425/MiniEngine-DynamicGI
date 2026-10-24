@@ -316,6 +316,7 @@ void Renderer::Shutdown(void)
 {
     s_RadianceCubeMap = nullptr;
     s_IrradianceCubeMap = nullptr;
+    Lighting::Shutdown();
     TextureManager::Shutdown();
     s_TextureHeap.Destroy();
     s_SamplerHeap.Destroy();
