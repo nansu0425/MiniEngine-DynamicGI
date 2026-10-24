@@ -30,6 +30,9 @@ primitive 와 짝짓는다. 판정은 아래와 같고, 하나라도 실패하�
   [6] depth VB 의 vertex 마다 position 이 VB 의 position 과 같고, alpha test material 이면 UV 가 VB 의 base color UV 와 같다.
   [7] --same-as 를 주면 두 .mini 가 byte 단위로 같다. header.version 과, CompileMesh 가 채우지 않고 load 할 때 채우는
       Mesh 의 srvTable, samplerTable 은 빼고 비교한다.
+  [8] VB 의 UV0, UV1 이 짝 primitive 의 TEXCOORD_0, TEXCOORD_1 과 float32 bit 로 같고, VB 에 UV 가 있는지가 glTF 에
+      TEXCOORD 가 있는지와 같다. OptimizeMesh 는 vertex 순서를 바꾸지 않으므로 draw 의 k 번째 vertex 를 짝 primitive 의 k 번째
+      vertex 와 비교한다. float 가 아닌 TEXCOORD 는 bit 로 비교할 수 없으므로 틀린 것으로 센다.
 """
 
 import argparse
@@ -106,6 +109,7 @@ DXGI_FORMAT_R32_UINT = 42
 
 POSITION_SIZE = 12
 PACKED_ATTRIBUTE_SIZE = 4
+UV_SIZE = 8
 SKIN_SIZE = 16
 
 GLTF_FLOAT = 5126
@@ -365,22 +369,25 @@ def multiset_difference(keys, other_keys):
 
 
 def depth_stride(mesh):
-    return POSITION_SIZE + PACKED_ATTRIBUTE_SIZE * bool(mesh.psoFlags & PSO_ALPHA_TEST) + SKIN_SIZE * (mesh.numJoints > 0)
+    return POSITION_SIZE + UV_SIZE * bool(mesh.psoFlags & PSO_ALPHA_TEST) + SKIN_SIZE * (mesh.numJoints > 0)
+
+
+def uv_offsets(mesh):
+    """UV set 마다 VB 의 vertex 안에서 그 UV 의 offset. VB 에 없는 UV 는 None"""
+    offset = POSITION_SIZE + PACKED_ATTRIBUTE_SIZE
+    if mesh.psoFlags & PSO_HAS_TANGENT:
+        offset += PACKED_ATTRIBUTE_SIZE
+    uv0 = offset if mesh.psoFlags & PSO_HAS_UV0 else None
+    if uv0 is not None:
+        offset += UV_SIZE
+    return [uv0, offset if mesh.psoFlags & PSO_HAS_UV1 else None]
 
 
 def base_color_uv_offset(mesh, material):
     """depth VB 의 UV 가 복사해 온 VB 의 UV 의 offset. 그 UV 가 VB 에 없으면 None"""
     texture_info = material.get('pbrMetallicRoughness', {}).get('baseColorTexture', {})
     # glTF::Material::baseColorUV 가 1 bit 라서 loader 는 texCoord 의 마지막 bit 만 본다.
-    uv_set = texture_info.get('texCoord', 0) & 1
-    offset = POSITION_SIZE + PACKED_ATTRIBUTE_SIZE
-    if mesh.psoFlags & PSO_HAS_TANGENT:
-        offset += PACKED_ATTRIBUTE_SIZE
-    if uv_set == 0:
-        return offset if mesh.psoFlags & PSO_HAS_UV0 else None
-    if mesh.psoFlags & PSO_HAS_UV0:
-        offset += PACKED_ATTRIBUTE_SIZE
-    return offset if mesh.psoFlags & PSO_HAS_UV1 else None
+    return uv_offsets(mesh)[texture_info.get('texCoord', 0) & 1]
 
 
 def rows_in_geometry(geometry, offset, size, stride):
@@ -428,10 +435,11 @@ def pair_draws_with_primitives(mini, gltf, buffers, walked, views):
             case = SimpleNamespace(
                 mesh_index=mesh_index, mesh=mesh, view=view, draw_index=draw_index, draw=draw,
                 vertex_count=vertex_count, indices=draw_indices(mini.geometry, view, draw),
-                primitive_index=primitive_index, position_bits=None, primitive_indices=None)
+                primitive_index=primitive_index, primitive=None, position_bits=None, primitive_indices=None)
             if primitive_index is not None:
                 paired[mesh.meshCBV].add(primitive_index)
-                case.position_bits, case.primitive_indices = primitive_geometry(gltf, buffers, primitives[primitive_index])
+                case.primitive = primitives[primitive_index]
+                case.position_bits, case.primitive_indices = primitive_geometry(gltf, buffers, case.primitive)
             draws.append(case)
 
     unpaired = []
@@ -570,13 +578,61 @@ def depth_problems(case, material):
         problems.append(f'{position_mismatches} of {len(vertices)} depth positions differ from the VB')
     if case.mesh.psoFlags & PSO_ALPHA_TEST:
         uv_offset = base_color_uv_offset(case.mesh, material)
+        uv, depth_uv = uv_bytes(vertices, uv_offset), uv_bytes(depth_vertices, POSITION_SIZE)
         if uv_offset is None:
             problems.append('alpha test material, but the VB has no base color UV')
+        elif uv is None or depth_uv is None:
+            problems.append(f'the base color UV reaches past the vbStride {case.mesh.vbStride} or the depth stride {depth_stride(case.mesh)}')
         else:
-            uv = slice(POSITION_SIZE, POSITION_SIZE + PACKED_ATTRIBUTE_SIZE)
-            uv_mismatches = int(np.count_nonzero(np.any(depth_vertices[:, uv] != vertices[:, uv_offset:uv_offset + PACKED_ATTRIBUTE_SIZE], axis=1)))
+            uv_mismatches = int(np.count_nonzero(np.any(depth_uv != uv, axis=1)))
             if uv_mismatches:
                 problems.append(f'{uv_mismatches} of {len(vertices)} depth UVs differ from the VB')
+    return problems
+
+
+def uv_bytes(vertices, offset):
+    """vertex 마다 offset 에서 시작하는 UV 의 byte. UV 가 없거나 vertex 끝을 넘으면 None"""
+    if offset is None or offset + UV_SIZE > vertices.shape[1]:
+        return None
+    return vertices[:, offset:offset + UV_SIZE]
+
+
+def uv_problems(case, gltf, buffers, totals):
+    if case.primitive is None:
+        return ['no glTF primitive to compare with']
+    view = case.view
+    rows = slice(case.draw.baseVertex, case.draw.baseVertex + max(case.vertex_count, 0))
+    if view.vertex_rows is None or rows.stop > len(view.vertex_rows):
+        return [f'vertices [{rows.start}, {rows.stop}) are beyond the VB']
+    vertices = view.vertex_rows[rows]
+
+    problems = []
+    for uv_set, offset in enumerate(uv_offsets(case.mesh)):
+        semantic = f'TEXCOORD_{uv_set}'
+        accessor_index = case.primitive['attributes'].get(semantic)
+        if accessor_index is None or offset is None:
+            if accessor_index is not None:
+                problems.append(f'the glTF primitive has {semantic}, but the VB has no UV{uv_set}')
+            elif offset is not None:
+                problems.append(f'the VB has UV{uv_set}, but the glTF primitive has no {semantic}')
+            continue
+        accessor = element(gltf, 'accessors', accessor_index)
+        if accessor['componentType'] != GLTF_FLOAT or accessor['type'] != 'VEC2':
+            problems.append(f'{semantic} is not a float VEC2, so its bits cannot be compared')
+            continue
+        expected = accessor_rows(gltf, buffers, accessor_index, '<u4')
+        if len(expected) != len(vertices):
+            problems.append(f'{semantic} has {len(expected)} values for {len(vertices)} vertices')
+            continue
+        uv = uv_bytes(vertices, offset)
+        if uv is None:
+            problems.append(f'UV{uv_set} at offset {offset} reaches past the vbStride {case.mesh.vbStride}')
+            continue
+        actual = np.ascontiguousarray(uv).view('<u4')
+        mismatches = int(np.count_nonzero(np.any(actual != expected, axis=1)))
+        totals.update(uvs=len(expected), mismatches=mismatches)
+        if mismatches:
+            problems.append(f'{mismatches} of {len(expected)} UV{uv_set} differ from {semantic}')
     return problems
 
 
@@ -660,6 +716,7 @@ def main():
     tally.judge(0, mini_path.name, [] if header.version == expected_version else
                 [(None, f'version {header.version}, not CURRENT_MINI_FILE_VERSION {expected_version}')])
     triangle_totals = Counter()
+    uv_totals = Counter()
     largest_world_difference = [0.0]
     beyond_blas_vertex_count = 0
     for case in cases:
@@ -672,6 +729,7 @@ def main():
         beyond_blas_vertex_count += beyond_blas
         material = materials[case.mesh.materialCBV] if case.mesh.materialCBV < len(materials) else {}
         tally.judge(6, subject, [(k, text) for text in depth_problems(case, material)])
+        tally.judge(8, subject, [(k, text) for text in uv_problems(case, gltf, buffers, uv_totals)])
     for mesh_index, (view, problems) in enumerate(zip(views, range_problems(views, header.geometrySize))):
         subject = label_of(mesh_index, view.mesh)
         tally.judge(3, subject, layout_problems(view, [case for case in cases if case.mesh_index == mesh_index]))
@@ -711,6 +769,9 @@ def main():
     else:
         print(f'[7] same bytes as {old_mini.path} except header.version, srvTable, samplerTable: {tally.summary(7, "files")}')
         tally.report(7)
+    print(f'[8] VB UV == glTF TEXCOORD (float32 bit, same vertex order): {tally.summary(8, "draws")}, '
+          f'{uv_totals["mismatches"]} of {uv_totals["uvs"]} UVs differ')
+    tally.report(8)
 
     failed = tally.has_failures()
     print('FAIL' if failed else 'PASS')

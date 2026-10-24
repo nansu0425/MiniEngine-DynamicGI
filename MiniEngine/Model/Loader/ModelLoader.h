@@ -26,7 +26,7 @@ namespace glTF { class Asset; struct Mesh; }
 
 // glTF model 의 texture 변환 결과를 바꿀 때도 올린다. 그래야 mtime 이 그대로인 DDS 도 .mini 와 함께 다시 만들어진다.
 // H3D model 의 DDS 는 .mini 를 다시 만들어도 다시 만들어지지 않는다.
-#define CURRENT_MINI_FILE_VERSION 16
+#define CURRENT_MINI_FILE_VERSION 17
 
 namespace Renderer
 {

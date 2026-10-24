@@ -97,11 +97,6 @@ uint3 LoadTriangleIndices(ByteAddressBuffer data, BLASGeometry geometry, uint pr
     return uint3(words.x >> 16, words.y & 0xFFFF, words.y >> 16);
 }
 
-float2 UnpackR16G16Float(uint packed)
-{
-    return f16tof32(uint2(packed & 0xFFFF, packed >> 16));
-}
-
 uint3 LoadPackedAttribute(ByteAddressBuffer data, uint3 vertexAddresses, uint offset)
 {
     return uint3(data.Load(vertexAddresses.x + offset), data.Load(vertexAddresses.y + offset), data.Load(vertexAddresses.z + offset));
@@ -109,8 +104,9 @@ uint3 LoadPackedAttribute(ByteAddressBuffer data, uint3 vertexAddresses, uint of
 
 float2 InterpolateUV(ByteAddressBuffer data, uint3 vertexAddresses, uint offset, float3 weights)
 {
-    const uint3 packed = LoadPackedAttribute(data, vertexAddresses, offset);
-    return UnpackR16G16Float(packed.x) * weights.x + UnpackR16G16Float(packed.y) * weights.y + UnpackR16G16Float(packed.z) * weights.z;
+    return data.Load<float2>(vertexAddresses.x + offset) * weights.x
+        + data.Load<float2>(vertexAddresses.y + offset) * weights.y
+        + data.Load<float2>(vertexAddresses.z + offset) * weights.z;
 }
 
 // committed hit와 traversal 중의 candidate가 같은 값으로 triangle을 가리키므로 둘 다 이 함수로 읽는다.

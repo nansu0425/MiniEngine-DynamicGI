@@ -81,7 +81,7 @@ namespace
         if (mesh.psoFlags & PSOFlags::kHasUV0)
         {
             geometry.uv0Offset = offset;
-            offset += kPackedAttributeSize;
+            offset += sizeof(XMFLOAT2);
         }
         if (mesh.psoFlags & PSOFlags::kHasUV1)
             geometry.uv1Offset = offset;

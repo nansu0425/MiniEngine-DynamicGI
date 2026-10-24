@@ -345,14 +345,15 @@ void OptimizeMesh( Renderer::Primitive& outPrim, const glTF::Primitive& inPrim, 
         OutputElements.push_back({"TANGENT", 0, DXGI_FORMAT_R10G10B10A2_UNORM, 0, D3D12_APPEND_ALIGNED_ELEMENT});
         outPrim.psoFlags |= PSOFlags::kHasTangent;
     }
+    // UV를 half로 담으면 texture를 여러 번 반복하는 면처럼 UV가 큰 곳에서 texel이 어긋나므로 accessor 값을 float32로 담는다.
     if (texcoord0.get())
     {
-        OutputElements.push_back({"TEXCOORD", 0, DXGI_FORMAT_R16G16_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT});
+        OutputElements.push_back({"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT});
         outPrim.psoFlags |= PSOFlags::kHasUV0;
     }
     if (texcoord1.get())
     {
-        OutputElements.push_back({"TEXCOORD", 1, DXGI_FORMAT_R16G16_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT});
+        OutputElements.push_back({"TEXCOORD", 1, DXGI_FORMAT_R32G32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT});
         outPrim.psoFlags |= PSOFlags::kHasUV1;
     }
     if (HasSkin)
@@ -401,8 +402,8 @@ void OptimizeMesh( Renderer::Primitive& outPrim, const glTF::Primitive& inPrim, 
     DepthElements.push_back({"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT});
     if (material.alphaTest)
     {
-        depthStride += 4;
-        DepthElements.push_back({"TEXCOORD", 0, DXGI_FORMAT_R16G16_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT});
+        depthStride += 8;
+        DepthElements.push_back({"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT});
     }
     if (HasSkin)
     {
