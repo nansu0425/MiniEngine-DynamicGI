@@ -55,7 +55,7 @@ harness 로 할 수 없는 일을 만나면 그 일이 계획되어 있는지와
 - screenshot 은 수치로 좁힌 영역의 원인을 볼 때와 입력할 위치를 찾을 때만 쓴다.
 - computer use 로 UI 를 조작했으면 그 결과도 조작 전과 뒤의 text 상태를 비교해 확인한다.
 - text 로 읽을 수 없는 상태를 바꾸는 조작은 결과를 판정할 수 없다. 지금은 gizmo 의 위치와 mode 가 그렇다. 이런 조작의 결과는 사용자에게 확인을 부탁한다.
-- D3D12 message 는 `stop` 의 요약과 `do status` 의 `d3d12_messages` 로 센다. 실행 중의 CORRUPTION, ERROR, WARNING 중 하나라도 0 이 아니면 FAIL 이다 (selftest 가 baseline 에서 셋 다 0 인 것을 확인한다). 종료 때의 수는 따로 본다.
+- D3D12 message 는 `stop` 의 요약과 `do status` 의 `d3d12_messages` 로 센다. 실행 중의 CORRUPTION, ERROR, WARNING 중 하나라도 0 이 아니면 FAIL 이다 (selftest 가 baseline 에서 셋 다 0 인 것을 확인한다). 종료 때는 `#274 LIVE_DEVICE` 하나만 나와야 하고, 그 밖의 message 는 device 보다 오래 남은 object 다 (selftest 가 baseline 에서 확인한다).
 - 어느 명령이 message 를 냈는지는 그 명령 앞뒤에서 `do status` 의 `d3d12_messages` 를 비교해 찾는다. `status` 는 제한 없이 세지만 log 는 같은 ID 를 정해진 횟수까지만 줄로 남기므로 (`D3D12MessageLog.h`) `log mark` 로 나눈 구간에는 줄이 없을 수 있다.
 - `start --gpu-validation` 이 무엇을 더 검사하는지는 `start --help` 에 있다.
 - crash 와 ASSERT 는 dialog 없이 끝난다. `do`, `shot`, `stop` 이 종료 이유와 log 경로를 알려 준다. 원인은 log 의 끝부분과 종료 이유가 가리키는 module 의 offset 으로 찾는다.

@@ -30,6 +30,7 @@ INSTANCE_FILE = HARNESS_DIR / 'instance.json'
 BASELINE_DIR = REPO_ROOT / 'scripts' / 'harness-baseline'
 USER_SETTINGS = [VIEWER_DIR / 'editor.ini', VIEWER_DIR / 'imgui.ini']
 MODEL_VIEWER_SOURCE = VIEWER_DIR / 'ModelViewer.cpp'
+D3D12_MESSAGE_LOG_HEADER = ENGINE_DIR / 'Core' / 'Automation' / 'D3D12MessageLog.h'
 # D3D12 message ID 의 이름을 읽을 Agility SDK 의 version 이 여기에 있다.
 PACKAGES_CONFIG = ENGINE_DIR / 'Core' / 'packages.config'
 SOURCE_DIRS = [ENGINE_DIR / 'Core', ENGINE_DIR / 'Model']
@@ -285,8 +286,15 @@ def d3d12_message_names():
     return {int(number): name for name, number in re.findall(r'D3D12_MESSAGE_ID_(\w+)\s*=\s*(\d+),', text)}
 
 
+def logged_lines_per_d3d12_id():
+    match = re.search(r'^\s*constexpr uint64_t kLoggedPerId = (\d+);', D3D12_MESSAGE_LOG_HEADER.read_text(encoding='utf-8'), re.M)
+    if match is None:
+        raise HarnessError(f'{D3D12_MESSAGE_LOG_HEADER} has no line constexpr uint64_t kLoggedPerId = <number>;')
+    return int(match[1])
+
+
 def summarize_d3d12_messages(text):
-    """줄의 형식은 MiniEngine/Core/Automation/D3D12MessageLog.h 에 있다."""
+    """줄의 형식은 D3D12_MESSAGE_LOG_HEADER 에 있다."""
     status = re.search(r'^D3D12 messages: (.*)$', text, re.MULTILINE)
     exit_report = re.search(r'^D3D12 live objects at exit:$', text, re.MULTILINE)
     totals = {int(id): int(total) for id, total in re.findall(r'^D3D12 #(\d+) total=(\d+)$', text, re.MULTILINE)}
@@ -322,6 +330,8 @@ def summarize_log(log):
 
 
 D3D12_SEVERITIES = ['CORRUPTION', 'ERROR', 'WARNING', 'INFO', 'MESSAGE']
+# 종료 report 를 device 를 놓기 전에 하므로 device 하나는 늘 살아 있다고 나온다.
+LIVE_DEVICE_ID = 274
 
 
 def count_by_severity(messages):
@@ -727,12 +737,21 @@ def command_selftest(args):
     return 1 if failures else 0
 
 
+def check_nothing_outlives_device(check, log):
+    at_exit = summarize_log(log)['d3d12']['at_exit'] or {}
+    names = d3d12_message_names()
+    check(f'the D3D12 exit report has only one #{LIVE_DEVICE_ID} LIVE_DEVICE',
+          {id: message['count'] for id, message in at_exit.items()} == {LIVE_DEVICE_ID: 1},
+          ', '.join(f'#{id} {names.get(id, "unknown")} x{message["count"]}' for id, message in sorted_by_severity(at_exit)) or 'none')
+
+
 def selftest_running_app(args, check):
     from PIL import Image
     import numpy as np
 
     # Debug 밖의 config 는 -debug 1 없이 띄우므로 debug layer 가 꺼져 있다 (MiniEngine/readme.md).
     logs_d3d12 = args.config == 'Debug'
+    repeated_faults = logged_lines_per_d3d12_id() + 1
     result = build(args.config)
     check(f'build {args.config} exits with 0', result['ok'], '; '.join(result['errors']))
     exe = exe_path(args.config)
@@ -857,7 +876,6 @@ def selftest_running_app(args, check):
               f'next command answered {answered} after {time.monotonic() - started:.1f} s')
 
         d3d12 = session.ask_ok('status')['d3d12_messages']
-        repeated_faults = 11
         if logs_d3d12:
             check('status reports D3D12 messages logged', d3d12['logged'] is True, d3d12)
             check('no D3D12 corruption, error or warning while running',
@@ -912,8 +930,9 @@ def selftest_running_app(args, check):
                   cap is not None and lines == int(cap[1]) and total is not None and int(total[1]) == faults and counted,
                   f'{lines} lines, cap {cap[0] if cap else None}, {total[0] if total else None}; ' + '; '.join(stop_lines))
         # 종료 report 가 log 에 닿는지를 그 report 의 LIVE_DEVICE 로 본다.
-        check('stop reports #274 LIVE_DEVICE at exit',
-              any(re.match(r'  at exit: \w+ #274 LIVE_DEVICE ', line) for line in stop_lines), '; '.join(stop_lines))
+        check(f'stop reports #{LIVE_DEVICE_ID} LIVE_DEVICE at exit',
+              any(re.match(rf'  at exit: \w+ #{LIVE_DEVICE_ID} LIVE_DEVICE ', line) for line in stop_lines), '; '.join(stop_lines))
+        check_nothing_outlives_device(check, Path(instance['log']))
         check('the D3D12 exit report comes before exit reason=normal', 0 <= exit_report < text.find('exit reason=normal'))
     else:
         check('stop reports D3D12 messages not logged', stop_lines == ['d3d12 messages: not logged (debug layer off)'], stop_lines)
