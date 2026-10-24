@@ -6,6 +6,7 @@ app 명령의 사용법은 `do help` 가 app 에서 받아 온다. app flag 는 
 import argparse
 import contextlib
 import ctypes
+import functools
 import hashlib
 import json
 import msvcrt
@@ -29,6 +30,8 @@ INSTANCE_FILE = HARNESS_DIR / 'instance.json'
 BASELINE_DIR = REPO_ROOT / 'scripts' / 'harness-baseline'
 USER_SETTINGS = [VIEWER_DIR / 'editor.ini', VIEWER_DIR / 'imgui.ini']
 MODEL_VIEWER_SOURCE = VIEWER_DIR / 'ModelViewer.cpp'
+# D3D12 message ID 의 이름을 읽을 Agility SDK 의 version 이 여기에 있다.
+PACKAGES_CONFIG = ENGINE_DIR / 'Core' / 'packages.config'
 SOURCE_DIRS = [ENGINE_DIR / 'Core', ENGINE_DIR / 'Model']
 SOURCE_SUFFIXES = {'.cpp', '.h', '.inl', '.hlsl', '.hlsli'}
 
@@ -258,6 +261,54 @@ def require_running():
     return instance
 
 
+@functools.cache
+def d3d12_message_names():
+    """D3D12_MESSAGE_ID 의 숫자에서 이름으로. build 가 쓰는 Agility SDK 의 header 에서 읽는다.
+
+    header 를 찾지 못해도 요약은 끝까지 찍어야 하므로 경고만 하고 이름 없이 진행한다.
+    """
+    def without_names(reason):
+        print(f'warning: D3D12 message names are unknown because {reason}', file=sys.stderr)
+        return {}
+
+    try:
+        packages = PACKAGES_CONFIG.read_text(encoding='utf-8-sig')
+    except OSError as error:
+        return without_names(f'{PACKAGES_CONFIG} cannot be read: {error}')
+    version = re.search(r'id="Microsoft\.Direct3D\.D3D12" version="([^"]+)"', packages)
+    if version is None:
+        return without_names(f'{PACKAGES_CONFIG} has no Microsoft.Direct3D.D3D12 version')
+    header = ENGINE_DIR / 'Packages' / f'Microsoft.Direct3D.D3D12.{version[1]}' / 'build' / 'native' / 'include' / 'd3d12sdklayers.h'
+    if not header.exists():
+        return without_names(f'{header} does not exist')
+    text = header.read_text(encoding='utf-8', errors='replace')
+    return {int(number): name for name, number in re.findall(r'D3D12_MESSAGE_ID_(\w+)\s*=\s*(\d+),', text)}
+
+
+def summarize_d3d12_messages(text):
+    """줄의 형식은 MiniEngine/Core/Automation/D3D12MessageLog.h 에 있다."""
+    status = re.search(r'^D3D12 messages: (.*)$', text, re.MULTILINE)
+    exit_report = re.search(r'^D3D12 live objects at exit:$', text, re.MULTILINE)
+    totals = {int(id): int(total) for id, total in re.findall(r'^D3D12 #(\d+) total=(\d+)$', text, re.MULTILINE)}
+    logged_times = {int(id): int(times) for id, times in
+                    re.findall(r'^D3D12 #(\d+): logged (\d+) times, the rest are only counted$', text, re.MULTILINE)}
+    running, at_exit = {}, {}
+    for match in re.finditer(r'^D3D12 (\w+) #(\d+) \w+ frame=(\d+): ', text, re.MULTILINE):
+        messages = at_exit if exit_report and match.start() > exit_report.start() else running
+        message = messages.setdefault(int(match[2]), {'severity': match[1], 'count': 0, 'at_least': False, 'first_frame': int(match[3])})
+        message['count'] += 1
+    for id in logged_times.keys() & running.keys():
+        # total 줄이 없으면 app 이 Graphics::Shutdown 전에 끝난 것이다. 제한을 알리는 줄은 한 번 더 났을 때 쓰므로 그보다 하나는 많다.
+        running[id]['count'] = totals.get(id, logged_times[id] + 1)
+        running[id]['at_least'] = id not in totals
+    return {
+        'status': status.group(1) if status else None,
+        'logged': status.group(1).startswith('logged') if status else None,
+        'running': running,
+        'at_exit': at_exit if exit_report else None,
+    }
+
+
 def summarize_log(log):
     text = log.read_text(encoding='utf-8', errors='replace') if log.exists() else ''
     reasons = re.findall(r'^exit reason=(.*)$', text, re.MULTILINE)
@@ -265,8 +316,51 @@ def summarize_log(log):
     return {
         'exit_reason': reasons[-1] if reasons else None,
         'smoke_test': smoke_test.group(1) if smoke_test else None,
+        'd3d12': summarize_d3d12_messages(text),
         'text': text,
     }
+
+
+D3D12_SEVERITIES = ['CORRUPTION', 'ERROR', 'WARNING', 'INFO', 'MESSAGE']
+
+
+def count_by_severity(messages):
+    counts = {severity: [0, False] for severity in D3D12_SEVERITIES}
+    for message in messages.values():
+        count = counts.setdefault(message['severity'], [0, False])
+        count[0] += message['count']
+        count[1] |= message['at_least']
+    return counts
+
+
+def sorted_by_severity(messages):
+    rank = lambda severity: D3D12_SEVERITIES.index(severity) if severity in D3D12_SEVERITIES else len(D3D12_SEVERITIES)
+    return sorted(messages.items(), key=lambda item: (rank(item[1]['severity']), item[1]['first_frame']))
+
+
+def describe_counts(messages, always=()):
+    counts = count_by_severity(messages)
+    shown = [severity for severity, (count, _) in counts.items() if count or severity in always]
+    return ', '.join(f'{counts[severity][0]}{"+" if counts[severity][1] else ""} {severity.lower()}' for severity in shown) or 'none'
+
+
+def describe_d3d12_status(d3d12):
+    return f'd3d12 messages: {d3d12["status"] or "no status line in the log"}'
+
+
+def describe_d3d12(d3d12):
+    """stop 이 찍는 D3D12 message 요약 줄."""
+    if not d3d12['logged']:
+        return [describe_d3d12_status(d3d12)]
+    names = d3d12_message_names()
+    at_exit = 'not reported' if d3d12['at_exit'] is None else describe_counts(d3d12['at_exit'])
+    lines = [f'd3d12 while running: {describe_counts(d3d12["running"], always=("CORRUPTION", "ERROR", "WARNING"))}; at exit: {at_exit}']
+    for id, message in sorted_by_severity(d3d12['running']):
+        lines.append(f'  {message["severity"]} #{id} {names.get(id, "unknown")} x{message["count"]}{"+" if message["at_least"] else ""}, '
+                     f'first at frame {message["first_frame"]}')
+    for id, message in sorted_by_severity(d3d12['at_exit'] or {}):
+        lines.append(f'  at exit: {message["severity"]} #{id} {names.get(id, "unknown")} x{message["count"]}')
+    return lines
 
 
 def describe_exit(summary, exit_code=None):
@@ -319,7 +413,8 @@ def stop_instance(instance, kill_now=False):
     if INSTANCE_FILE.exists() and load_instance()['pid'] == instance['pid']:
         INSTANCE_FILE.unlink()
     summary = summarize_log(Path(instance['log']))
-    return {'result': result, 'exit_reason': summary['exit_reason'], 'smoke_test': summary['smoke_test'], 'log': instance['log']}
+    return {'result': result, 'exit_reason': summary['exit_reason'], 'smoke_test': summary['smoke_test'], 'd3d12': summary['d3d12'],
+            'log': instance['log']}
 
 
 def stop_running_instance():
@@ -359,7 +454,7 @@ def default_assets():
     return [VIEWER_DIR / match.group(1), VIEWER_DIR / 'Textures']
 
 
-def start_instance(config, model=None, build_first=True):
+def start_instance(config, model=None, build_first=True, gpu_validation=False):
     missing = [path for path in default_assets() if not path.exists()] if model is None else \
         [path for path in [VIEWER_DIR / model] if not path.exists()]
     if missing:
@@ -392,6 +487,8 @@ def start_instance(config, model=None, build_first=True):
     command = [str(exe), '-settings_dir', str(run_dir), '-log', str(log), '-unattended', '1', '-control', pipe, '-hdr_output', '0']
     if model is not None:
         command += ['-model', model]
+    if gpu_validation:
+        command += ['-gpu_debug', '1']
     process = launch(command, VIEWER_DIR)
 
     instance = {'pid': process.pid, 'exe': str(exe), 'config': config, 'model': model, 'pipe': pipe,
@@ -544,7 +641,10 @@ def command_build(args):
 
 
 def command_start(args):
-    instance = start_instance(args.config, args.model, not args.no_build)
+    if args.gpu_validation and args.config != 'Debug':
+        raise HarnessError(f'--gpu-validation works only in Debug: start does not turn on the D3D12 debug layer in {args.config}, '
+                           'so GPU-based validation would stay off')
+    instance = start_instance(args.config, args.model, not args.no_build, args.gpu_validation)
     session = Session(instance)
     try:
         status = session.ask_ok('status')
@@ -552,6 +652,7 @@ def command_start(args):
         session.close()
     print(f'started {instance["config"]} pid {instance["pid"]}: client {status["client"]}, scene {status["scene"]}, '
           f'ui {status["ui"]}, gpu {status["gpu"]}')
+    print(describe_d3d12_status(summarize_log(Path(instance['log']))['d3d12']))
     print(f'run dir: {instance["run_dir"]}')
     print(f'log: {instance["log"]}')
     return 0
@@ -592,6 +693,8 @@ def command_stop(args):
         return 0
     result = stop_instance(instance, args.kill)
     print(f'{result["result"]}; exit reason={result["exit_reason"]}; smoke test={result["smoke_test"]}')
+    for line in describe_d3d12(result['d3d12']):
+        print(line)
     print(f'log: {result["log"]}')
     return 0 if result['exit_reason'] == 'normal' else 1
 
@@ -628,6 +731,8 @@ def selftest_running_app(args, check):
     from PIL import Image
     import numpy as np
 
+    # Debug 밖의 config 는 -debug 1 없이 띄우므로 debug layer 가 꺼져 있다 (MiniEngine/readme.md).
+    logs_d3d12 = args.config == 'Debug'
     result = build(args.config)
     check(f'build {args.config} exits with 0', result['ok'], '; '.join(result['errors']))
     exe = exe_path(args.config)
@@ -750,6 +855,34 @@ def selftest_running_app(args, check):
             answered = False
         check('a command its client gave up on does not block the next command', gave_up and answered,
               f'next command answered {answered} after {time.monotonic() - started:.1f} s')
+
+        d3d12 = session.ask_ok('status')['d3d12_messages']
+        repeated_faults = 11
+        if logs_d3d12:
+            check('status reports D3D12 messages logged', d3d12['logged'] is True, d3d12)
+            check('no D3D12 corruption, error or warning while running',
+                  d3d12['corruption'] == d3d12['error'] == d3d12['warning'] == 0,
+                  '; '.join(describe_d3d12(summarize_log(Path(instance['log']))['d3d12'])))
+            before_fault = read_dds_rgba32f(capture(session, 'scene', 'selftest-scene-before-d3d12-error'))
+            session.ask_ok('log mark d3d12-fault')
+            session.ask_ok('fault d3d12_error')
+            session.ask_ok('frames 2')
+            errors = session.ask_ok('status')['d3d12_messages']['error']
+            check('fault d3d12_error raises the error count in status', errors > d3d12['error'], f'{d3d12["error"]} -> {errors}')
+            after_fault = read_dds_rgba32f(capture(session, 'scene', 'selftest-scene-after-d3d12-error'))
+            check('scene after fault d3d12_error is bit-identical', np.array_equal(before_fault.view(np.uint32), after_fault.view(np.uint32)),
+                  describe_difference(before_fault, after_fault))
+            # 같은 ID 의 줄 수 제한을 넘겨, 줄로 쓰지 않은 것까지 세는지 본다.
+            for _ in range(repeated_faults):
+                session.ask_ok('fault d3d12_error')
+            session.ask_ok('frames 2')
+            repeated = session.ask_ok('status')['d3d12_messages']['error']
+            check(f'status counts {repeated_faults} more faults', repeated == errors + repeated_faults, f'{errors} -> {repeated}')
+        else:
+            check('status reports D3D12 messages not logged because the debug layer is off',
+                  d3d12 == {'logged': False, 'reason': 'debug layer off'}, d3d12)
+            refused = session.ask('fault d3d12_error')
+            check('fault d3d12_error fails when D3D12 messages are not logged', not refused['ok'], refused.get('error'))
     finally:
         session.close()
 
@@ -759,6 +892,31 @@ def selftest_running_app(args, check):
     stopped = stop_instance(instance)
     check(f'quit exits in {EXIT_TIMEOUT} s', stopped['result'] == 'quit' and stopped['exit_reason'] == 'normal',
           f'{stopped["result"]}, exit reason={stopped["exit_reason"]}, {time.monotonic() - started:.1f} s')
+
+    text = summarize_log(Path(instance['log']))['text']
+    stop_lines = describe_d3d12(stopped['d3d12'])
+    if logs_d3d12:
+        mark = text.find('[Harness] mark d3d12-fault')
+        exit_report = text.find('D3D12 live objects at exit:')
+        # 종료 report 에 ERROR 가 있어도 맞지 않게 mark 와 종료 report 사이에서 찾는다.
+        fault_error = re.compile(r'^D3D12 ERROR #(\d+) ', re.MULTILINE).search(text, mark, exit_report) if 0 <= mark < exit_report else None
+        check('log has a D3D12 ERROR between the mark and the exit report', fault_error is not None, stop_lines[0])
+        if fault_error is not None:
+            id, faults = fault_error[1], 1 + repeated_faults
+            running_text = text[mark:exit_report]
+            cap = re.search(rf'^D3D12 #{id}: logged (\d+) times, the rest are only counted$', running_text, re.MULTILINE)
+            lines = len(re.findall(rf'^D3D12 ERROR #{id} ', running_text, re.MULTILINE))
+            total = re.search(rf'^D3D12 #{id} total=(\d+)$', text, re.MULTILINE)
+            counted = any(re.match(rf'  ERROR #{id} \w+ x{faults},', line) for line in stop_lines)
+            check(f'{faults} faults of #{id} leave a cap line, total={faults} and x{faults} in stop',
+                  cap is not None and lines == int(cap[1]) and total is not None and int(total[1]) == faults and counted,
+                  f'{lines} lines, cap {cap[0] if cap else None}, {total[0] if total else None}; ' + '; '.join(stop_lines))
+        # 종료 report 가 log 에 닿는지를 그 report 의 LIVE_DEVICE 로 본다.
+        check('stop reports #274 LIVE_DEVICE at exit',
+              any(re.match(r'  at exit: \w+ #274 LIVE_DEVICE ', line) for line in stop_lines), '; '.join(stop_lines))
+        check('the D3D12 exit report comes before exit reason=normal', 0 <= exit_report < text.find('exit reason=normal'))
+    else:
+        check('stop reports D3D12 messages not logged', stop_lines == ['d3d12 messages: not logged (debug layer off)'], stop_lines)
 
     expected_reasons = {'assert': 'breakpoint at=', 'exception': 'exception code=0xC0000005'}
     for fault, expected in expected_reasons.items():
@@ -829,6 +987,10 @@ def main():
     add_config(command)
     command.add_argument('--model', help='glTF path relative to MiniEngine/ModelViewer, passed as -model. Uses the orbit camera')
     command.add_argument('--no-build', action='store_true')
+    command.add_argument('--gpu-validation', action='store_true',
+                         help='pass -gpu_debug 1 for GPU-based validation, which checks on the GPU the state and descriptor of each '
+                              'resource a shader accesses. Without it, the state of a resource a shader reads is not checked. '
+                              'Debug only. Slower')
 
     command = add_command('do', 'send commands to the running instance one by one and stop at the first error. '
                                 'Reports a crash or a hang but leaves a hung app to stop. "do help" lists the commands', command_do)
@@ -843,8 +1005,8 @@ def main():
     command.add_argument('--max-width', type=int, default=PREVIEW_MAX_WIDTH)
     command.add_argument('--exposure', type=float, default=PREVIEW_EXPOSURE, help='for the scene view only')
 
-    command = add_command('stop', 'quit the running instance, killing it if it hangs, and summarize its log. '
-                                  'Exits with 1 unless the app ended normally', command_stop)
+    command = add_command('stop', 'quit the running instance, killing it if it hangs, and summarize its log with the D3D12 messages. '
+                                  'Exits with 1 unless the app ended normally, whatever the messages', command_stop)
     command.add_argument('--kill', action='store_true', help='kill without sending quit')
 
     command = add_command('selftest', 'check the harness itself', command_selftest)

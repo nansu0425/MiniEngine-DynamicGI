@@ -5,7 +5,7 @@ description: ModelViewer 를 build, run, drive, screenshot, verify 하는 harnes
 
 # ModelViewer harness
 
-진입점은 `python scripts/viewer.py` 하나다. 각 subcommand 가 무엇을 하는지는 `--help`, app 명령은 `do help`, 명령의 protocol 은 `MiniEngine/Core/Automation/ControlChannel.h`, 종료 이유의 뜻은 `MiniEngine/Core/Automation/UnattendedRun.h`, app flag 는 `MiniEngine/readme.md` 에 있다. 여기에는 agent 가 harness 를 운용하는 법만 적는다.
+진입점은 `python scripts/viewer.py` 하나다. 각 subcommand 가 무엇을 하는지는 `--help`, app 명령은 `do help`, 명령의 protocol 은 `MiniEngine/Core/Automation/ControlChannel.h`, 종료 이유의 뜻은 `MiniEngine/Core/Automation/UnattendedRun.h`, log 의 D3D12 message 줄은 `MiniEngine/Core/Automation/D3D12MessageLog.h`, app flag 는 `MiniEngine/readme.md` 에 있다. 여기에는 agent 가 harness 를 운용하는 법만 적는다.
 
 harness 로 할 수 없는 일을 만나면 그 일이 계획되어 있는지와 그 근거를 `docs/harness-roadmap.md` 에서 본다.
 
@@ -13,7 +13,8 @@ harness 로 할 수 없는 일을 만나면 그 일이 계획되어 있는지와
 
 - app 을 직접 실행하지 않고 언제나 `start` 로 띄운다. 그래야 사용자의 설정 파일이 남는다 (`start --help`).
 - OS 를 거쳐야만 보이는 것은 computer use 로 본다 (아래 computer use 절). computer use 를 쓸 수 없는 session 에서는 그것을 사용자에게 확인해 달라고 부탁한다.
-- D3D12 debug layer 의 message 는 harness 로도 computer use 로도 볼 수 없으므로 (아직 log 에 남지 않는다) 언제나 사용자에게 확인을 부탁한다.
+- D3D12 debug layer 의 message 를 봐야 하면 Debug 로 띄운다. `start` 는 다른 config 에 `-debug 1` 을 주지 않으므로 debug layer 가 꺼져 message 자체가 생기지 않는다 (`start` 가 상태를 알린다).
+- DXGI message 는 harness 로도 computer use 로도 볼 수 없으므로 사용자에게 확인을 부탁한다.
 - mouse 와 keyboard 를 흉내 내는 명령은 아직 없다. ImGui 조작은 같은 일을 하는 명령 (`settings`, `panel`, `ui`, `validation`, `restore`) 으로 한다.
 
 ## 실행 loop
@@ -54,6 +55,9 @@ harness 로 할 수 없는 일을 만나면 그 일이 계획되어 있는지와
 - screenshot 은 수치로 좁힌 영역의 원인을 볼 때와 입력할 위치를 찾을 때만 쓴다.
 - computer use 로 UI 를 조작했으면 그 결과도 조작 전과 뒤의 text 상태를 비교해 확인한다.
 - text 로 읽을 수 없는 상태를 바꾸는 조작은 결과를 판정할 수 없다. 지금은 gizmo 의 위치와 mode 가 그렇다. 이런 조작의 결과는 사용자에게 확인을 부탁한다.
+- D3D12 message 는 `stop` 의 요약과 `do status` 의 `d3d12_messages` 로 센다. 실행 중의 CORRUPTION, ERROR, WARNING 중 하나라도 0 이 아니면 FAIL 이다 (selftest 가 baseline 에서 셋 다 0 인 것을 확인한다). 종료 때의 수는 따로 본다.
+- 어느 명령이 message 를 냈는지는 그 명령 앞뒤에서 `do status` 의 `d3d12_messages` 를 비교해 찾는다. `status` 는 제한 없이 세지만 log 는 같은 ID 를 정해진 횟수까지만 줄로 남기므로 (`D3D12MessageLog.h`) `log mark` 로 나눈 구간에는 줄이 없을 수 있다.
+- `start --gpu-validation` 이 무엇을 더 검사하는지는 `start --help` 에 있다.
 - crash 와 ASSERT 는 dialog 없이 끝난다. `do`, `shot`, `stop` 이 종료 이유와 log 경로를 알려 준다. 원인은 log 의 끝부분과 종료 이유가 가리키는 module 의 offset 으로 찾는다.
 - hang 이 보고되면 볼 것을 본 뒤 `stop` 으로 끝낸다.
 - harness 자체가 의심되면 `selftest` 를 돌린다. app 을 여러 번 띄우고 끈다.

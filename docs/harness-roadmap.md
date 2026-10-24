@@ -37,23 +37,23 @@ harness 는 agent 가 ModelViewer 를 build, 실행하고 명령으로 조작, c
 ### 진단 (로드맵 작업 3 전)
 
 - 할 일
-  - D3D12 message 를 `ID3D12InfoQueue1` 의 callback 으로 받아 log 에 쓴다. 지금의 info queue 설정은 `Graphics::Initialize` (`Core/Graphics/GraphicsCore.cpp`) 에 있다.
   - DRED 를 켠다.
   - `Display::Present` 가 버리는 `Present` 의 HRESULT 로 device removed 와 reset 을 잡는다. 그때 `GetDeviceRemovedReason` 과 DRED 를 log 에 쓰고 끝낸다. 새 종료 이유는 `UnattendedRun.h` 의 목록에 더한다.
   - minidump 를 run 폴더에 남긴다. crash 는 `UnattendedRun` 의 filter 가 process 안에서, hang 은 viewer.py 가 kill 하기 전에 process 밖에서 쓴다. `stop --dump` 를 더한다.
-  - `stop` 의 요약에 D3D12 error 수를 넣는다.
   - `fault device_removed` (`ID3D12Device5::RemoveDevice`) 를 더한다.
+  - DXGI message 를 log 에 쓴다. `IDXGIInfoQueue` 에는 `ID3D12InfoQueue1` 같은 callback 이 없어 (Windows SDK 10.0.26100 의 `dxgidebug.h`) 쌓인 message 를 `GetMessage` 로 꺼내야 한다. 언제 꺼낼지 (frame 마다, 종료 때) 는 이 작업에서 정한다.
+  - GBV 의 양성 대조군: shader 가 state 가 틀린 resource 를 읽는 fault 를 더해, `start --gpu-validation` 에서 그 GBV message 가 log 에 남는지 보인다.
 - 근거
-  - 지금은 D3D12 debug layer 의 message 가 debugger 출력으로만 나가 harness 가 볼 수 없다. SKILL.md "쓰는 범위" 절이 이것을 사용자에게 부탁하는 이유다.
   - hang 과 crash 의 원인을 log 와 종료 이유만으로 찾기 어렵다. dump 가 있으면 사용자에게 재현을 부탁하지 않고 그 자리를 볼 수 있다.
+  - GBV 의 message 가 log 에 닿는다는 것을 아직 보이지 않았다. 그래서 GBV 에서 message 가 0 이라는 결과는 그 경로에 문제가 없다는 근거로 약하다.
+  - DXGI message 는 debugger 출력으로만 나가 SKILL.md "쓰는 범위" 절이 사용자에게 확인을 부탁한다. Debug 에서 DXGI 의 ERROR 와 CORRUPTION 은 break 하므로 (`Graphics::Initialize`) 종료 이유 `breakpoint` 로는 드러나지만 그 내용과 WARNING 은 남지 않는다.
 - 수정: `Core/Graphics/GraphicsCore.cpp`, `Core/Display/Display.cpp`, `Core/Automation/UnattendedRun.h, .cpp`, `Core/Automation/EngineCommands.cpp`, `scripts/viewer.py`, `.claude/skills/modelviewer/SKILL.md`
 - 완료 기준 (selftest 에 더한다)
   - `fault device_removed` 뒤에 log 에 종료 이유와 DRED 가 남는다.
-  - 일부러 D3D12 error 를 낸 호출이 log 에 잡히고 `stop` 이 그 수를 센다.
   - `fault hang` 뒤 `stop` 이 dump 를 남기고 kill 한다.
+  - GBV 의 양성 대조군 fault 뒤에 `stop` 이 그 GBV message 를 실행 중의 message 로 센다.
 - 이 작업 때 함께 볼 것
-  - `PostEffects::ExtractLuma` (`Core/Effects/PostEffects/PostEffects.cpp:320`) 가 `g_SceneColorBuffer` 를 transition 없이 SRV 로 읽는다. Bloom 을 끄고 adaptive exposure 를 켜서 `ProcessHDR` 이 `ExtractLuma` 를 부를 때다. harness 이전부터 있던 문제다. D3D12 message 가 log 에 남게 되면 validation error 를 확인하고 따로 fix commit 으로 고친다. 사용자가 이 시점으로 정했다.
-  - 아직 실행으로 확인하지 않은 경로: MAX_PATH 를 넘는 `-settings_dir`, `__fastfail`, stack overflow, debugger 가 붙은 경우, Release build, 두 viewer.py 호출 사이에 app 이 끝난 경우 (exit code 를 알 수 없다고 보고한다), 두 thread 의 동시 crash. dump 와 D3D12 message 가 생기면 확인할 수단이 늘어나므로 이때 돌려 본다.
+  - 아직 실행으로 확인하지 않은 경로: MAX_PATH 를 넘는 `-settings_dir`, `__fastfail`, stack overflow, debugger 가 붙은 경우, Release build, 두 viewer.py 호출 사이에 app 이 끝난 경우 (exit code 를 알 수 없다고 보고한다), 두 thread 의 동시 crash. dump 가 생기면 확인할 수단이 늘어나므로 이때 돌려 본다.
 
 ### UI 상태를 text 로 노출 (로드맵 작업 3 전)
 

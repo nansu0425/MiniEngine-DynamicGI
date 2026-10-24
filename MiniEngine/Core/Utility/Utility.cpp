@@ -285,17 +285,17 @@ namespace
     // Print하는 중에 crash해서 unhandled exception filter가 같은 thread에서 다시 Print해도 막히지 않게 recursive로 둔다.
     std::recursive_mutex s_LogFileMutex;
     FILE* s_LogFile = nullptr;
+}
 
-    void WriteToLogFile( const char* utf8 )
-    {
-        if (s_LogFile == nullptr)
-            return;
+void Utility::PrintToLogFile( const char* utf8 )
+{
+    if (s_LogFile == nullptr)
+        return;
 
-        std::lock_guard<std::recursive_mutex> lock(s_LogFileMutex);
-        fputs(utf8, s_LogFile);
-        // process가 갑자기 끝나도 그 앞까지는 file에 남도록 쓸 때마다 OS에 넘긴다.
-        fflush(s_LogFile);
-    }
+    std::lock_guard<std::recursive_mutex> lock(s_LogFileMutex);
+    fputs(utf8, s_LogFile);
+    // process가 갑자기 끝나도 그 앞까지는 file에 남도록 쓸 때마다 OS에 넘긴다.
+    fflush(s_LogFile);
 }
 
 std::wstring Utility::ToWide( const std::string& utf8 )
@@ -335,7 +335,7 @@ void Utility::Print( const char* msg )
 #else
     OutputDebugStringA(msg);
 #endif
-    WriteToLogFile(msg);
+    PrintToLogFile(msg);
 }
 
 void Utility::Print( const wchar_t* msg )
@@ -346,5 +346,5 @@ void Utility::Print( const wchar_t* msg )
     OutputDebugString(msg);
 #endif
     if (s_LogFile != nullptr)
-        WriteToLogFile(ToUTF8(msg).c_str());
+        PrintToLogFile(ToUTF8(msg).c_str());
 }

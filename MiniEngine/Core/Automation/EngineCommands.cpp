@@ -1,5 +1,6 @@
 #include "Core/pch.h"
 #include "Core/Automation/ControlChannel.h"
+#include "Core/Automation/D3D12MessageLog.h"
 #include "Core/Automation/FrameCapture.h"
 #include "Core/Display/Display.h"
 #include "Core/Editor/EditorSettings.h"
@@ -93,6 +94,19 @@ namespace
         return client;
     }
 
+    Fields DescribeD3D12Messages(void)
+    {
+        const D3D12MessageLog::Status status = D3D12MessageLog::GetStatus();
+        if (!status.logged)
+            return Fields().Flag("logged", false).Text("reason", status.notLoggedReason);
+
+        Fields fields;
+        fields.Flag("logged", true).Flag("gpu_based_validation", status.gpuBasedValidation);
+        for (int severity = 0; severity < (int)_countof(status.countBySeverity); ++severity)
+            fields.Integer(Utility::ToLower(D3D12MessageLog::GetSeverityName((D3D12_MESSAGE_SEVERITY)severity)), (int64_t)status.countBySeverity[severity]);
+        return fields;
+    }
+
     void ReplyStatus(const std::string&, const Reply& reply)
     {
         const RECT client = GetClientSize();
@@ -109,6 +123,7 @@ namespace
             .Text("gpu", GetGpuName())
             .Text("config", kConfiguration)
             .Text("exe", GetExePath())
+            .Object("d3d12_messages", DescribeD3D12Messages())
             .Object("app", ControlChannel::GetStatus()));
     }
 
@@ -348,14 +363,23 @@ namespace
             for (;;)
                 Sleep(1000);
         }
+        else if (fault == "d3d12_error")
+        {
+            // 크기가 0인 buffer는 debug layer가 ERROR를 내고 E_INVALIDARG로 거절할 뿐 device는 그대로다.
+            const CD3DX12_HEAP_PROPERTIES heap(D3D12_HEAP_TYPE_DEFAULT);
+            const CD3DX12_RESOURCE_DESC desc = CD3DX12_RESOURCE_DESC::Buffer(0);
+            Microsoft::WRL::ComPtr<ID3D12Resource> resource;
+            (void)Graphics::g_Device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COMMON, nullptr,
+                IID_PPV_ARGS(&resource));
+        }
     }
 
-    // harness가 crash와 hang을 판정하는지 확인하려고 장애를 일부러 낸다.
+    // harness가 crash, hang, D3D12 message를 판정하는지 확인하려고 장애를 일부러 낸다.
     void HandleFault(const std::string& arguments, const Reply& reply)
     {
-        if (arguments != "assert" && arguments != "exception" && arguments != "hang")
+        if (arguments != "assert" && arguments != "exception" && arguments != "hang" && arguments != "d3d12_error")
         {
-            reply.Error("usage: fault assert|exception|hang");
+            reply.Error("usage: fault assert|exception|hang|d3d12_error");
             return;
         }
 #ifdef RELEASE
@@ -365,6 +389,12 @@ namespace
             return;
         }
 #endif
+        const D3D12MessageLog::Status d3d12Messages = D3D12MessageLog::GetStatus();
+        if (arguments == "d3d12_error" && !d3d12Messages.logged)
+        {
+            reply.Error("D3D12 messages are not logged (" + d3d12Messages.notLoggedReason + ")");
+            return;
+        }
         reply.Ok();
         // 응답이 harness에 닿을 시간을 두고 다음 frame에 일으킨다.
         AfterFrames(1, [arguments] { InjectFault(arguments); });
@@ -387,6 +417,7 @@ namespace ControlChannel
         Register("capture", "capture scene|overlay|display <path without extension>: scene is the HDR before post effects as float32 .dds, "
             "overlay is the debug view layer as .png with premultiplied alpha, display is the presented image with UI as .png", CaptureFrame);
         Register("log", "log mark <text>", MarkLog);
-        Register("fault", "fault assert|exception|hang: injects a failure in the next frame to test the harness", HandleFault);
+        Register("fault", "fault assert|exception|hang|d3d12_error: injects a failure in the next frame to test the harness. "
+            "d3d12_error makes a D3D12 call that the debug layer rejects with an ERROR, and is refused when D3D12 messages are not logged", HandleFault);
     }
 }

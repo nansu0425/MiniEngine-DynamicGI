@@ -22,6 +22,8 @@ namespace Utility
     void InitializeLogFile( void );
     void Print( const char* msg );
     void Print( const wchar_t* msg );
+    // D3D12 debug layer처럼 debugger 출력에 이미 쓰인 message가 거기에 두 번 보이지 않게 -log file에만 쓴다.
+    void PrintToLogFile( const char* utf8 );
 
     inline void Printf( const char* format, ... )
     {
@@ -44,27 +46,24 @@ namespace Utility
     }
 
 #ifndef RELEASE
+    // 다른 thread가 쓰는 줄이 이 줄의 중간에 끼지 않게 한 줄을 다 만든 뒤 한 번에 쓴다.
     inline void PrintSubMessage( const char* format, ... )
     {
-        Print("--> ");
         char buffer[256];
         va_list ap;
         va_start(ap, format);
         vsprintf_s(buffer, 256, format, ap);
         va_end(ap);
-        Print(buffer);
-        Print("\n");
+        Print((std::string("--> ") + buffer + "\n").c_str());
     }
     inline void PrintSubMessage( const wchar_t* format, ... )
     {
-        Print("--> ");
         wchar_t buffer[256];
         va_list ap;
         va_start(ap, format);
         vswprintf(buffer, 256, format, ap);
         va_end(ap);
-        Print(buffer);
-        Print("\n");
+        Print((std::wstring(L"--> ") + buffer + L"\n").c_str());
     }
     inline void PrintSubMessage( void )
     {

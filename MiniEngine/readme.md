@@ -28,7 +28,8 @@ On exit, ModelViewer saves its state in the working directory, or in the folder 
 ## Command line options for automation:
 scripts/viewer.py starts ModelViewer with these options. They change nothing when omitted.
 * -settings_dir <folder>: read and write editor.ini and imgui.ini in <folder> instead of the working directory
-* -log <file>: also write the debug output to <file>, flushed at every message
+* -log <file>: also write the debug output to <file>, flushed at every message. While the D3D12 debug layer is on, its messages go there too, in the lines described in Core/Automation/D3D12MessageLog.h
+* -gpu_debug 1: also turn on GPU-based validation of the D3D12 debug layer. The debug layer is always on in Debug, and in the other configurations only with -debug 1
 * -unattended 1: for runs that nobody watches. What it changes is described in Core/Automation/UnattendedRun.h
 * -control <name>: take commands on the named pipe \\.\pipe\<name> with the protocol described in Core/Automation/ControlChannel.h. Send `help` for the commands
 * -hdr_output 0: present in SDR even on an HDR display

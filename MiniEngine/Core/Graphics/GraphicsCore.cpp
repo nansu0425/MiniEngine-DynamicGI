@@ -29,6 +29,7 @@
 #include "Core/Particles/ParticleEffectManager.h"
 #include "Core/Effects/TemporalEffects/TemporalEffects.h"
 #include "Core/Display/Display.h"
+#include "Core/Automation/D3D12MessageLog.h"
 
 #pragma comment(lib, "d3d12.lib") 
 
@@ -175,6 +176,7 @@ void Graphics::Initialize(bool RequireInlineRaytracing)
 #endif
 
     DWORD dxgiFactoryFlags = 0;
+    bool gpuBasedValidation = false;
 
     if (useDebugLayers)
     {
@@ -191,6 +193,7 @@ void Graphics::Initialize(bool RequireInlineRaytracing)
                 if (SUCCEEDED((debugInterface->QueryInterface(MY_IID_PPV_ARGS(&debugInterface1)))))
                 {
                     debugInterface1->SetEnableGPUBasedValidation(true);
+                    gpuBasedValidation = true;
                 }
             }
         }
@@ -333,7 +336,7 @@ void Graphics::Initialize(bool RequireInlineRaytracing)
         ExitProcess(1);
     }
 
-#if _DEBUG
+    // -debug 1로 debug layer를 켠 Debug 밖의 config도 Debug와 같은 message를 남기고 세도록 #if _DEBUG 없이 건다.
     ID3D12InfoQueue* pInfoQueue = nullptr;
     if (SUCCEEDED(g_Device->QueryInterface(MY_IID_PPV_ARGS(&pInfoQueue))))
     {
@@ -384,7 +387,7 @@ void Graphics::Initialize(bool RequireInlineRaytracing)
         pInfoQueue->PushStorageFilter(&NewFilter);
         pInfoQueue->Release();
     }
-#endif
+    D3D12MessageLog::Start(g_Device, gpuBasedValidation);
 
     // We like to do read-modify-write operations on UAVs during post processing.  To support that, we
     // need to either have the hardware do typed UAV loads of R11G11B10_FLOAT or we need to manually
@@ -459,6 +462,7 @@ void Graphics::Shutdown( void )
     ID3D12DebugDevice* debugInterface;
     if (SUCCEEDED(g_Device->QueryInterface(&debugInterface)))
     {
+        D3D12MessageLog::BeginLiveObjectReport();
         debugInterface->ReportLiveDeviceObjects(D3D12_RLDO_DETAIL | D3D12_RLDO_IGNORE_INTERNAL);
         debugInterface->Release();
     }
@@ -466,6 +470,7 @@ void Graphics::Shutdown( void )
 
     if (g_Device != nullptr)
     {
+        D3D12MessageLog::Stop(g_Device);
         g_Device->Release();
         g_Device = nullptr;
     }
