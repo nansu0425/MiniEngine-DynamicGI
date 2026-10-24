@@ -92,6 +92,8 @@
     <ClInclude Include="Raytracing\RayQueryValidation.h" />
     <ClInclude Include="Raytracing\RayQuerySmokeTest.h" />
     <ClInclude Include="Raytracing\SceneHeapTable.h" />
+    <ClInclude Include="PathTracer\PathTracer.h" />
+    <ClInclude Include="PathTracer\PathTracerPanel.h" />
     <ClInclude Include="Renderer\Renderer.h" />
     <ClInclude Include="Sponza\SponzaRenderer.h" />
     <ClInclude Include="Loader\TextureConvert.h" />
@@ -117,6 +119,8 @@
     <ClCompile Include="Raytracing\RayQueryValidation.cpp" />
     <ClCompile Include="Raytracing\RayQuerySmokeTest.cpp" />
     <ClCompile Include="Raytracing\SceneHeapTable.cpp" />
+    <ClCompile Include="PathTracer\PathTracer.cpp" />
+    <ClCompile Include="PathTracer\PathTracerPanel.cpp" />
     <ClCompile Include="Renderer\Renderer.cpp" />
     <ClCompile Include="Sponza\SponzaRenderer.cpp" />
     <ClCompile Include="Loader\TextureConvert.cpp" />
@@ -213,6 +217,9 @@
       <ShaderModel>6.5</ShaderModel>
     </FxCompile>
     <FxCompile Include="Raytracing\RayQueryValidationCS.hlsl">
+      <ShaderModel>6.5</ShaderModel>
+    </FxCompile>
+    <FxCompile Include="PathTracer\PathTracerCS.hlsl">
       <ShaderModel>6.5</ShaderModel>
     </FxCompile>
   </ItemGroup>

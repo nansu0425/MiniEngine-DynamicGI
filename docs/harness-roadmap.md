@@ -10,9 +10,9 @@ harness 는 agent 가 ModelViewer 를 build, 실행하고 명령으로 조작, c
 
 ## 작업
 
-순서는 로드맵의 작업에 필요한 때를 따른다. 입력 주입, 진단, UI 상태 노출은 로드맵 작업 3 (PT pass 와 누적) 전에 한다. 작업 3 이 PT panel 을 만들고, 그 UI 흐름과 camera 이동에 따른 reset 을 확인해야 하기 때문이다.
+harness 는 미리 만들지 않는다. 로드맵의 작업을 하다가 정말 필요하다고 느낄 때, 그때 필요한 만큼만 만든다. 아래 작업은 그때 고를 후보와 근거이고, 제목의 때는 예상일 뿐 일정이 아니다.
 
-### 입력 주입 (로드맵 작업 3 전)
+### 입력 주입 (필요해질 때)
 
 - 할 일
   - `-input virtual` flag 를 더한다. `KbmUpdate` (`Core/App/Input.cpp`) 가 DirectInput 대신 virtual 상태를 읽고 foreground 검사를 건너뛴다. camera 가 cursor 를 잡는 동안의 `GetCursorPos`, `SetCursorPos` (같은 파일) 도 virtual 로 바꾼다. 그러면 UI 와 camera 가 입력을 나누는 지금의 규칙이 그대로 돈다.
@@ -34,7 +34,7 @@ harness 는 agent 가 ModelViewer 를 build, 실행하고 명령으로 조작, c
   - View menu 를 click 하면 `settings get Panels` 의 값이 바뀐다. virtual F1 뒤에 `status` 의 ui 가 hidden 이다.
   - virtual input 으로 camera 를 움직이는 동안 velocity 가 0 이 아니고, velocity 를 쓰는 경로의 결과가 정지한 camera 와 다르다. 판정 수단은 이 작업에서 정한다. 후보는 velocity buffer 를 capture target 으로 더해 0 이 아닌 pixel 을 세는 것과, 움직이는 동안 TAA 의 Speed Limit 만 바꾼 두 scene capture 가 다르고 정지한 camera 에서는 같은지 보는 것이다. TAA 를 켠 capture 는 지난 frame 수에 따라 달라지므로 (SKILL.md "결정성" 절) 뒤의 방법은 두 run 의 명령과 frame 수를 맞춘다.
 
-### 진단 (로드맵 작업 3 전)
+### 진단 (필요해질 때)
 
 - 할 일
   - DRED 를 켠다.
@@ -73,7 +73,7 @@ harness 는 agent 가 ModelViewer 를 build, 실행하고 명령으로 조작, c
   - `do` 에 `fault d3d12_error` 와 명령 여럿을 주면 error 의 증가분이 한 명령의 줄에만 나온다. fault 가 다음 frame 에 일어나므로 그 줄이 fault 의 줄인지 다음 명령의 줄인지는 이 작업에서 정해 SKILL.md 에 적는다.
   - `\n` 으로 끝나지 않는 CRT error 뒤에도 `stop` 의 exit reason 이 `crt_error` 다.
 
-### UI 상태를 text 로 노출 (로드맵 작업 3 전)
+### UI 상태를 text 로 노출 (필요해질 때)
 
 - 할 일: UI 가 바꾸는 상태 중 text 로 읽을 수 없는 것을 조사해 명령이나 `status` 로 노출한다. 지금 아는 것은 `SceneEditor` 가 고른 object 와 gizmo mode (translate, rotate), sun icon 의 위치 (`ModelViewer.cpp` 의 `Sun`) 다.
 - 근거: SKILL.md "판정" 절은 text 로 읽을 수 없는 상태를 바꾸는 조작의 결과를 판정하지 못한다고 정한다. 입력 주입이 UI 를 조작하게 되면 그 결과를 읽을 명령이 있어야 판정할 수 있다.
@@ -82,7 +82,7 @@ harness 는 agent 가 ModelViewer 를 build, 실행하고 명령으로 조작, c
 ### 측정 (로드맵 작업 5, 6, 12 즈음)
 
 - `timing <path>`: Profiler 의 GPU time 과 CPU time 을 path 로 읽는다 (`Core/Profiling/EngineProfiling`). Release 에서는 `ScopedTimer` 가 no-op 이라 error 를 돌려준다. capture 한 frame 은 GPU 를 기다리므로 (`FrameCapture.h`) 그 frame 은 재지 않는다. 완료 기준: Profile 에서 값을, Release 에서 error 를 돌려준다 (selftest).
-- PT 가 자기 명령 (`pt status|reset|wait samples=|export dir=`) 을 등록한다. 로드맵 작업 3, 6 에 이 항목을 넣을지는 그때 사용자가 정한다.
+- `pt export dir=`: PT 의 `pt` 명령에 export 를 더한다. 로드맵 작업 6 에 넣을지는 그때 사용자가 정한다.
 - 검토만 한 것: pixel 값이나 영역 통계를 읽는 명령. 지금은 scene capture 의 DDS 를 Python 으로 읽으면 되므로 만들지 않는다.
 
 ### pixtool wrapper (필요해질 때)

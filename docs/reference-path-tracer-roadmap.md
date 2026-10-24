@@ -24,7 +24,7 @@ DDGI 와 RT Reflection 의 정답 image 를 만드는 path tracer 를 inline Ray
   - chain, curtain, flagpole, vase_hanging 의 금속 영역은 base color 가 매우 어둡다 (측정).
 - 기본 Environment 는 `FindFirstFile` 이 처음 찾은 set 이다 (`ModelViewer.cpp:290-331`). NTFS 는 이름순으로 돌려주므로 Atrium 이다 (추측, Windows 는 순서를 보장하지 않는다). cubemap 에 sun disk 는 없다. +Y 면에 큰 천창이 있고 (8 bit 로 decode 하면 texel 의 39% 가 1 을 넘는다) 작은 downlight 와 간판 조명이 있다. 그 HDR 밝기는 재지 않았다.
   - CloudCommon 은 목록에 없다. DirectX-Graphics-Samples `e5975f9` 에서 받은 `Textures/` 의 짝이 `CloudCommon_diffuseIBL.dds` 와 `CloudCommons_specularIBL.dds` 로 이름이 어긋나, 찾는 `CloudCommon_specularIBL.dds` 가 invalid 라 그 set 을 넣지 않는다 (`ModelViewer.cpp:310-320`, `TextureManager.cpp:129-131`). harness log 도 "Found 5 IBL environment map sets" 다. upstream asset 의 이름 문제라 고치지 않는다.
-- 입력이 없으면 EditorCamera 의 pose 가 frame 마다 bit 단위로 같다 (추측, 작업 3 에서 확인). 같은 GPU 와 driver 에서 같은 입력은 같은 bit 의 결과를 낸다 (추측, 작업 6 에서 확인).
+- 입력이 없으면 EditorCamera 의 pose 가 frame 마다 bit 단위로 같다 (작업 3 에서 확인). 같은 GPU 와 driver 에서 같은 입력은 같은 bit 의 결과를 낸다 (추측, 작업 6 에서 확인).
 - `SurfaceRayOrigin` 의 offset 이 Sponza ×125 (Khronos 판. world 좌표는 옛 판 ×100 과 같다) 에서 충분한지는 재지 않았다 (323e185). PT 에서 self-hit 나 뚫림으로 보이는 문제가 생기면 그때 검증 pass 에 mode 를 더한다. furnace 는 이 문제를 잡지 못하고 Cornell box (작업 13) 가 잡는다.
 - PT 가 쓰는 입력 경로 (loader → material data → `HitSurface`) 와 단위, light 가 spec 과 다른 곳은 설계할 때 조사했다. README "Rendering 기준" 대로 그 입력을 처음 쓰는 작업이 고친다. 작업마다 "입력 경로" 항목에 적었다.
 - GPU 는 RTX 4060 Laptop 이다 (ef16b70). 1 spp 의 비용은 아직 모르고 작업 5 에서 처음 잰다.

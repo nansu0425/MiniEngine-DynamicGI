@@ -31,6 +31,7 @@
 #include "Model/Raytracing/RaytracingView.h"
 #include "Model/Raytracing/RaytracingPanel.h"
 #include "Model/Raytracing/RayQueryValidation.h"
+#include "Model/PathTracer/PathTracerPanel.h"
 #include "Model/Loader/glTF.h"
 #include "Model/Renderer/Renderer.h"
 #include "Model/Model.h"
@@ -345,6 +346,7 @@ void ModelViewer::Startup( void )
     Renderer::Initialize();
     RayQuerySmokeTest::Run();
     RaytracingView::Initialize();
+    PathTracerPanel::Initialize();
 
     LoadIBLTextures();
 
@@ -400,6 +402,7 @@ void ModelViewer::Startup( void )
 void ModelViewer::Cleanup( void )
 {
     SceneEditor::RemoveObject(m_Sun);
+    PathTracerPanel::Shutdown();
     RaytracingView::Shutdown();
     m_RaytracingScene.Destroy();
     m_ModelInst = nullptr;
@@ -433,6 +436,7 @@ void ModelViewer::Update( float deltaT )
 
     SceneEditor::Update(m_Camera);
     RaytracingPanel::Update();
+    PathTracerPanel::Update();
 
     GraphicsContext& gfxContext = GraphicsContext::Begin(L"Scene Update");
 
@@ -569,6 +573,10 @@ void ModelViewer::RenderScene( void )
         DepthOfField::Render(gfxContext, m_Camera.GetNearClip(), m_Camera.GetFarClip());
     else
         MotionBlur::RenderObjectBlur(gfxContext, g_VelocityBuffer);
+
+    // scene color의 마지막 pass 뒤에 덮어써서, PT가 raster와 같은 bloom, exposure, tone mapping을 거쳐 두 화면을 같은 조건으로 견주게 한다.
+    // raster는 그대로 그린다. ray tracing view의 validation이 raster의 depth를 읽는다.
+    PathTracerPanel::Render(gfxContext.GetComputeContext(), m_Camera, m_MainViewport, m_RaytracingScene, g_SceneColorBuffer);
 
     gfxContext.Finish();
 }

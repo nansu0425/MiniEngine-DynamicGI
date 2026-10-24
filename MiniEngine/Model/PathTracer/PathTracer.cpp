@@ -1,0 +1,144 @@
+#include "Model/PathTracer/PathTracer.h"
+#include "Model/Raytracing/CameraRays.h"
+#include "Model/Raytracing/RaytracingScene.h"
+#include "Model/Raytracing/SceneHeapTable.h"
+#include "Core/Camera/Camera.h"
+#include "Core/Display/Display.h"
+#include "Core/Graphics/GraphicsCore.h"
+#include "Core/Graphics/Command/CommandContext.h"
+#include "Core/Graphics/Command/CommandListManager.h"
+#include "Core/Graphics/Resource/ColorBuffer.h"
+
+#include "Output/Model/CompiledShaders/PathTracerCS.h"
+
+#include <algorithm>
+
+using namespace Math;
+using namespace Graphics;
+
+namespace
+{
+    enum RootParameter { kConstants, kScene, kOutputs = kScene + RaytracingScene::kNumRootParameters, kNumRootParameters };
+    RootSignature s_RootSignature;
+    ComputePSO s_PSO(L"Path Tracer");
+
+    // PathTracerCS.hlsl의 u register 순서다.
+    enum UAV { kAccumulationUAV, kSceneColorUAV, kNumUAVs };
+    SceneHeapTable s_UAVs;
+    ColorBuffer s_Accumulation;
+
+    // 누적한 image를 정하는 조건. Settings의 samplesPerFrame과 targetSamples는 쌓는 속도와 양만 정하므로 넣지 않는다.
+    struct ImageConditions
+    {
+        // camera의 위치, 방향, FOV와 scene의 해상도가 정한다.
+        CameraRays rays;
+        uint32_t seed;
+    };
+
+    // rasterSampleOffset은 비교하지 않는다. 그 값은 TAA jitter를 따라 frame마다 바뀌지만, PT는 pixel 격자 안의 위치를 스스로 고르므로
+    // image가 그대로다. 비교하면 TAA를 켠 동안 frame마다 reset되어 sample이 쌓이지 않는다.
+    bool HaveSameImage(const ImageConditions& a, const ImageConditions& b)
+    {
+        return XMVector3Equal(a.rays.origin, b.rays.origin) &&
+            XMVector3Equal(a.rays.topLeftCornerDirection, b.rays.topLeftCornerDirection) &&
+            XMVector3Equal(a.rays.pixelStepRight, b.rays.pixelStepRight) &&
+            XMVector3Equal(a.rays.pixelStepDown, b.rays.pixelStepDown) &&
+            a.seed == b.seed;
+    }
+
+    bool s_ResetRequested = true;
+    ImageConditions s_Accumulated;
+    PathTracer::Progress s_Progress = {};
+
+    __declspec(align(16)) struct Constants
+    {
+        CameraRays Rays;
+        uint32_t Seed;
+        uint32_t FirstSample;
+        uint32_t NumSamples;
+    };
+
+    // SceneHeapTable.h의 규칙대로, 앞 frame의 dispatch가 읽고 있을 수 있는 buffer는 GPU를 기다린 뒤에 다시 만든다.
+    void FitAccumulationTo(const ColorBuffer& sceneColor)
+    {
+        if (s_Accumulation.GetWidth() == sceneColor.GetWidth() && s_Accumulation.GetHeight() == sceneColor.GetHeight())
+            return;
+
+        g_CommandManager.IdleGPU();
+        s_Accumulation.Create(L"Path Tracer Accumulation", sceneColor.GetWidth(), sceneColor.GetHeight(), 1, DXGI_FORMAT_R32G32B32A32_FLOAT);
+        s_ResetRequested = true;
+    }
+}
+
+void PathTracer::Initialize(void)
+{
+    s_RootSignature.Reset(kNumRootParameters);
+    s_RootSignature[kConstants].InitAsConstantBuffer(0);
+    RaytracingScene::InitRootParameters(s_RootSignature, kScene);
+    s_RootSignature[kOutputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, kNumUAVs);
+    s_RootSignature.Finalize(L"Path Tracer");
+
+    s_PSO.SetRootSignature(s_RootSignature);
+    s_PSO.SetComputeShader(g_pPathTracerCS, sizeof(g_pPathTracerCS));
+    s_PSO.Finalize();
+
+    s_UAVs.Create(kNumUAVs);
+}
+
+void PathTracer::Shutdown(void)
+{
+    s_Accumulation.Destroy();
+}
+
+void PathTracer::Reset(void)
+{
+    s_ResetRequested = true;
+}
+
+PathTracer::Progress PathTracer::GetProgress(void)
+{
+    return s_Progress;
+}
+
+void PathTracer::Render(ComputeContext& context, const Settings& settings, const Camera& camera, const D3D12_VIEWPORT& rasterViewport,
+    const RaytracingScene& scene, ColorBuffer& sceneColor)
+{
+    ScopedTimer _prof(L"Path Tracer", context);
+
+    FitAccumulationTo(sceneColor);
+
+    // 변경을 알려 주는 곳이 없으므로 쌓던 때의 조건과 견준다. Show를 끈 동안 바뀐 조건도 다시 켤 때 잡힌다.
+    const ImageConditions conditions = { DescribeCameraRays(camera, rasterViewport), settings.seed };
+    if (s_ResetRequested || !HaveSameImage(conditions, s_Accumulated))
+    {
+        s_Accumulated = conditions;
+        s_Progress.samples = 0;
+        s_Progress.seconds = 0.0;
+        ++s_Progress.resets;
+        s_ResetRequested = false;
+    }
+
+    Constants constants;
+    constants.Rays = conditions.rays;
+    constants.Seed = settings.seed;
+    constants.FirstSample = s_Progress.samples;
+    constants.NumSamples = s_Progress.samples < settings.targetSamples ? std::min(settings.samplesPerFrame, settings.targetSamples - s_Progress.samples) : 0;
+
+    s_UAVs.PointTo(kAccumulationUAV, s_Accumulation, s_Accumulation.GetUAV());
+    s_UAVs.PointTo(kSceneColorUAV, sceneColor, sceneColor.GetUAV());
+
+    context.SetRootSignature(s_RootSignature);
+    context.SetPipelineState(s_PSO);
+    context.TransitionResource(s_Accumulation, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+    context.TransitionResource(sceneColor, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+    context.SetDynamicConstantBufferView(kConstants, sizeof(constants), &constants);
+    scene.Bind(context, kScene);
+    s_UAVs.Bind(context, kOutputs);
+    context.Dispatch2D(sceneColor.GetWidth(), sceneColor.GetHeight());
+
+    if (constants.NumSamples != 0)
+    {
+        s_Progress.samples += constants.NumSamples;
+        s_Progress.seconds += GetMeasuredFrameTime();
+    }
+}
