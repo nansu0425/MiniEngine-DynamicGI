@@ -140,7 +140,7 @@ raster 는 기준이 아니다 (8432ed7). 같은 시점의 두 화면으로 볼 
   - 수정과 수치, 작업 2 부터 쓰는 Validation: Depth Comparison 의 Log 줄 세 개는 24b0057 의 message 에 있다.
 
 2. UV 를 float32 로 (10/24 ~ 10/25, 3 h)
-   - 입력 경로: UV0, UV1 을 `R16G16_FLOAT` 로 담아 Sponza 에서 base color texel 로 최대 14.1 texel 이 어긋난다 (`MeshConvert.cpp:350, 355, 405`). spec 은 float accessor 값을 32 bit 이상의 float 로 다루라고 한다 (SHOULD, `Specification.adoc:1154`). PT 는 SHOULD 도 따르므로 고친다 (README "Rendering 기준").
+   - 입력 경로: UV0, UV1 을 `R16G16_FLOAT` 로 담아 Sponza 에서 base color texel 로 최대 14.1 texel 이 어긋난다 (`MeshConvert.cpp:350, 355, 405`). TEXCOORD 의 float accessor 값은 32 bit float 이므로 (`Specification.adoc:1143, 1603`) half 로 담으면 asset 과 다른 UV 로 그린다. unorm16 accessor 도 half 에 담으면 normalized 값의 변환에 32 bit 이상의 float 를 쓰라는 SHOULD (`:1154`) 를 지키지 못한다. PT 는 SHOULD 도 따르므로 고친다 (README "Rendering 기준").
    - 수정: `Model/Loader/MeshConvert.cpp` (vertex 와 depth VB 의 UV 를 `R32G32_FLOAT` 로), `Model/Renderer/Renderer.cpp` (raster input layout, `:125, 138, 341-345`), `Model/Raytracing/BottomLevelAS.cpp` (attribute offset 의 4 byte 가정, `:74-90`), `Model/Raytracing/RaytracingScene.hlsli` (UV 보간, `:100-114`), `Model/Loader/ModelLoader.h` (`.mini` version).
    - 완료 기준: `.mini` 의 UV 가 glTF accessor 와 bit 단위로 같다 (확인 script). raster 에서 ceiling, bricks 처럼 UV 가 큰 면의 texture 만 조금 옮겨지고, Debug: UV0 와 Validation: Depth Comparison (작업 B 가 남긴 Log 줄 세 개로 Restore) 의 수치가 그대로다.
 3. PT pass 와 누적 (10/25, 5 h)
