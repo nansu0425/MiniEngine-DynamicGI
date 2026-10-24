@@ -64,7 +64,6 @@ harness 는 agent 가 ModelViewer 를 build, 실행하고 명령으로 조작, c
 ### 측정 (로드맵 작업 5, 6, 12 즈음)
 
 - `timing <path>`: Profiler 의 GPU time 과 CPU time 을 path 로 읽는다 (`Core/Profiling/EngineProfiling`). Release 에서는 `ScopedTimer` 가 no-op 이라 error 를 돌려준다. capture 한 frame 은 GPU 를 기다리므로 (`FrameCapture.h`) 그 frame 은 재지 않는다. 완료 기준: Profile 에서 값을, Release 에서 error 를 돌려준다 (selftest).
-- DDS reader 를 `scripts/imagefiles.py` 로 옮겨 로드맵의 `scripts/compare-images.py` 와 같이 쓴다. 로드맵 작업 6 이 `compare-images.py` 를 만들 때 한다. 두 script 가 같은 파일을 다르게 읽지 않게 하려는 것이다.
 - PT 가 자기 명령 (`pt status|reset|wait samples=|export dir=`) 을 등록한다. 로드맵 작업 3, 6 에 이 항목을 넣을지는 그때 사용자가 정한다.
 - 검토만 한 것: pixel 값이나 영역 통계를 읽는 명령. 지금은 scene capture 의 DDS 를 Python 으로 읽으면 되므로 만들지 않는다.
 

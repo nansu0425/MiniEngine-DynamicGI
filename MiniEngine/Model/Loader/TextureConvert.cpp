@@ -45,6 +45,20 @@ void CompileTextureOnDemand(const std::wstring& originalFile, uint32_t flags)
     }
 }
 
+void CompileTextureWithCurrentConverter(const std::wstring& originalFile, uint32_t flags)
+{
+    struct _stat64 srcFileStat;
+
+    bool srcFileMissing = _wstat64(originalFile.c_str(), &srcFileStat) == -1;
+    // source 가 DDS 이면 ConvertToDDS 는 그 source 를 덮어쓴다.
+    bool srcFileIsDDS = Utility::ToLower(Utility::GetFileExtension(originalFile)) == L"dds";
+
+    if (srcFileMissing || srcFileIsDDS)
+        CompileTextureOnDemand(originalFile, flags);
+    else
+        ConvertToDDS(originalFile, flags);
+}
+
 bool ConvertToDDS( const std::wstring& filePath, uint32_t Flags )
 {
     bool bInterpretAsSRGB =	GetFlag(kSRGB);
@@ -65,6 +79,8 @@ bool ConvertToDDS( const std::wstring& filePath, uint32_t Flags )
     std::wstring ext = Utility::ToLower(Utility::GetFileExtension(filePath));
 
     // Load texture image
+    // image 의 colorspace 정보는 무시하고 그 image 를 쓰는 slot 이 transfer function 을 정한다 (glTF spec Images 절, MUST).
+    // 그래서 TGA 와 WIC loader 는 sRGB metadata 를 무시하고 읽는다.
     TexMetadata info;
     std::unique_ptr<ScratchImage> image(new ScratchImage);
 
@@ -86,7 +102,7 @@ bool ConvertToDDS( const std::wstring& filePath, uint32_t Flags )
     }
     else if ( ext == L"tga" )
     {
-        HRESULT hr = LoadFromTGAFile( filePath.c_str(), &info, *image );
+        HRESULT hr = LoadFromTGAFile( filePath.c_str(), TGA_FLAGS_IGNORE_SRGB, &info, *image );
         if (FAILED(hr))
         {
             Utility::Printf( "Could not load texture \"%ws\" (TGA: %08X).\n", filePath.c_str(), hr );
@@ -120,11 +136,7 @@ bool ConvertToDDS( const std::wstring& filePath, uint32_t Flags )
     }
     else
     {
-        WIC_FLAGS wicFlags = WIC_FLAGS_NONE;
-        //if (g_pScene->Settings().bIgnoreSRGB)
-        //    wicFlags |= WIC_FLAGS_IGNORE_SRGB;
-
-        HRESULT hr = LoadFromWICFile( filePath.c_str(), wicFlags, &info, *image );
+        HRESULT hr = LoadFromWICFile( filePath.c_str(), WIC_FLAGS_IGNORE_SRGB, &info, *image );
         if (FAILED(hr))
         {
             Utility::Printf( "Could not load texture \"%ws\" (WIC: %08X).\n", filePath.c_str(), hr );
@@ -166,7 +178,7 @@ bool ConvertToDDS( const std::wstring& filePath, uint32_t Flags )
     }
     else if (bBlockCompress)
     {
-        tformat = bInterpretAsSRGB ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM;
+        tformat = DXGI_FORMAT_R8G8B8A8_UNORM;
         if (bUseBestBC)
             cformat = bInterpretAsSRGB ? DXGI_FORMAT_BC7_UNORM_SRGB : DXGI_FORMAT_BC7_UNORM;
         else if (bPreserveAlpha)
@@ -176,7 +188,7 @@ bool ConvertToDDS( const std::wstring& filePath, uint32_t Flags )
     }
     else
     {
-        cformat = tformat = bInterpretAsSRGB ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM;
+        cformat = tformat = DXGI_FORMAT_R8G8B8A8_UNORM;
     }
 
     if (bBumpMap)
@@ -212,6 +224,14 @@ bool ConvertToDDS( const std::wstring& filePath, uint32_t Flags )
             image.swap(timage);
             info.format = tformat;
         }
+    }
+
+    // base color 와 emissive 의 값은 sRGB 로 encode 되어 있으므로 (spec Metallic-Roughness Material, Emissive Parameter 절)
+    // 값을 두고 format 만 바꿔 GPU 가 sample 할 때 decode 하게 한다. mip 생성보다 먼저 바꿔야 decode 한 값으로 filter 한다.
+    if (bInterpretAsSRGB && !isHDR)
+    {
+        image->OverrideFormat(MakeSRGB(info.format));
+        info.format = image->GetMetadata().format;
     }
 
     // Handle mipmaps

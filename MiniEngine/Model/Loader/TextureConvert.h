@@ -35,6 +35,9 @@ inline uint8_t TextureOptions(bool sRGB, bool hasAlpha=false, bool invertY=false
 // If the DDS version of the texture specified does not exist or is older than the source texture, reconvert it.
 void CompileTextureOnDemand(const std::wstring& originalFile, uint32_t flags);
 
+// DDS 가 이미 있어도 source 를 지금의 변환으로 다시 변환한다. source 가 없거나 DDS 이면 CompileTextureOnDemand 와 같다.
+void CompileTextureWithCurrentConverter(const std::wstring& originalFile, uint32_t flags);
+
 // Loads a non-DDS texture such as TGA, PNG, or JPG, then converts it to a more optimal
 // DDS format with a full mip chain.  Resultant file has the same path with the file extension
 // changed to "DDS".

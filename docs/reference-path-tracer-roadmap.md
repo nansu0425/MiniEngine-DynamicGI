@@ -150,7 +150,7 @@ raster 는 기준이 아니다 (8432ed7). 같은 시점의 두 화면으로 볼 
    - 입력 경로: normal 과 tangent 는 작업 4 가 고쳤다. normal texture 의 decode 와 `scale` 은 spec 과 맞다.
    - 완료 기준: 상수 sky 로 비친 Sponza 가 보이고, Max Bounces 를 1 에서 올리면 구석이 밝아진다. Furnace (albedo 1, emission 0) 와 Geometric Normals 에서 edge 와 texture 가 사라진 균일한 화면이 되고, Geometric Normals 를 끄면 normal 이 꺾인 곳만 어두워진다. Profiler 의 1 spp GPU time (B = 64, RR on, 기본 시점과 해상도) 을 적는다.
 6. Export, 비교 script, furnace 의 수치 (10/26, 4.5 h)
-   - 추가: `Model/PathTracer/PathTracerCapture.h, .cpp`, `scripts/compare-images.py` (`diff`, `furnace`, `png`). 수정: panel (Export, Export at Powers of 4, Log, invalid sample 수), `.gitignore`, `README.md` (준비에 Python 과 package).
+   - 추가: `Model/PathTracer/PathTracerCapture.h, .cpp`, `scripts/compare-images.py` (`diff`, `furnace`, `png`. DDS 는 `scripts/imagefiles.py` 로 읽는다). 수정: panel (Export, Export at Powers of 4, Log, invalid sample 수), `.gitignore`, `README.md` (준비에 Python 과 package).
    - Export at Powers of 4 를 켜면 sample 수가 1, 4, 16, … 에 이를 때마다 export 한다. Log 줄은 위 "재현" 의 형식이다.
    - 완료 기준 (furnace 는 모두 Lambert, Geometric Normals, RR off. 분산이 0 이라 16 spp 로 충분하다):
      - white furnace (albedo 1, emission 0, sky L, B = 1024): 모든 pixel 이 |X/L − 1| ≤ 1e-4 이고 invalid 가 0 이다. throughput 과 종료의 정규화를 본다.

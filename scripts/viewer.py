@@ -18,6 +18,8 @@ import time
 from ctypes import wintypes
 from pathlib import Path
 
+from imagefiles import ImageFileError, read_dds_rgba32f
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 ENGINE_DIR = REPO_ROOT / 'MiniEngine'
 VIEWER_DIR = ENGINE_DIR / 'ModelViewer'
@@ -448,23 +450,6 @@ def newest_source_mtime():
 
 # --- 이미지 -------------------------------------------------------------------------------
 
-def read_dds_rgba32f(path):
-    import numpy as np
-    data = path.read_bytes()
-    if data[:4] != b'DDS ':
-        raise HarnessError(f'{path} is not a DDS file')
-    height, width = int.from_bytes(data[12:16], 'little'), int.from_bytes(data[16:20], 'little')
-    four_cc = data[84:88]
-    # DXGI_FORMAT_R32G32B32A32_FLOAT 는 DX10 header 로, D3DFMT_A32B32G32R32F(116) 는 legacy header 로 쓴다.
-    if four_cc == b'DX10' and int.from_bytes(data[128:132], 'little') == 2:
-        offset = 148
-    elif int.from_bytes(four_cc, 'little') == 116:
-        offset = 128
-    else:
-        raise HarnessError(f'{path} is not RGBA32F')
-    return np.frombuffer(data, dtype='<f4', count=width * height * 4, offset=offset).reshape(height, width, 4)
-
-
 def tone_map_for_view(hdr, exposure):
     import numpy as np
     rgb = np.nan_to_num(hdr[..., :3], nan=0.0, posinf=1e4) * exposure
@@ -619,7 +604,7 @@ def command_selftest(args):
     user_settings = hash_user_settings()
     try:
         selftest_running_app(args, check)
-    except HarnessError as error:
+    except (HarnessError, ImageFileError) as error:
         check('selftest ran to the end', False, str(error))
     finally:
         instance = load_instance()
@@ -861,7 +846,7 @@ def main():
     args = parser.parse_args()
     try:
         return args.handler(args)
-    except HarnessError as error:
+    except (HarnessError, ImageFileError) as error:
         print(f'error: {error}', file=sys.stderr)
         return 1
 

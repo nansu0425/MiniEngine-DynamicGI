@@ -327,7 +327,7 @@ void BuildMaterials(ModelData& model, const glTF::Asset& asset)
         if (iter != textureOptions.end())
         {
             model.m_TextureOptions.push_back(iter->second);
-            CompileTextureOnDemand(asset.m_basePath + Utility::UTF8ToWideString(iter->first), iter->second);
+            CompileTextureWithCurrentConverter(asset.m_basePath + Utility::UTF8ToWideString(iter->first), iter->second);
         }
         else
             model.m_TextureOptions.push_back(0xFF);
