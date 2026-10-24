@@ -821,43 +821,42 @@ def main():
     def add_config(command):
         command.add_argument('--config', choices=CONFIGS, default=DEFAULT_CONFIG)
 
-    command = commands.add_parser('build', help='build ModelViewer and print only the errors')
-    add_config(command)
-    command.set_defaults(handler=command_build)
+    def add_command(name, summary, handler):
+        # 같은 문장을 viewer.py --help 의 subcommand 목록과 그 subcommand 의 --help 에 함께 보인다.
+        command = commands.add_parser(name, help=summary, description=summary)
+        command.set_defaults(handler=handler)
+        return command
 
-    command = commands.add_parser('start', help='build, then start ModelViewer in a new run folder under MiniEngine/ModelViewer/Harness/runs '
-                                                'with a copy of scripts/harness-baseline as -settings_dir, so the user\'s editor.ini and imgui.ini '
-                                                f'stay untouched. Deletes all but the newest {KEPT_RUNS} run folders, keeping the running one')
+    command = add_command('build', 'build ModelViewer and print only the errors', command_build)
+    add_config(command)
+
+    command = add_command('start', 'build, then start ModelViewer in a new run folder under MiniEngine/ModelViewer/Harness/runs '
+                                   "with a copy of scripts/harness-baseline as -settings_dir, so the user's editor.ini and imgui.ini "
+                                   f'stay untouched. Deletes all but the newest {KEPT_RUNS} run folders, keeping the running one', command_start)
     add_config(command)
     command.add_argument('--model', help='glTF path relative to MiniEngine/ModelViewer, passed as -model. Uses the orbit camera')
     command.add_argument('--no-build', action='store_true')
-    command.set_defaults(handler=command_start)
 
-    command = commands.add_parser('do', help='send commands to the running instance one by one and stop at the first error. '
-                                             'Reports a crash or a hang but leaves a hung app to stop. "do help" lists the commands')
+    command = add_command('do', 'send commands to the running instance one by one and stop at the first error. '
+                                'Reports a crash or a hang but leaves a hung app to stop. "do help" lists the commands', command_do)
     command.add_argument('commands', nargs='+', metavar='command')
-    command.set_defaults(handler=command_do)
 
-    command = commands.add_parser('run', help='send the commands in a file, one per line. # starts a comment')
+    command = add_command('run', 'send the commands in a file, one per line. # starts a comment', command_run)
     command.add_argument('file')
-    command.set_defaults(handler=command_run)
 
-    command = commands.add_parser('shot', help='capture a target and write a small PNG to look at')
+    command = add_command('shot', 'capture a target and write a small PNG to look at', command_shot)
     command.add_argument('target', choices=['scene', 'overlay', 'display'])
     command.add_argument('--crop', type=parse_crop, metavar='X,Y,W,H', help='in original pixels')
     command.add_argument('--max-width', type=int, default=PREVIEW_MAX_WIDTH)
     command.add_argument('--exposure', type=float, default=PREVIEW_EXPOSURE, help='for the scene view only')
-    command.set_defaults(handler=command_shot)
 
-    command = commands.add_parser('stop', help='quit the running instance, killing it if it hangs, and summarize its log. '
-                                               'Exits with 1 unless the app ended normally')
+    command = add_command('stop', 'quit the running instance, killing it if it hangs, and summarize its log. '
+                                  'Exits with 1 unless the app ended normally', command_stop)
     command.add_argument('--kill', action='store_true', help='kill without sending quit')
-    command.set_defaults(handler=command_stop)
 
-    command = commands.add_parser('selftest', help='check the harness itself')
+    command = add_command('selftest', 'check the harness itself', command_selftest)
     add_config(command)
     command.add_argument('--gpu', default='RTX 4060', help='a part of the GPU name that status must report')
-    command.set_defaults(handler=command_selftest)
 
     args = parser.parse_args()
     try:
