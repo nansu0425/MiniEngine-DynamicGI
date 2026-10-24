@@ -55,6 +55,24 @@ harness 는 agent 가 ModelViewer 를 build, 실행하고 명령으로 조작, c
 - 이 작업 때 함께 볼 것
   - 아직 실행으로 확인하지 않은 경로: MAX_PATH 를 넘는 `-settings_dir`, `__fastfail`, stack overflow, debugger 가 붙은 경우, Release build, 두 viewer.py 호출 사이에 app 이 끝난 경우 (exit code 를 알 수 없다고 보고한다), 두 thread 의 동시 crash. dump 가 생기면 확인할 수단이 늘어나므로 이때 돌려 본다.
 
+### 진단 출력 (진단과 함께)
+
+- 할 일
+  - `stop` 의 D3D12 요약 (`viewer.py` 의 `describe_d3d12`) 이 종료 때 message 마다 description 의 resource 이름을 처음 몇 개 보인다. 몇 개까지 보일지는 이 작업에서 정한다.
+  - `stop` 이 출력한 요약을 run 폴더에 파일로도 쓴다.
+  - `do` 와 `run` (`viewer.py` 의 `run_commands`) 이 명령마다 `status` 의 `d3d12_messages` 가 늘어난 만큼을 보인다.
+  - Debug 의 `OnCrtReport` (`Core/Automation/UnattendedRun.cpp:85-94`) 는 CRT message 를 그대로 Print 하고 바로 `exit reason=` 줄을 쓴다 (`:34-35`). message 가 `\n` 으로 끝나지 않으면 두 줄이 붙어 viewer.py 가 `^exit reason=` 으로 찾지 못할 수 있다 (추측, 확인하지 않음). 확인하고, 맞으면 줄바꿈을 보장한다.
+- 근거: 573dded 의 log 만으로 Lighting resource 해제 누락 (e8a2352) 을 진단한 agent 가 보고한 불편이다.
+  - `stop` 요약에는 message 의 ID 와 수만 있어 어느 resource 가 남았는지 보려면 app.log 를 열어야 했다.
+  - 요약을 증거로 남기려면 출력을 옮겨 적어야 했다.
+  - 어느 명령이 message 를 냈는지 좁히려면 명령 사이에 `status` 를 끼워야 했다.
+- 수정: `scripts/viewer.py`, `Core/Automation/UnattendedRun.cpp`, `.claude/skills/modelviewer/SKILL.md`
+- 완료 기준 (selftest 에 더한다)
+  - 이름을 붙인 resource 를 놓지 않는 경우 (fault 로 만들지는 이 작업에서 정한다) `stop` 의 종료 때 줄에 그 이름이 나온다.
+  - `stop` 뒤 run 폴더의 요약 파일이 `stop` 의 출력과 같다.
+  - `do` 에 `fault d3d12_error` 와 명령 여럿을 주면 error 의 증가분이 한 명령의 줄에만 나온다. fault 가 다음 frame 에 일어나므로 그 줄이 fault 의 줄인지 다음 명령의 줄인지는 이 작업에서 정해 SKILL.md 에 적는다.
+  - `\n` 으로 끝나지 않는 CRT error 뒤에도 `stop` 의 exit reason 이 `crt_error` 다.
+
 ### UI 상태를 text 로 노출 (로드맵 작업 3 전)
 
 - 할 일: UI 가 바꾸는 상태 중 text 로 읽을 수 없는 것을 조사해 명령이나 `status` 로 노출한다. 지금 아는 것은 `SceneEditor` 가 고른 object 와 gizmo mode (translate, rotate), sun icon 의 위치 (`ModelViewer.cpp` 의 `Sun`) 다.
