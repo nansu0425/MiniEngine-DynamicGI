@@ -72,14 +72,30 @@ void Renderer::CompileMesh(
     boundingSphere = sphereOS;
     boundingBox = bboxOS;
 
-    std::map<uint32_t, std::vector<Primitive*>> renderMeshes;
+    struct DrawGroup
+    {
+        std::vector<Primitive*> draws;
+        size_t vbSize = 0;
+        size_t depthVBSize = 0;
+        size_t ibSize = 0;
+    };
+
+    std::map<uint32_t, DrawGroup> renderMeshes;
     for (auto& prim : primitives)
     {
-        uint32_t hash = prim.hash;
-        renderMeshes[hash].push_back(&prim);
-        totalVertexSize += prim.VB->size();
-        totalDepthVertexSize += prim.DepthVB->size();
-        totalIndexSize += Math::AlignUp(prim.IB->size(), 4);
+        DrawGroup& group = renderMeshes[prim.hash];
+        group.draws.push_back(&prim);
+        group.vbSize += prim.VB->size();
+        group.depthVBSize += prim.DepthVB->size();
+        group.ibSize += prim.IB->size();
+    }
+
+    for (auto& iter : renderMeshes)
+    {
+        const DrawGroup& group = iter.second;
+        totalVertexSize += group.vbSize;
+        totalDepthVertexSize += group.depthVBSize;
+        totalIndexSize += Math::AlignUp(group.ibSize, 4);
     }
 
     uint32_t totalBufferSize = (uint32_t)(totalVertexSize + totalDepthVertexSize + totalIndexSize);
@@ -94,38 +110,31 @@ void Renderer::CompileMesh(
 
     for (auto& iter : renderMeshes)
     {
-        size_t numDraws = iter.second.size();
+        const DrawGroup& group = iter.second;
+        size_t numDraws = group.draws.size();
         Mesh* mesh = (Mesh*)malloc(sizeof(Mesh) + sizeof(Mesh::Draw) * (numDraws - 1));
-        size_t vbSize = 0;
-        size_t vbDepthSize = 0;
-        size_t ibSize = 0;
 
         // Compute local space bounding sphere for all submeshes
         BoundingSphere collectiveSphere(kZero);
 
-        for (auto& draw : iter.second)
-        {
-            vbSize += draw->VB->size();
-            vbDepthSize += draw->DepthVB->size();
-            ibSize += draw->IB->size();
+        for (auto& draw : group.draws)
             collectiveSphere = collectiveSphere.Union(draw->m_BoundsLS);
-        }
 
         mesh->bounds[0] = collectiveSphere.GetCenter().GetX();
         mesh->bounds[1] = collectiveSphere.GetCenter().GetY();
         mesh->bounds[2] = collectiveSphere.GetCenter().GetZ();
         mesh->bounds[3] = collectiveSphere.GetRadius();
         mesh->vbOffset = (uint32_t)bufferMemory.size() + curVBOffset;
-        mesh->vbSize = (uint32_t)vbSize;
+        mesh->vbSize = (uint32_t)group.vbSize;
         mesh->vbDepthOffset = (uint32_t)bufferMemory.size() + curDepthVBOffset;
-        mesh->vbDepthSize = (uint32_t)vbDepthSize;
+        mesh->vbDepthSize = (uint32_t)group.depthVBSize;
         mesh->ibOffset = (uint32_t)bufferMemory.size() + curIBOffset;
-        mesh->ibSize = (uint32_t)ibSize;
-        mesh->vbStride = (uint8_t)iter.second[0]->vertexStride;
-        mesh->ibFormat = uint8_t(iter.second[0]->index32 ? DXGI_FORMAT_R32_UINT : DXGI_FORMAT_R16_UINT);
+        mesh->ibSize = (uint32_t)group.ibSize;
+        mesh->vbStride = (uint8_t)group.draws[0]->vertexStride;
+        mesh->ibFormat = uint8_t(group.draws[0]->index32 ? DXGI_FORMAT_R32_UINT : DXGI_FORMAT_R16_UINT);
         mesh->meshCBV = (uint16_t)matrixIdx;
-        mesh->materialCBV = iter.second[0]->materialIdx;
-        mesh->psoFlags = iter.second[0]->psoFlags;
+        mesh->materialCBV = group.draws[0]->materialIdx;
+        mesh->psoFlags = group.draws[0]->psoFlags;
         mesh->pso = 0xFFFF;
         if (srcMesh.skin >= 0)
         {
@@ -140,29 +149,45 @@ void Renderer::CompileMesh(
 
         mesh->numDraws = (uint16_t)numDraws;
 
+        const Primitive& firstDraw = *group.draws[0];
+        const uint32_t indexSize = firstDraw.index32 ? 4 : 2;
+
+        // baseVertex 는 VB 와 depth VB 에서 같은 vertex 를 가리켜야 한다. depth pass 가 depth VB 에도 같은 draw 인자를 쓰기 때문이다 (MeshSorter::RenderMeshes).
+        // 그래서 VB 에 대한 depth VB 의 크기 비가 draw 마다 같아야 한다.
         uint32_t drawIdx = 0;
-        uint32_t curVertOffset = 0;
-        uint32_t curIndexOffset = 0;
-        for (auto& draw : iter.second)
+        size_t drawVBOffset = 0;
+        size_t drawDepthVBOffset = 0;
+        size_t drawIBOffset = 0;
+        for (auto& draw : group.draws)
         {
+            ASSERT(draw->vertexStride == mesh->vbStride);
+            ASSERT(draw->DepthVB->size() * firstDraw.VB->size() == firstDraw.DepthVB->size() * draw->VB->size());
+            ASSERT(draw->IB->size() == draw->primCount * indexSize);
+
             Mesh::Draw& d = mesh->draw[drawIdx++];
             d.primCount = draw->primCount;
-            d.baseVertex = curVertOffset;
-            d.startIndex = curIndexOffset;
-            std::memcpy(uploadMem + curVBOffset + curVertOffset, draw->VB->data(), draw->VB->size());
-            curVertOffset += (uint32_t)draw->VB->size() / draw->vertexStride;
-            std::memcpy(uploadMem + curDepthVBOffset, draw->DepthVB->data(), draw->DepthVB->size());
-            std::memcpy(uploadMem + curIBOffset + curIndexOffset, draw->IB->data(), draw->IB->size());
-            curIndexOffset += (uint32_t)draw->IB->size() >> (draw->index32 + 1);
+            d.baseVertex = (uint32_t)(drawVBOffset / mesh->vbStride);
+            d.startIndex = (uint32_t)(drawIBOffset / indexSize);
+            std::memcpy(uploadMem + curVBOffset + drawVBOffset, draw->VB->data(), draw->VB->size());
+            std::memcpy(uploadMem + curDepthVBOffset + drawDepthVBOffset, draw->DepthVB->data(), draw->DepthVB->size());
+            std::memcpy(uploadMem + curIBOffset + drawIBOffset, draw->IB->data(), draw->IB->size());
+            drawVBOffset += draw->VB->size();
+            drawDepthVBOffset += draw->DepthVB->size();
+            drawIBOffset += draw->IB->size();
         }
 
-        curVBOffset += (uint32_t)vbSize;
-        curDepthVBOffset += (uint32_t)vbDepthSize;
-        curIBOffset += (uint32_t)Math::AlignUp(ibSize, 4);
-        curIndexOffset = Math::AlignUp(curIndexOffset, 4);
+        curVBOffset += (uint32_t)group.vbSize;
+        curDepthVBOffset += (uint32_t)group.depthVBSize;
+        // 다음 Mesh 의 IB 와 다음 node 의 VB 는 4 byte 단위로 읽히므로 Mesh 끝을 4 byte 에 맞춘다.
+        // draw 사이는 index 크기 정렬로 충분하다. DXR 의 IndexBuffer 도 그만큼만 요구한다 (Raytracing.md 의 D3D12_RAYTRACING_GEOMETRY_TRIANGLES_DESC).
+        curIBOffset += (uint32_t)Math::AlignUp(group.ibSize, 4);
 
         meshList.push_back(mesh);
     }
+
+    ASSERT(curVBOffset == totalVertexSize);
+    ASSERT(curDepthVBOffset == totalVertexSize + totalDepthVertexSize);
+    ASSERT(curIBOffset == totalBufferSize);
 
     bufferMemory.insert(bufferMemory.end(), stagingBuffer->begin(), stagingBuffer->end());
 }
