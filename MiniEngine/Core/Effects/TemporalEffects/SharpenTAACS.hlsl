@@ -35,7 +35,6 @@ cbuffer InlineConstants : register(b0)
 groupshared float gs_R[TILE_PIXEL_COUNT];
 groupshared float gs_G[TILE_PIXEL_COUNT];
 groupshared float gs_B[TILE_PIXEL_COUNT];
-groupshared float gs_W[TILE_PIXEL_COUNT];
 
 float3 LoadSample(uint ldsIndex)
 {
@@ -55,7 +54,6 @@ void main( uint3 Gid : SV_GroupID, uint3 GTid : SV_GroupThreadID, uint3 DTid : S
         gs_R[i] = Color.r;
         gs_G[i] = Color.g;
         gs_B[i] = Color.b;
-        gs_W[i] = Color.w;
     }
 
     GroupMemoryBarrierWithGroupSync();
@@ -65,13 +63,6 @@ void main( uint3 Gid : SV_GroupID, uint3 GTid : SV_GroupThreadID, uint3 DTid : S
     float3 Center = LoadSample(ldsIndex);
     float3 Neighbors = LoadSample(ldsIndex - 1) + LoadSample(ldsIndex + 1) +
         LoadSample(ldsIndex - TILE_SIZE_X) + LoadSample(ldsIndex + TILE_SIZE_X);
-
-    // If the temporal weight is less than 0.5, it might be a brand new pixel.  Brand new pixels
-    // have not been antialiased at all and can be jarring.  Here we change the weights to actually
-    // blur rather than sharpen those pixels.
-    float TemporalWeight = gs_W[ldsIndex];
-    float CenterWeight = TemporalWeight <= 0.5 ? 0.5 : WA;
-    float LateralWeight = TemporalWeight <= 0.5 ? 0.125 : WB;
 
     OutColor[DTid.xy] = exp2(max(0, WA * Center - WB * Neighbors)) - 1.0;
 }

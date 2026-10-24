@@ -33,7 +33,6 @@ namespace TemporalEffects
 {
     BoolVar EnableTAA("Graphics/AA/TAA/Enable", false);
     NumVar Sharpness("Graphics/AA/TAA/Sharpness", 0.5f, 0.0f, 1.0f, 0.25f);
-    NumVar TemporalMaxLerp("Graphics/AA/TAA/Blend Factor", 1.0f, 0.0f, 1.0f, 0.01f);
     ExpVar TemporalSpeedLimit("Graphics/AA/TAA/Speed Limit", 64.0f, 1.0f, 1024.0f, 1.0f);
     BoolVar TriggerReset("Graphics/AA/TAA/Reset", false);
     BoolVar EnableCBR("Graphics/CBR/Enable", false);
@@ -180,14 +179,13 @@ void TemporalEffects::ApplyTemporalAA(ComputeContext& Context)
     __declspec(align(16)) struct ConstantBuffer
     {
         float RcpBufferDim[2];
-        float TemporalBlendFactor;
-        float RcpSeedLimiter;
         float CombinedJitter[2];
+        float RcpSeedLimiter;
     };
     ConstantBuffer cbv = {
         1.0f / g_SceneColorBuffer.GetWidth(), 1.0f / g_SceneColorBuffer.GetHeight(),
-        (float)TemporalMaxLerp, 1.0f / TemporalSpeedLimit,
-        s_JitterDeltaX, s_JitterDeltaY
+        s_JitterDeltaX, s_JitterDeltaY,
+        1.0f / TemporalSpeedLimit
     };
 
     Context.SetDynamicConstantBufferView(3, sizeof(cbv), &cbv);
