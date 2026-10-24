@@ -7,6 +7,8 @@ description: ModelViewer 를 build, run, drive, screenshot, verify 하는 harnes
 
 진입점은 `python scripts/viewer.py` 하나다. 각 subcommand 가 무엇을 하는지는 `--help`, app 명령은 `do help`, 명령의 protocol 은 `MiniEngine/Core/Automation/ControlChannel.h`, 종료 이유의 뜻은 `MiniEngine/Core/Automation/UnattendedRun.h`, app flag 는 `MiniEngine/readme.md` 에 있다. 여기에는 agent 가 harness 를 운용하는 법만 적는다.
 
+harness 로 할 수 없는 일을 만나면 그 일이 계획되어 있는지와 그 근거를 `docs/harness-roadmap.md` 에서 본다.
+
 ## 쓰는 범위
 
 - app 을 직접 실행하지 않고 언제나 `start` 로 띄운다. 그래야 사용자의 설정 파일이 남는다 (`start --help`).
