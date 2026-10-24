@@ -7,9 +7,9 @@
   vertex 와 depth vertex 의 layout: OptimizeMesh (MiniEngine/Model/Loader/MeshConvert.cpp)
   depth vertex 의 stride: MeshSorter::RenderMeshes (MiniEngine/Model/Renderer/Renderer.cpp)
 
-받은 asset 에도 python -I 로 돌릴 수 있도록 repo 의 module 을 import 하지 않는다. 같은 이유로 glTF 폴더 밖이나 scheme 이
-있는 uri, buffer 밖을 가리키는 accessor 는 읽기 전에 거부한다. engine 이 무시하는 sparse accessor 도 거부한다. engine 과
-같은 틀린 값을 읽어 PASS 할 수 있기 때문이다.
+받은 asset 에도 python -I 로 돌릴 수 있게 한다 (scripts/gltffiles.py). 그래서 glTF 폴더 밖이나 scheme 이 있는 uri, buffer
+밖을 가리키는 accessor 는 읽기 전에 거부한다. engine 이 무시하는 sparse accessor 도 거부한다. engine 과 같은 틀린 값을 읽어
+PASS 할 수 있기 때문이다.
 
 node 의 linear index 는 scene 을 WalkGraph 처럼 depth-first 로 돌며 매긴다. draw 의 vertex 는 다음 draw 의 baseVertex
 앞까지 (마지막 draw 는 vbSize / vbStride 앞까지) 다. Mesh 의 draw 는 Mesh::meshCBV 가 가리키는 node 의 glTF mesh 에서
@@ -38,11 +38,13 @@ import re
 import struct
 import sys
 from collections import Counter
-from pathlib import Path, PurePosixPath, PureWindowsPath
+from pathlib import Path
 from types import SimpleNamespace
-from urllib.parse import urlsplit
 
 import numpy as np
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from gltffiles import file_in_gltf_folder
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 MODEL_LOADER_HEADER = REPO_ROOT / 'MiniEngine' / 'Model' / 'Loader' / 'ModelLoader.h'
@@ -198,21 +200,6 @@ def non_negative_int(value, name):
     if type(value) is not int or value < 0:
         raise ValueError(f'{name} is {value!r}, not a non-negative integer')
     return value
-
-
-def file_in_gltf_folder(gltf_path, uri):
-    """loader 처럼 uri 를 glTF 폴더 기준의 경로로 읽되, glTF 폴더 밖의 파일은 가리키지 못하게 한다."""
-    if not isinstance(uri, str) or not uri:
-        raise ValueError(f'uri {uri!r} is not a file name')
-    if urlsplit(uri).scheme:
-        raise ValueError(f'uri {uri!r} has a scheme. Only paths relative to the glTF folder are read')
-    if PureWindowsPath(uri).anchor or PurePosixPath(uri).is_absolute():
-        raise ValueError(f'uri {uri!r} is an absolute or UNC path')
-    folder = gltf_path.parent.resolve()
-    path = (folder / uri).resolve()
-    if not path.is_relative_to(folder):
-        raise ValueError(f'uri {uri!r} points outside the glTF folder')
-    return path
 
 
 def accessor_layout(gltf, buffers, accessor_index):

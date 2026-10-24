@@ -330,6 +330,9 @@ void LoadIBLTextures()
         g_IBLSet.Increment();
 }
 
+// scripts/viewer.py가 이 이름과 형식으로 기본 model 경로를 읽는다.
+const wchar_t kDefaultModel[] = L"glTF-Sample-Assets/Models/Sponza/glTF/Sponza.gltf";
+
 void ModelViewer::Startup( void )
 {
     MotionBlur::Enable = true;
@@ -357,8 +360,10 @@ void ModelViewer::Startup( void )
 #ifdef LEGACY_RENDERER
         Sponza::Startup(m_Camera);
 #else
-        m_ModelInst = Renderer::LoadModel(L"Sponza/PBR/sponza2.gltf", forceRebuild);
-        m_ModelInst.Resize(100.0f * m_ModelInst.GetRadius());
+        m_ModelInst = Renderer::LoadModel(kDefaultModel, forceRebuild);
+        // 옛 Sponza(DirectX-Graphics-Samples의 sponza2.gltf)로 정한 camera pose와 검증 Log 줄을 그대로 쓰도록,
+        // 옛 Sponza를 100배 하던 때와 world 좌표가 같아지는 배율이다 (Khronos 판은 node scale을 빼면 옛 판의 100배이고, node scale 0.008 × 125 ≈ 1).
+        m_ModelInst.Resize(125.0f * m_ModelInst.GetRadius());
         OrientedBox obb = m_ModelInst.GetBoundingBox();
         float modelRadius = Length(obb.GetDimensions()) * 0.5f;
         const Vector3 eye = obb.GetCenter() + Vector3(modelRadius * 0.5f, 0.0f, 0.0f);

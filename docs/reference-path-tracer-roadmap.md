@@ -11,7 +11,7 @@ DDGI 와 RT Reflection 의 정답 image 를 만드는 path tracer 를 inline Ray
 
 ## 전제
 
-- 장면은 `EditorCamera` 로 연 정적 Sponza 다. Restore 는 EditorCamera 에서만 된다 (`ModelViewer.cpp:379-389`). animation 과 instance 변경은 reset 조건에 넣지 않는다.
+- 장면은 `EditorCamera` 로 연 정적 Sponza 다. Restore 는 EditorCamera 에서만 된다 (`ModelViewer.cpp:384-394`). animation 과 instance 변경은 reset 조건에 넣지 않는다.
 - Sponza 는 작업 B 부터 KhronosGroup glTF-Sample-Assets `8f49239` 의 `Models/Sponza/glTF/` (이하 Khronos 판) 다. 이 폴더가 마지막으로 바뀐 commit 은 2023-05-18 의 `5bad5aa` 다. 그 전에는 DirectX-Graphics-Samples `e5975f9` 의 `MiniEngine/ModelViewer/Sponza/pbr/sponza2.gltf` (이하 옛 판) 였고, 옛 판은 같이 두지 않는다.
   - 고른 이유: 형식과 규약이 spec 을 따르는 공개 asset 이라, spec 을 따르는 renderer 끼리, 외부 renderer 까지 같은 입력으로 비교할 수 있다. KhronosGroup glTF-Validator 2.0.0-dev.3.10 에서 Khronos 판은 error, warning, info 가 모두 0 이다. 옛 판은 error 6184, warning 1928 이고, 대부분 accessor min/max 의 반올림과 byteStride 문제라 해석은 바뀌지 않는다.
   - geometry: triangle 262,267 개와 축 (+Y 가 위), UV 가 옛 판과 같다. node scale 이 0.008 이라 장면이 옛 판의 0.8 배이므로, 작업 B 가 `Resize` 의 ×100 을 ×125 로 바꿔 world 좌표를 옛 판과 같게 한다 (125 × 0.0080000004 ≈ 1). 옛 판에서 정한 시점과 작업 2 의 float16 UV 오차는 그대로다.
@@ -141,9 +141,9 @@ raster 는 기준이 아니다 (8432ed7). 같은 시점의 두 화면으로 볼 
 - B. Khronos 판으로 교체 (10/24, 3.75 h)
   - 수정
     - `scripts/fetch-assets.ps1`: KhronosGroup glTF-Sample-Assets 의 `Models/Sponza/glTF/` 를 sparse 로 받고 commit 을 `8f492390ddc7a2ae221a1369ef560589cf8c70fb` 로 고정한다. IBL 의 `Textures/` 같은 upstream 의 다른 asset 이 여전히 필요한지는 구현할 때 확인한다.
-    - `ModelViewer/ModelViewer.cpp:360-361`: 기본 경로와 scale (×100 → ×125)
+    - `ModelViewer/ModelViewer.cpp:334, 363-366`: 기본 경로와 scale (×100 → ×125)
     - `.gitignore`, `README.md`: asset 은 repo 밖에 받는다. Khronos 판은 license 를 "Cryengine Limited License Agreement" 로 표시한다.
-    - `scripts/viewer.py:31` 의 `DEFAULT_ASSETS`
+    - `scripts/viewer.py:354-359` 의 `default_assets` (`ModelViewer.cpp` 의 `kDefaultModel` 을 읽는다)
     - `scripts/check-texture-colorspace.py`: JPEG 지원과 기본 경로
   - `scripts/harness-baseline/` 를 확인한다. pose 는 그대로 쓴다. baseColorFactor 0.588 로 장면이 어두워지므로 Exposure 0.25 를 다시 본다.
   - eb009f6 의 Log 줄 세 개로 Restore 해 Validation: Depth Comparison 의 새 Log 줄 세 개를 남긴다. 작업 2 부터 이 줄을 쓴다.
@@ -180,7 +180,7 @@ raster 는 기준이 아니다 (8432ed7). 같은 시점의 두 화면으로 볼 
      - furnace 는 self-hit, leak, visibility 오류와 방향 분포의 오류를 잡지 못한다. 무엇에 맞든 같은 값을 내기 때문이다.
 7. Sun 과 raster 의 sun 단위 (10/26, 3 h)
    - 추가: `Model/Raytracing/SurfaceRay.hlsli` (surface 에서 한 방향으로 나가는 ray, `DescribeSunRay` 를 옮김). 수정: `RaytracingDebugViewCS.hlsl`, `SceneLights.hlsli`, `PathTracerCS.hlsl` (NEE 와 다음 반사가 공용 함수를 쓴다), `PathTracer.cpp`, `ModelViewer.cpp`, `Model/Renderer/DefaultPS.hlsl`, `references/manifest.json`.
-   - 입력 경로: raster 의 `ShadeDirectionalLight` 는 `c_light` 를 1/π 없이 곱한다 (`DefaultPS.hlsl:176-195`). sun 항 전체 (diffuse 와 specular) 를 π 로 나누고 `Sun Light Intensity` 의 기본값을 4 에서 4π 로 올려 raster 화면을 그대로 둔다. glTF 의 sparse 에 `/extensions/2.0/Khronos/KHR_lights_punctual/` 를 더해 lux 의 근거를 references 에 둔다. `ModelViewer.cpp:361` 의 ×125 (작업 B) 는 지금의 light 에 영향이 없어 남기고, `glTF spec과 다르다` 주석에 1 unit = 0.8 cm (계산) 와 거리로 감쇠하는 light 를 넣을 때 바꾼다는 것을 적는다.
+   - 입력 경로: raster 의 `ShadeDirectionalLight` 는 `c_light` 를 1/π 없이 곱한다 (`DefaultPS.hlsl:176-195`). sun 항 전체 (diffuse 와 specular) 를 π 로 나누고 `Sun Light Intensity` 의 기본값을 4 에서 4π 로 올려 raster 화면을 그대로 둔다. glTF 의 sparse 에 `/extensions/2.0/Khronos/KHR_lights_punctual/` 를 더해 lux 의 근거를 references 에 둔다. `ModelViewer.cpp:366` 의 ×125 (작업 B) 는 지금의 light 에 영향이 없어 남기고, `glTF spec과 다르다` 주석에 1 unit = 0.8 cm (계산) 와 거리로 감쇠하는 light 를 넣을 때 바꾼다는 것을 적는다.
    - 저장된 editor.ini 의 `Viewer/Lighting/Sun Light Intensity=4` 가 새 기본값을 덮어쓰므로 (`GameCore.cpp:96-107`) 12.5663706 으로 고친다. 고치지 않으면 raster 의 sun 이 π 배 어두워진다. commit message 에도 적는다.
    - 주석: Intensity 를 lux 로 읽는 이유 (KHR_lights_punctual 의 해당 줄)
    - 완료 기준: 기본 시점에서 고치기 전과 뒤의 raster screenshot 이 같다. sun 을 gizmo 나 Engine Tuning 으로 돌리면 PT 가 reset 되고 그림자가 따라온다. 그림자 경계가 Debug: Sun Visibility 와 같다.

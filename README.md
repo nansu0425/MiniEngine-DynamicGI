@@ -11,7 +11,7 @@
 
 ## 빌드와 실행
 
-1. asset 을 받는다. ModelViewer 가 쓰는 Sponza 와 IBL texture 는 용량 때문에 repo 에 두지 않는다.
+1. asset 을 받는다. ModelViewer 가 쓰는 Sponza (KhronosGroup glTF-Sample-Assets) 와 IBL texture (upstream DirectX-Graphics-Samples) 는 용량 때문에 repo 에 두지 않는다.
 
    ```powershell
    .\scripts\fetch-assets.ps1
@@ -80,4 +80,4 @@ spec 의 doubleSided 는 camera 에서 그릴 때의 결과만 정하고, shadow
 
 ## License
 
-이 프로젝트의 작업은 MIT License 를 따른다([LICENSE](LICENSE)). upstream MiniEngine 코드는 Microsoft 의 MIT License 를 따른다([MiniEngine/License.txt](MiniEngine/License.txt)). Sponza asset 의 출처는 받은 뒤 `MiniEngine/ModelViewer/Sponza/pbr/copyright.txt` 에 있다.
+이 프로젝트의 작업은 MIT License 를 따른다([LICENSE](LICENSE)). upstream MiniEngine 코드는 Microsoft 의 MIT License 를 따른다([MiniEngine/License.txt](MiniEngine/License.txt)). Sponza asset 은 Cryengine Limited License Agreement 를 따르고, 그 license 표시는 받은 뒤 `MiniEngine/ModelViewer/glTF-Sample-Assets/Models/Sponza/LICENSE.md` 에 있다.

@@ -28,7 +28,7 @@ RUNS_DIR = HARNESS_DIR / 'runs'
 INSTANCE_FILE = HARNESS_DIR / 'instance.json'
 BASELINE_DIR = REPO_ROOT / 'scripts' / 'harness-baseline'
 USER_SETTINGS = [VIEWER_DIR / 'editor.ini', VIEWER_DIR / 'imgui.ini']
-DEFAULT_ASSETS = [VIEWER_DIR / 'Sponza' / 'PBR' / 'sponza2.gltf', VIEWER_DIR / 'Textures']
+MODEL_VIEWER_SOURCE = VIEWER_DIR / 'ModelViewer.cpp'
 SOURCE_DIRS = [ENGINE_DIR / 'Core', ENGINE_DIR / 'Model']
 SOURCE_SUFFIXES = {'.cpp', '.h', '.inl', '.hlsl', '.hlsli'}
 
@@ -351,8 +351,16 @@ def prune_runs():
             shutil.rmtree(run, ignore_errors=True)
 
 
+def default_assets():
+    match = re.search(r'^const wchar_t kDefaultModel\[\] = L"([^"]+)";', MODEL_VIEWER_SOURCE.read_text(encoding='utf-8'), re.M)
+    if match is None:
+        raise HarnessError(f'{MODEL_VIEWER_SOURCE} has no line starting with '
+                           'const wchar_t kDefaultModel[] = L"<glTF path relative to MiniEngine/ModelViewer>";')
+    return [VIEWER_DIR / match.group(1), VIEWER_DIR / 'Textures']
+
+
 def start_instance(config, model=None, build_first=True):
-    missing = [path for path in DEFAULT_ASSETS if not path.exists()] if model is None else \
+    missing = [path for path in default_assets() if not path.exists()] if model is None else \
         [path for path in [VIEWER_DIR / model] if not path.exists()]
     if missing:
         hint = ' Run .\\scripts\\fetch-assets.ps1.' if model is None else ''
@@ -444,7 +452,7 @@ def build(config):
 
 def newest_source_mtime():
     sources = [path for directory in SOURCE_DIRS for path in directory.rglob('*') if path.suffix in SOURCE_SUFFIXES]
-    sources += [VIEWER_DIR / 'ModelViewer.cpp']
+    sources += [MODEL_VIEWER_SOURCE]
     return max(path.stat().st_mtime for path in sources)
 
 
