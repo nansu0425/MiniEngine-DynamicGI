@@ -21,6 +21,7 @@
 #include "Core/Graphics/Pipeline/RootSignature.h"
 #include "Core/Display/ImageScaling/ImageScaling.h"
 #include "Core/Effects/TemporalEffects/TemporalEffects.h"
+#include "Core/Automation/FrameCapture.h"
 
 #pragma comment(lib, "dxgi.lib") 
 
@@ -89,6 +90,8 @@ namespace Graphics
 #endif
 
     bool g_bEnableHDROutput = false;
+    // display가 ST.2084를 받을 수 있는지. -hdr_output 0으로 HDR을 끈 것과 display가 SDR인 것을 status가 구분하게 한다.
+    bool g_bHDRDisplay = false;
     NumVar g_HDRPaperWhite("Graphics/Display/Paper White (nits)", 200.0f, 100.0f, 500.0f, 50.0f);
     NumVar g_MaxDisplayLuminance("Graphics/Display/Peak Brightness (nits)", 1000.0f, 500.0f, 10000.0f, 100.0f);
     const char* HDRModeLabels[] = { "HDR", "SDR", "Side-by-Side" };
@@ -265,11 +268,15 @@ void Display::Initialize(void)
         UINT colorSpaceSupport;
 
         // Query support for ST.2084 on the display and set the color space accordingly
-        if (SUCCEEDED(swapChain->GetContainingOutput(&output)) && SUCCEEDED(output.As(&output6)) &&
+        g_bHDRDisplay = SUCCEEDED(swapChain->GetContainingOutput(&output)) && SUCCEEDED(output.As(&output6)) &&
             SUCCEEDED(output6->GetDesc1(&outputDesc)) && outputDesc.ColorSpace == DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020 &&
             SUCCEEDED(swapChain->CheckColorSpaceSupport(DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020, &colorSpaceSupport)) &&
-            (colorSpaceSupport & DXGI_SWAP_CHAIN_COLOR_SPACE_SUPPORT_FLAG_PRESENT) &&
-            SUCCEEDED(swapChain->SetColorSpace1(DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020)))
+            (colorSpaceSupport & DXGI_SWAP_CHAIN_COLOR_SPACE_SUPPORT_FLAG_PRESENT);
+
+        // -hdr_output 0이면 HDR display에서도 SDR로 내보내, display capture가 어느 display에서나 같은 encoding이 되게 한다.
+        uint32_t hdrOutput = 1;
+        CommandLineArgs::GetInteger(L"hdr_output", hdrOutput);
+        if (g_bHDRDisplay && hdrOutput != 0 && SUCCEEDED(swapChain->SetColorSpace1(DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020)))
         {
             g_bEnableHDROutput = true;
         }
@@ -379,6 +386,7 @@ void Graphics::PreparePresent(void)
     }
 
     CompositeOverlays(Context);
+    FrameCapture::Capture(FrameCapture::kDisplay, Context, DisplayPlane);
 
     Context.TransitionResource(DisplayPlane, D3D12_RESOURCE_STATE_PRESENT);
 

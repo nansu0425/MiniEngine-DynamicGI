@@ -39,6 +39,7 @@
 #include "Core/Display/Display.h"
 #include "Core/Editor/EditorCamera.h"
 #include "Core/Editor/SceneEditor.h"
+#include "Core/Automation/ControlChannel.h"
 
 // Dynamic GI 프로젝트에선 legacy path가 아닌 glTF path를 사용한다.
 // legacy는 Blinn-Phong, glTF는 PBR shading
@@ -150,6 +151,39 @@ bool RestoreScene(EditorCamera& camera, const RayQueryValidation::SceneCondition
     g_SunOrientation = orientation;
     g_SunInclination = inclination;
     return true;
+}
+
+// harness가 camera를 숫자로 읽고 정한다. editorCamera가 없으면 OrbitCamera라 pose를 정할 수 없다.
+void RegisterPoseCommand(EditorCamera* editorCamera)
+{
+    ControlChannel::SetStatus("camera", editorCamera != nullptr ? "editor" : "orbit");
+    ControlChannel::Register("pose", "pose | pose <x> <y> <z> <heading> <pitch>: the editor camera", [editorCamera](const std::string& arguments, const ControlChannel::Reply& reply)
+    {
+        if (editorCamera == nullptr)
+        {
+            reply.Error("pose needs the editor camera. -model uses the orbit camera.");
+            return;
+        }
+
+        float x, y, z, heading, pitch;
+        if (!arguments.empty())
+        {
+            if (sscanf_s(arguments.c_str(), "%f %f %f %f %f", &x, &y, &z, &heading, &pitch) != 5)
+            {
+                reply.Error("usage: pose <x> <y> <z> <heading> <pitch>");
+                return;
+            }
+            editorCamera->SetPose({ Vector3(x, y, z), heading, pitch });
+        }
+
+        const EditorCamera::Pose pose = editorCamera->GetPose();
+        reply.Ok(ControlChannel::Fields()
+            .Float("x", pose.position.GetX())
+            .Float("y", pose.position.GetY())
+            .Float("z", pose.position.GetZ())
+            .Float("heading", pose.heading)
+            .Float("pitch", pose.pitch));
+    });
 }
 
 void DrawArrow(ImDrawList& drawList, ImVec2 from, ImVec2 to, ImU32 color, float thickness)
@@ -341,9 +375,10 @@ void ModelViewer::Startup( void )
     }
 
     m_Camera.SetZRange(1.0f, 10000.0f);
+    EditorCamera* editorCamera = nullptr;
     if (gltfFileName.size() == 0)
     {
-        EditorCamera* editorCamera = new EditorCamera(m_Camera, Vector3(kYUnitVector));
+        editorCamera = new EditorCamera(m_Camera, Vector3(kYUnitVector));
         m_CameraController.reset(editorCamera);
         // OrbitCamera는 pose를 정할 수 없으므로 검증의 Restore는 EditorCamera를 쓸 때만 된다.
         RayQueryValidation::SetSceneConditions(
@@ -352,6 +387,7 @@ void ModelViewer::Startup( void )
     }
     else
         m_CameraController.reset(new OrbitCamera(m_Camera, m_ModelInst.GetBoundingSphere(), Vector3(kYUnitVector)));
+    RegisterPoseCommand(editorCamera);
 
     SceneEditor::AddObject(m_Sun);
 }

@@ -15,6 +15,8 @@
 #include "Core/Utility/Utility.h"
 #include <string>
 #include <locale>
+#include <mutex>
+#include <share.h>
 #if defined(_M_ARM64)
 #include <arm_neon.h>
 #endif
@@ -276,4 +278,73 @@ std::string Utility::RemoveExtension(const std::string& filePath)
 std::wstring Utility::RemoveExtension(const std::wstring& filePath)
 {
     return filePath.substr(0, filePath.rfind(L"."));
+}
+
+namespace
+{
+    // Print하는 중에 crash해서 unhandled exception filter가 같은 thread에서 다시 Print해도 막히지 않게 recursive로 둔다.
+    std::recursive_mutex s_LogFileMutex;
+    FILE* s_LogFile = nullptr;
+
+    void WriteToLogFile( const char* utf8 )
+    {
+        if (s_LogFile == nullptr)
+            return;
+
+        std::lock_guard<std::recursive_mutex> lock(s_LogFileMutex);
+        fputs(utf8, s_LogFile);
+        // process가 갑자기 끝나도 그 앞까지는 file에 남도록 쓸 때마다 OS에 넘긴다.
+        fflush(s_LogFile);
+    }
+}
+
+std::wstring Utility::ToWide( const std::string& utf8 )
+{
+    const int size = MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), -1, nullptr, 0);
+    if (size <= 0)
+        return std::wstring();
+    std::wstring wide(size - 1, L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), -1, &wide[0], size);
+    return wide;
+}
+
+std::string Utility::ToUTF8( const std::wstring& wide )
+{
+    const int size = WideCharToMultiByte(CP_UTF8, 0, wide.c_str(), -1, nullptr, 0, nullptr, nullptr);
+    if (size <= 0)
+        return std::string();
+    std::string utf8(size - 1, '\0');
+    WideCharToMultiByte(CP_UTF8, 0, wide.c_str(), -1, &utf8[0], size, nullptr, nullptr);
+    return utf8;
+}
+
+void Utility::InitializeLogFile( void )
+{
+    std::wstring path;
+    if (!CommandLineArgs::GetString(L"log", path))
+        return;
+
+    // 실행 중에도 harness가 읽을 수 있게 읽기는 막지 않는다.
+    s_LogFile = _wfsopen(path.c_str(), L"wb", _SH_DENYWR);
+}
+
+void Utility::Print( const char* msg )
+{
+#ifdef _CONSOLE
+    printf("%s", msg);
+#else
+    OutputDebugStringA(msg);
+#endif
+    WriteToLogFile(msg);
+}
+
+void Utility::Print( const wchar_t* msg )
+{
+#ifdef _CONSOLE
+    wprintf(L"%ws", msg);
+#else
+    OutputDebugString(msg);
+#endif
+    if (s_LogFile != nullptr)
+        WriteToLogFile(ToUTF8(msg).c_str());
 }

@@ -127,6 +127,9 @@
     <ClInclude Include="Graphics\Pipeline\PipelineState.h" />
     <ClInclude Include="Graphics\Resource\PixelBuffer.h" />
     <ClInclude Include="Effects\PostEffects\PostEffects.h" />
+    <ClInclude Include="Automation\ControlChannel.h" />
+    <ClInclude Include="Automation\FrameCapture.h" />
+    <ClInclude Include="Automation\UnattendedRun.h" />
     <ClInclude Include="Editor\EditorCamera.h" />
     <ClInclude Include="Editor\EditorSettings.h" />
     <ClInclude Include="Editor\SceneEditor.h" />
@@ -166,6 +169,10 @@
     <ClCompile Include="Graphics\Descriptor\DynamicDescriptorHeap.cpp" />
     <ClCompile Include="Graphics\Descriptor\DescriptorHeap.cpp" />
     <ClCompile Include="Profiling\EngineProfiling.cpp" />
+    <ClCompile Include="Automation\ControlChannel.cpp" />
+    <ClCompile Include="Automation\EngineCommands.cpp" />
+    <ClCompile Include="Automation\FrameCapture.cpp" />
+    <ClCompile Include="Automation\UnattendedRun.cpp" />
     <ClCompile Include="Editor\EditorCamera.cpp" />
     <ClCompile Include="Editor\EditorSettings.cpp" />
     <ClCompile Include="Editor\SceneEditor.cpp" />

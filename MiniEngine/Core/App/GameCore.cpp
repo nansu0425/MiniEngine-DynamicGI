@@ -23,6 +23,9 @@
 #include "Core/UI/ImGuiLayer.h"
 #include "Core/Utility/CommandLineArg.h"
 #include "Core/Editor/EditorSettings.h"
+#include "Core/Automation/ControlChannel.h"
+#include "Core/Automation/FrameCapture.h"
+#include "Core/Automation/UnattendedRun.h"
 #include <shellapi.h>
 
 #pragma comment(lib, "runtimeobject.lib")
@@ -87,6 +90,9 @@ namespace GameCore
         int argc = 0;
         LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
         CommandLineArgs::Initialize(argc, argv);
+        Utility::InitializeLogFile();
+        // device를 찾지 못해 멈추는 것처럼 초기화 중의 실패도 무인 실행에서 판정할 수 있게 가장 먼저 건다.
+        UnattendedRun::Initialize();
 
         Graphics::Initialize(game.RequiresInlineRaytracing());
         SystemTime::Initialize();
@@ -98,10 +104,12 @@ namespace GameCore
         game.Startup();
         // Startup이 정한 기본값을 지난 실행의 상태로 덮어쓴다.
         EditorSettings::Load();
+        ControlChannel::Initialize();
     }
 
     void TerminateApplication( IGameApp& game )
     {
+        ControlChannel::Shutdown();
         g_CommandManager.IdleGPU();
 
         EditorSettings::Save();
@@ -118,6 +126,8 @@ namespace GameCore
 
         float DeltaTime = Graphics::GetFrameTime();
 
+        // harness의 명령은 F1처럼 frame을 시작하기 전에 적용해 이번 frame의 UI, 입력, update가 모두 같은 상태를 보게 한다.
+        ControlChannel::Update();
         // GameInput이 UI가 가져간 입력을 걸러낼 수 있게 ImGui frame을 먼저 연다.
         ImGuiLayer::BeginFrame();
         // scene을 rendering하기 전에 rendering buffer를 이번 frame의 scene 영역 크기에 맞춘다.
@@ -129,6 +139,7 @@ namespace GameCore
 
         game.Update(DeltaTime);
         game.RenderScene();
+        FrameCapture::Capture(FrameCapture::kScene, g_SceneColorBuffer);
 
         PostEffects::Render();
 
@@ -139,6 +150,7 @@ namespace GameCore
         OverlayContext.SetViewportAndScissor(0, 0, g_SceneOverlayBuffer.GetWidth(), g_SceneOverlayBuffer.GetHeight());
         game.RenderSceneOverlay(OverlayContext);
         OverlayContext.Finish();
+        FrameCapture::Capture(FrameCapture::kOverlay, g_SceneOverlayBuffer);
 
         EngineProfiling::ShowFrameStats();
         EngineProfiling::ShowProfiler();
@@ -222,6 +234,7 @@ namespace GameCore
 
         TerminateApplication(app);
         Graphics::Shutdown();
+        UnattendedRun::ReportNormalExit();
         return 0;
     }
 

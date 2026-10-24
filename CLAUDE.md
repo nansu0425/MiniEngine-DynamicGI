@@ -2,9 +2,9 @@
 
 프로젝트 설명, 빌드, reference 정책은 [README.md](README.md) 를 따른다.
 
-## Command line build
+## App build, 실행, 확인
 
-- `MSBuild\Current\Bin\amd64\MSBuild.exe` 에 `-p:PreferredToolArchitecture=x64` 를 붙여 VS IDE 와 같은 x64 host compiler 로 build 한다. 32-bit `MSBuild.exe` 는 x86 host compiler 를 쓰고, 그 compiler 가 만든 pch 는 IDE 의 compiler 와 호환되지 않아 IDE build 가 C1853 으로 실패한다.
+- app 의 build, 실행, 확인은 `modelviewer` skill ([.claude/skills/modelviewer/SKILL.md](.claude/skills/modelviewer/SKILL.md)) 로 한다. 확인을 사용자에게 부탁하기 전에 harness 로 먼저 확인한다.
 
 ## Reference 검색
 

@@ -5,7 +5,7 @@
 
 namespace
 {
-    const char* kFileName = "editor.ini";
+    const wchar_t* kFileName = L"editor.ini";
 
     struct Section
     {
@@ -26,6 +26,16 @@ namespace
     }
 }
 
+std::wstring EditorSettings::GetFilePath(const std::wstring& fileName)
+{
+    std::wstring directory;
+    if (!CommandLineArgs::GetString(L"settings_dir", directory) || directory.empty())
+        return fileName;
+    if (directory.back() != L'\\' && directory.back() != L'/')
+        directory += L'\\';
+    return directory + fileName;
+}
+
 void EditorSettings::Register(const std::string& section, const std::function<void(Values&)>& save, const std::function<void(const Values&)>& load)
 {
     s_Sections[section] = { save, load };
@@ -40,7 +50,7 @@ void EditorSettings::Unregister(const std::string& section)
 
 void EditorSettings::Load(void)
 {
-    std::ifstream file(kFileName);
+    std::ifstream file(GetFilePath(kFileName));
     std::string line;
     Values* values = nullptr;
     while (std::getline(file, line))
@@ -71,7 +81,7 @@ void EditorSettings::Save(void)
         section.second.save(values);
     }
 
-    std::ofstream file(kFileName);
+    std::ofstream file(GetFilePath(kFileName));
     for (const auto& section : sections)
     {
         file << '[' << section.first << "]\n";
@@ -79,4 +89,33 @@ void EditorSettings::Save(void)
             file << value.first << '=' << value.second << '\n';
         file << '\n';
     }
+}
+
+std::vector<std::string> EditorSettings::GetSectionNames(void)
+{
+    std::vector<std::string> names;
+    for (const auto& section : s_Sections)
+        names.push_back(section.first);
+    return names;
+}
+
+bool EditorSettings::ReadSection(const std::string& section, Values& values)
+{
+    const auto found = s_Sections.find(section);
+    if (found == s_Sections.end())
+        return false;
+
+    values.clear();
+    found->second.save(values);
+    return true;
+}
+
+bool EditorSettings::ApplySection(const std::string& section, const Values& values)
+{
+    const auto found = s_Sections.find(section);
+    if (found == s_Sections.end())
+        return false;
+
+    found->second.load(values);
+    return true;
 }

@@ -24,6 +24,10 @@ namespace ImGuiLayer
     bool BeginSceneGizmo(void);
     void EndSceneGizmo(void);
 
+    // F1로도 바꾼다. 숨기면 scene이 window 전체를 차지한다.
+    void SetVisible(bool visible);
+    bool IsVisible(void);
+
     // View 메뉴의 name 항목으로 여닫는 창이다. UI를 숨기면 메뉴 항목과 창 모두 그리지 않는다.
     // 창이 열려 있는지는 editor.ini에 저장되어 다음 실행 때 되돌아온다.
     void ShowPanel(const char* name, bool& open, const std::function<void()>& drawContent);

@@ -9,6 +9,14 @@
 imgui.ini
 # 종료할 때 저장하는 editor 상태
 editor.ini
+# harness 가 실행마다 복사해 쓰는 결정성 baseline
+!/scripts/harness-baseline/*.ini
+
+# scripts/viewer.py 가 남기는 build log 와 실행마다의 settings, log, capture
+/MiniEngine/ModelViewer/Harness/
+
+# Python 이 module 을 import 할 때 만드는 bytecode cache
+__pycache__/
 
 # scripts/fetch-assets.ps1 가 받아 오는 upstream asset
 /MiniEngine/ModelViewer/Sponza/

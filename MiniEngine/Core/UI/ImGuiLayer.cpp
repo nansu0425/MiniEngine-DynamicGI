@@ -34,6 +34,8 @@ namespace
     constexpr float kDefaultFontSize = 13.0f;
 
     DescriptorHeap s_SrvHeap;
+    // ImGui는 경로를 복사하지 않고 pointer로 들고 있다.
+    std::string s_IniFilePath;
     float s_DpiScale = 0.0f;
     bool s_Visible = true;
     bool s_ShowDemoWindow = false;
@@ -173,6 +175,8 @@ void ImGuiLayer::Initialize(void)
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    s_IniFilePath = Utility::ToUTF8(EditorSettings::GetFilePath(L"imgui.ini"));
+    ImGui::GetIO().IniFilename = s_IniFilePath.c_str();
 
     ImGui_ImplWin32_Init(GameCore::g_hWnd);
     ApplyDpiScale(ImGui_ImplWin32_GetDpiScaleForHwnd(GameCore::g_hWnd));
@@ -304,6 +308,16 @@ void ImGuiLayer::EndSceneGizmo(void)
     ImGui::End();
 }
 
+void ImGuiLayer::SetVisible(bool visible)
+{
+    s_Visible = visible;
+}
+
+bool ImGuiLayer::IsVisible(void)
+{
+    return s_Visible;
+}
+
 void ImGuiLayer::ShowPanel(const char* name, bool& open, const std::function<void()>& drawContent)
 {
     if (s_PanelStates.find(name) == s_PanelStates.end())
@@ -337,7 +351,7 @@ bool ImGuiLayer::HandleWindowMessage(HWND hWnd, UINT message, WPARAM wParam, LPA
     // lParam의 bit 30은 key repeat이다.
     if (message == WM_KEYDOWN && wParam == VK_F1 && (lParam & (1 << 30)) == 0)
     {
-        s_Visible = !s_Visible;
+        SetVisible(!IsVisible());
         return true;
     }
 

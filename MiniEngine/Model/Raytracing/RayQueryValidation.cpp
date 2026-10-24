@@ -10,6 +10,7 @@
 #include "Core/Graphics/Resource/ColorBuffer.h"
 #include "Core/Graphics/Resource/DepthBuffer.h"
 #include "Core/Graphics/Resource/ReadbackBuffer.h"
+#include "Core/Automation/ControlChannel.h"
 
 #include "Output/Model/CompiledShaders/RayQueryValidationCS.h"
 
@@ -301,6 +302,14 @@ namespace
 
     const char* kLogPrefix = "[Ray Query Validation] ";
 
+    // Log 한 줄의 "key=value; key=value" 형식으로 이어 쓴다.
+    void AppendCondition(std::string& conditions, const std::string& key, const std::string& value)
+    {
+        if (!conditions.empty())
+            conditions += "; ";
+        conditions += key + "=" + value;
+    }
+
     // Capture의 조건과 수치를 "key=value; key=value" 한 줄로 쓴다. 숫자는 다시 읽어도 같은 float가 되는 자릿수로 쓴다.
     std::string DescribeCapture(const Capture& capture)
     {
@@ -308,13 +317,8 @@ namespace
         const ModeDesc& mode = kModes[frame.mode];
         const Stats& stats = capture.stats;
 
-        std::string line = kLogPrefix;
-        const auto add = [&line](const std::string& key, const std::string& value)
-        {
-            if (line.size() > strlen(kLogPrefix))
-                line += "; ";
-            line += key + "=" + value;
-        };
+        std::string conditions;
+        const auto add = [&conditions](const std::string& key, const std::string& value) { AppendCondition(conditions, key, value); };
         char text[256];
 
         add("mode", mode.label);
@@ -342,7 +346,21 @@ namespace
                     DescribeBin(FindPercentileBin(metric, samples, 0.5)).c_str(), DescribeBin(FindPercentileBin(metric, samples, 0.99)).c_str(), max);
             add(mode.metrics[index].label, text);
         }
-        return line;
+        return kLogPrefix + conditions;
+    }
+
+    // Restore가 되돌리는 조건만 Log 줄의 형식으로 쓴다.
+    std::string DescribeRestorableConditions(void)
+    {
+        RayQueryValidation::SceneConditions scene;
+        if (s_DescribeScene)
+            s_DescribeScene(scene);
+
+        std::string conditions;
+        AppendCondition(conditions, "taa", TemporalEffects::EnableTAA ? "on" : "off");
+        for (const auto& condition : scene)
+            AppendCondition(conditions, condition.first, condition.second);
+        return conditions;
     }
 
     RayQueryValidation::SceneConditions ParseLogLine(const std::string& line)
@@ -423,6 +441,72 @@ namespace
         if (s_HasRestored)
             ShowRestoredDifferences();
     }
+
+    // Restore 칸을 그 Capture의 줄로 채운다.
+    void CaptureForRestore(void)
+    {
+        CaptureLastFrame();
+        strncpy_s(s_RestoreLine, DescribeCapture(s_Capture).c_str(), _TRUNCATE);
+        s_HasRestored = false;
+    }
+
+    // panel의 Capture, Log, Restore와 같은 일을 harness가 명령으로 한다.
+    void RegisterCommands(void)
+    {
+        ControlChannel::Register("validation", "validation capture: like Capture then Log. Needs a Validation view", [](const std::string& arguments, const ControlChannel::Reply& reply)
+        {
+            if (arguments != "capture")
+            {
+                reply.Error("usage: validation capture");
+                return;
+            }
+            if (!WasLastFrameValidated())
+            {
+                reply.Error("the last frame was not validated. Pick a Validation view in the Ray Tracing View settings.");
+                return;
+            }
+
+            CaptureForRestore();
+            const std::string line = DescribeCapture(s_Capture);
+            Utility::Print((line + "\n").c_str());
+            ControlChannel::Fields values;
+            for (const auto& value : ParseLogLine(line))
+                values.Text(value.first, value.second);
+            reply.Ok(ControlChannel::Fields().Text("line", line).Object("values", values));
+        });
+
+        ControlChannel::Register("describe", "describe: the camera, sun and TAA as a line that restore takes", [](const std::string&, const ControlChannel::Reply& reply)
+        {
+            if (!s_DescribeScene)
+            {
+                reply.Error("describe needs the editor camera");
+                return;
+            }
+            reply.Ok(ControlChannel::Fields().Text("line", DescribeRestorableConditions()));
+        });
+
+        ControlChannel::Register("restore", "restore <line>: like Restore with a line printed by Log, validation capture or describe", [](const std::string& arguments, const ControlChannel::Reply& reply)
+        {
+            if (!s_RestoreScene)
+            {
+                reply.Error("restore needs the editor camera");
+                return;
+            }
+            if (arguments.empty())
+            {
+                reply.Error("usage: restore <line>");
+                return;
+            }
+
+            Restore(arguments);
+            if (!s_Restored.sceneRestored)
+            {
+                reply.Error("the line lacks the camera or sun. Only TAA was restored.");
+                return;
+            }
+            reply.Ok(ControlChannel::Fields().Text("line", DescribeRestorableConditions()));
+        });
+    }
 }
 
 void RayQueryValidation::SetSceneConditions(const std::function<void(SceneConditions&)>& describe, const std::function<bool(const SceneConditions&)>& restore)
@@ -497,6 +581,8 @@ void RayQueryValidation::Initialize(void)
     s_RasterDepthSRV.Create(1);
     s_UAVs.Create(kNumUAVs);
     s_UAVs.PointTo(kStatsUAV, s_Stats, s_Stats.GetUAV());
+
+    RegisterCommands();
 }
 
 void RayQueryValidation::Shutdown(void)
@@ -510,11 +596,7 @@ void RayQueryValidation::ShowSection(void)
     const bool lastFrameValidated = WasLastFrameValidated();
     ImGui::BeginDisabled(!lastFrameValidated);
     if (ImGui::Button("Capture"))
-    {
-        CaptureLastFrame();
-        strncpy_s(s_RestoreLine, DescribeCapture(s_Capture).c_str(), _TRUNCATE);
-        s_HasRestored = false;
-    }
+        CaptureForRestore();
     ImGui::EndDisabled();
     ImGui::SetItemTooltip(lastFrameValidated ? "Reads the stats of the last frame." : "Pick a Validation view in the View section.");
 

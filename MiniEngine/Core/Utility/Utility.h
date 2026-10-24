@@ -18,13 +18,10 @@
 
 namespace Utility
 {
-#ifdef _CONSOLE
-    inline void Print( const char* msg ) { printf("%s", msg); }
-    inline void Print( const wchar_t* msg ) { wprintf(L"%ws", msg); }
-#else
-    inline void Print( const char* msg ) { OutputDebugStringA(msg); }
-    inline void Print( const wchar_t* msg ) { OutputDebugString(msg); }
-#endif
+    // -log <file>이 있으면 그 file에도 쓴다. InitializeLogFile 전에 찍은 것은 file에 남지 않는다.
+    void InitializeLogFile( void );
+    void Print( const char* msg );
+    void Print( const wchar_t* msg );
 
     inline void Printf( const char* format, ... )
     {
@@ -76,6 +73,9 @@ namespace Utility
 
     std::wstring UTF8ToWideString( const std::string& str );
     std::string WideStringToUTF8( const std::wstring& wstr );
+    // 위의 두 함수와 달리 MAX_PATH에서 자르지 않고, 양쪽 모두 UTF-8로 변환한다.
+    std::wstring ToWide( const std::string& utf8 );
+    std::string ToUTF8( const std::wstring& wide );
     std::string ToLower(const std::string& str);
     std::wstring ToLower(const std::wstring& str);
     std::string GetBasePath(const std::string& str);

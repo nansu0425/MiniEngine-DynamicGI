@@ -21,9 +21,17 @@
 * sun direction: select the sun icon and rotate it (green ring: azimuth, red ring: elevation). The arrow shows where the light goes
 
 ## Editor state:
-On exit, ModelViewer saves its state in the working directory and restores it on the next start.
+On exit, ModelViewer saves its state in the working directory, or in the folder given by -settings_dir, and restores it on the next start.
 * imgui.ini: panel layout, written by ImGui. Delete it to reset the layout
 * editor.ini: window size and position, open panels, engine tuning values, editor camera, ray tracing view. Delete it to reset them
+
+## Command line options for automation:
+scripts/viewer.py starts ModelViewer with these options. They change nothing when omitted.
+* -settings_dir <folder>: read and write editor.ini and imgui.ini in <folder> instead of the working directory
+* -log <file>: also write the debug output to <file>, flushed at every message
+* -unattended 1: for runs that nobody watches. What it changes is described in Core/Automation/UnattendedRun.h
+* -control <name>: take commands on the named pipe \\.\pipe\<name> with the protocol described in Core/Automation/ControlChannel.h. Send `help` for the commands
+* -hdr_output 0: present in SDR even on an HDR display
 
 ## glTF 2.0 Support:
 
