@@ -40,8 +40,8 @@ COMMAND_TIMEOUT = 120
 EXIT_TIMEOUT = 30
 # frame 이 이 시간 동안 오르지 않으면 main loop 나 GPU 가 멈춘 것으로 본다.
 HANG_SECONDS = 10
-# camera 를 옮긴 뒤 scene 이 더 바뀌지 않을 때까지 기다리는 frame 수. 근거는 .claude/skills/modelviewer/SKILL.md 의 결정성 절에 있다.
-SETTLE_FRAMES = 600
+# camera 나 설정을 바꾼 뒤 수치를 비교할 capture 까지 기다리는 frame 수. 근거는 .claude/skills/modelviewer/SKILL.md 의 결정성 절에 있다.
+SETTLE_FRAMES = 1
 # start 가 남겨 두는 run 폴더 수. 실행 중인 instance 의 run 은 이와 관계없이 남긴다.
 KEPT_RUNS = 10
 PREVIEW_MAX_WIDTH = 1280
@@ -720,12 +720,30 @@ def selftest_running_app(args, check):
         restored = session.ask_ok(f'restore {before}')['line']
         check('describe, pose change, restore gives the first describe', restored == before == session.ask_ok('describe')['line'], restored)
 
+        def check_same_as_settled(name, label):
+            scene = read_dds_rgba32f(capture(session, 'scene', name))
+            check(label, np.array_equal(settled[0].view(np.uint32), scene.view(np.uint32)), describe_difference(settled[0], scene))
+
         session.ask_ok('pose ' + ' '.join(start[key] for key in pose_keys))
         session.ask_ok(f'frames {SETTLE_FRAMES}')
-        returned = read_dds_rgba32f(capture(session, 'scene', 'selftest-scene-returned'))
-        # 판정하지 않고 SKILL.md 의 결정성 절이 말하는 차이를 재서 기록만 한다.
-        print(f'INFO  scene at the first pose again after moving and {SETTLE_FRAMES} frames: '
-              f'{describe_difference(settled[0], returned)}', flush=True)
+        check_same_as_settled('selftest-scene-returned', 'scene at the first pose again after moving is bit-identical')
+
+        taa = 'Graphics/AA/TAA/Enable'
+        session.ask_ok(f'settings set Engine Tuning: {taa}=on')
+        session.ask_ok('frames 30')
+        with_taa = read_dds_rgba32f(capture(session, 'scene', 'selftest-scene-taa-on'))
+        # 이 검사가 없으면 TAA 가 켜지지 않았어도 다음 검사가 통과한다.
+        check('scene differs with TAA on', not np.array_equal(settled[0].view(np.uint32), with_taa.view(np.uint32)))
+        session.ask_ok(f'settings set Engine Tuning: {taa}=off')
+        session.ask_ok(f'frames {SETTLE_FRAMES}')
+        check_same_as_settled('selftest-scene-taa-off', 'scene after TAA on for 30 frames and off again is bit-identical')
+
+        sharpness = 'Graphics/AA/TAA/Sharpness'
+        original_sharpness = session.ask_ok('settings get Engine Tuning')['values'][sharpness]
+        session.ask_ok(f'settings set Engine Tuning: {sharpness}=0')
+        session.ask_ok(f'frames {SETTLE_FRAMES}')
+        check_same_as_settled('selftest-scene-sharpness-0', 'scene with TAA off does not change with Sharpness')
+        session.ask_ok(f'settings set Engine Tuning: {sharpness}={original_sharpness}')
 
         abandoned = Channel(instance['pipe'], 10)
         abandoned.send('frames 1000000')

@@ -34,9 +34,10 @@ description: ModelViewer 를 build, run, drive, screenshot, verify 하는 harnes
 ## 결정성
 
 - 시작 상태는 `scripts/harness-baseline/` 이고, 값을 고른 이유는 그 파일의 주석에 있다.
-- 같은 상태에서 연달아 찍은 scene 은 bit 가 같다 (selftest 가 확인한다).
-- TAA 를 꺼도 engine 이 매 frame TAA history 를 섞는다 (`TemporalEffects::ResolveImage` 가 `EnableTAA` 와 관계없이 `ApplyTemporalAA` 를 부른다). 그래서 camera 를 옮기면 scene 이 수백 frame 동안 바뀐다. 옮긴 뒤 240 frame 에는 최대 0.125, 360 frame 에는 최대 0.03 의 차이가 남았다. viewer.py 의 `SETTLE_FRAMES` 는 이 측정으로 정했다. camera 를 옮기거나 `restore` 한 뒤 수치를 비교할 scene 은 `frames <SETTLE_FRAMES>` 뒤에 찍는다.
-- 기다려도 같은 pose 의 scene 이 같아지지는 않는다. 움직였다가 같은 pose 로 돌아와 600 frame 을 기다린 scene 은 움직이기 전과 pixel 의 절반 이상이 다르다 (1920x1080 에서 1078985~1196303 pixel, 52~58%, 최대 0.25 를 쟀다). 그래서 같은 명령 순서로 찍은 이미지끼리만 비교한다. 코드의 전과 뒤를 비교할 때는 두 실행에서 같은 명령 순서를 쓴다. selftest 의 INFO 줄이 이 차이를 매번 잰다.
+- 두 명령 사이에는 1 frame 이상이 지나지만 몇 frame 인지는 timing 이 정한다 (명령을 실행하는 방식은 `ControlChannel.h`). `frames <n>` 도 n frame 이상을 기다릴 뿐이다.
+- TAA 를 끄면 그다음 frame 부터 scene 이 그 frame 의 raster 만으로 정해진다. 같은 상태에서 찍은 scene 은 camera 를 옮겼다 되돌린 뒤에도, TAA 를 켰다 끈 뒤에도, TAA 의 Sharpness 를 바꾼 뒤에도 bit 가 같다 (selftest 가 확인한다).
+- 1 frame 늦게 반영되는 것이 둘 있다. TAA 를 끈 frame 은 앞 frame 이 정한 jitter 로 그려지고, Exposure 를 바꾼 frame 의 display 는 바꾸기 전의 밝기다. viewer.py 의 `SETTLE_FRAMES` 는 이 지연을 명령 간격에 기대지 않고 덮는 frame 수다. 상태를 바꾼 뒤 수치를 비교할 capture 는 `frames <SETTLE_FRAMES>` 뒤에 찍는다.
+- TAA 나 adaptive exposure 를 켜면 결과가 지난 frame 수에 따라 바뀌므로, 같은 명령 순서로도 실행마다 다를 수 있다. 수치를 비교할 capture 는 둘을 끄고 찍는다.
 
 ## token 규칙
 
