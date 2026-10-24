@@ -11,10 +11,20 @@ DDGI 와 RT Reflection 의 정답 image 를 만드는 path tracer 를 inline Ray
 
 ## 전제
 
-- 장면은 `EditorCamera` 로 연 정적 Sponza 다. Restore 는 EditorCamera 에서만 된다 (`ModelViewer.cpp:344-352`). animation 과 instance 변경은 reset 조건에 넣지 않는다.
+- 장면은 `EditorCamera` 로 연 정적 Sponza 다. Restore 는 EditorCamera 에서만 된다 (`ModelViewer.cpp:379-389`). animation 과 instance 변경은 reset 조건에 넣지 않는다.
+- Sponza 는 작업 B 부터 KhronosGroup glTF-Sample-Assets `8f49239` 의 `Models/Sponza/glTF/` (이하 Khronos 판) 다. 이 폴더가 마지막으로 바뀐 commit 은 2023-05-18 의 `5bad5aa` 다. 그 전에는 DirectX-Graphics-Samples `e5975f9` 의 `MiniEngine/ModelViewer/Sponza/pbr/sponza2.gltf` (이하 옛 판) 였고, 옛 판은 같이 두지 않는다.
+  - 고른 이유: 형식과 규약이 spec 을 따르는 공개 asset 이라, spec 을 따르는 renderer 끼리, 외부 renderer 까지 같은 입력으로 비교할 수 있다. KhronosGroup glTF-Validator 2.0.0-dev.3.10 에서 Khronos 판은 error, warning, info 가 모두 0 이다. 옛 판은 error 6184, warning 1928 이고, 대부분 accessor min/max 의 반올림과 byteStride 문제라 해석은 바뀌지 않는다.
+  - geometry: triangle 262,267 개와 축 (+Y 가 위), UV 가 옛 판과 같다. node scale 이 0.008 이라 장면이 옛 판의 0.8 배이므로, 작업 B 가 `Resize` 의 ×100 을 ×125 로 바꿔 world 좌표를 옛 판과 같게 한다 (125 × 0.0080000004 ≈ 1). 옛 판에서 정한 시점과 작업 2 의 float16 UV 오차는 그대로다.
+  - TANGENT: normal map 을 쓰는 primitive 102 개 모두에 있다 (103 개 중 없는 1 개는 normal map 이 없다). Khronos 판의 README 는 MikkTSpace 로 만들었다고 한다. T 가 +u 방향인 비율이 99.8% 이상, `cross(N, T) · w` 가 image 위쪽인 비율이 99.9% 이상, w 와 UV handedness 의 일치가 100% 다 (측정). 그래서 Sponza 의 normal map 은 모두 asset 의 TANGENT 로 읽힌다 (작업 4).
+  - texture: base color 등 65 장이 JPEG (q≈95, ICC 와 EXIF 없음) 이고 1024² 다. 옛 판에서 2048² 였던 curtain 은 절반이 되었다.
+- asset 의 값은 공개된 그대로 쓰고 고치지 않는다. 아래는 Khronos 판의 알려진 결함이다. material 값은 Pestana (2015) 의 programmer art 이고 base color 는 2010 년 Crytek 의 diffuse 다.
+  - normal map 24 장 (내용으로 20 장) 중 22 장이 glTF 규약이다. leaf (thorn) 는 DirectX 규약이라 green 이 뒤집혀 보이고, chain 은 판정할 수 없다 (측정).
+  - 모든 material 의 baseColorFactor 가 0.588 이라 dielectric albedo 가 0.59 배가 된다. Khronos 판의 README 도 "I assume" 라고만 적어 의도를 알 수 없다.
+  - flagpole, leaf (thorn), vase_plant 의 roughness 가 specular 와 양의 상관이다. leaf 면적의 19.7% 가 roughness < 0.1 이다 (측정).
+  - chain, curtain, flagpole, vase_hanging 의 금속 영역은 base color 가 매우 어둡다 (측정).
 - 기본 Environment 는 `FindFirstFile` 이 처음 찾은 set 이다 (`ModelViewer.cpp:263-296`). NTFS 는 이름순으로 돌려주므로 Atrium 이다 (추측, Windows 는 순서를 보장하지 않는다). cubemap 에 sun disk 는 없다. +Y 면에 큰 천창이 있고 (8 bit 로 decode 하면 texel 의 39% 가 1 을 넘는다) 작은 downlight 와 간판 조명이 있다. 그 HDR 밝기는 재지 않았다.
 - 입력이 없으면 EditorCamera 의 pose 가 frame 마다 bit 단위로 같다 (추측, 작업 3 에서 확인). 같은 GPU 와 driver 에서 같은 입력은 같은 bit 의 결과를 낸다 (추측, 작업 6 에서 확인).
-- `SurfaceRayOrigin` 의 offset 이 Sponza ×100 에서 충분한지는 재지 않았다 (323e185). PT 에서 self-hit 나 뚫림으로 보이는 문제가 생기면 그때 검증 pass 에 mode 를 더한다. furnace 는 이 문제를 잡지 못하고 Cornell box (작업 13) 가 잡는다.
+- `SurfaceRayOrigin` 의 offset 이 Sponza ×125 (Khronos 판. world 좌표는 옛 판 ×100 과 같다) 에서 충분한지는 재지 않았다 (323e185). PT 에서 self-hit 나 뚫림으로 보이는 문제가 생기면 그때 검증 pass 에 mode 를 더한다. furnace 는 이 문제를 잡지 못하고 Cornell box (작업 13) 가 잡는다.
 - PT 가 쓰는 입력 경로 (loader → material data → `HitSurface`) 와 단위, light 가 spec 과 다른 곳은 설계할 때 조사했다. README "Rendering 기준" 대로 그 입력을 처음 쓰는 작업이 고친다. 작업마다 "입력 경로" 항목에 적었다.
 - GPU 는 RTX 4060 Laptop 이다 (ef16b70). 1 spp 의 비용은 아직 모르고 작업 5 에서 처음 잰다.
 - 시간은 모두 추측이다. 하루에 사용자의 build, 확인, commit 을 넣어 12 시간을 쓴다고 본다.
@@ -38,7 +48,7 @@ Output 설정으로 둘 중 하나를 누적한다. pixel 격자는 `CameraRays.
 ### BRDF
 
 - 구조는 spec 의 normative 규칙대로다: `material = mix(dielectric, metal, metallic)` (`Specification.adoc:3532`), dielectric 은 ior 1.5 의 `fresnel_mix(diffuse, specular)`, metal 은 `conductor_fresnel(baseColor, specular)` (`:3564-3598`, "Complete Model"). 두 specular 는 D, V 가 같아서 `f0 = mix(0.04, baseColor, metallic)` 인 lobe 하나로 합친다 (Schlick 이 f0 에 선형이다).
-- lobe 식은 sample implementation (informative, `:3660` 부터) 을 쓴다. GGX D, height-correlated Smith V (`:3725-3728`), `|V·H|` 의 Schlick F, `α = roughness²` 다. α 는 `α_min = 1e-3` 아래로 내리지 않는다 (spec 이 clamp 를 권한다, `:3741`). fp32 의 D 최대값 `1/(π α²) ≈ 3.2e5` 가 안전한 범위다. Sponza 에서 roughness 가 0.1 보다 작은 texel 은 2.4% 이고 flagpole, thorn (20% 이상) 과 vase_plant 에 몰려 있다 (metallicRoughness PNG 의 G 를 잼. 이 texture 는 linear 로 남아 있다).
+- lobe 식은 sample implementation (informative, `:3660` 부터) 을 쓴다. GGX D, height-correlated Smith V (`:3725-3728`), `|V·H|` 의 Schlick F, `α = roughness²` 다. α 는 `α_min = 1e-3` 아래로 내리지 않는다 (spec 이 clamp 를 권한다, `:3741`). fp32 의 D 최대값 `1/(π α²) ≈ 3.2e5` 가 안전한 범위다. Sponza 에서 roughness 가 0.1 보다 작은 texel 은 2.4% 이고 flagpole, thorn (20% 이상) 과 vase_plant 에 몰려 있다 (옛 판의 metallicRoughness PNG 의 G 를 잼. 이 texture 는 linear 로 남아 있다). Khronos 판의 G 는 옛 판과 상관이 0.998 ~ 1.000 이라 비율도 거의 같다고 본다 (추측).
 - diffuse 와 specular 의 coupling 은 Kulla & Conty 2017 의 energy-preserving 형태 `f_d = ρ (1 − E_s(μ_o)) (1 − E_s(μ_i)) / (π (1 − Ē_s))` 로 sample 의 `fresnel_mix` 식을 대신한다. E_s(μ, roughness) 는 f0 = 0.04 인 Fresnel-weighted specular 의 directional albedo 이고 Ē_s 는 그 cosine 평균이다. ior 이 1.5 로 고정이라 spec 이 말한 16³ 대신 2D table (32 × 32) 과 1D table 이면 된다. table 은 script 가 같은 lobe 식으로 만든다.
   - spec 은 sample 의 `fresnel_mix` 가 energy conservation 을 깬다고 적고 (`:3877`), physically accurate simulation 의 BRDF 는 positive, reciprocal, energy conserving 이어야 한다 (MUST, `:3653-3655`).
   - quadrature 로 잰 directional albedo (baseColor 1, metallic 0, roughness 0.3 ~ 1.0, 이 문서를 쓸 때 계산): `fresnel_mix` 는 1.27 까지 올라간다. `(1 − F(N·L))(1 − F(N·V))` (`:3879`) 는 energy 를 지키지만 수직에서 0.89 ~ 0.92, μ_o = 0.05 에서 0.26 ~ 0.53 으로 어두워진다. Kulla & Conty 는 1.0000 이다.
@@ -55,7 +65,7 @@ Output 설정으로 둘 중 하나를 누적한다. pixel 격자는 `CameraRays.
 - Sun: `GetSunDirection()` (`ModelViewer.cpp:104-111`) 쪽의 delta directional light 다. `Sun Light Intensity` 를 KHR_lights_punctual 의 directional light 처럼 sun 에 수직인 면의 illuminance (lux) 로 읽는다. 기본값은 4π 다 (작업 7). `E_sun = π × Intensity` 로 raster 의 지금 식에 맞추는 방법은 고르지 않았다. app 의 sun 이 glTF 의 directional light 와 π 배 다른 단위가 된다.
 - Sky: 고른 Environment 의 radiance cube (`*_specularIBL.dds`) mip 0 을 world 방향으로 bilinear sampling 한다. skybox 와 같은 방향 규약이다 (`SkyboxVS.hlsl:33-37`). cube 에는 단위가 없으므로 cd/m² 로 읽는다 (app 의 정의). Environment 가 None 이면 0 이다.
   - skybox 가 보이는 Gloss Reduction mip (기본 2, `Renderer.cpp:462-466`) 은 고르지 않았다. 정답이 raster 의 specular 설정에 묶이고 흐린 sky 가 정답이 된다. mip 0 이 원래의 radiance 다. Stonewall (fp16) 의 radiance mip 0 을 cosine 적분하면 irradiance cube 와 rgb 54개 중 51개가 0.91 ~ 1.06 배로 맞았다 (`π × cube / E`, 계산). 그래서 irradiance cube 는 E/π 를 담고, raster 의 diffuse IBL 도 이 단위에서 Lambert 와 맞는다.
-- Emission: `HitSurface.emissive` (`HitSurface.hlsli:62`) 를 cd/m² 의 radiance 로 더한다. ray 가 맞을 수 있는 면은 culling 규칙이 정하므로 맞은 면이 방출한다. Sponza 에는 emissive 가 없다.
+- Emission: `HitSurface.emissive` (`HitSurface.hlsli:62`) 를 cd/m² 의 radiance 로 더한다. ray 가 맞을 수 있는 면은 culling 규칙이 정하므로 맞은 면이 방출한다. Sponza 에는 emissive 가 없다 (Khronos 판은 추측).
 
 ### Path 와 sampling
 
@@ -116,38 +126,48 @@ raster 는 기준이 아니다 (8432ed7). 같은 시점의 두 화면으로 볼 
 
 ## 작업
 
-완료 기준의 수치와 Log 줄은 그 작업을 담은 commit 의 message 에 남기고, roadmap 보다 오래 남아야 하는 이유는 구현할 때 코드 주석으로 남긴다. "입력 경로" 는 그 작업이 처음 쓰는 입력이 spec 과 다른 곳을 다루는 자리다 (README "Rendering 기준"). 날짜와 순서의 이유는 아래 일정에 있다.
+완료 기준의 수치와 Log 줄은 그 작업을 담은 commit 의 message 에 남기고, roadmap 보다 오래 남아야 하는 이유는 구현할 때 코드 주석으로 남긴다. "입력 경로" 는 그 작업이 처음 쓰는 입력이 spec 과 다른 곳을 다루는 자리다 (README "Rendering 기준"). 날짜와 순서의 이유는 아래 일정에 있다. 작업 1 뒤에 더한 두 작업은 글자 A, B 로 적는다. commit message, `docs/harness-roadmap.md`, 코드 주석이 작업을 번호로 가리키므로 작업 2 ~ 13 의 번호를 바꾸지 않는다.
 
-1. base color 와 emissive texture 의 sRGB decode (10/24, 3 h)
-   - 입력 경로: PNG 를 WIC metadata 대로 읽어 sRGB slot 의 값을 decode 하지 않고 linear 로 쓴다 (`TextureConvert.cpp:123-127, 179, 199-215`). spec 은 base color 와 emissive 를 sRGB 로 읽으라고 한다 (`Specification.adoc:2613, 2689`). image 의 colorspace metadata 는 무시해야 한다 (MUST, `:2359`).
-   - 수정: `Model/Loader/TextureConvert.cpp` (`WIC_FLAGS_IGNORE_SRGB`, sRGB slot 은 값을 두고 format 만 `_SRGB` 로, mip 은 linear 에서 filter). fetch 로 받은 upstream DDS 는 mtime 이 PNG 와 같아 다시 만들어지지 않으므로 (`TextureConvert.cpp:41`), 이미 받은 checkout 도 손대지 않고 다시 만들어지게 한다 (예: DDS 이름에 변환 version, `.mini` version). 확인 script 를 `scripts/` 에 둔다.
-   - 완료 기준: base color DDS 24개의 mip 0 이 PNG 와 bit 단위로 같고 format 이 `R8G8B8A8_UNORM_SRGB` 다. metallicRoughness 와 normal 은 그대로다. raster 가 크게 어두워지고 채도가 오른다 (texel 평균 albedo 가 0.45 배, 측정). 고치기 전과 뒤의 raster screenshot 쌍을 같은 Exposure 로 남긴다.
-2. UV 를 float32 로 (10/24, 3 h)
+1. base color 와 emissive texture 의 sRGB decode (10/24, 3 h, 끝남: 7b3ba43)
+   - 입력 경로: PNG 를 WIC metadata 대로 읽어 sRGB slot 의 값을 decode 하지 않고 linear 로 썼다. spec 은 base color 와 emissive 를 sRGB 로 읽으라고 한다 (`Specification.adoc:2613, 2689`). image 의 colorspace metadata 는 무시해야 한다 (MUST, `:2359`).
+   - 수정과 수치, 고치기 전과 뒤의 raster screenshot 쌍 (`Harness/kept/`) 은 7b3ba43 의 message 에 있다. 수치와 screenshot 은 옛 판의 것이다. 작업 B 가 확인 script 를 Khronos 판으로 다시 돌린다.
+
+- A. loader 의 multi-primitive packing 수정 (10/24, 1.5 h)
+  - 결함: `Model/Loader/ModelConvert.cpp` 의 `CompileMesh` (`:146-155`) 는 같은 hash 의 primitive 를 한 Mesh 의 draw 여러 개로 묶는데, vertex 개수 (`curVertOffset`) 와 index 개수 (`curIndexOffset`) 를 byte offset 자리에 더한다. depth VB 는 모든 draw 를 같은 offset 에 쓴다.
+  - 영향: 옛 판은 Mesh 마다 draw 가 하나라 영향이 없다. Khronos 판 (mesh 1 개, primitive 103 개 → Mesh 25 개, Mesh 당 draw 최대 15 개) 은 triangle 의 80.8% 가 glTF 와 다르다. draw 103 개 중 99 개가 틀리고, 10 개는 index 가 BLAS 의 VertexCount (`BottomLevelAS.cpp:53`) 를 넘는다. Validation: Depth Comparison 과 Debug: UV0 에서 `0xC0000005` 로 crash 한다 (`Model.cpp:206`. device removed 로 추측).
+  - 수정: packing 을 고치고 `.mini` version 을 올린다 (`ModelLoader.h:29`, 작업 1 이 15 로 올렸다). `.mini` 와 glTF 의 triangle 이 같은지 보는 확인 script 를 `scripts/` 에 둔다. Khronos 판은 작업 B 전이므로 따로 받아 `-model` 로 연다.
+  - 완료 기준: 확인 script 에서 두 판 모두 틀린 triangle 이 0 이다. Khronos 판에서 Depth Comparison 이 crash 하지 않는다. eb009f6 의 Log 줄 세 개로 Restore 한 옛 판의 Depth Comparison 수치가 고치기 전과 같다. 기준은 고치기 전에 잰 값이다. eb009f6 뒤의 commit 이 그 수치를 바꿨을 수 있다.
+  - 옛 판으로 확인할 수 있는 마지막 작업이다.
+- B. Khronos 판으로 교체 (10/24, 3.75 h)
+  - 수정
+    - `scripts/fetch-assets.ps1`: KhronosGroup glTF-Sample-Assets 의 `Models/Sponza/glTF/` 를 sparse 로 받고 commit 을 `8f492390ddc7a2ae221a1369ef560589cf8c70fb` 로 고정한다. IBL 의 `Textures/` 같은 upstream 의 다른 asset 이 여전히 필요한지는 구현할 때 확인한다.
+    - `ModelViewer/ModelViewer.cpp:360-361`: 기본 경로와 scale (×100 → ×125)
+    - `.gitignore`, `README.md`: asset 은 repo 밖에 받는다. Khronos 판은 license 를 "Cryengine Limited License Agreement" 로 표시한다.
+    - `scripts/viewer.py:31` 의 `DEFAULT_ASSETS`
+    - `scripts/check-texture-colorspace.py`: JPEG 지원과 기본 경로
+  - `scripts/harness-baseline/` 를 확인한다. pose 는 그대로 쓴다. baseColorFactor 0.588 로 장면이 어두워지므로 Exposure 0.25 를 다시 본다.
+  - eb009f6 의 Log 줄 세 개로 Restore 해 Validation: Depth Comparison 의 새 Log 줄 세 개를 남긴다. 작업 2 부터 이 줄을 쓴다.
+  - 완료 기준: 기본 실행이 Khronos 판을 옛 판과 같은 world 좌표로 연다 (같은 pose 에서 구도가 같다). `check-texture-colorspace.py` 가 Khronos 판에서 통과한다. 새 Log 줄 세 개가 생긴다. `viewer.py` 의 selftest 가 PASS 한다.
+
+2. UV 를 float32 로 (10/24 ~ 10/25, 3 h)
    - 입력 경로: UV0, UV1 을 `R16G16_FLOAT` 로 담아 Sponza 에서 base color texel 로 최대 14.1 texel 이 어긋난다 (`MeshConvert.cpp:350, 355, 405`). spec 은 float accessor 값을 32 bit 이상의 float 로 다루라고 한다 (SHOULD, `Specification.adoc:1154`). PT 는 SHOULD 도 따르므로 고친다 (README "Rendering 기준").
    - 수정: `Model/Loader/MeshConvert.cpp` (vertex 와 depth VB 의 UV 를 `R32G32_FLOAT` 로), `Model/Renderer/Renderer.cpp` (raster input layout, `:125, 138, 341-345`), `Model/Raytracing/BottomLevelAS.cpp` (attribute offset 의 4 byte 가정, `:74-90`), `Model/Raytracing/RaytracingScene.hlsli` (UV 보간, `:100-114`), `Model/Loader/ModelLoader.h` (`.mini` version).
-   - 작업 4 의 MikkTSpace 와 합치지 않는다. PT pass (작업 3) 가 먼저 UV 를 쓰고, input layout 과 BLAS attribute 를 바꾸는 일은 tangent 생성과 따로 확인할 수 있어 원인을 나누기 쉽다. `.mini` version 을 한 번 더 올리는 비용만 든다.
-   - 완료 기준: `.mini` 의 UV 가 glTF accessor 와 bit 단위로 같다 (확인 script). raster 에서 ceiling, bricks 처럼 UV 가 큰 면의 texture 만 조금 옮겨지고, Debug: UV0 와 Validation: Depth Comparison (eb009f6 의 Log 줄 세 개로 Restore) 의 수치가 그대로다.
-3. PT pass 와 누적 (10/24, 5 h)
+   - 완료 기준: `.mini` 의 UV 가 glTF accessor 와 bit 단위로 같다 (확인 script). raster 에서 ceiling, bricks 처럼 UV 가 큰 면의 texture 만 조금 옮겨지고, Debug: UV0 와 Validation: Depth Comparison (작업 B 가 남긴 Log 줄 세 개로 Restore) 의 수치가 그대로다.
+3. PT pass 와 누적 (10/25, 5 h)
    - 추가: `Model/PathTracer/PathTracer.h, .cpp` (pass, 누적, reset), `PathTracerPanel.h, .cpp`, `PathTracerCS.hlsl` (SM 6.5), `Core/Shaders/Random.hlsli`. 수정: `Model/Model.vcxproj`, `Core/Core.vcxproj`, `ModelViewer/ModelViewer.cpp` (Update 에서 panel, `RenderScene` 끝에서 Render).
    - root signature 와 dispatch 는 `RaytracingDebugView.cpp` 의 형태에 누적 buffer 와 scene color 의 UAV 를 `SceneHeapTable` 로 더한다. shading 은 아직 없고 primary hit 의 `baseColor × (1 − metallic)` 을 radiance 로 쓴다.
    - 주석: reset 이 비교하는 값과 `rasterSampleOffset` 을 빼는 이유, scene color 에 쓰는 이유
-   - 입력 경로: alpha, doubleSided, metallic 은 spec 과 맞다. base color 와 UV 는 작업 1, 2 가 고쳤다.
+   - 입력 경로: alpha, doubleSided, metallic 은 spec 과 맞다. triangle 은 작업 A, base color 와 UV 는 작업 1, 2 가 고쳤다.
    - 완료 기준: Show 를 켜면 albedo image 가 보이고 sample 이 쌓이며 edge 와 alpha test 경계가 매끄러워진다. camera 를 건드리지 않으면 TAA 를 켜도 sample 수가 계속 오르고, camera 이동, window 크기, Seed, Reset 에서 0 부터 다시 센다. Target 에서 멈추고 Show 를 다시 켜면 이어서 쌓는다.
-4. MikkTSpace tangent 와 normal map 의 green 규약 (10/25, 9.5 h)
-   - 입력 경로: TANGENT 가 없으면 spec 은 tangent 를 MikkTSpace 로 만든다고 정한다 (`Specification.adoc:1759`, 정의). 지금은 DirectXMesh `ComputeTangentFrame` 이 만들고 (`MeshConvert.cpp:290-327`), triangle 의 5.1% 에서 T 가 u 와 반대이며, bitangent 가 UV 의 +v (image 아래) 를 향한다. glTF 는 normal texture 의 +Y 가 위이고 (`schema/material.schema.json:65`) UV (0, 0) 이 image 의 왼쪽 위다 (`Specification.adoc:2498`). Sponza normal map 은 17개가 DirectX 규약, curtain 이 glTF 규약, 3개는 판정이 안 된다 (curl 로 추정). 지금은 engine 과 asset 이 둘 다 반대라 17개가 맞게 보이고 curtain 만 뒤집혀 있다. PT 는 spec 을 모두 따르므로 (README "Rendering 기준") 둘 다 고친다.
-   - (a) MikkTSpace 와 test quad (7 h)
-     - MikkTSpace 의 reference 구현을 쓴다. license 문구가 README "참고 범위" 에 맞는지 직접 확인하고 (zlib 으로 보지만 확인 전이다) `references/manifest.json` 에 commit 과 함께 더한다. 코드는 원래의 copyright 와 license 문구를 남겨 가져온다 (vcpkg 에 port 가 있으면 `vcpkg.json` 으로 받는다).
-     - MikkTSpace 는 corner 마다 tangent 를 내므로 tangent 가 다른 vertex 를 나누고 index buffer 를 다시 만든다. `.mini` version 을 올린다. bitangent 방향은 MikkTSpace 의 w 와 spec 의 `B = cross(N, T) · w` (`:1763`, `HitSurface.hlsli:70`, `DefaultPS.hlsl:228`) 로 정해지므로 w 를 따로 뒤집는 수정은 없다.
-     - 규약을 한 번 확인한다. `scripts/make-normal-map-test.py` 가 xy 평면에서 +z 를 보는 quad 를 쓴다. UV (0, 0) 은 왼쪽 위 corner 이고, normal map 의 모든 texel 은 glTF 규약으로 (0, 0.6, 0.8) 이다. license 문제가 없고 정답을 손으로 안다. TANGENT 가 있는 판, 없는 판, u 를 뒤집은 판을 `-model` 로 열고 (OrbitCamera 로도 된다) Debug: Shading Normal 에서 world 의 +y 쪽 (색 (0.5, 0.8, 0.9)) 인지 본다. 반대면 (0.5, 0.2, 0.9) 다.
-     - 완료 기준: test quad 세 판이 모두 +y 다. Validation: Depth Comparison 의 수치가 그대로다 (vertex 를 나눠도 위치는 같다). (a) 만 끝난 상태에서는 Sponza 의 DirectX 규약 17개가 뒤집혀 보인다.
-   - (b) Sponza normal map (2.5 h)
-     - 받은 뒤 script 가 DirectX 규약인 normal map 의 G 를 뒤집는다 (asset 은 repo 에 두지 않고 fetch 로 받는다). 목록은 curl 판정을 script 에 넣어 정하고, 판정이 안 되는 3개는 화면으로 정한다. 작업 1 의 DDS 재생성과 같은 장치를 쓴다.
-     - 완료 기준: bricks 를 위에서 비추면 윗면 경계가 밝다. 고치기 전 (작업 3) 과 비교해 curtain 과 UV 가 mirror 된 경계만 바뀐다. curtain 의 고치기 전과 뒤 screenshot 을 남긴다.
+4. tangent 와 normal map 의 green 규약 확인 (10/25, 2 h)
+   - 입력 경로: glTF 는 normal texture 의 +Y 가 위이고 (`schema/material.schema.json:65`) UV (0, 0) 이 image 의 왼쪽 위이며 (`Specification.adoc:2498`), bitangent 는 `B = cross(N, T) · w` 다 (`:1763`). Khronos 판은 normal map 을 쓰는 primitive 모두에 TANGENT 가 있고 (전제), loader 는 그것을 읽어 `R10G10B10A2_UNORM` 으로 담는다 (`MeshConvert.cpp:285-288, 343-346`). engine 이 w 와 normal map 을 이 규약대로 읽는지 (`HitSurface.hlsli:70`, `DefaultPS.hlsl:228`) 는 아직 확인하지 않았다. TANGENT 가 없을 때 MikkTSpace 로 만드는 일은 뒤로 미뤘다 (뒤로 미룬 일).
+   - `scripts/make-normal-map-test.py` 가 xy 평면에서 +z 를 보는 quad 를 쓴다. UV (0, 0) 은 왼쪽 위 corner 이고, normal map 의 모든 texel 은 glTF 규약으로 (0, 0.6, 0.8) 이다. license 문제가 없고 정답을 손으로 안다. TANGENT (1, 0, 0, 1) 인 판과, u 를 뒤집고 TANGENT 를 (−1, 0, 0, −1) 로 둔 판을 `-model` 로 열고 (OrbitCamera 로도 된다) Debug: Shading Normal 에서 world 의 +y 쪽 (색 (0.5, 0.8, 0.9)) 인지 본다. 반대면 (0.5, 0.2, 0.9) 이고, 그러면 engine 의 그 경로를 고친다.
+   - 완료 기준: test quad 두 판이 모두 +y 다.
 5. Lambert path 와 furnace 설정 (10/25 ~ 10/26, 4 h)
    - 추가: `Model/PathTracer/LambertBrdf.hlsli` (ONB, cosine hemisphere, 교체 단위의 세 함수), `Model/PathTracer/SceneLights.hlsli` (단위 정의, sky 와 emission, 이 작업의 sky 는 상수). 수정: `PathTracerCS.hlsl`, panel.
    - Path 절을 sun 과 glTF BRDF 없이 만든다: emission, BRDF sampling 의 반사, Max Bounces, Russian roulette, NaN/Inf guard, Furnace, Geometric Normals. Material 은 Lambert 하나다.
    - 주석: Lambert 의 `glTF spec과 다르다`, RR 식에서 min 을 쓰는 이유, B 가 세는 반사, scene radiance 의 단위
-   - 입력 경로: normal 과 tangent 는 작업 4 가 고쳤다. normal texture 의 decode 와 `scale` 은 spec 과 맞다.
+   - 입력 경로: normal 과 tangent 의 규약은 작업 4 가 확인했다. normal texture 의 decode 와 `scale` 은 spec 과 맞다. leaf (thorn) 의 normal map 은 전제의 알려진 결함이다.
    - 완료 기준: 상수 sky 로 비친 Sponza 가 보이고, Max Bounces 를 1 에서 올리면 구석이 밝아진다. Furnace (albedo 1, emission 0) 와 Geometric Normals 에서 edge 와 texture 가 사라진 균일한 화면이 되고, Geometric Normals 를 끄면 normal 이 꺾인 곳만 어두워진다. Profiler 의 1 spp GPU time (B = 64, RR on, 기본 시점과 해상도) 을 적는다.
 6. Export, 비교 script, furnace 의 수치 (10/26, 4.5 h)
    - 추가: `Model/PathTracer/PathTracerCapture.h, .cpp`, `scripts/compare-images.py` (`diff`, `furnace`, `png`. DDS 는 `scripts/imagefiles.py` 로 읽는다). 수정: panel (Export, Export at Powers of 4, Log, invalid sample 수), `.gitignore`, `README.md` (준비에 Python 과 package).
@@ -160,7 +180,7 @@ raster 는 기준이 아니다 (8432ed7). 같은 시점의 두 화면으로 볼 
      - furnace 는 self-hit, leak, visibility 오류와 방향 분포의 오류를 잡지 못한다. 무엇에 맞든 같은 값을 내기 때문이다.
 7. Sun 과 raster 의 sun 단위 (10/26, 3 h)
    - 추가: `Model/Raytracing/SurfaceRay.hlsli` (surface 에서 한 방향으로 나가는 ray, `DescribeSunRay` 를 옮김). 수정: `RaytracingDebugViewCS.hlsl`, `SceneLights.hlsli`, `PathTracerCS.hlsl` (NEE 와 다음 반사가 공용 함수를 쓴다), `PathTracer.cpp`, `ModelViewer.cpp`, `Model/Renderer/DefaultPS.hlsl`, `references/manifest.json`.
-   - 입력 경로: raster 의 `ShadeDirectionalLight` 는 `c_light` 를 1/π 없이 곱한다 (`DefaultPS.hlsl:176-195`). sun 항 전체 (diffuse 와 specular) 를 π 로 나누고 `Sun Light Intensity` 의 기본값을 4 에서 4π 로 올려 raster 화면을 그대로 둔다. glTF 의 sparse 에 `/extensions/2.0/Khronos/KHR_lights_punctual/` 를 더해 lux 의 근거를 references 에 둔다. `ModelViewer.cpp:327` 의 ×100 은 지금의 light 에 영향이 없어 남기고, `glTF spec과 다르다` 주석에 1 unit = 1 cm 와 거리로 감쇠하는 light 를 넣을 때 바꾼다는 것을 적는다.
+   - 입력 경로: raster 의 `ShadeDirectionalLight` 는 `c_light` 를 1/π 없이 곱한다 (`DefaultPS.hlsl:176-195`). sun 항 전체 (diffuse 와 specular) 를 π 로 나누고 `Sun Light Intensity` 의 기본값을 4 에서 4π 로 올려 raster 화면을 그대로 둔다. glTF 의 sparse 에 `/extensions/2.0/Khronos/KHR_lights_punctual/` 를 더해 lux 의 근거를 references 에 둔다. `ModelViewer.cpp:361` 의 ×125 (작업 B) 는 지금의 light 에 영향이 없어 남기고, `glTF spec과 다르다` 주석에 1 unit = 0.8 cm (계산) 와 거리로 감쇠하는 light 를 넣을 때 바꾼다는 것을 적는다.
    - 저장된 editor.ini 의 `Viewer/Lighting/Sun Light Intensity=4` 가 새 기본값을 덮어쓰므로 (`GameCore.cpp:96-107`) 12.5663706 으로 고친다. 고치지 않으면 raster 의 sun 이 π 배 어두워진다. commit message 에도 적는다.
    - 주석: Intensity 를 lux 로 읽는 이유 (KHR_lights_punctual 의 해당 줄)
    - 완료 기준: 기본 시점에서 고치기 전과 뒤의 raster screenshot 이 같다. sun 을 gizmo 나 Engine Tuning 으로 돌리면 PT 가 reset 되고 그림자가 따라온다. 그림자 경계가 Debug: Sun Visibility 와 같다.
@@ -209,22 +229,23 @@ raster 는 기준이 아니다 (8432ed7). 같은 시점의 두 화면으로 볼 
       - PT 는 Material Lambert 다 (Bitterli 는 순수 diffuse 다). emissive NEE 가 없어 light 에 맞을 확률이 sample 당 약 1.45% 이므로 16 × 16 tile 평균으로 비교한다.
       - 완료 기준: tile 평균의 `agree` r (PT 와 reference 를 각각 두 Seed 로) 이 1.1 이하다. leak, self-hit, visibility, 방향 분포, emissive 의 data 경로처럼 furnace 가 못 잡는 오류를 여기서 본다.
       - (b) 가 PT 의 bug 를 찾아도 10/29 에는 고치지 않는다. 고치기와 작업 12 의 재측정 (export 가 script 로 되어 있어 GPU 시간이 대부분이다) 은 발표 뒤에 하고, 발표의 측정에는 고치기 전의 값이라고 적는다.
-    - time box: (a) 는 10/28 의 5 h 이고 10/28 이 끝나면 멈춘다. (b) 는 10/29 오전의 3 h 이고 끝나면 멈춘다. 그날의 나머지는 발표 자료를 만든다. (b) 가 통과하면 그 image 와 r 을 발표 자료에 넣고, 통과하지 못하면 같은 시점의 PT 와 reference image, 그때의 r, 원인 후보를 "진행 중" 으로 보인다. 처음 정한 8 h 는 (a) 와 (b) 를 모두 10/28 에 하는 것이었지만, 작업 2 가 생기고 작업 4 가 MikkTSpace 를 품어 작업이 7.5 h 늘었으므로 (b) 를 10/29 로 옮겼다. DDGI 와의 비교 수치는 (b) 가 통과한 뒤에 믿는다.
+    - time box: (a) 는 10/28 의 5 h 이고 10/28 이 끝나면 멈춘다. (b) 는 10/29 오전의 3 h 이고 끝나면 멈춘다. 그날의 나머지는 발표 자료를 만든다. (b) 가 통과하면 그 image 와 r 을 발표 자료에 넣고, 통과하지 못하면 같은 시점의 PT 와 reference image, 그때의 r, 원인 후보를 "진행 중" 으로 보인다. 처음 정한 8 h 는 (a) 와 (b) 를 모두 10/28 에 하는 것이었지만, 작업 2 가 생기고 작업 4 가 MikkTSpace 를 품어 작업이 7.5 h 늘었으므로 (b) 를 10/29 로 옮겼다. 그 뒤 Khronos 판으로 바꿔 작업 4 가 7.5 h 줄었지만, 작업 A, B 와 이 문서의 수정이 6.25 h 를 써서 남는 1.25 h 로는 (b) 를 10/28 로 되돌리지 못한다. DDGI 와의 비교 수치는 (b) 가 통과한 뒤에 믿는다.
 
 ## 일정
 
 | 날짜 | 작업 | 작업 시간 | 여유 |
 |---|---|---|---|
-| 10/24 | 1, 2, 3 | 11 h | 1 h |
-| 10/25 | 4, 5 의 앞 2.5 h | 12 h | 0 h |
+| 10/24 | 1 (끝남), 이 문서의 수정 1 h, A, B, 2 의 앞 2.75 h | 12 h | 0 h |
+| 10/25 | 2 의 뒤 0.25 h, 3, 4, 5 의 앞 2.5 h | 9.75 h | 2.25 h |
 | 10/26 | 5 의 뒤 1.5 h, 6, 7, 8 의 앞 3 h | 12 h | 0 h |
 | 10/27 | 8 의 뒤 5.5 h, 9, 10 | 11.5 h | 0.5 h |
 | 10/28 | 11, 12, 13 (a) | 12 h | 0 h |
 | 10/29 | 오전에 13 (b) 3 h, 나머지는 발표 자료 | 3 h | 늘리지 않는다 |
 
-- 10/24 ~ 10/28 의 작업은 58.5 h 이고 명시한 여유는 1.5 h 다. 그 다음 여유는 밀리는 순서의 첫 항목인 작업 13 (a) 의 5 h 다. 10/29 의 3 h 는 발표 자료의 시간이라 밀린 작업에 쓰지 않는다. 앞날이 넘치면 그 뒤 날의 여유를 당겨 쓰고, 모자라면 아래 순서로 뺀다.
+- 10/24 ~ 10/28 의 작업은 끝난 작업 1 과 이 문서의 수정을 넣어 57.25 h 이고 명시한 여유는 2.75 h 다. 그 다음 여유는 밀리는 순서의 첫 항목인 작업 13 (a) 의 5 h 다. 10/29 의 3 h 는 발표 자료의 시간이라 밀린 작업에 쓰지 않는다. 앞날이 넘치면 그 뒤 날의 여유를 당겨 쓰고, 모자라면 아래 순서로 뺀다.
 - 순서의 이유
-  - 작업 1, 2, 4 (입력 경로) 를 PT 의 shading 앞에 둔다. PT 가 정답이므로 그 입력이 먼저 spec 을 따라야 하고, 늦게 고치면 그 앞의 screenshot, furnace, 측정을 다시 해야 한다. 작업 3 (PT pass) 은 normal 을 쓰지 않으므로 작업 4 앞에 두어 PT 의 비용과 문제를 첫날 본다.
+  - 작업 1, 2, 4 (입력 경로) 를 PT 의 shading 앞에 둔다. PT 가 정답이므로 그 입력이 먼저 spec 을 따라야 하고, 늦게 고치면 그 앞의 screenshot, furnace, 측정을 다시 해야 한다. 작업 3 (PT pass) 은 normal 을 쓰지 않으므로 작업 4 앞에 두어 PT 의 비용과 문제를 일찍 본다.
+  - 작업 A, B 는 작업 2 앞이다. B 가 옛 판을 지우므로, 옛 판의 수치 (eb009f6) 로 확인할 수 있는 A 를 먼저 한다. PT 의 입력이 처음부터 Khronos 판이어야 그 뒤의 확인과 screenshot 을 다시 하지 않으므로 B 를 작업 2, 3 앞에 둔다.
   - 작업 10 (Log 와 Restore) 은 작업 11, 12 앞이다. 측정의 고정 시점과 작업 13 의 camera 가 Restore 를 쓰고, 발표가 restart 뒤의 재현을 보일 수 있다.
   - 작업 13 은 마지막이다. 독립된 estimator 와 맞춰 보는 가장 강한 근거지만 원인 찾기의 상한을 알 수 없다. 작업 12 뒤에 두어 발표의 핵심 자료를 먼저 확보하고, (a) 의 script 를 쓰는 동안 작업 12 의 GPU run 을 돌린다. (b) 는 10/29 오전의 3 h 로 끝을 정한다.
 - 10/24 ~ 10/28 이 밀리면 이 순서로 발표 뒤로 옮긴다.
@@ -233,7 +254,7 @@ raster 는 기준이 아니다 (8432ed7). 같은 시점의 두 화면으로 볼 
   3. 작업 12 의 두 번째, 세 번째 시점과 bounce 측정 (DDGI 단계로)
   4. 작업 10: 측정 시점을 검증 panel 의 Restore 와 손으로 되돌린다. 발표는 재현성을 같은 실행 안에서만 보인다.
   5. 작업 11: 작업 12 를 Radiance 로 한다. 발표는 DDGI 와 비교할 양을 정의로만 보인다.
-  - 작업 1, 2, 4 는 빼지 않는다. PT 의 입력이 spec 을 따른다는 것이 정답의 전제다.
+  - 작업 A, B, 2, 4 는 빼지 않는다. PT 의 입력이 glTF 와 같고 spec 을 따른다는 것이 정답의 전제다.
 
 ## 발표 자료
 
@@ -242,7 +263,8 @@ raster 는 기준이 아니다 (8432ed7). 같은 시점의 두 화면으로 볼 
 | 보여 줄 것 | 작업 |
 |---|---|
 | coupling 별 directional albedo (`fresnel_mix` 1.27, `(1 − F)(1 − F)` 의 grazing, Kulla & Conty 1.0), 단위 (lux, cd/m²) | 이 문서 |
-| PT 의 입력을 spec 에 맞춘 것: sRGB decode 전과 뒤의 raster, float16 UV 의 최대 14.1 texel, MikkTSpace 와 test quad 세 판, curtain 의 전과 뒤 | 1, 2, 4 |
+| asset 을 Khronos 판으로 바꾼 이유 (validator, 옛 판과 같은 geometry) 와 알려진 결함, packing 을 고치기 전과 뒤의 틀린 triangle 비율 | 이 문서, A, B |
+| PT 의 입력을 spec 에 맞춘 것: sRGB decode 전과 뒤의 raster (옛 판), float16 UV 의 최대 14.1 texel, test quad 두 판 | 1, 2, 4 |
 | white furnace, emission furnace (B 항등식), shading normal 이 잃는 energy, 같은 Seed 의 재현 | 6 |
 | sun 단위를 바꿔도 raster 화면이 그대로다 | 7 |
 | BRDF Test 의 표와 roughness 별 albedo, glTF white furnace, sun 직접광 (B = 1) 과 raster sun | 8 |
@@ -260,9 +282,11 @@ raster 는 기준이 아니다 (8432ed7). 같은 시점의 두 화면으로 볼 
 - glTF 의 KHR_lights_punctual light 를 load 하는 일, point 와 spot light, sun 의 angular size
 - DoF 같은 lens model, denoiser, texture LOD (ray cone 등)
 - Sponza 가 쓰지 않는 loader 기능. 그 기능을 처음 쓰는 asset 의 작업이 다룬다.
+- asset 의 값을 고치는 일. 전제의 알려진 결함도 공개된 그대로 쓴다.
 
 ## 뒤로 미룬 일
 
+- TANGENT 가 없을 때 MikkTSpace 로 tangent 를 만드는 일 (`Specification.adoc:1759`): TANGENT 없이 normal map 을 쓰는 asset 을 처음 쓸 때. 그때까지는 지금처럼 DirectXMesh `ComputeTangentFrame` 이 만든다 (`MeshConvert.cpp:290-327`). 계획은 7b3ba43 의 이 문서 작업 4 (a) 에 있다.
 - metal 의 multiple scattering (Kulla & Conty 의 energy compensation 항): rough 한 metal 의 energy 손실이 결과를 바꾸는 장면이나 RT Reflection 전. 그러면 metal 의 furnace 도 1 이 된다.
 - sky 의 importance sampling 과 MIS: 작업 9, 12 에서 Atrium 의 천창이나 조명이 firefly 를 만들거나 1% 에 이르지 못할 때
 - emissive triangle 의 NEE: Cornell box 처럼 작은 emitter 가 수렴을 막을 때
