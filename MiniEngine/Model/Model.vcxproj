@@ -90,6 +90,7 @@
     <ClInclude Include="Raytracing\RaytracingView.h" />
     <ClInclude Include="Raytracing\RaytracingPanel.h" />
     <ClInclude Include="Raytracing\RayQueryValidation.h" />
+    <ClInclude Include="Raytracing\RayPick.h" />
     <ClInclude Include="Raytracing\RayQuerySmokeTest.h" />
     <ClInclude Include="Raytracing\SceneHeapTable.h" />
     <ClInclude Include="PathTracer\PathTracer.h" />
@@ -117,6 +118,7 @@
     <ClCompile Include="Raytracing\RaytracingView.cpp" />
     <ClCompile Include="Raytracing\RaytracingPanel.cpp" />
     <ClCompile Include="Raytracing\RayQueryValidation.cpp" />
+    <ClCompile Include="Raytracing\RayPick.cpp" />
     <ClCompile Include="Raytracing\RayQuerySmokeTest.cpp" />
     <ClCompile Include="Raytracing\SceneHeapTable.cpp" />
     <ClCompile Include="PathTracer\PathTracer.cpp" />
@@ -217,6 +219,9 @@
       <ShaderModel>6.5</ShaderModel>
     </FxCompile>
     <FxCompile Include="Raytracing\RayQueryValidationCS.hlsl">
+      <ShaderModel>6.5</ShaderModel>
+    </FxCompile>
+    <FxCompile Include="Raytracing\RayPickCS.hlsl">
       <ShaderModel>6.5</ShaderModel>
     </FxCompile>
     <FxCompile Include="PathTracer\PathTracerCS.hlsl">

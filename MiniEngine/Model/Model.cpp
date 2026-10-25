@@ -289,3 +289,16 @@ Math::OrientedBox ModelInstance::GetBoundingBox() const
 
     return m_Locator * m_Model->m_BoundingBox;
 }
+
+Math::AxisAlignedBox ModelInstance::GetAxisAlignedBox() const
+{
+    if (m_Model == nullptr)
+        return AxisAlignedBox(Vector3(kZero), Vector3(kZero));
+
+    const AxisAlignedBox& box = m_Model->m_BoundingBox;
+    const Vector3 corners[2] = { box.GetMin(), box.GetMax() };
+    AxisAlignedBox world;
+    for (int corner = 0; corner < 8; ++corner)
+        world.AddPoint(m_Locator * Vector3(corners[corner & 1].GetX(), corners[(corner >> 1) & 1].GetY(), corners[corner >> 2].GetZ()));
+    return world;
+}

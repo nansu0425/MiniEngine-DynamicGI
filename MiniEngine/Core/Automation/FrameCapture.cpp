@@ -1,5 +1,6 @@
 #include "Core/pch.h"
 #include "Core/Automation/FrameCapture.h"
+#include "Core/Display/Display.h"
 #include "Core/Graphics/Command/CommandContext.h"
 #include "Core/Graphics/Resource/PixelBuffer.h"
 #include "Core/Graphics/Resource/ReadbackBuffer.h"
@@ -7,6 +8,7 @@
 #include "DirectXTex.h"
 #include <wincodec.h>
 
+#include <fstream>
 #include <map>
 
 using namespace FrameCapture;
@@ -58,6 +60,14 @@ namespace
         const GUID* pixelFormat = target == kDisplay ? &GUID_WICPixelFormat24bppBGR : nullptr;
         return SaveToWICFile(*fileImage, WIC_FLAGS_NONE, GetWICCodec(WIC_CODEC_PNG), path.c_str(), pixelFormat);
     }
+
+    // image를 참고로 볼 때 판정할 근거가 함께 있도록, 그 image를 그린 frame의 state를 옆에 남긴다.
+    bool SaveState(const std::string& path)
+    {
+        std::ofstream file(Utility::ToWide(path), std::ios::binary);
+        file << "{" << ControlChannel::GetState().ToMembers() << "}";
+        return file.good();
+    }
 }
 
 bool FrameCapture::FindTarget(const std::string& name, Target& target)
@@ -100,6 +110,7 @@ void FrameCapture::Capture(Target target, CommandContext& context, PixelBuffer& 
         return;
 
     const std::string path = pending->second.pathWithoutExtension + kTargets[target].extension;
+    const std::string statePath = pending->second.pathWithoutExtension + ".state.json";
     const ControlChannel::Reply reply = pending->second.reply;
     s_PendingCaptures.erase(pending);
 
@@ -124,8 +135,15 @@ void FrameCapture::Capture(Target target, CommandContext& context, PixelBuffer& 
         reply.Error("cannot write " + path + " (hr " + hrText + ")");
         return;
     }
+    if (!SaveState(statePath))
+    {
+        reply.Error("cannot write " + statePath);
+        return;
+    }
     reply.Ok(ControlChannel::Fields()
         .Text("path", path)
         .Integer("width", buffer.GetWidth())
-        .Integer("height", buffer.GetHeight()));
+        .Integer("height", buffer.GetHeight())
+        .Integer("frame", Graphics::GetFrameCount())
+        .Text("state", statePath));
 }

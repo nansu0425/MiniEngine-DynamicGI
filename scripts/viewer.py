@@ -5,6 +5,7 @@ app 명령의 사용법은 `do help` 가 app 에서 받아 온다. app flag 는 
 
 import argparse
 import contextlib
+import copy
 import ctypes
 import functools
 import hashlib
@@ -30,6 +31,14 @@ INSTANCE_FILE = HARNESS_DIR / 'instance.json'
 BASELINE_DIR = REPO_ROOT / 'scripts' / 'harness-baseline'
 USER_SETTINGS = [VIEWER_DIR / 'editor.ini', VIEWER_DIR / 'imgui.ini']
 MODEL_VIEWER_SOURCE = VIEWER_DIR / 'ModelViewer.cpp'
+VALIDATION_SHADER = ENGINE_DIR / 'Model' / 'Raytracing' / 'RayQueryValidationCS.hlsl'
+# selftest 가 pickscene.py 의 test scene 을 쓰는 HARNESS_DIR 안의 폴더
+PICK_SCENE = 'pick-known-answers'
+# selftest 가 run 과 같은 방식으로 실행하고 이름을 붙인 응답으로 판정하는, 완료 판정 기준의 acceptance scenario
+ACCEPTANCE_SCENARIO = REPO_ROOT / 'scripts' / 'harness-scenarios' / 'acceptance.txt'
+# run 의 줄 형식. --help 가 사용법을 보인다.
+SCENARIO_NAMED_LINE = re.compile(r'^(\w+) = (.+)$')
+SCENARIO_REFERENCE = re.compile(r'\{(\w+(?:\.[^.{}]+)*)\}')
 D3D12_MESSAGE_LOG_HEADER = ENGINE_DIR / 'Core' / 'Automation' / 'D3D12MessageLog.h'
 # D3D12 message ID 의 이름을 읽을 Agility SDK 의 version 이 여기에 있다.
 PACKAGES_CONFIG = ENGINE_DIR / 'Core' / 'packages.config'
@@ -53,6 +62,10 @@ KEPT_RUNS = 10
 PREVIEW_MAX_WIDTH = 1280
 # scene capture 의 보기용 PNG 를 만드는 고정 exposure. 보기용이라 수치 판정에는 쓰지 않는다.
 PREVIEW_EXPOSURE = 1.0
+# Validation view 를 끈 뒤 수치를 비교할 scene capture 까지 기다리는 frame 수. 근거는 .claude/skills/modelviewer/SKILL.md 의 결정성 절에 있다.
+VALIDATION_VIEW_SETTLE_FRAMES = 10
+# 아무것도 바꾸지 않아도 frame 마다 바뀌는 state 의 값. state 끼리 비교할 때 뺀다.
+TIME_VARYING_STATE = [('frame',), ('pt', 'samples'), ('pt', 'seconds')]
 
 
 class HarnessError(Exception):
@@ -456,12 +469,16 @@ def prune_runs():
             shutil.rmtree(run, ignore_errors=True)
 
 
-def default_assets():
+def default_model():
     match = re.search(r'^const wchar_t kDefaultModel\[\] = L"([^"]+)";', MODEL_VIEWER_SOURCE.read_text(encoding='utf-8'), re.M)
     if match is None:
         raise HarnessError(f'{MODEL_VIEWER_SOURCE} has no line starting with '
                            'const wchar_t kDefaultModel[] = L"<glTF path relative to MiniEngine/ModelViewer>";')
-    return [VIEWER_DIR / match.group(1), VIEWER_DIR / 'Textures']
+    return match.group(1)
+
+
+def default_assets():
+    return [VIEWER_DIR / default_model(), VIEWER_DIR / 'Textures']
 
 
 def start_instance(config, model=None, build_first=True, gpu_validation=False):
@@ -598,11 +615,13 @@ def make_view(original, target, view, crop, max_width, exposure):
     return image.size, scale
 
 
+def capture_with_state(session, target, name):
+    """image 의 경로, 그 frame, 그 frame 의 state 를 남긴 파일의 경로가 든 capture 의 응답."""
+    return session.ask_ok(f'capture {target} {shots_dir(session.instance) / name}')
+
+
 def capture(session, target, name):
-    shots = Path(session.instance['run_dir']) / 'shots'
-    shots.mkdir(exist_ok=True)
-    response = session.ask_ok(f'capture {target} {shots / name}')
-    return Path(response['path'])
+    return Path(capture_with_state(session, target, name)['path'])
 
 
 def next_shot_name(instance, target):
@@ -631,15 +650,57 @@ def running_session():
         session.close()
 
 
+def resolve_references(command, responses):
+    def value_of(reference):
+        name, *keys = reference[1].split('.')
+        if name not in responses:
+            raise HarnessError(f'{{{reference[1]}}} names no earlier response. Named so far: {", ".join(responses)}')
+        value = responses[name]
+        for key in keys:
+            if not isinstance(value, dict) or key not in value:
+                raise HarnessError(f'{{{reference[1]}}}: no {key!r} there')
+            value = value[key]
+        if isinstance(value, (dict, list)):
+            raise HarnessError(f'{{{reference[1]}}} is not a single value')
+        return str(value).lower() if isinstance(value, bool) else str(value)
+    return SCENARIO_REFERENCE.sub(value_of, command)
+
+
+def shots_dir(instance):
+    shots = Path(instance['run_dir']) / 'shots'
+    shots.mkdir(exist_ok=True)
+    return shots
+
+
+def run_lines(session, lines, echo):
+    """명령을 차례로 보내고 (이름을 붙인 응답, 실패한 명령의 응답 또는 None) 을 돌려준다. 실패한 명령에서 멈춘다.
+    줄의 형식은 run 의 --help 가 정한다."""
+    responses = {'shots': shots_dir(session.instance).as_posix()}
+    for line in lines:
+        named = SCENARIO_NAMED_LINE.match(line)
+        name, command = named.groups() if named else (None, line)
+        command = resolve_references(command, responses)
+        if echo:
+            print(f'> {command}')
+        response = session.ask(command)
+        if echo:
+            print(json.dumps(response, ensure_ascii=False))
+        if not response['ok']:
+            return responses, response
+        if name:
+            responses[name] = response
+    return responses, None
+
+
 def run_commands(lines):
     with running_session() as session:
-        for line in lines:
-            print(f'> {line}')
-            response = session.ask(line)
-            print(json.dumps(response, ensure_ascii=False))
-            if not response['ok']:
-                return 1
-    return 0
+        _, failed = run_lines(session, lines, echo=True)
+    return 0 if failed is None else 1
+
+
+def scenario_lines(path):
+    lines = [line.strip() for line in Path(path).read_text(encoding='utf-8').splitlines()]
+    return [line for line in lines if line and not line.startswith('#')]
 
 
 def command_build(args):
@@ -673,8 +734,7 @@ def command_do(args):
 
 
 def command_run(args):
-    lines = [line.strip() for line in Path(args.file).read_text(encoding='utf-8').splitlines()]
-    return run_commands([line for line in lines if line and not line.startswith('#')])
+    return run_commands(scenario_lines(args.file))
 
 
 def parse_crop(text):
@@ -687,10 +747,12 @@ def parse_crop(text):
 def command_shot(args):
     with running_session() as session:
         name = next_shot_name(session.instance, args.target)
-        original = capture(session, args.target, name)
+        response = capture_with_state(session, args.target, name)
+    original = Path(response['path'])
     view = original.with_name(f'{name}-view.png')
     size, scale = make_view(original, args.target, view, args.crop, args.max_width, args.exposure)
     print(f'original: {original}')
+    print(f'state: {response["state"]} (frame {response["frame"]})')
     print(f'view: {view} ({size[0]}x{size[1]}, view pixel = original pixel x {scale:.4g}'
           + (f' after crop at {args.crop[0]},{args.crop[1]})' if args.crop else ')'))
     return 0
@@ -735,6 +797,801 @@ def command_selftest(args):
 
     print(f'{len(failures)} failed' if failures else 'all passed')
     return 1 if failures else 0
+
+
+def without_time_varying(state):
+    kept = copy.deepcopy(state)
+    for path in TIME_VARYING_STATE:
+        parent = kept
+        for key in path[:-1]:
+            parent = parent.get(key, {})
+        parent.pop(path[-1], None)
+    return kept
+
+
+def part_of_state(state, path):
+    """state <path> 가 돌려줄, path 가 가리키는 member 만 남긴 state."""
+    keys = path.split('.')
+    part = inner = {}
+    for key in keys[:-1]:
+        state = state[key]
+        inner[key] = {}
+        inner = inner[key]
+    inner[keys[-1]] = state[keys[-1]]
+    return part
+
+
+def read_state(session, paths):
+    """paths 가 가리키는 부분을 한 state 로 합친다. 바깥 key 가 겹치지 않는 path 를 준다."""
+    state = {}
+    for path in paths:
+        state.update(session.ask_ok(f'state {path}')['state'])
+    return state
+
+
+def record_change(session, changes, name, line, *paths):
+    """line 을 보내고, 그 명령이 바꾼 state 의 paths 를 check_changes 가 볼 수 있게 changes 에 더한다."""
+    before = read_state(session, paths)
+    reply = session.ask_ok(line)
+    changes.append((name, reply.get('state'), read_state(session, paths), before))
+    return reply
+
+
+def check_changes(check, label, changes):
+    """명령마다 응답의 state 가 바로 뒤에 읽은 state 와 같고, 명령 전과 달라야 한다. 시간에 따라 바뀌는 값은 비교에서 뺀다."""
+    wrong = [name for name, replied, read, before in changes
+             if replied is None or without_time_varying(replied) != without_time_varying(read)
+             or without_time_varying(read) == without_time_varying(before)]
+    check(label, not wrong, ', '.join(wrong) or ', '.join(name for name, *_ in changes))
+
+
+def check_state(session, check):
+    """state 가 판정의 SSOT 로서, 같은 값을 주는 다른 명령과 상태를 바꾼 명령의 응답과 shot 의 state 파일에 맞는지 본다.
+    UI 를 숨기고 TAA 를 끈 상태에서 부르고, 그 상태로 되돌려 놓는다."""
+    import numpy as np
+
+    usage = session.ask_ok('help')['commands']['state']
+    check('state usage gives the units and axes', all(term in usage for term in ['world units', 'radians', '+y', 'client pixels']), usage)
+
+    before_reading = read_dds_rgba32f(capture(session, 'scene', 'selftest-state-before-reading'))
+    whole = session.ask_ok('state')['state']
+    session.ask_ok('frames 60')
+    later = session.ask_ok('state')['state']
+    check('state stays the same for 60 frames but the frame and PT progress',
+          without_time_varying(later) == without_time_varying(whole) and later['frame'] >= whole['frame'] + 60,
+          f'frame {whole["frame"]} -> {later["frame"]}')
+
+    paths = [key for key in whole if key != 'frame'] + ['settings.Engine Tuning', 'camera.forward.x']
+    differing = [path for path in paths
+                 if without_time_varying(session.ask_ok(f'state {path}')['state']) != without_time_varying(part_of_state(whole, path))]
+    check('state <path> is that part of the whole state', not differing, ', '.join(differing) or ', '.join(paths))
+
+    wrong = session.ask('state no.such.path')
+    unchanged = without_time_varying(session.ask_ok('state')['state']) == without_time_varying(whole)
+    check('state with an unknown path fails, names the keys there and changes nothing',
+          not wrong['ok'] and 'camera' in wrong.get('error', '') and unchanged, wrong.get('error'))
+
+    after_reading = read_dds_rgba32f(capture(session, 'scene', 'selftest-state-after-reading'))
+    check('scene is bit-identical before and after reading state', np.array_equal(before_reading.view(np.uint32), after_reading.view(np.uint32)),
+          describe_difference(before_reading, after_reading))
+
+    expected_model = session.instance['model'] or default_model()
+    check('state model is the model start opened', whole['model']['path'] == expected_model, whole['model']['path'])
+
+    status = session.ask_ok('status')
+    ui, engine = whole['ui'], whole['engine']
+    as_status = {
+        'ui': 'shown' if ui['visible'] else 'hidden',
+        'client': f'{ui["client"]["width"]}x{ui["client"]["height"]}',
+        'scene': f'{ui["scene"]["width"]}x{ui["scene"]["height"]}',
+        'app': {'camera': whole['camera']['controller']},
+        **{key: engine[key] for key in ['config', 'gpu', 'exe', 'hdr_output', 'hdr_display', 'd3d12_messages']},
+    }
+    differing = [f'{key} {status[key]} != {value}' for key, value in as_status.items() if status[key] != value]
+    check('state ui, engine and camera controller are what status reports', not differing, '; '.join(differing))
+
+    sections = session.ask('settings get')['error'].split('Sections: ')[1].split(', ')
+    differing = [section for section in sections if whole['settings'].get(section) != session.ask_ok(f'settings get {section}')['values']]
+    check('state settings has every section as settings get reads it', not differing and sorted(sections) == sorted(whole['settings']),
+          ', '.join(differing) or ', '.join(sections))
+
+    progress = {key: value for key, value in session.ask_ok('pt status').items() if key != 'ok'}
+    check('state pt is what pt status reports but the progress', without_time_varying({'pt': progress}) == without_time_varying({'pt': whole['pt']}),
+          f'{progress} vs {whole["pt"]}')
+
+    changes = []
+    change = functools.partial(record_change, session, changes)
+
+    pose_keys = ['x', 'y', 'z', 'heading', 'pitch']
+    start = session.ask_ok('pose')
+    moved = change('pose', 'pose ' + ' '.join(repr(float(start[key]) + offset) for key, offset in zip(pose_keys, [12.5, -3.25, 7.75, 0.125, 0.0625])),
+                   'camera')
+    camera = session.ask_ok('state camera')['state']['camera']
+    check('state camera is the pose and follows it', all(camera[key] == moved[key] for key in pose_keys) and camera != whole['camera'],
+          ' '.join(str(camera[key]) for key in pose_keys))
+    described = dict(item.split('=', 1) for item in session.ask_ok('describe')['line'].split('; '))
+    check('state camera is the camera describe writes',
+          [str(camera[key]) for key in pose_keys] == described['camera'].split(',') + [described['heading'], described['pitch']],
+          f'camera={described["camera"]}; heading={described["heading"]}; pitch={described["pitch"]}')
+    section = session.ask_ok('settings get Editor Camera')['values']
+    check('state camera agrees with the Editor Camera section',
+          [str(camera[key]) for key in pose_keys + ['move_speed']] ==
+          [section[key] for key in ['Position X', 'Position Y', 'Position Z', 'Heading', 'Pitch', 'Move Speed']], section)
+
+    shot = capture_with_state(session, 'display', 'selftest-state-display')
+    saved = json.loads(Path(shot['state']).read_text(encoding='utf-8'), parse_float=str)
+    now = session.ask_ok('state')['state']
+    check('shot leaves the state of its frame next to the image',
+          saved['frame'] == shot['frame'] and without_time_varying(saved) == without_time_varying(now) and saved['camera'] == camera,
+          f'frame {saved["frame"]} in the file, {shot["frame"]} in the reply')
+
+    exposure = 'Graphics/HDR/Exposure'
+    original_exposure = whole['settings']['Engine Tuning'][exposure]
+    change('settings set', f'settings set Engine Tuning: {exposure}=2', 'settings.Engine Tuning')
+    session.ask_ok(f'settings set Engine Tuning: {exposure}={original_exposure}')
+    change('ui show', 'ui show', 'ui')
+    change('panel open', 'panel Engine Tuning open', 'ui')
+    change('panel close', 'panel Engine Tuning close', 'ui')
+    change('ui hide', 'ui hide', 'ui')
+
+    original_view = whole['settings']['Ray Tracing View']['View']
+    session.ask_ok('settings set Ray Tracing View: View=Validation: Depth Comparison')
+    session.ask_ok('frames 2')
+    captured = change('validation capture', 'validation capture', 'validation')
+    validation = session.ask_ok('state validation')['state']['validation']
+    check('state validation has the values validation capture replies',
+          validation['captured'] and validation.get('values') == captured['values'] and not whole['validation']['captured'],
+          captured['line'])
+    session.ask_ok(f'settings set Ray Tracing View: View={original_view}')
+    session.ask_ok(f'frames {VALIDATION_VIEW_SETTLE_FRAMES}')
+
+    check_changes(check, 'commands that change the state reply with the changed part as state then reads it', changes)
+
+    session.ask_ok('pose ' + ' '.join(str(start[key]) for key in pose_keys))
+    session.ask_ok(f'frames {SETTLE_FRAMES}')
+
+
+SUN_KEYS = {key: f'Viewer/Lighting/Sun {key.title()}' for key in ['orientation', 'inclination']} | {'intensity': 'Viewer/Lighting/Sun Light Intensity'}
+
+
+def vector_of(fields):
+    import numpy as np
+    return np.array([float(fields[axis]) for axis in 'xyz'])
+
+
+def degrees_between(first, second):
+    difference = (first - second) % 360.0
+    return min(difference, 360.0 - difference)
+
+
+def sun_direction_of(orientation, inclination):
+    """ModelViewer.cpp 의 GetSunDirection 과 같은 식. 그 식은 π 대신 3.14159 를 쓴다."""
+    import numpy as np
+    theta, phi = float(orientation), float(inclination) * 3.14159 * 0.5
+    return np.array([np.cos(theta) * np.cos(phi), np.sin(phi), np.sin(theta) * np.cos(phi)])
+
+
+def elevation_and_azimuth_of(direction):
+    import numpy as np
+    return np.degrees(np.arcsin(direction[1])), np.degrees(np.arctan2(direction[2], direction[0])) % 360.0
+
+
+def check_sun(session, check, changes):
+    """sun set 이 gizmo 와 Engine Tuning 이 바꾸는 raw 값을 바꾸고, state sun 이 조명이 쓰는 방향과 맞는지 본다.
+    UI 를 숨기고 TAA 를 끈 상태에서 부르고, sun 을 처음 상태로 되돌려 놓는다."""
+    import numpy as np
+
+    def raw_sun():
+        values = session.ask_ok('settings get Engine Tuning')['values']
+        return {key: values[name] for key, name in SUN_KEYS.items()}
+
+    def sun_state():
+        return session.ask_ok('state sun')['state']['sun']
+
+    def restore_raw(raw):
+        session.ask_ok('settings set Engine Tuning: ' + '; '.join(f'{SUN_KEYS[key]}={raw[key]}' for key in ['orientation', 'inclination']))
+
+    usage = session.ask_ok('help')['commands']['sun']
+    check('sun usage gives the units and axes', all(term in usage for term in ['degrees', '+x', '+z', '+y', 'world units']), usage)
+
+    original_raw, original = raw_sun(), sun_state()
+    expected = sun_direction_of(original_raw['orientation'], original_raw['inclination'])
+    direction = vector_of(original['direction'])
+    elevation, azimuth = elevation_and_azimuth_of(direction)
+    check('state sun direction is GetSunDirection of the raw Sun Orientation and Inclination, and elevation, azimuth are of that direction',
+          np.abs(direction - expected).max() <= 1e-6 and abs(float(original['elevation']) - elevation) <= 1e-4
+          and degrees_between(float(original['azimuth']), azimuth) <= 1e-4,
+          f'{original["direction"]} vs {expected.tolist()}; elevation {original["elevation"]} vs {elevation}, azimuth {original["azimuth"]} vs {azimuth}')
+
+    session.ask_ok(f'frames {SETTLE_FRAMES}')
+    reference = read_dds_rgba32f(capture(session, 'scene', 'selftest-sun-before'))
+
+    misread = []
+    for elevation, azimuth in [(30, 120), (5, 350)]:
+        record_change(session, changes, f'sun set elevation={elevation} azimuth={azimuth}', f'sun set elevation={elevation} azimuth={azimuth}', 'sun')
+        sun, raw = sun_state(), raw_sun()
+        if (abs(float(sun['elevation']) - elevation) > 1e-4 or degrees_between(float(sun['azimuth']), azimuth) > 1e-4
+                or raw['orientation'] == original_raw['orientation'] or raw['inclination'] == original_raw['inclination']):
+            misread.append(f'{elevation},{azimuth} read {sun["elevation"]},{sun["azimuth"]} raw {raw}')
+    check('sun set elevation, azimuth reads them back and changes the raw values', not misread, '; '.join(misread))
+
+    session.ask_ok(f'frames {SETTLE_FRAMES}')
+    lowered = read_dds_rgba32f(capture(session, 'scene', 'selftest-sun-lowered'))
+    restore_raw(original_raw)
+    session.ask_ok(f'frames {SETTLE_FRAMES}')
+    returned = read_dds_rgba32f(capture(session, 'scene', 'selftest-sun-returned'))
+    check('scene changes with the sun elevation and is bit-identical once the raw values come back',
+          not np.array_equal(reference.view(np.uint32), lowered.view(np.uint32)) and np.array_equal(reference.view(np.uint32), returned.view(np.uint32)),
+          describe_difference(reference, returned))
+
+    requested = np.array([0.3, 0.8, 0.5])
+    record_change(session, changes, 'sun set direction', 'sun set direction=0.3,0.8,0.5', 'sun')
+    read = vector_of(sun_state()['direction'])
+    check('sun set direction reads back as the normalized direction', np.abs(read - requested / np.linalg.norm(requested)).max() <= 1e-5, read.tolist())
+
+    whole = without_time_varying(session.ask_ok('state')['state'])
+    accepted = []
+    for request in ['elevation=-1', 'elevation=91', 'direction=1,-0.5,0', 'direction=0,0,0', 'intensity=0.5', 'intensity=-1',
+                    'elevation=abc', 'direction=1,2', 'color=1', 'elevation=10 direction=1,1,1', 'elevation=10 elevation=20', '']:
+        response = session.ask(f'sun set {request}')
+        if response['ok'] or without_time_varying(session.ask_ok('state')['state']) != whole:
+            accepted.append(request or '(nothing)')
+    check('sun set out of range or malformed fails and changes nothing', not accepted, ', '.join(accepted))
+
+    before = sun_state()
+    zenith = session.ask_ok('sun set direction=0,1,0')
+    after = sun_state()
+    noted = session.ask_ok(f'sun set intensity={original["intensity"]}')
+    check('sun set to the zenith says it keeps the azimuth and keeps it',
+          'azimuth' in zenith.get('note', '') and abs(float(after['elevation']) - 90) <= 1e-4
+          and degrees_between(float(after['azimuth']), float(before['azimuth'])) <= 1e-4 and 'note' not in noted,
+          f'{zenith.get("note")}; azimuth {before["azimuth"]} -> {after["azimuth"]}')
+
+    session.ask_ok('sun set elevation=40 azimuth=200')
+    described, set_sun = session.ask_ok('describe')['line'], sun_state()
+    session.ask_ok('sun set elevation=20 azimuth=10')
+    session.ask_ok(f'restore {described}')
+    check('restore of the describe line after sun set gives that sun again', sun_state() == set_sun, f'{set_sun} -> {sun_state()}')
+
+    restore_raw(original_raw)
+    position = {'x': '100.5', 'y': '200.25', 'z': '-300.75'}
+    record_change(session, changes, 'sun set position', 'sun set position=' + ','.join(position[axis] for axis in 'xyz'), 'sun')
+    session.ask_ok(f'frames {SETTLE_FRAMES}')
+    moved = read_dds_rgba32f(capture(session, 'scene', 'selftest-sun-moved'))
+    check('sun set position reads back as given and leaves the scene bit-identical',
+          {axis: str(value) for axis, value in sun_state()['position'].items()} == position and np.array_equal(reference.view(np.uint32), moved.view(np.uint32)),
+          describe_difference(reference, moved))
+
+    record_change(session, changes, 'sun set intensity', 'sun set intensity=2.5', 'sun')
+    intensity = sun_state()['intensity']
+    check('sun set intensity is the raw Sun Light Intensity', str(intensity) == raw_sun()['intensity'] and abs(float(intensity) - 2.5) <= 2.5e-6,
+          f'{intensity} vs {raw_sun()["intensity"]}')
+
+    session.ask_ok('settings set Engine Tuning: ' + '; '.join(f'{SUN_KEYS[key]}={original_raw[key]}' for key in SUN_KEYS))
+    session.ask_ok('sun set position=' + ','.join(str(original['position'][axis]) for axis in 'xyz'))
+    check('sun is back as it was', sun_state() == original, f'{original} -> {sun_state()}')
+
+
+def check_look_at(session, check, changes):
+    """pose look-at 이 위치를 두고 점을 보게 하는지 본다. camera 를 처음 pose 로 되돌려 놓는다."""
+    import numpy as np
+
+    usage = session.ask_ok('help')['commands']['pose']
+    check('pose usage gives look-at and the units', all(term in usage for term in ['look-at', 'world units', 'radians']), usage)
+
+    start = session.ask_ok('state camera')['state']['camera']
+    position = vector_of(start)
+    wrong = []
+    for name, target in [('below', position + np.array([300.0, -150.0, 40.0])), ('model center', np.zeros(3))]:
+        record_change(session, changes, f'pose look-at {name}', 'pose look-at ' + ' '.join(repr(float(value)) for value in target), 'camera')
+        camera = session.ask_ok('state camera')['state']['camera']
+        expected = (target - position) / np.linalg.norm(target - position)
+        if np.abs(vector_of(camera['forward']) - expected).max() > 1e-5 or any(camera[axis] != start[axis] for axis in 'xyz'):
+            wrong.append(f'{name}: forward {camera["forward"]} vs {expected.tolist()}, position {[camera[axis] for axis in "xyz"]}')
+    check('pose look-at keeps the position and points forward at the target', not wrong, '; '.join(wrong))
+
+    camera = session.ask_ok('state camera')['state']['camera']
+    response = session.ask('pose look-at ' + ' '.join(str(camera[axis]) for axis in 'xyz'))
+    check('pose look-at the camera position fails and changes nothing',
+          not response['ok'] and session.ask_ok('state camera')['state']['camera'] == camera, response.get('error'))
+
+    session.ask_ok('pose ' + ' '.join(str(start[key]) for key in ['x', 'y', 'z', 'heading', 'pitch']))
+
+
+def project_to_scene(camera, scene, position):
+    """SceneEditor::ProjectToScene 처럼 world 위치를 client pixel 로 투영한다. camera 뒤면 None."""
+    import numpy as np
+    heading, pitch = float(camera['heading']), float(camera['pitch'])
+    forward = np.array([-np.cos(pitch) * np.sin(heading), np.sin(pitch), -np.cos(pitch) * np.cos(heading)])
+    right = np.array([np.cos(heading), 0.0, -np.sin(heading)])
+    up = np.cross(right, forward)
+    offset = position - vector_of(camera)
+    depth = offset @ forward
+    if depth < float(camera['near']):
+        return None
+    tangent = np.tan(float(camera['vertical_fov']) / 2)
+    x = (offset @ right) / (depth * tangent * float(camera['aspect']))
+    y = (offset @ up) / (depth * tangent)
+    return np.array([scene['left'] + (0.5 + 0.5 * x) * scene['width'], scene['top'] + (0.5 - 0.5 * y) * scene['height']])
+
+
+def check_editor(session, check, changes):
+    """editor 명령이 icon click 과 W, E key 가 바꾸는 선택과 gizmo mode 를 바꾸고, state editor 의 icon 위치가 투영과 맞는지 본다.
+    UI 를 숨긴 상태에서 부르고, 선택, mode, UI, camera 를 처음 상태로 되돌려 놓는다."""
+    import numpy as np
+    from PIL import Image
+
+    def editor_state():
+        return session.ask_ok('state editor')['state']['editor']
+
+    usage = session.ask_ok('help')['commands']['editor']
+    check('editor usage gives what it changes and the units', all(term in usage for term in ['select', 'mode', 'client pixels', 'world position']), usage)
+
+    original = editor_state()
+    start = session.ask_ok('state camera')['state']['camera']
+    sun = vector_of(original['objects']['Sun']['position'])
+
+    record_change(session, changes, 'editor select Sun', 'editor select Sun', 'editor')
+    selected = editor_state()['selected']
+    record_change(session, changes, 'editor select none', 'editor select none', 'editor')
+    unselected = editor_state()['selected']
+    before = editor_state()
+    unknown = session.ask('editor select Moon')
+    check('editor select picks the object or none, and an unknown name fails with the names and changes nothing',
+          selected == 'Sun' and unselected == 'none' and not unknown['ok'] and 'Sun' in unknown.get('error', '') and editor_state() == before,
+          f'{selected}, {unselected}, {unknown.get("error")}')
+
+    session.ask_ok('ui show')
+    session.ask_ok('editor select Sun')
+    session.ask_ok('pose look-at ' + ' '.join(repr(float(value)) for value in sun))
+    session.ask_ok('frames 2')
+
+    def gizmo_around_sun(name):
+        session.ask_ok('frames 2')
+        icon = editor_state()['objects']['Sun']['screen']
+        x, y = round(float(icon['x'])), round(float(icon['y']))
+        image = np.asarray(Image.open(capture(session, 'display', name)))
+        # ImGuizmo 의 gizmo 는 scene 높이의 몇 % 크기라 icon 을 중심으로 이 정도면 덮는다.
+        return image[max(0, y - 150):y + 150, max(0, x - 150):x + 150]
+
+    record_change(session, changes, 'editor mode rotate', 'editor mode rotate', 'editor')
+    rotate_mode = editor_state()['gizmo_mode']
+    rotate, rotate_again = gizmo_around_sun('selftest-editor-rotate'), gizmo_around_sun('selftest-editor-rotate-again')
+    record_change(session, changes, 'editor mode translate', 'editor mode translate', 'editor')
+    translate_mode = editor_state()['gizmo_mode']
+    translate = gizmo_around_sun('selftest-editor-translate')
+    check('editor mode sets the gizmo mode, and the display around the sun differs between the modes but not within one',
+          rotate_mode == 'rotate' and translate_mode == 'translate' and np.array_equal(rotate, rotate_again) and not np.array_equal(rotate, translate),
+          f'{rotate_mode}, {translate_mode}, rotate twice equal {np.array_equal(rotate, rotate_again)}')
+
+    # pose look-at sun 뒤라 sun 이 scene 가운데에 있고, 다음 pose 에서는 가운데에서 벗어난다.
+    camera = session.ask_ok('state camera')['state']['camera']
+    poses = {'at the center': [camera[key] for key in ['x', 'y', 'z', 'heading', 'pitch']],
+             'off the center': [camera['x'], camera['y'], camera['z'], float(camera['heading']) + 0.15, float(camera['pitch']) - 0.1]}
+    off = []
+    for name, pose in poses.items():
+        session.ask_ok('pose ' + ' '.join(str(value) for value in pose))
+        state = session.ask_ok('state')['state']
+        icon, expected = state['editor']['objects']['Sun'], project_to_scene(state['camera'], state['ui']['scene'], sun)
+        screen = np.array([float(icon['screen'][axis]) for axis in 'xy']) if 'screen' in icon else None
+        if expected is None or screen is None or not icon['on_screen'] or np.abs(screen - expected).max() > 0.5:
+            off.append(f'{name}: {icon} vs {None if expected is None else expected.tolist()}')
+    session.ask_ok('pose look-at ' + ' '.join(repr(float(value)) for value in vector_of(camera) * 2 - sun))
+    hidden = editor_state()['objects']['Sun']
+    check('state editor gives the icon where the camera projects the sun, and no position behind the camera',
+          not off and hidden['on_screen'] is False and 'screen' not in hidden, '; '.join(off) or str(hidden))
+
+    session.ask_ok('editor select ' + original['selected'])
+    session.ask_ok('editor mode ' + original['gizmo_mode'])
+    session.ask_ok('ui hide')
+    session.ask_ok('pose ' + ' '.join(str(start[key]) for key in ['x', 'y', 'z', 'heading', 'pitch']))
+    session.ask_ok(f'frames {SETTLE_FRAMES}')
+    check('editor and camera are back as they were', editor_state() == original and session.ask_ok('state camera')['state']['camera'] == start)
+
+
+def check_fit_needs_a_capture(session, check):
+    """validation fit 이 Fit to Capture 처럼 그 view 의 capture 가 없으면 맞추지 않는지 본다. 아무 capture 도 하기 전에 부른다."""
+    section = 'Ray Tracing View'
+    original = session.ask_ok(f'settings get {section}')['values']['View']
+    session.ask_ok(f'settings set {section}: View=Validation: Depth Comparison')
+    session.ask_ok(f'settings set {section}: Heatmap=Depth Error')
+    before = session.ask_ok('state')['state']
+    refused = session.ask('validation fit')
+    unchanged = without_time_varying(session.ask_ok('state')['state']) == without_time_varying(before)
+    check('validation fit fails without a capture of the view and changes nothing',
+          not refused['ok'] and 'capture' in refused.get('error', '') and not before['validation']['captured'] and unchanged, refused.get('error'))
+    session.ask_ok(f'settings set {section}: View={original}')
+    session.ask_ok(f'frames {VALIDATION_VIEW_SETTLE_FRAMES}')
+
+
+def check_validation_fit(session, check, changes):
+    """validation fit 이 Fit to Capture 처럼 Heatmap Range 를 마지막 capture 에 맞추고, 버튼이 disabled 인 조건에서는 거절하는지 본다.
+    Ray Tracing View 의 View 를 처음 값으로 되돌려 놓는다."""
+    section = 'Ray Tracing View'
+    path = f'settings.{section}'
+    usage = session.ask_ok('help')['commands']['validation']
+    check('validation usage gives what fit changes', all(term in usage for term in ['fit', 'Fit to Capture', 'Heatmap Range', 'p1 ~ p99']), usage)
+    original = session.ask_ok(f'settings get {section}')['values']['View']
+
+    def refused():
+        before = session.ask_ok(f'state {path}')['state']
+        reply = session.ask('validation fit')
+        return not reply['ok'] and session.ask_ok(f'state {path}')['state'] == before, reply.get('error')
+
+    session.ask_ok(f'settings set {section}: View=Off')
+    not_validation = refused()
+    session.ask_ok(f'settings set {section}: View=Validation: Depth Comparison')
+    # Validation view 를 고르면 heatmap 은 첫 category 에서 시작한다.
+    category = refused()
+    check('validation fit fails where Fit to Capture is disabled and changes nothing', not_validation[0] and category[0],
+          f'not a Validation view: {not_validation[1]}; a category heatmap: {category[1]}')
+
+    start_range = '-3,3'
+    session.ask_ok(f'settings set {section}: Heatmap=Depth Error; Heatmap Range={start_range}')
+    session.ask_ok('frames 2')
+    session.ask_ok('validation capture')
+    fitted = record_change(session, changes, 'validation fit', 'validation fit', path)['state']['settings'][section]['Heatmap Range']
+    again = session.ask_ok('validation fit')['state']['settings'][section]['Heatmap Range']
+    check('validation fit fits the Heatmap Range to the capture and gives the same range again', fitted != start_range and again == fitted,
+          f'{start_range} -> {fitted} -> {again}')
+    session.ask_ok(f'settings set {section}: View={original}')
+    session.ask_ok(f'frames {VALIDATION_VIEW_SETTLE_FRAMES}')
+
+
+def depth_match_tolerance():
+    match = re.search(r'^static const float kDepthMatchTolerance = ([0-9.e+-]+);', VALIDATION_SHADER.read_text(encoding='utf-8'), re.M)
+    if match is None:
+        raise HarnessError(f'{VALIDATION_SHADER} has no line starting with static const float kDepthMatchTolerance = <number>;')
+    return float(match.group(1))
+
+
+def raster_depth_of(z, camera):
+    """Camera.cpp 의 reverse Z projection 을 거꾸로 풀어 depth buffer 값을 camera forward 방향의 거리로 되돌린다."""
+    near, far = float(camera['near']), float(camera['far'])
+    return near * far / (near + float(z) * (far - near))
+
+
+def grid_cells(grid):
+    """pick grid 의 응답을 칸마다 (x, y, instance, material, distance, position 의 text) 로 푼다. miss 인 칸의 값은 None 이다."""
+    keys = ['instance', 'material', 'distance', 'position']
+    cells = []
+    for row in range(grid['rows']):
+        fields = grid['row'][str(row)]
+        tokens = {key: fields[key].split() for key in keys}
+        for column, x in enumerate(int(x) for x in grid['x'].split()):
+            cells.append((x, fields['y'], {key: None if tokens[key][column] == '-' else tokens[key][column] for key in keys}))
+    return cells
+
+
+def cell_of(pick):
+    """단일 pick 의 응답을 grid_cells 의 칸 값처럼 쓴다."""
+    if not pick['hit']:
+        return {key: None for key in ['instance', 'material', 'distance', 'position']}
+    return {'instance': str(pick['instance']), 'material': str(pick['material']), 'distance': pick['distance'],
+            'position': ','.join(pick['position'][axis] for axis in 'xyz')}
+
+
+def check_pick(session, check):
+    """pick 이 본 것을 단일 pick, model bounds, raster depth, pose look-at 과 견준다. UI 를 숨긴 상태에서 부르고, camera 와 UI 를 되돌려 놓는다."""
+    import numpy as np
+
+    usage = session.ask_ok('help')['commands']['pick']
+    check('pick usage gives the pixel convention and the units',
+          all(term in usage for term in ['client pixels', 'sample', 'TAA', 'world units', 'reverse Z', 'alpha_test']), usage)
+
+    state = session.ask_ok('state')['state']
+    camera, scene = state['camera'], state['ui']['scene']
+    before = read_dds_rgba32f(capture(session, 'scene', 'selftest-pick-before'))
+    cells = grid_cells(session.ask_ok('pick grid 16x9')['grid'])
+    picks = [session.ask_ok(f'pick {x} {y}')['pick'] for x, y, _ in cells]
+    after = read_dds_rgba32f(capture(session, 'scene', 'selftest-pick-after'))
+    check('scene is bit-identical before and after pick', np.array_equal(before.view(np.uint32), after.view(np.uint32)),
+          describe_difference(before, after))
+
+    low, high = (vector_of(state['model']['bounds'][end]) for end in ['min', 'max'])
+    margin = 1e-5 * np.abs(high - low).max()
+    differing = [f'{x},{y}: grid {values}, pick {cell_of(pick)}' for (x, y, values), pick in zip(cells, picks) if values != cell_of(pick)]
+    outside = [f'{pick["pixel"]}: {pick["position"]}' for pick in picks
+               if pick['hit'] and not np.all((vector_of(pick['position']) >= low - margin) & (vector_of(pick['position']) <= high + margin))]
+    hits = sum(pick['hit'] for pick in picks)
+    check('pick grid gives in each cell what pick gives at its center, and every hit is in the model bounds',
+          not differing and not outside and hits > len(picks) // 2,
+          '; '.join(differing[:3] + outside[:3]) or f'{hits} of {len(picks)} cells hit')
+
+    # Depth Comparison validation 처럼, alpha test 가 ray 가 맞은 것을 정한 pixel 은 raster 가 다른 mip 을 읽어 다른 것을 볼 수 있으므로 뺀다.
+    tolerance = depth_match_tolerance()
+    compared, decided_by_alpha_test, mismatched, misdecoded = 0, 0, [], []
+    for pick in picks:
+        if not (pick['hit'] and pick['raster']['hit']):
+            continue
+        raster_depth = raster_depth_of(pick['raster']['z'], camera)
+        if abs(float(pick['raster']['depth']) - raster_depth) > 1e-6 * raster_depth:
+            misdecoded.append(f'{pick["pixel"]}: {pick["raster"]} vs {raster_depth}')
+        if pick['alpha_test']:
+            decided_by_alpha_test += 1
+            continue
+        compared += 1
+        error = abs(float(pick['depth']) - raster_depth) / raster_depth
+        if error > tolerance:
+            mismatched.append(f'{pick["pixel"]}: depth {pick["depth"]}, raster {raster_depth}, error {error:.3g}')
+    check('pick raster depth is its z decoded by the reverse Z of Camera.cpp', not misdecoded, '; '.join(misdecoded[:3]))
+    check(f'pick depth is the raster depth within {tolerance:g} where alpha testing does not decide the hit',
+          not mismatched and compared >= 0.9 * len(picks),
+          '; '.join(mismatched[:3]) or f'{compared} of {len(picks)} cells compared, {decided_by_alpha_test} decided by alpha testing')
+
+    # TAA 를 끄면 scene 의 가운데 pixel 의 sample 은 frustum 의 가운데라서, 그 ray 는 camera 의 forward 와 같다 (CameraRays.h).
+    # scene 의 폭과 높이가 짝수일 때만 그렇다.
+    center = (scene['left'] + scene['width'] // 2, scene['top'] + scene['height'] // 2)
+    usable = [pick for pick in picks if pick['hit'] and not pick['alpha_test']]
+    target = vector_of(max(usable, key=lambda pick: (pick['pixel']['y'], -abs(pick['pixel']['x'] - center[0])))['position'])
+    session.ask_ok('pose look-at ' + ' '.join(repr(float(value)) for value in target))
+    centered = session.ask_ok(f'pick {center[0]} {center[1]}')['pick']
+    missed_by = np.linalg.norm(vector_of(centered['position']) - target) if centered['hit'] else None
+    check('pick at the scene center after pose look-at a picked point hits that point',
+          scene['width'] % 2 == 0 and scene['height'] % 2 == 0 and missed_by is not None and missed_by <= 1e-4 * float(centered['distance']),
+          f'{missed_by} away from {target.tolist()} at distance {centered.get("distance")}')
+    session.ask_ok('pose ' + ' '.join(str(camera[key]) for key in ['x', 'y', 'z', 'heading', 'pitch']))
+
+    wrong = []
+    before = without_time_varying(session.ask_ok('state')['state'])
+    for line in ['pick', 'pick 1', 'pick 1.5 2', 'pick 1 2 3', 'pick grid 0x5', 'pick grid 65x64', 'pick grid 4x']:
+        if session.ask(line)['ok']:
+            wrong.append(line)
+    check('malformed pick fails and changes nothing', not wrong and without_time_varying(session.ask_ok('state')['state']) == before,
+          ', '.join(wrong))
+
+    session.ask_ok('ui show')
+    shown = session.ask_ok('state')['state']
+    shown_scene = shown['ui']['scene']
+    under_ui = [(5, 5), (shown_scene['left'] + shown_scene['width'] + 10, shown_scene['top'] + 100)]
+    replies = [session.ask(f'pick {x} {y}') for x, y in under_ui]
+    check('pick under the UI fails and changes nothing',
+          not any(reply['ok'] for reply in replies) and without_time_varying(session.ask_ok('state')['state']) == without_time_varying(shown),
+          '; '.join(reply.get('error', 'ok') for reply in replies))
+    session.ask_ok('ui hide')
+    session.ask_ok(f'frames {SETTLE_FRAMES}')
+    check('camera and UI are back as they were after pick', session.ask_ok('state camera')['state']['camera'] == camera and
+          session.ask_ok('state ui')['state']['ui'] == state['ui'])
+
+
+def check_rest_of_ui_commands(session, check):
+    """UI 조작을 대신하는 명령 중 앞의 check 가 보지 않은 것도, 그 조작이 바꾸는 state 를 바꾸고 바뀐 부분으로 응답하는지 본다.
+    UI 를 숨긴 상태에서 부르고, 바꾼 것을 되돌려 놓는다."""
+    changes = []
+    change = functools.partial(record_change, session, changes)
+    start = session.ask_ok('state')['state']
+
+    client = start['ui']['client']
+    change('window client', 'window client 1600x900', 'ui')
+    change('window client back', f'window client {client["width"]}x{client["height"]}', 'ui')
+
+    speed = start['camera']['move_speed']
+    faster = float(speed) * 2
+    change('settings set Editor Camera', f'settings set Editor Camera: Move Speed={faster:g}', 'settings.Editor Camera')
+    moved_speed = session.ask_ok('state camera')['state']['camera']['move_speed']
+    session.ask_ok(f'settings set Editor Camera: Move Speed={speed}')
+
+    back_faces = start['settings']['Ray Tracing View']['Show Single-Sided Back Faces']
+    for section, key, value in [('Ray Tracing View', 'Show Single-Sided Back Faces', '0' if back_faces == '1' else '1'),
+                                ('Path Tracer', 'Samples per Frame', str(int(start['settings']['Path Tracer']['Samples per Frame']) + 1))]:
+        change(f'settings set {section}', f'settings set {section}: {key}={value}', f'settings.{section}')
+        session.ask_ok(f'settings set {section}: {key}={start["settings"][section][key]}')
+
+    # Show 가 꺼져 있으면 reset 은 다시 켤 때 일어나므로, 켜고 쌓은 뒤에 reset 한다.
+    session.ask_ok('settings set Path Tracer: Show=1')
+    session.ask_ok('pt wait samples=2')
+    change('pt reset', 'pt reset', 'pt')
+    session.ask_ok(f'settings set Path Tracer: Show={start["settings"]["Path Tracer"]["Show"]}')
+
+    line = session.ask_ok('describe')['line']
+    camera = start['camera']
+    session.ask_ok('pose ' + ' '.join(repr(float(camera[key]) + 10) for key in ['x', 'y', 'z']) + f' {camera["heading"]} {camera["pitch"]}')
+    session.ask_ok('sun set elevation=40')
+    change('restore', f'restore {line}', 'settings.Engine Tuning', 'camera', 'sun')
+
+    check_changes(check, 'window, settings set Editor Camera, Ray Tracing View and Path Tracer, pt reset and restore change the state '
+                         'and reply with the changed part', changes)
+    check('settings set Editor Camera changes the move speed in state camera', float(moved_speed) == faster != float(speed),
+          f'{speed} -> {moved_speed}')
+    # pt 는 reset 과 Show 를 켜고 끈 것이 resets 를 늘린다.
+    now = session.ask_ok('state')['state']
+    differing = [key for key in start if key not in ('frame', 'pt') and now[key] != start[key]]
+    check('the state other than pt is as it was after the rest of the UI commands', not differing, ', '.join(differing))
+
+
+def check_acceptance(session, check):
+    """ACCEPTANCE_SCENARIO 를 run 과 같은 방식으로 실행하고, 단계마다 이름을 붙인 응답으로 판정한다. 요청한 값은 scenario 에서 읽는다.
+    UI 를 숨긴 상태에서 부르고, camera, sun, editor 를 되돌려 놓는다."""
+    import numpy as np
+
+    lines = scenario_lines(ACCEPTANCE_SCENARIO)
+
+    def argument_of(prefix):
+        return next(line[len(prefix):] for line in lines if line.startswith(prefix))
+
+    restore_line = session.ask_ok('describe')['line']
+    before = session.ask_ok('state')['state']
+    responses, failed = run_lines(session, lines, echo=False)
+    try:
+        if not check('the acceptance scenario runs to the end', failed is None, failed['error'] if failed else ''):
+            return
+
+        requested = dict(item.split('=') for item in argument_of('sun set ').split())
+        lit = responses['lit']['state']
+        sun, raw = lit['sun'], lit['settings']['Engine Tuning']
+        direction = sun_direction_of(float(raw[SUN_KEYS['orientation']]), float(raw[SUN_KEYS['inclination']]))
+        check('acceptance 1: state sun is at the elevation and azimuth sun set asked for, and the raw values make that direction',
+              abs(float(sun['elevation']) - float(requested['elevation'])) <= 1e-4
+              and degrees_between(float(sun['azimuth']), float(requested['azimuth'])) <= 1e-4
+              and np.abs(direction - vector_of(sun['direction'])).max() <= 1e-6 and sun != responses['sun_before']['state']['sun'],
+              f'asked {requested}; elevation {sun["elevation"]}, azimuth {sun["azimuth"]}, direction {sun["direction"]}, '
+              f'orientation {raw[SUN_KEYS["orientation"]]}, inclination {raw[SUN_KEYS["inclination"]]}')
+
+        wanted = {'selected': argument_of('editor select '), 'gizmo_mode': argument_of('editor mode ')}
+        editor = responses['selection']['state']['editor']
+        shot = responses['gizmo']
+        saved = json.loads(Path(shot['state']).read_text(encoding='utf-8'), parse_float=str)
+        check('acceptance 2: state editor and the state file of the display shot have the selection and gizmo mode',
+              all(editor[key] == value and saved['editor'][key] == value for key, value in wanted.items()) and saved['frame'] == shot['frame'],
+              f'state editor {editor["selected"]}, {editor["gizmo_mode"]}; frame {saved["frame"]} file {saved["editor"]["selected"]}, '
+              f'{saved["editor"]["gizmo_mode"]}')
+
+        section = 'Ray Tracing View'
+        unfitted = responses['unfitted']['state']['settings'][section]['Heatmap Range']
+        fitted = responses['fitted']['state']['settings'][section]['Heatmap Range']
+        check('acceptance 3: validation fit changes the Heatmap Range', fitted != unfitted, f'{unfitted} -> {fitted}')
+
+        floor, center = responses['floor']['pick'], responses['center']['pick']
+        missed_by = np.linalg.norm(vector_of(center['position']) - vector_of(floor['position'])) if floor['hit'] and center['hit'] else None
+        check('acceptance 4: the picked point faces up, and the pick at the scene center after pose look-at hits it',
+              floor['hit'] and not floor['alpha_test'] and float(floor['normal']['y']) > 0.99
+              and missed_by is not None and missed_by <= 1e-4 * float(center['distance']),
+              f'floor {floor.get("position")} normal {floor.get("normal")}; center {missed_by} away at distance {center.get("distance")}')
+
+        cells = grid_cells(responses['grid']['grid'])
+        on_floor = sum(values['material'] == str(floor['material']) for _, _, values in cells)
+        check('acceptance 5: most cells of pick grid are the material of the floor', on_floor > len(cells) / 2,
+              f'{on_floor} of {len(cells)} cells are material {floor["material"]}')
+    finally:
+        session.ask_ok(f'restore {restore_line}')
+        session.ask_ok(f'editor select {before["editor"]["selected"]}')
+        session.ask_ok(f'editor mode {before["editor"]["gizmo_mode"]}')
+        session.ask_ok(f'settings set Ray Tracing View: View={before["settings"]["Ray Tracing View"]["View"]}')
+        session.ask_ok('ui hide' if not before['ui']['visible'] else 'ui show')
+        session.ask_ok(f'frames {VALIDATION_VIEW_SETTLE_FRAMES}')
+
+
+def camera_ray(camera, scene, sample):
+    """CameraRays.cpp 와 CameraRays.hlsli 처럼, scene 의 pixel 격자에서 sample (client pixel) 을 지나는 ray 의 origin 과 방향.
+    camera 는 roll 이 없다고 본다."""
+    import numpy as np
+    forward = vector_of(camera['forward'])
+    forward /= np.linalg.norm(forward)
+    right = np.cross(forward, [0.0, 1.0, 0.0])
+    right /= np.linalg.norm(right)
+    up = np.cross(right, forward)
+    half_height = np.tan(float(camera['vertical_fov']) / 2)
+    half_width = half_height * scene['width'] / scene['height']
+    # pixel 격자는 frustum 을 반 pixel 왼쪽 위로 옮긴 것이다.
+    x, y = sample[0] - scene['left'] - 0.5, sample[1] - scene['top'] - 0.5
+    direction = forward + right * half_width * (2 * x / scene['width'] - 1) + up * half_height * (1 - 2 * y / scene['height'])
+    return vector_of(camera), direction / np.linalg.norm(direction)
+
+
+def check_pick_known_answers(args, check):
+    """pickscene.py 의 정답을 아는 test scene 을 -model 로 띄워, pick 이 돌려준 것을 해석적으로 구한 정답과 견준다."""
+    import numpy as np
+    import pickscene
+
+    model = pickscene.write(HARNESS_DIR / PICK_SCENE).relative_to(VIEWER_DIR).as_posix()
+    instance = start_instance(args.config, model=model, build_first=False)
+    session = Session(instance)
+    try:
+        session.ask_ok('ui hide')
+        session.ask_ok(f'frames {SETTLE_FRAMES}')
+        state = session.ask_ok('state')['state']
+        camera, scene = state['camera'], state['ui']['scene']
+        transform = pickscene.world_transform(state['model']['bounds'])
+        if not check('the pick test scene is opened and scaled by one factor', state['model']['path'] == model and transform is not None,
+                     f'{state["model"]}'):
+            return
+        forward = vector_of(camera['forward'])
+
+        def expect(sample):
+            origin, direction = camera_ray(camera, scene, sample)
+            cosine = direction @ forward
+            return origin, direction, pickscene.classify(origin, direction, transform, float(camera['near']) / cosine, float(camera['far']) / cosine)
+
+        def kind(found):
+            return None if found is None else (found[1].name, found[2].name)
+
+        # pixel 의 가장자리까지 옮긴 sample 에서도 같은 면을 맞는 칸만 판정한다. 그 밖의 칸은 정답이 sample 위치의 오차에 달려 있다.
+        def unambiguous(pixel):
+            center = np.array(pixel) + 0.5
+            kinds = {kind(expect(center + offset)[2]) for offset in [(0, 0), (-0.5, 0), (0.5, 0), (0, -0.5), (0, 0.5)]}
+            return len(kinds) == 1
+
+        grid = grid_cells(session.ask_ok('pick grid 32x18')['grid'])
+        wrong, judged, instances = [], {}, {}
+        for x, y, values in grid:
+            if not unambiguous((x, y)):
+                continue
+            origin, direction, found = expect(np.array([x, y]) + 0.5)
+            name = 'sky' if found is None else found[1].name
+            judged[name] = judged.get(name, 0) + 1
+            if found is None:
+                if values['material'] is not None:
+                    wrong.append(f'{x},{y}: {values} where nothing is')
+                continue
+            t, surface, face = found
+            if values['material'] != str(surface.material):
+                wrong.append(f'{x},{y}: {values} where {surface.name} {face.name} is at {t}')
+                continue
+            position = np.array([float(value) for value in values['position'].split(',')])
+            if abs(float(values['distance']) - t) > 1e-4 * t or np.linalg.norm(position - (origin + t * direction)) > 1e-4 * t:
+                wrong.append(f'{x},{y}: {values} where {surface.name} {face.name} is at {t}')
+            instances.setdefault(surface.name, set()).add(values['instance'])
+        distinct_instances = all(len(ids) == 1 for ids in instances.values()) and len(set().union(*instances.values())) == len(instances)
+        check('pick grid finds the known surface, distance and position in each cell of the test scene',
+              not wrong and distinct_instances and all(judged.get(name, 0) >= 20 for name in ['wall', 'box', 'sky']),
+              '; '.join(wrong[:3]) or f'judged cells {judged}, instances {instances}')
+
+        middle = np.array([scene['left'] + scene['width'] / 2, scene['top'] + scene['height'] / 2])
+
+        # 상자의 옆면처럼 grid 의 칸에 들지 않을 만큼 좁은 면도 고르도록 grid 보다 촘촘한 pixel 에서 찾는다.
+        lattice = [(x, y) for y in range(scene['top'], scene['top'] + scene['height'], 16) for x in range(scene['left'], scene['left'] + scene['width'], 16)]
+        lattice.sort(key=lambda pixel: np.linalg.norm(np.array(pixel) - middle))
+
+        def representative(seen):
+            """scene 가운데에 가장 가까운, seen (면의 kind 나 하늘의 None) 만 보는 pixel."""
+            return next((pixel for pixel in lattice if kind(expect(np.array(pixel) + 0.5)[2]) == seen and unambiguous(pixel)), None)
+
+        wrong = []
+        for seen in [('wall', 'front'), ('box', '+z'), ('box', '-x'), None]:
+            pixel = representative(seen)
+            if pixel is None:
+                wrong.append(f'no cell sees {seen or "the sky"}')
+                continue
+            pick = session.ask_ok(f'pick {pixel[0]} {pixel[1]}')['pick']
+            sample = np.array([float(pick['sample'][axis]) for axis in 'xy'])
+            origin, direction, found = expect(sample)
+            problems = [] if np.array_equal(sample, np.array(pixel) + 0.5) else [f'sample {sample.tolist()} is not the pixel center']
+            if found is None:
+                problems += [f'{key} {pick[key]}' for key in ['hit', 'alpha_test'] if pick[key]]
+                problems += ['raster hit'] if pick['raster']['hit'] else []
+            elif not pick['hit']:
+                problems.append('no hit')
+            else:
+                t, surface, face = found
+                depth = t * (direction @ forward)
+                expected = {'material': surface.material, 'front_face': True, 'alpha_test': False}
+                problems += [f'{key} {pick[key]}' for key, value in expected.items() if pick[key] != value]
+                if abs(float(pick['distance']) - t) > 1e-4 * t or abs(float(pick['depth']) - depth) > 1e-4 * depth:
+                    problems.append(f'distance {pick["distance"]}, depth {pick["depth"]} for {t}, {depth}')
+                if np.abs(vector_of(pick['normal']) - np.array(face.normal)).max() > 1e-4:
+                    problems.append(f'normal {pick["normal"]} for {face.normal}')
+                base_color = np.array([float(pick['base_color'][channel]) for channel in 'rgba'])
+                if np.abs(base_color - np.array(surface.base_color)).max() > 1e-3:
+                    problems.append(f'base color {base_color.tolist()} for {surface.base_color}')
+                if not pick['raster']['hit'] or abs(raster_depth_of(pick['raster']['z'], camera) - depth) > depth_match_tolerance() * depth:
+                    problems.append(f'raster {pick["raster"]} for depth {depth}')
+            if problems:
+                wrong.append(f'{seen or "sky"} at {pixel}: ' + ', '.join(problems))
+        check('pick gives the known sample, distance, depth, normal, material, base color and raster depth on the wall, two box faces and the sky',
+              not wrong, '; '.join(wrong))
+
+        check('the test scene camera did not move while picking', session.ask_ok('state camera')['state']['camera'] == camera)
+        if args.config == 'Debug':
+            d3d12 = session.ask_ok('status')['d3d12_messages']
+            check('no D3D12 corruption, error or warning while picking the test scene',
+                  d3d12['corruption'] == d3d12['error'] == d3d12['warning'] == 0, d3d12)
+    finally:
+        session.close()
+        stopped = stop_instance(instance)
+    check('the test scene exits normally', stopped['result'] == 'quit' and stopped['exit_reason'] == 'normal',
+          f'{stopped["result"]}, exit reason={stopped["exit_reason"]}')
+    if args.config == 'Debug':
+        check_nothing_outlives_device(check, Path(instance['log']))
 
 
 def check_nothing_outlives_device(check, log):
@@ -862,6 +1719,18 @@ def selftest_running_app(args, check):
         check_same_as_settled('selftest-scene-sharpness-0', 'scene with TAA off does not change with Sharpness')
         session.ask_ok(f'settings set Engine Tuning: {sharpness}={original_sharpness}')
 
+        check_fit_needs_a_capture(session, check)
+        check_state(session, check)
+        changes = []
+        check_sun(session, check, changes)
+        check_look_at(session, check, changes)
+        check_editor(session, check, changes)
+        check_validation_fit(session, check, changes)
+        check_changes(check, 'sun set, pose look-at, editor and validation fit change the state and reply with the changed part', changes)
+        check_pick(session, check)
+        check_rest_of_ui_commands(session, check)
+        check_acceptance(session, check)
+
         abandoned = Channel(instance['pipe'], 10)
         abandoned.send('frames 1000000')
         gave_up = abandoned.receive(1.0) is None
@@ -936,6 +1805,8 @@ def selftest_running_app(args, check):
         check('the D3D12 exit report comes before exit reason=normal', 0 <= exit_report < text.find('exit reason=normal'))
     else:
         check('stop reports D3D12 messages not logged', stop_lines == ['d3d12 messages: not logged (debug layer off)'], stop_lines)
+
+    check_pick_known_answers(args, check)
 
     expected_reasons = {'assert': 'breakpoint at=', 'exception': 'exception code=0xC0000005'}
     for fault, expected in expected_reasons.items():
@@ -1015,10 +1886,15 @@ def main():
                                 'Reports a crash or a hang but leaves a hung app to stop. "do help" lists the commands', command_do)
     command.add_argument('commands', nargs='+', metavar='command')
 
-    command = add_command('run', 'send the commands in a file, one per line. # starts a comment', command_run)
+    command = add_command('run', 'send the commands in a file, one per line, as do does. A line starting with # is a comment. '
+                                 '"<name> = <command>" names the response, and {<name>.<key>.<key>} in a later line becomes a value in it, '
+                                 'as in "pose look-at {floor.pick.position.x} ...". {shots} is the folder where shot writes, '
+                                 'as in "capture display {shots}/name". '
+                                 'do takes the same lines', command_run)
     command.add_argument('file')
 
-    command = add_command('shot', 'capture a target and write a small PNG to look at', command_shot)
+    command = add_command('shot', 'capture a target and write a small PNG to look at, '
+                                  'with the state of the captured frame as JSON next to it', command_shot)
     command.add_argument('target', choices=['scene', 'overlay', 'display'])
     command.add_argument('--crop', type=parse_crop, metavar='X,Y,W,H', help='in original pixels')
     command.add_argument('--max-width', type=int, default=PREVIEW_MAX_WIDTH)

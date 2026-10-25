@@ -169,6 +169,7 @@ public:
     Math::Scalar GetRadius() const;
     Math::BoundingSphere GetBoundingSphere() const;
     Math::OrientedBox GetBoundingBox() const;
+    Math::AxisAlignedBox GetAxisAlignedBox() const;
 
     size_t GetNumAnimations(void) const { return m_AnimState.size(); }
     void PlayAnimation(uint32_t animIdx, bool loop);

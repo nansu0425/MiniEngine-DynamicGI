@@ -89,6 +89,19 @@ void EditorCamera::SetPose(const Pose& pose)
     m_TargetCamera.Update();
 }
 
+void EditorCamera::LookAt(Vector3 target)
+{
+    Pose pose = GetPose();
+    const Vector3 direction = Normalize(target - pose.position);
+    pose.pitch = ASin(Clamp((float)Dot(direction, m_WorldUp), -1.0f, 1.0f));
+
+    const float north = Dot(direction, m_WorldNorth);
+    const float east = Dot(direction, m_WorldEast);
+    if (north * north + east * east > 0.0f)
+        pose.heading = ATan2(-east, north);
+    SetPose(pose);
+}
+
 Matrix3 EditorCamera::GetOrientation() const
 {
     return Matrix3(m_WorldEast, m_WorldUp, -m_WorldNorth) *

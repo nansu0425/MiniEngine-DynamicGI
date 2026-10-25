@@ -23,12 +23,25 @@ namespace ControlChannel
         Fields& Integer(const std::string& key, int64_t value);
         Fields& Flag(const std::string& key, bool value);
         Fields& Object(const std::string& key, const Fields& value);
+        // other의 member를 뒤에 붙인다. 여러 group의 state를 한 응답에 담을 때 쓰고, key가 겹치지 않게 부른다.
+        Fields& Append(const Fields& other);
 
         // 중괄호 없이 member만 쓴다.
         std::string ToMembers(void) const;
 
+        // path가 가리키는 member 하나만 남긴 사본을 selected에 쓴다. path는 바깥 key부터 '.'로 잇는다.
+        // 없는 key를 만나면 false를 돌려주고, error에 그 자리에 있는 key를 쓴다.
+        bool Select(const std::string& path, Fields& selected, std::string& error) const;
+
     private:
-        std::vector<std::pair<std::string, std::string>> m_Members;
+        struct Member
+        {
+            std::string key;
+            // object가 아닐 때 JSON으로 쓴 값
+            std::string value;
+            std::shared_ptr<Fields> object;
+        };
+        std::vector<Member> m_Members;
     };
 
     struct Request;
@@ -55,6 +68,15 @@ namespace ControlChannel
     // status에 더할 값. app이 정하는 것처럼 engine이 모르는 상태를 status 하나로 보게 한다.
     void SetStatus(const std::string& key, const std::string& value);
     Fields GetStatus(void);
+
+    // state 명령이 돌려주는 scene, editor, engine 상태의 한 group. camera처럼 engine이 모르는 상태는 app이 등록한다.
+    // state는 harness가 판정하는 SSOT이므로 상태를 바꾼 명령은 바뀐 부분을 GetState로 응답한다.
+    // status와 pose처럼 같은 값을 예전 형식으로 따로 돌려주는 명령도 있고, 그 값이 state와 같은지는 selftest가 확인한다.
+    void RegisterState(const std::string& group, const std::function<Fields(void)>& describe);
+    // frame과 등록한 group 전부. path가 있으면 그 member만 남긴다 (Fields::Select). 없는 path는 false를 돌려준다.
+    bool GetState(const std::string& path, Fields& state, std::string& error);
+    // 상태를 바꾼 명령이 바뀐 부분을 state와 같은 형식으로 응답할 때 쓴다. 없는 path면 빈 Fields다.
+    Fields GetState(const std::string& path = std::string());
 
     // 명령의 효과가 화면에 나타난 뒤에 응답하도록, frames만큼 frame을 더 그린 뒤 main thread에서 action을 부른다.
     void AfterFrames(uint32_t frames, const std::function<void()>& action);

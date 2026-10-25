@@ -42,7 +42,6 @@ R10G10B10A2_UNORM (약 1/1023) 이다. TOLERANCE 는 그 합의 몇 배다. 규�
 
 import argparse
 import json
-import struct
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -51,6 +50,7 @@ import numpy as np
 from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from gltfwriter import GLTF_FLOAT, GLTF_UNSIGNED_SHORT, BufferBuilder, flatten
 from viewer import HARNESS_DIR, SETTLE_FRAMES
 
 SCENE_DIR = HARNESS_DIR / 'normal-map-convention'
@@ -68,9 +68,6 @@ TOLERANCE = 0.02
 CAMERA_SIDE = np.array([0.0, 0.0, 1.0])
 FRONT_FACE_COLOR = (0, 255, 0)
 BACK_FACE_COLOR = (255, 0, 0)
-
-GLTF_FLOAT = 5126
-GLTF_UNSIGNED_SHORT = 5123
 
 QUAD_POSITIONS = [(-1.0, 1.0, 0.0), (1.0, 1.0, 0.0), (1.0, -1.0, 0.0), (-1.0, -1.0, 0.0)]
 QUAD_NORMAL = (0.0, 0.0, 1.0)
@@ -143,32 +140,6 @@ def tangent_frame_problems(quad):
     if not np.allclose(bitangent, up):
         problems.append(f'quad {quad.name}: cross(NORMAL, TANGENT) * w {bitangent} is not -v {up}')
     return problems
-
-
-class BufferBuilder:
-    def __init__(self):
-        self.data = bytearray()
-        self.views = []
-        self.accessors = []
-
-    def add(self, values, component_type, type_name, count, with_bounds=False):
-        if len(self.data) % 4:
-            self.data += b'\0' * (4 - len(self.data) % 4)
-        fmt = '<' + ('f' if component_type == GLTF_FLOAT else 'H') * len(values)
-        packed = struct.pack(fmt, *values)
-        self.views.append({'buffer': 0, 'byteOffset': len(self.data), 'byteLength': len(packed)})
-        self.data += packed
-        accessor = {'bufferView': len(self.views) - 1, 'componentType': component_type, 'count': count, 'type': type_name}
-        if with_bounds:
-            rows = np.array(values).reshape(count, -1)
-            accessor['min'] = rows.min(axis=0).tolist()
-            accessor['max'] = rows.max(axis=0).tolist()
-        self.accessors.append(accessor)
-        return len(self.accessors) - 1
-
-
-def flatten(rows):
-    return [value for row in rows for value in row]
 
 
 def command_make(args):

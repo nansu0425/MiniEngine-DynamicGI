@@ -31,4 +31,18 @@ RayDesc GetRasterSampleRay(CameraRays rays, uint2 pixel)
     return GetCameraRay(rays, float2(pixel) + rays.rasterSampleOffset);
 }
 
+// ray를 raster가 그리는 near, far plane 사이로 자른다. 그래야 raster가 볼 수 있는 것만 맞는다.
+void ClipToRasterDepthRange(inout RayDesc ray, float3 cameraForward, float nearZ, float farZ)
+{
+    const float cosine = dot(ray.Direction, cameraForward);
+    ray.TMin = nearZ / cosine;
+    ray.TMax = farZ / cosine;
+}
+
+// Camera.cpp의 reverse Z projection을 거꾸로 풀어, depth buffer 값을 camera의 forward 방향으로 잰 거리로 되돌린다.
+float GetRasterViewDepth(float rasterZ, float nearZ, float farZ)
+{
+    return nearZ * farZ / (nearZ + rasterZ * (farZ - nearZ));
+}
+
 #endif

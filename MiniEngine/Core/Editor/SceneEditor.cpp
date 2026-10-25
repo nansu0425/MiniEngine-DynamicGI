@@ -1,6 +1,7 @@
 #include "Core/pch.h"
 #include "Core/Editor/SceneEditor.h"
 #include "Core/App/GameInput.h"
+#include "Core/Automation/ControlChannel.h"
 #include "Core/UI/ImGuiLayer.h"
 
 #include <algorithm>
@@ -64,6 +65,97 @@ namespace
         }
         return nearest;
     }
+
+    const char* GetGizmoModeName(GizmoMode mode)
+    {
+        return mode == GizmoMode::Rotate ? "rotate" : "translate";
+    }
+
+    ControlChannel::Fields DescribeObject(const Camera& camera, const SceneEditor::Object& object)
+    {
+        const Vector3 position = object.GetPosition();
+        ControlChannel::Fields fields;
+        fields.Object("position", ControlChannel::Fields()
+            .Float("x", position.GetX())
+            .Float("y", position.GetY())
+            .Float("z", position.GetZ()));
+
+        // icon을 그리는 것과 같은 투영이다. camera 뒤에 있으면 화면 위치가 없다.
+        ImVec2 screen;
+        if (!SceneEditor::ProjectToScene(camera, position, screen))
+            return fields.Flag("on_screen", false);
+
+        const RECT scene = ImGuiLayer::GetSceneViewport();
+        const bool inScene = screen.x >= scene.left && screen.x < scene.right && screen.y >= scene.top && screen.y < scene.bottom;
+        return fields
+            .Flag("on_screen", inScene)
+            .Object("screen", ControlChannel::Fields().Float("x", screen.x).Float("y", screen.y));
+    }
+
+    ControlChannel::Fields DescribeEditor(const Camera& camera)
+    {
+        ControlChannel::Fields objects;
+        for (const SceneEditor::Object* object : s_Objects)
+            objects.Object(object->GetName(), DescribeObject(camera, *object));
+        return ControlChannel::Fields()
+            .Text("selected", s_Selected != nullptr ? s_Selected->GetName() : "none")
+            .Text("gizmo_mode", GetGizmoModeName(s_GizmoMode))
+            .Object("objects", objects);
+    }
+
+    bool SelectByName(const std::string& name, std::string& error)
+    {
+        if (name == "none")
+        {
+            s_Selected = nullptr;
+            return true;
+        }
+
+        std::string names;
+        for (SceneEditor::Object* object : s_Objects)
+        {
+            if (name == object->GetName())
+            {
+                s_Selected = object;
+                return true;
+            }
+            names += std::string(names.empty() ? "" : ", ") + object->GetName();
+        }
+        error = "no object '" + name + "'. Objects: " + names + ", none";
+        return false;
+    }
+
+    bool SetGizmoMode(const std::string& name, std::string& error)
+    {
+        for (GizmoMode mode : { GizmoMode::Translate, GizmoMode::Rotate })
+        {
+            if (name == GetGizmoModeName(mode))
+            {
+                s_GizmoMode = mode;
+                return true;
+            }
+        }
+        error = "usage: editor mode translate|rotate";
+        return false;
+    }
+
+    void HandleEditorCommand(const std::string& arguments, const ControlChannel::Reply& reply)
+    {
+        const size_t actionEnd = arguments.find(' ');
+        const std::string action = arguments.substr(0, actionEnd);
+        const std::string value = actionEnd == std::string::npos ? std::string() : arguments.substr(actionEnd + 1);
+        std::string error = "usage: editor select <name>|none | editor mode translate|rotate";
+        const bool done =
+            action == "select" ? SelectByName(value, error) :
+            action == "mode" ? SetGizmoMode(value, error) :
+            false;
+        if (!done)
+        {
+            reply.Error(error);
+            return;
+        }
+        reply.Ok(ControlChannel::Fields().Object("state", ControlChannel::GetState("editor")));
+    }
 }
 
 void SceneEditor::AddObject(Object& object)
@@ -99,6 +191,16 @@ void SceneEditor::Update(const Camera& camera)
     }
 
     ImGuiLayer::EndSceneGizmo();
+}
+
+void SceneEditor::RegisterCommands(const Camera& camera)
+{
+    const Camera* projection = &camera;
+    ControlChannel::RegisterState("editor", [projection] { return DescribeEditor(*projection); });
+    ControlChannel::Register("editor", "editor select <name>|none | editor mode translate|rotate: the object the gizmo edits and the gizmo mode, "
+        "as clicking an icon and pressing W or E do. state editor has them, and for each object its world position and, in front of the camera, "
+        "its icon's center in client pixels. on_screen is whether that center is in the scene. Icons and the gizmo are drawn only while the UI is shown",
+        HandleEditorCommand);
 }
 
 float SceneEditor::GetIconRadius(void)

@@ -31,6 +31,7 @@
 #include "Model/Raytracing/RaytracingView.h"
 #include "Model/Raytracing/RaytracingPanel.h"
 #include "Model/Raytracing/RayQueryValidation.h"
+#include "Model/Raytracing/RayPick.h"
 #include "Model/PathTracer/PathTracerPanel.h"
 #include "Model/Loader/glTF.h"
 #include "Model/Renderer/Renderer.h"
@@ -41,6 +42,9 @@
 #include "Core/Editor/EditorCamera.h"
 #include "Core/Editor/SceneEditor.h"
 #include "Core/Automation/ControlChannel.h"
+
+#include <algorithm>
+#include <sstream>
 
 // Dynamic GI 프로젝트에선 legacy path가 아닌 glTF path를 사용한다.
 // legacy는 Blinn-Phong, glTF는 PBR shading
@@ -58,6 +62,7 @@ using Renderer::MeshSorter;
 class Sun : public SceneEditor::Object
 {
 public:
+    virtual const char* GetName() const override { return "Sun"; }
     virtual Vector3 GetPosition() const override { return m_Position; }
     virtual void SetPosition(Vector3 position) override { m_Position = position; }
     virtual void Draw(const Camera& camera, bool selected) const override;
@@ -102,14 +107,23 @@ ExpVar g_SunLightIntensity("Viewer/Lighting/Sun Light Intensity", 4.0f, 0.0f, 16
 NumVar g_SunOrientation("Viewer/Lighting/Sun Orientation", -0.5f, -100.0f, 100.0f, 0.1f );
 NumVar g_SunInclination("Viewer/Lighting/Sun Inclination", 0.75f, 0.0f, 1.0f, 0.01f );
 
+// Sun Inclination 1이 수평에서 올라간 각도(radian). π 대신 3.14159를 쓰므로, sun 명령이 고도를 inclination으로 바꿀 때도 이 값을 써야
+// 조명이 쓰는 방향이 요청한 고도가 된다.
+constexpr float kSunInclinationToElevation = 3.14159f * 0.5f;
+
+Vector3 GetSunDirection(float orientation, float inclination)
+{
+    float costheta = cosf(orientation);
+    float sintheta = sinf(orientation);
+    float cosphi = cosf(inclination * kSunInclinationToElevation);
+    float sinphi = sinf(inclination * kSunInclinationToElevation);
+    return Normalize(Vector3( costheta * cosphi, sinphi, sintheta * cosphi ));
+}
+
 // surface에서 sun을 향하는 방향. raster의 조명과 ray tracing debug view가 같은 sun을 보게 한다.
 Vector3 GetSunDirection()
 {
-    float costheta = cosf(g_SunOrientation);
-    float sintheta = sinf(g_SunOrientation);
-    float cosphi = cosf(g_SunInclination * 3.14159f * 0.5f);
-    float sinphi = sinf(g_SunInclination * 3.14159f * 0.5f);
-    return Normalize(Vector3( costheta * cosphi, sinphi, sintheta * cosphi ));
+    return GetSunDirection(g_SunOrientation, g_SunInclination);
 }
 
 // 검증의 Log 한 줄에 찍는 camera와 sun. 같은 화면으로 되돌릴 수 있게 방향으로 바꾸지 않고 저장된 값을 그대로 쓴다.
@@ -154,11 +168,48 @@ bool RestoreScene(EditorCamera& camera, const RayQueryValidation::SceneCondition
     return true;
 }
 
+ControlChannel::Fields DescribeVector(Vector3 vector)
+{
+    return ControlChannel::Fields().Float("x", vector.GetX()).Float("y", vector.GetY()).Float("z", vector.GetZ());
+}
+
+// state의 camera. editorCamera가 없으면 OrbitCamera라 pose가 없다.
+ControlChannel::Fields DescribeCamera(const Camera& camera, const EditorCamera* editorCamera)
+{
+    const Vector3 position = camera.GetPosition();
+    ControlChannel::Fields fields;
+    fields.Text("controller", editorCamera != nullptr ? "editor" : "orbit")
+        .Float("x", position.GetX())
+        .Float("y", position.GetY())
+        .Float("z", position.GetZ());
+    if (editorCamera != nullptr)
+    {
+        const EditorCamera::Pose pose = editorCamera->GetPose();
+        fields.Float("heading", pose.heading).Float("pitch", pose.pitch).Float("move_speed", editorCamera->GetMoveSpeed());
+    }
+    return fields
+        .Object("forward", DescribeVector(camera.GetForwardVec()))
+        .Float("vertical_fov", camera.GetFOV())
+        .Float("aspect", 1.0f / camera.GetAspectRatio())
+        .Float("near", camera.GetNearClip())
+        .Float("far", camera.GetFarClip());
+}
+
+ControlChannel::Fields DescribeModel(const std::string& path, const ModelInstance& model)
+{
+    const AxisAlignedBox bounds = model.GetAxisAlignedBox();
+    return ControlChannel::Fields()
+        .Text("path", path)
+        .Object("bounds", ControlChannel::Fields().Object("min", DescribeVector(bounds.GetMin())).Object("max", DescribeVector(bounds.GetMax())));
+}
+
 // harness가 camera를 숫자로 읽고 정한다. editorCamera가 없으면 OrbitCamera라 pose를 정할 수 없다.
 void RegisterPoseCommand(EditorCamera* editorCamera)
 {
     ControlChannel::SetStatus("camera", editorCamera != nullptr ? "editor" : "orbit");
-    ControlChannel::Register("pose", "pose | pose <x> <y> <z> <heading> <pitch>: the editor camera", [editorCamera](const std::string& arguments, const ControlChannel::Reply& reply)
+    ControlChannel::Register("pose", "pose | pose <x> <y> <z> <heading> <pitch> | pose look-at <x> <y> <z>: the editor camera, "
+        "in world units and radians as in state camera. look-at keeps the position and turns the camera toward the point. "
+        "Looking straight up or down keeps the heading", [editorCamera](const std::string& arguments, const ControlChannel::Reply& reply)
     {
         if (editorCamera == nullptr)
         {
@@ -167,11 +218,28 @@ void RegisterPoseCommand(EditorCamera* editorCamera)
         }
 
         float x, y, z, heading, pitch;
-        if (!arguments.empty())
+        const std::string usage = "usage: pose <x> <y> <z> <heading> <pitch> | pose look-at <x> <y> <z>";
+        if (arguments.compare(0, 8, "look-at ") == 0)
+        {
+            char rest;
+            if (sscanf_s(arguments.c_str() + 8, "%f %f %f %c", &x, &y, &z, &rest, 1) != 3)
+            {
+                reply.Error(usage);
+                return;
+            }
+            const Vector3 target(x, y, z);
+            if (LengthSquare(target - editorCamera->GetPose().position) == 0.0f)
+            {
+                reply.Error("the point is where the camera is, so there is no direction to look in");
+                return;
+            }
+            editorCamera->LookAt(target);
+        }
+        else if (!arguments.empty())
         {
             if (sscanf_s(arguments.c_str(), "%f %f %f %f %f", &x, &y, &z, &heading, &pitch) != 5)
             {
-                reply.Error("usage: pose <x> <y> <z> <heading> <pitch>");
+                reply.Error(usage);
                 return;
             }
             editorCamera->SetPose({ Vector3(x, y, z), heading, pitch });
@@ -183,7 +251,205 @@ void RegisterPoseCommand(EditorCamera* editorCamera)
             .Float("y", pose.position.GetY())
             .Float("z", pose.position.GetZ())
             .Float("heading", pose.heading)
-            .Float("pitch", pose.pitch));
+            .Float("pitch", pose.pitch)
+            .Object("state", ControlChannel::GetState("camera")));
+    });
+}
+
+float GetSunElevation(Vector3 direction)
+{
+    return XMConvertToDegrees(asinf(Clamp((float)direction.GetY(), -1.0f, 1.0f)));
+}
+
+// [0, 360)
+float WrapDegrees(float degrees)
+{
+    const float wrapped = fmodf(degrees, 360.0f);
+    if (wrapped >= 0.0f)
+        return wrapped;
+    // -0.00001처럼 360을 더하면 360으로 반올림되는 값은 0이다.
+    return wrapped + 360.0f < 360.0f ? wrapped + 360.0f : 0.0f;
+}
+
+// 천정에서는 방향이 방위를 정하지 않으므로 Sun Orientation을 방위로 쓴다.
+float GetSunAzimuth(Vector3 direction, float orientation)
+{
+    const float x = direction.GetX();
+    const float z = direction.GetZ();
+    return WrapDegrees(XMConvertToDegrees(x == 0.0f && z == 0.0f ? orientation : atan2f(z, x)));
+}
+
+float GetDegreesBetween(float first, float second)
+{
+    const float difference = WrapDegrees(first - second);
+    return std::min(difference, 360.0f - difference);
+}
+
+// state의 sun. 고도와 방위는 조명이 실제로 쓰는 방향에서 계산한다.
+ControlChannel::Fields DescribeSun(const Sun& sun)
+{
+    const Vector3 direction = GetSunDirection();
+    return ControlChannel::Fields()
+        .Object("direction", DescribeVector(direction))
+        .Float("elevation", GetSunElevation(direction))
+        .Float("azimuth", GetSunAzimuth(direction, g_SunOrientation))
+        .Float("intensity", g_SunLightIntensity)
+        .Object("position", DescribeVector(sun.GetPosition()));
+}
+
+// count개의 숫자를 ','로 이은 text. 끝에 다른 글자가 있거나 유한하지 않은 숫자는 받지 않는다.
+bool ReadNumbers(const std::string& text, float* numbers, int count)
+{
+    std::istringstream stream(text);
+    for (int i = 0; i < count; ++i)
+    {
+        if (i > 0 && stream.get() != ',')
+            return false;
+        if (!(stream >> numbers[i]) || !std::isfinite(numbers[i]))
+            return false;
+    }
+    return stream.peek() == std::char_traits<char>::eof();
+}
+
+// 받은 값과 다시 읽은 값이 같다고 보는 차이. 고도와 방위를 radian과 inclination으로 바꾸며 생기는 float 오차보다 크게 잡았다.
+// 고도 90은 Sun Inclination의 최댓값 1이 89.99992도라 7.6e-5도 차이로 받는다.
+constexpr float kSunDegreesTolerance = 1e-4f;
+constexpr float kSunDirectionTolerance = 1e-5f;
+constexpr float kSunIntensityTolerance = 1e-6f;
+
+// gizmo와 Engine Tuning이 바꾸는 변수를 같은 방식으로 바꾼다.
+// 받지 않는 값이 하나라도 있으면 아무것도 바꾸지 않도록, 변수의 사본에 먼저 적용해 읽어 본다.
+void SetSun(Sun& sun, const std::string& arguments, const ControlChannel::Reply& reply)
+{
+    const std::string usage = "usage: sun set elevation=<degrees> azimuth=<degrees> | direction=<x>,<y>,<z> | position=<x>,<y>,<z> | intensity=<v>";
+    std::map<std::string, std::vector<float>> values;
+    std::istringstream tokens(arguments);
+    for (std::string token; tokens >> token;)
+    {
+        const size_t separator = token.find('=');
+        const std::string key = token.substr(0, separator);
+        const int count = key == "direction" || key == "position" ? 3 : key == "elevation" || key == "azimuth" || key == "intensity" ? 1 : 0;
+        if (separator == std::string::npos || count == 0 || values.count(key) != 0)
+        {
+            reply.Error("'" + token + "' is not a key=value of sun set, or repeats a key. Nothing was set. " + usage);
+            return;
+        }
+        float numbers[3];
+        if (!ReadNumbers(token.substr(separator + 1), numbers, count))
+        {
+            reply.Error(key + " takes " + (count == 3 ? "<x>,<y>,<z>" : "a number") + ". Nothing was set. " + usage);
+            return;
+        }
+        values[key].assign(numbers, numbers + count);
+    }
+    if (values.empty())
+    {
+        reply.Error(usage);
+        return;
+    }
+    const bool hasElevation = values.count("elevation") != 0;
+    const bool hasAzimuth = values.count("azimuth") != 0;
+    const bool hasDirection = values.count("direction") != 0;
+    if (hasDirection && (hasElevation || hasAzimuth))
+    {
+        reply.Error("direction sets elevation and azimuth, so it cannot be given with them. Nothing was set.");
+        return;
+    }
+
+    NumVar orientation = g_SunOrientation;
+    NumVar inclination = g_SunInclination;
+    ExpVar intensity = g_SunLightIntensity;
+    Vector3 position = sun.GetPosition();
+    Vector3 direction(kZero);
+    if (hasElevation)
+        inclination = XMConvertToRadians(values["elevation"][0]) / kSunInclinationToElevation;
+    if (hasAzimuth)
+        orientation = XMConvertToRadians(WrapDegrees(values["azimuth"][0]));
+    if (hasDirection)
+    {
+        const std::vector<float>& xyz = values["direction"];
+        const Vector3 requested(xyz[0], xyz[1], xyz[2]);
+        if (LengthSquare(requested) == 0.0f)
+        {
+            reply.Error("direction has no length. Nothing was set.");
+            return;
+        }
+        direction = Normalize(requested);
+        inclination = asinf(Clamp((float)direction.GetY(), -1.0f, 1.0f)) / kSunInclinationToElevation;
+        if (direction.GetX() != 0.0f || direction.GetZ() != 0.0f)
+            orientation = atan2f(direction.GetZ(), direction.GetX());
+    }
+    if (values.count("position") != 0)
+        position = Vector3(values["position"][0], values["position"][1], values["position"][2]);
+    // ExpVar는 log2로 저장하므로 0 이하는 NaN이 된다. /fp:fast에서는 NaN과의 비교를 믿을 수 없어 사본에 넣기 전에 거른다.
+    const bool hasIntensity = values.count("intensity") != 0;
+    const bool intensityPositive = !hasIntensity || values["intensity"][0] > 0.0f;
+    if (hasIntensity && intensityPositive)
+        intensity = values["intensity"][0];
+
+    const Vector3 applied = GetSunDirection(orientation, inclination);
+    const float appliedElevation = GetSunElevation(applied);
+    const float appliedAzimuth = GetSunAzimuth(applied, orientation);
+    ControlChannel::Fields rejected;
+    bool anyRejected = false;
+    if (hasElevation && fabsf(appliedElevation - values["elevation"][0]) > kSunDegreesTolerance)
+    {
+        rejected.Float("elevation", appliedElevation);
+        anyRejected = true;
+    }
+    if (hasAzimuth && GetDegreesBetween(appliedAzimuth, values["azimuth"][0]) > kSunDegreesTolerance)
+    {
+        rejected.Float("azimuth", appliedAzimuth);
+        anyRejected = true;
+    }
+    const Vector3 directionError = Abs(applied - direction);
+    if (hasDirection && std::max({ (float)directionError.GetX(), (float)directionError.GetY(), (float)directionError.GetZ() }) > kSunDirectionTolerance)
+    {
+        rejected.Object("direction", DescribeVector(applied));
+        anyRejected = true;
+    }
+    if (hasIntensity && (!intensityPositive || fabsf(intensity - values["intensity"][0]) > kSunIntensityTolerance * values["intensity"][0]))
+    {
+        rejected.Float("intensity", intensity);
+        anyRejected = true;
+    }
+    if (anyRejected)
+    {
+        reply.Error("the sun cannot take some values, so nothing was set. rejected has what they would read back as. "
+            "elevation is 0 to 90, so direction needs y >= 0, and intensity is limited to the range of Sun Light Intensity.",
+            ControlChannel::Fields().Object("rejected", rejected));
+        return;
+    }
+
+    g_SunOrientation = orientation;
+    g_SunInclination = inclination;
+    // ExpVar는 지수를 저장하므로 값을 넣지 않고 사본을 그대로 옮긴다. 그래야 바꾸지 않은 intensity가 bit 단위로 그대로 남는다.
+    g_SunLightIntensity = intensity;
+    sun.SetPosition(position);
+
+    ControlChannel::Fields fields;
+    const bool toZenith = (hasElevation || hasDirection) && appliedElevation >= 90.0f - kSunDegreesTolerance;
+    if (toZenith && !hasAzimuth)
+        fields.Text("note", "at the zenith the direction has no azimuth, so azimuth stays as it was");
+    reply.Ok(fields.Object("state", ControlChannel::GetState("sun")));
+}
+
+void RegisterSunCommand(Sun& sun)
+{
+    ControlChannel::RegisterState("sun", [&sun] { return DescribeSun(sun); });
+    ControlChannel::Register("sun", "sun set <key>=<value> ...: the sun, as its rotate and translate gizmos and Engine Tuning's Viewer/Lighting change it. "
+        "elevation=<degrees> is up from the horizon, 0 to 90. azimuth=<degrees> turns about +y from +x toward +z, 0 to 360. "
+        "direction=<x>,<y>,<z> points from a surface toward the sun and is normalized. It sets elevation and azimuth, so it is not given with them. "
+        "position=<x>,<y>,<z> in world units only places the icon, as the sun is infinitely far. intensity=<v> is Sun Light Intensity. "
+        "Nothing is set unless every value reads back as given. state sun has these keys, with the direction the lighting uses",
+        [&sun](const std::string& arguments, const ControlChannel::Reply& reply)
+    {
+        if (arguments.compare(0, 4, "set ") != 0)
+        {
+            reply.Error("usage: sun set <key>=<value> ... . state sun reads the sun");
+            return;
+        }
+        SetSun(sun, arguments.substr(4), reply);
     });
 }
 
@@ -346,6 +612,7 @@ void ModelViewer::Startup( void )
     Renderer::Initialize();
     RayQuerySmokeTest::Run();
     RaytracingView::Initialize();
+    RayPick::Initialize();
     PathTracerPanel::Initialize();
 
     LoadIBLTextures();
@@ -390,19 +657,26 @@ void ModelViewer::Startup( void )
         // OrbitCamera는 pose를 정할 수 없으므로 검증의 Restore는 EditorCamera를 쓸 때만 된다.
         RayQueryValidation::SetSceneConditions(
             [editorCamera](RayQueryValidation::SceneConditions& conditions) { DescribeScene(*editorCamera, conditions); },
-            [editorCamera](const RayQueryValidation::SceneConditions& conditions) { return RestoreScene(*editorCamera, conditions); });
+            [editorCamera](const RayQueryValidation::SceneConditions& conditions) { return RestoreScene(*editorCamera, conditions); },
+            { "camera", "sun" });
     }
     else
         m_CameraController.reset(new OrbitCamera(m_Camera, m_ModelInst.GetBoundingSphere(), Vector3(kYUnitVector)));
     RegisterPoseCommand(editorCamera);
+    ControlChannel::RegisterState("camera", [this, editorCamera] { return DescribeCamera(m_Camera, editorCamera); });
+    const std::string modelPath = Utility::ToUTF8(gltfFileName.empty() ? std::wstring(kDefaultModel) : gltfFileName);
+    ControlChannel::RegisterState("model", [this, modelPath] { return DescribeModel(modelPath, m_ModelInst); });
 
     SceneEditor::AddObject(m_Sun);
+    SceneEditor::RegisterCommands(m_Camera);
+    RegisterSunCommand(m_Sun);
 }
 
 void ModelViewer::Cleanup( void )
 {
     SceneEditor::RemoveObject(m_Sun);
     PathTracerPanel::Shutdown();
+    RayPick::Shutdown();
     RaytracingView::Shutdown();
     m_RaytracingScene.Destroy();
     m_ModelInst = nullptr;
@@ -579,6 +853,8 @@ void ModelViewer::RenderScene( void )
     PathTracerPanel::Render(gfxContext.GetComputeContext(), m_Camera, m_MainViewport, m_RaytracingScene, g_SceneColorBuffer);
 
     gfxContext.Finish();
+
+    RayPick::Render(m_Camera, m_MainViewport, g_SceneDepthBuffer, m_RaytracingScene);
 }
 
 void ModelViewer::RenderSceneOverlay( GraphicsContext& gfxContext )

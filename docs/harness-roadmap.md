@@ -11,13 +11,15 @@ harness 는 agent 가 ModelViewer 를 build, 실행하고 명령으로 조작, c
 
 ## 후보
 
-### 입력 주입 (필요해질 때)
+### 여러 frame 에 걸친 camera 움직임 (필요해질 때)
 
-- 할 일: app 이 실제 입력 대신 명령으로 정한 mouse 와 keyboard 입력을 읽게 해서, camera 조작과 UI click 을 명령으로 한다.
-- 근거
-  - computer use 로는 camera 를 날릴 수 없다 (SKILL.md "computer use" 절). `pose` 는 camera 를 정하지만 EditorCamera 의 입력 경로를 지나지 않는다.
-  - `pose` 는 velocity 를 만들지 않으므로, motion vector 를 쓰는 경로 (예: TAA) 는 입력 주입이 있어야 검사할 수 있다.
-  - 입력을 frame 단위로 정할 수 있다. OS 입력은 frame 과 맞지 않아 같은 scenario 가 실행마다 다른 frame 수로 들어간다 (추측).
+- 할 일: camera 가 여러 frame 에 걸쳐 움직이게 해서 motion vector 를 쓰는 경로 (예: TAA) 를 검사한다. 입력 주입으로 할지 pose 를 frame 마다 옮기는 명령으로 할지는 그때 정한다. 조작 수단으로서의 입력 주입은 만들지 않는다 (보류한 결정).
+- 근거: `pose` 는 velocity 를 만들지 않으므로, motion vector 를 쓰는 경로는 지금 검사할 수 없다.
+
+### Validation view 를 끈 뒤의 비결정성 원인 (필요해질 때)
+
+- 할 일: Validation view 를 끈 직후의 scene 이 몇 pixel 다른 원인 (SKILL.md "결정성" 절) 을 찾는다.
+- 근거: harness 는 끈 뒤 기다려서 피하고 있을 뿐이다. 원인이 GPU 의 동기화 문제라면 다른 pass 의 결과도 timing 에 따라 바뀔 수 있다 (추측). 기다림으로 덮지 못하는 비교가 생기거나, 진단 후보의 GPU capture 를 쓸 수 있게 되면 본다.
 
 ### 진단 (필요해질 때)
 
@@ -34,11 +36,6 @@ harness 는 agent 가 ModelViewer 를 build, 실행하고 명령으로 조작, c
 - 근거: 573dded 의 log 만으로 Lighting resource 해제 누락 (e8a2352) 을 진단한 agent 가 보고한 불편이다. 어느 resource 가 남았는지 보려면 app.log 를 열어야 했고, 요약을 증거로 남기려면 옮겨 적어야 했고, 어느 명령이 message 를 냈는지 좁히려면 명령 사이에 `status` 를 끼워야 했다.
 - 함께 볼 것: Debug 의 CRT message 가 `\n` 으로 끝나지 않으면 `exit reason=` 줄이 그 뒤에 붙어 viewer.py 가 찾지 못할 수 있다 (`OnCrtReport`, 추측, 확인하지 않음).
 
-### UI 상태를 text 로 노출 (필요해질 때)
-
-- 할 일: UI 가 바꾸는 상태 중 text 로 읽을 수 없는 것 (예: `SceneEditor` 가 고른 object 와 gizmo mode) 을 명령이나 `status` 로 노출한다.
-- 근거: SKILL.md "판정" 절은 text 로 읽을 수 없는 상태를 바꾸는 조작의 결과를 판정하지 못한다고 정한다. 입력 주입이 UI 를 조작하게 되면 그 결과를 읽을 명령이 있어야 판정할 수 있다.
-
 ### 측정 (로드맵 작업 5, 6, 12 즈음)
 
 - 할 일: Profiler 의 GPU time 과 CPU time 을 명령으로 읽는다. PT 의 export 를 `pt` 명령으로 한다 (로드맵 작업 6 에 넣을지는 그때 사용자가 정한다).
@@ -51,6 +48,12 @@ harness 는 agent 가 ModelViewer 를 build, 실행하고 명령으로 조작, c
 - 근거: GPU capture, resource 저장, shader debugging 이 필요할 때 쓴다. RenderDoc 은 DXR 을 지원하지 않아 고르지 않았다.
 
 ## 보류한 결정
+
+### 사람의 입력을 흉내 내는 조작
+
+- harness 는 mouse 와 keyboard 입력이나 UI click 을 흉내 내어 app 을 조작하지 않는다. 판정은 `state` 로 하고, UI 와 gizmo 가 바꾸는 상태는 같은 상태를 바꾸는 의미 단위 명령 (예: `sun set elevation= azimuth=`, `editor mode`) 으로 바꾼다. screenshot 은 참고로만 본다.
+  - agent 가 sun 의 translate gizmo 를 rotate gizmo 로 잘못 보고, translate gizmo 를 옮긴 뒤 sun 이 돌지 않은 것이 이상하다고 보고한 일이 있었다. image 로 UI 의 상태를 판단하는 것은 믿을 수 없고, 입력을 흉내 내는 조작은 click 할 곳과 결과를 그 판단에 기댄다.
+- 다시 볼 조건: WASD 나 gizmo drag 같은 입력 처리 코드 자체를 harness 로 검사해야 할 때. 그때까지 그 확인은 사용자가 한다.
 
 ### MCP server
 

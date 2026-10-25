@@ -2,6 +2,7 @@
 #include "Model/Raytracing/RaytracingDebugView.h"
 #include "Model/Raytracing/RayQueryValidation.h"
 #include "Core/pch.h"
+#include "Core/Automation/ControlChannel.h"
 #include "Core/Editor/EditorSettings.h"
 
 #include <imgui.h>
@@ -109,6 +110,43 @@ namespace
         ImGui::SetItemTooltip("All rays cull the back faces of single-sided materials. When on, only debug view rays hit them.");
     }
 
+    // Fit to Capture가 맞출 수 있으면 맞춘 heatmap을, 맞출 수 없으면 그 이유를 준다. 버튼이 disabled인 조건과 validation fit이 거절하는 조건이 같다.
+    bool FitHeatmap(RayQueryValidation::Heatmap& fitted, std::string& reason)
+    {
+        if (s_Selection.group != kValidation)
+        {
+            reason = "the view is not a Validation view. Pick one as View in the Ray Tracing View settings.";
+            return false;
+        }
+        const RayQueryValidation::Mode mode = GetValidationMode();
+        if (!RayQueryValidation::IsMetricItem(mode, s_Heatmap.item))
+        {
+            reason = std::string("the heatmap is the category ") + RayQueryValidation::GetHeatmapItemLabel(mode, s_Heatmap.item) +
+                ", not a metric. Pick a metric as Heatmap in the Ray Tracing View settings.";
+            return false;
+        }
+        fitted = s_Heatmap;
+        if (!RayQueryValidation::FitHeatmapToCapture(mode, fitted))
+        {
+            reason = "the last capture is not of this view or has no sample of this metric. validation capture first.";
+            return false;
+        }
+        return true;
+    }
+
+    void FitHeatmapByCommand(const ControlChannel::Reply& reply)
+    {
+        RayQueryValidation::Heatmap fitted;
+        std::string reason;
+        if (!FitHeatmap(fitted, reason))
+        {
+            reply.Error(reason);
+            return;
+        }
+        s_Heatmap = fitted;
+        reply.Ok(ControlChannel::Fields().Object("state", ControlChannel::GetState(std::string("settings.") + kSettingsSection)));
+    }
+
     // Validation view의 결과 중 overlay에 칠할 category나 metric과, metric을 칠할 범위를 고른다.
     void ShowHeatmapOptions(void)
     {
@@ -136,8 +174,9 @@ namespace
             RayQueryValidation::kMinHeatmapExponent, RayQueryValidation::kMaxHeatmapExponent, "2^%d", "2^%d");
         ImGui::SetItemTooltip("Metric values at the lower end are light blue and at the upper end dark blue.");
 
-        RayQueryValidation::Heatmap fitted = s_Heatmap;
-        ImGui::BeginDisabled(!metric || !RayQueryValidation::FitHeatmapToCapture(mode, fitted));
+        RayQueryValidation::Heatmap fitted;
+        std::string reason;
+        ImGui::BeginDisabled(!FitHeatmap(fitted, reason));
         if (ImGui::Button("Fit to Capture"))
             s_Heatmap = fitted;
         ImGui::EndDisabled();
@@ -196,6 +235,7 @@ void RaytracingView::Initialize(void)
 {
     RaytracingDebugView::Initialize();
     RayQueryValidation::Initialize();
+    RayQueryValidation::SetFitCommand(FitHeatmapByCommand);
     EditorSettings::Register(kSettingsSection, SaveSettings, LoadSettings);
 }
 

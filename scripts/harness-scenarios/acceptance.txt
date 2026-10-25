@@ -1,0 +1,35 @@
+# harness 의 완료 판정 기준에 있는 acceptance scenario 다. 판정은 screenshot 이 아니라 state 와 pick 의 값으로 한다.
+# selftest 가 이 파일을 run 과 같은 방식으로 실행하고, 이름을 붙인 응답으로 단계마다 판정한다 (viewer.py 의 check_acceptance).
+# baseline 의 client 1920x1080 에서 UI 를 숨기면 scene 의 가운데 pixel 은 960 540 이다.
+ui hide
+
+# 1. sun 을 낮게 둔다. 판정: state 의 sun 이 요청한 고도와 방위이고, raw 값 (Engine Tuning 의 Sun Orientation, Inclination) 이 그 방향을 만든다.
+sun_before = state sun
+sun set elevation=20 azimuth=200
+lit = state
+
+# 2. Sun 을 고르고 rotate gizmo 를 띄운 채 display 를 찍는다. 판정: state editor 와, 그 image 를 그린 frame 의 state 파일.
+ui show
+editor select Sun
+editor mode rotate
+gizmo = capture display {shots}/acceptance-rotate-gizmo
+selection = state editor
+ui hide
+
+# 3. Depth Error heatmap 의 Heatmap Range 를 capture 에 맞춘다. 판정: Heatmap Range 가 fit 전과 다르다.
+settings set Ray Tracing View: View=Validation: Depth Comparison
+settings set Ray Tracing View: Heatmap=Depth Error
+unfitted = state settings.Ray Tracing View
+frames 2
+validation capture
+fitted = validation fit
+settings set Ray Tracing View: View=Off
+
+# 4. atrium 바닥 가까이 서서 바닥의 한 점을 pick 하고 그 점을 본다. 판정: 그 점은 위를 향하고, 화면 가운데의 pick 이 그 점에 닿는다.
+pose 0 200 0 1.6 -0.4
+floor = pick 960 1000
+pose look-at {floor.pick.position.x} {floor.pick.position.y} {floor.pick.position.z}
+center = pick 960 540
+
+# 5. 화면이 무엇으로 덮였는지 본다. 판정: grid 칸의 과반이 그 바닥의 material 이다.
+grid = pick grid 16x9

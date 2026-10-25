@@ -204,6 +204,24 @@ bool TraceClosestHit(RayDesc ray, uint rayFlags, out RayHit hit)
     return true;
 }
 
+bool HitsSameTriangle(RayDesc ray, uint rayFlags, bool rayHit, RayHit closestHit)
+{
+    RayHit otherHit;
+    if (TraceClosestHit(ray, rayFlags, otherHit) != rayHit)
+        return false;
+    return !rayHit || (otherHit.instanceIndex == closestHit.instanceIndex && otherHit.geometryIndex == closestHit.geometryIndex
+        && otherHit.primitiveIndex == closestHit.primitiveIndex);
+}
+
+// rayFlags로 쏜 ray가 맞은 것 (rayHit, closestHit) 을 alpha test가 정했는지. raster의 cutout은 mip chain을, ray는 mip 0을 읽으므로
+// 이런 ray는 raster와 다른 것을 맞을 수 있다. FORCE_OPAQUE는 ray가 지나간 cutout을, CULL_NON_OPAQUE는 ray가 맞은 cutout을 찾는다.
+// 어느 쪽이든 맞은 triangle이 바뀌면 alpha test가 이 ray의 결과를 정한 것이다.
+bool IsDecidedByAlphaTest(RayDesc ray, uint rayFlags, bool rayHit, RayHit closestHit)
+{
+    return !HitsSameTriangle(ray, rayFlags | RAY_FLAG_FORCE_OPAQUE, rayHit, closestHit)
+        || !HitsSameTriangle(ray, rayFlags | RAY_FLAG_CULL_NON_OPAQUE, rayHit, closestHit);
+}
+
 // ray의 TMin과 TMax 사이에 ray를 막는 것이 있는지 알려 준다. 두 점 사이를 볼 때는 TMax를 두 점의 거리로 둔다.
 bool IsOccluded(RayDesc ray, uint rayFlags)
 {

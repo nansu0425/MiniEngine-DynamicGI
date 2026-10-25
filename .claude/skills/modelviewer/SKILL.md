@@ -1,6 +1,6 @@
 ---
 name: modelviewer
-description: ModelViewer 를 build, run, drive, screenshot, verify 하는 harness (scripts/viewer.py). 코드를 고친 뒤 실제 app 에서 동작을 확인할 때, app 을 띄워 camera, 설정, panel 을 명령으로 바꾸고 화면을 capture 해 볼 때, crash 와 hang 을 판정할 때 쓴다.
+description: ModelViewer 를 build, run, drive, screenshot, verify 하는 harness (scripts/viewer.py). 코드를 고친 뒤 실제 app 에서 동작을 확인할 때, app 을 띄워 camera, sun, 설정, panel, editor 의 선택을 명령으로 바꾸고 그 상태를 state 로 읽을 때, 화면에 무엇이 보이는지 pick 으로 볼 때, 화면을 capture 해 볼 때, crash 와 hang 을 판정할 때 쓴다.
 ---
 
 # ModelViewer harness
@@ -15,18 +15,19 @@ harness 로 할 수 없는 일을 만나면 그 일이 계획되어 있는지와
 - OS 를 거쳐야만 보이는 것은 computer use 로 본다 (아래 computer use 절). computer use 를 쓸 수 없는 session 에서는 그것을 사용자에게 확인해 달라고 부탁한다.
 - D3D12 debug layer 의 message 를 봐야 하면 Debug 로 띄운다. `start` 는 다른 config 에 `-debug 1` 을 주지 않으므로 debug layer 가 꺼져 message 자체가 생기지 않는다 (`start` 가 상태를 알린다).
 - DXGI message 는 harness 로도 computer use 로도 볼 수 없으므로 사용자에게 확인을 부탁한다.
-- mouse 와 keyboard 를 흉내 내는 명령은 아직 없다. ImGui 조작은 같은 일을 하는 명령 (`settings`, `panel`, `ui`, `validation`, `restore`) 으로 한다.
+- UI 와 mouse 로 바꾸는 상태는 같은 상태를 바꾸는 명령으로 바꾼다. gizmo 가 바꾸는 sun 의 방향과 위치, icon click 과 W, E 가 바꾸는 editor 의 선택과 gizmo mode 도 그렇다. 명령은 `do help` 에 있다. gizmo 를 화면으로 보고 판단하거나 끌지 않는다 (근거는 `docs/harness-roadmap.md` 의 보류한 결정).
 
 ## 실행 loop
 
 1. `start` 로 띄운다. 기능 확인은 기본값 Debug 로, 시간은 `--config Profile` 로 잰다.
-2. `do "<명령>" "<명령>" ...` 로 조작한다. 서로 기다릴 필요가 없는 명령은 한 번의 `do` 에 묶는다.
-3. `shot display|scene|overlay` 로 capture 한다. 출력된 view PNG 는 판정 절이 정한 경우에만 Read 로 본다.
+2. `do "state <path>"` 로 지금 상태를 읽고, `do "<명령>" "<명령>" ...` 로 조작한다. 서로 기다릴 필요가 없는 명령은 한 번의 `do` 에 묶는다.
+3. 지금 무엇이 보이는지는 `pick grid` 로 본다. 대략의 구도를 보고 싶으면 `shot display|scene|overlay` 로 capture 해 view PNG 를 Read 한다.
 4. `stop` 으로 끝낸다.
 
+- 앞 명령의 응답에 있는 값을 뒤 명령에 넣거나 같은 순서를 되풀이하려면 명령을 파일에 적어 `run` 으로 보낸다. 형식은 `run --help` 에 있고, `scripts/harness-scenarios/acceptance.txt` 가 그 예다.
 - 나중에 비교할 shot 은 `MiniEngine/ModelViewer/Harness/kept/` 로 복사해 둔다. `runs/` 의 run 은 뒤의 `start` 와 `selftest` 가 지울 수 있다.
 - 사용자가 직접 띄운 ModelViewer 와 동시에 실행하면 `.mini` 와 DDS cache 쓰기가 겹칠 수 있다.
-- `--model` 로 띄우면 orbit camera 라서 `pose`, `describe`, `restore` 가 error 를 돌려준다.
+- `--model` 로 띄우면 orbit camera 라서 `pose`, `pose look-at`, `describe`, `restore` 가 error 를 돌려준다.
 
 ## capture 고르기
 
@@ -42,19 +43,25 @@ harness 로 할 수 없는 일을 만나면 그 일이 계획되어 있는지와
 - TAA 를 끄면 그다음 frame 부터 scene 이 그 frame 의 raster 만으로 정해진다. 같은 상태에서 찍은 scene 은 camera 를 옮겼다 되돌린 뒤에도, TAA 를 켰다 끈 뒤에도, TAA 의 Sharpness 를 바꾼 뒤에도 bit 가 같다 (selftest 가 확인한다).
 - 1 frame 늦게 반영되는 것이 둘 있다. TAA 를 끈 frame 은 앞 frame 이 정한 jitter 로 그려지고, Exposure 를 바꾼 frame 의 display 는 바꾸기 전의 밝기다. viewer.py 의 `SETTLE_FRAMES` 는 이 지연을 명령 간격에 기대지 않고 덮는 frame 수다. 상태를 바꾼 뒤 수치를 비교할 capture 는 `frames <SETTLE_FRAMES>` 뒤에 찍는다.
 - TAA 나 adaptive exposure 를 켜면 결과가 지난 frame 수에 따라 바뀌므로, 같은 명령 순서로도 실행마다 다를 수 있다. 수치를 비교할 capture 는 둘을 끄고 찍는다.
+- Validation view 를 켠 채 명령 몇 개를 보내고 끈 직후에 찍은 scene 은, 끄기 전과 몇 pixel 이 다를 수 있다. Profile 의 baseline 에서는 늘 같은 36 pixel 이 최대 1/128 달랐고, 몇 번에 한 번 일어났으며, 3 frame 뒤에는 같았다. 원인은 확인하지 않았다. `state` 와 `pick` 을 더하기 전의 30152da 로 build 한 app 에서도 같은 pixel 수와 차이로 일어난다. Validation view 를 끈 뒤 수치를 비교할 capture 는 viewer.py 의 `VALIDATION_VIEW_SETTLE_FRAMES` 만큼 `frames` 로 기다린 뒤에 찍는다.
 
 ## token 규칙
 
 - view PNG 만 Read 한다. 원본 PNG 와 DDS 는 Read 하지 않는다.
 - 일부만 보면 되면 `--crop X,Y,W,H` (원본 pixel) 를, 구도만 보면 `--max-width 640` 을 쓴다.
 - 최근 몇 장만 보고, 이미 본 shot 은 다시 Read 하지 않는다.
+- `state` 전체는 수 KB 다. 필요한 group 만 `state <path>` 로 읽는다.
 
 ## 판정
 
-- 상태 확인과 PASS/FAIL 판정은 text 와 수치로 한다. text 는 `status`, `describe`, `settings get` 과 명령의 응답이고, 수치는 image diff 와 비교 script 의 결과다. screenshot (computer use 의 screenshot 과 `shot` 의 view PNG) 을 해석해 판정하지 않는다.
-- screenshot 은 수치로 좁힌 영역의 원인을 볼 때와 입력할 위치를 찾을 때만 쓴다.
-- computer use 로 UI 를 조작했으면 그 결과도 조작 전과 뒤의 text 상태를 비교해 확인한다.
-- text 로 읽을 수 없는 상태를 바꾸는 조작은 결과를 판정할 수 없다. 지금은 gizmo 의 위치와 mode 가 그렇다. 이런 조작의 결과는 사용자에게 확인을 부탁한다.
+- 판정의 SSOT 는 `state` 다. 상태 확인과 PASS/FAIL 판정은 `state` 와, 상태를 바꾼 명령이 응답에 담는 그 일부로 한다. 같은 값을 예전 형식으로 주는 `status`, `pose`, `describe`, `settings get` 은 `state` 와 같다 (selftest 가 확인한다). 수치는 image diff 와 비교 script 의 결과다.
+- screenshot (computer use 의 screenshot 과 `shot` 의 view PNG) 은 수치만으로 상황이 잡히지 않을 때 대략 파악하는 참고로 본다. screenshot 을 해석해 판정하지 않는다.
+- image 와 `state` 가 다르면 `state` 를 믿고 차이의 원인을 찾는다. `state` 에 없는 항목이거나 rendering 의 bug 다. `shot` 이 image 옆에 남기는 state 파일이 그 image 를 그린 frame 의 `state` 이므로, image 에 보이는 것의 상태 (예: gizmo 가 translate 인지 rotate 인지) 는 image 가 아니라 그 파일에서 읽는다.
+- 지금 무엇이 보이는지는 `pick grid` 의 칸마다 instance, material, 거리, 위치로 본다. 응답은 지도처럼 읽히게 행마다 그 넷이 각각 칸을 공백으로 이은 text 한 줄이고, miss 인 칸은 `-` 다. 한 pixel 은 `pick <x> <y>` 로 본다. mesh 와 material 은 이름 없이 index 만 있다 (.mini 에 이름이 없다).
+- pick 의 좌표는 client pixel 이고 scene 영역 안이어야 한다. UI 가 보이면 dock 이 덮은 곳은 error 다. `state editor` 의 icon 화면 위치에 무엇이 있는지는 그 좌표를 반올림한 pixel 로 pick 한다. icon 위치는 ImGui 좌표라서 TAA 를 끄면 pick 의 pixel 격자와 반 pixel 어긋난다 (코드에서 추론했고 실행으로 확인하지 않았다).
+- pick 의 `alpha_test` 가 true 면 raster 는 다른 것을 볼 수 있다. raster 의 cutout 은 mip chain 을, ray 는 mip 0 을 읽는다. 같은 pixel 의 raster depth 는 응답의 `raster` 에 있다.
+- `validation fit` 은 그 view 의 `validation capture` 가 먼저 있어야 한다.
+- computer use 로 UI 를 조작했으면 그 결과도 조작 전과 뒤의 `state` 를 비교해 확인한다.
 - D3D12 message 는 `stop` 의 요약과 `do status` 의 `d3d12_messages` 로 센다. 실행 중의 CORRUPTION, ERROR, WARNING 중 하나라도 0 이 아니면 FAIL 이다 (selftest 가 baseline 에서 셋 다 0 인 것을 확인한다). 종료 때는 `#274 LIVE_DEVICE` 하나만 나와야 하고, 그 밖의 message 는 device 보다 오래 남은 object 다 (selftest 가 baseline 에서 확인한다).
 - 어느 명령이 message 를 냈는지는 그 명령 앞뒤에서 `do status` 의 `d3d12_messages` 를 비교해 찾는다. `status` 는 제한 없이 세지만 log 는 같은 ID 를 정해진 횟수까지만 줄로 남기므로 (`D3D12MessageLog.h`) `log mark` 로 나눈 구간에는 줄이 없을 수 있다.
 - `start --gpu-validation` 이 무엇을 더 검사하는지는 `start --help` 에 있다.
@@ -69,18 +76,20 @@ harness 로 할 수 없는 일을 만나면 그 일이 계획되어 있는지와
 - app 은 이때도 `start` 로 띄운다. `open_application` 은 flag 없이 새 instance 를 띄워 사용자의 `editor.ini`, `imgui.ini` 를 덮어쓸 수 있으므로 쓰지 않는다.
 - `request_access` 에는 이름 `ModelViewer` 가 아니라 `do status` 가 돌려주는 `exe` 경로를 준다. 이름으로는 찾지 못하고, 경로로는 full tier 로 승인된다. config 마다 exe 경로가 다르므로 config 를 바꾸면 다시 승인받아야 할 수 있다 (확인하지 않았다).
 - screenshot 에는 D3D 영역도 그려지고 `shot display` 와 구도가 같다. `scale` 을 0.6 정도로 줄여 찍는다. click 좌표는 응답이 알려 주는 coordinate frame 기준이다. 허용하지 않은 app 은 가려지지만 File Explorer 창은 그대로 보인다.
-- 조작 (결과는 판정 절에 따라 text 상태로 확인한다)
+- 조작 (결과는 판정 절에 따라 `state` 로 확인한다)
   - ImGui menu 와 panel 은 left click 으로 다룬다. F1 로 UI 를 숨겼다 되돌려도 dock 배치는 남는다.
   - 키를 누른 채 두려면 `hold_key` 를 쓴다.
-  - gizmo 를 끌 때는 `mouse_move`, `left_mouse_down`, 0.2 s 간격의 `mouse_move` 몇 번, `left_mouse_up` 순서로 한다. `left_click_drag` 는 gizmo 를 고르기만 하고 끌지 못한다.
-  - computer use 는 오른쪽과 가운데 button 을 누른 채 둘 수 없어서 camera 를 움직이지 못한다 (camera 조작법은 `MiniEngine/readme.md` 의 Controls). camera 는 `pose` 로 옮긴다.
+  - gizmo 는 끌지 않는다. gizmo 가 바꾸는 상태는 `sun set` 과 `editor` 로 바꾼다 (쓰는 범위 절).
+  - computer use 는 오른쪽과 가운데 button 을 누른 채 둘 수 없어서 camera 를 움직이지 못한다 (camera 조작법은 `MiniEngine/readme.md` 의 Controls). camera 는 `pose` 와 `pose look-at` 으로 옮긴다.
 - Esc 로 끝내면 정상 종료된다. Esc 는 DirectInput 으로 읽으므로 ModelViewer 창이 foreground 여야 한다. 끝난 뒤에는 `stop` 으로 instance 를 정리하고 log 요약을 본다.
 
 ## 예
 
 ```
 python scripts/viewer.py start
-python scripts/viewer.py do "ui hide" "settings set Ray Tracing View: View=Validation: Depth Comparison" "frames 2" "validation capture"
+python scripts/viewer.py do "ui hide" "state sun" "sun set elevation=20 azimuth=200" "pick grid 16x9"
+python scripts/viewer.py do "settings set Ray Tracing View: View=Validation: Depth Comparison" "frames 2" "validation capture" "validation fit"
 python scripts/viewer.py shot overlay --max-width 640
+python scripts/viewer.py run scripts/harness-scenarios/acceptance.txt
 python scripts/viewer.py stop
 ```

@@ -122,6 +122,8 @@ namespace
 
     std::function<void(RayQueryValidation::SceneConditions&)> s_DescribeScene;
     std::function<bool(const RayQueryValidation::SceneConditions&)> s_RestoreScene;
+    std::vector<std::string> s_SceneStatePaths;
+    std::function<void(const ControlChannel::Reply&)> s_Fit;
     // Restore할 Log 한 줄. Capture하면 그 Capture의 줄로 채운다.
     char s_RestoreLine[4096] = {};
     bool s_HasRestored = false;
@@ -450,14 +452,40 @@ namespace
         s_HasRestored = false;
     }
 
+    ControlChannel::Fields DescribeCaptureValues(void)
+    {
+        ControlChannel::Fields values;
+        for (const auto& value : ParseLogLine(DescribeCapture(s_Capture)))
+            values.Text(value.first, value.second);
+        return values;
+    }
+
+    // panel이 보이는 Capture의 수치. validation capture가 응답하는 values와 같다.
+    ControlChannel::Fields DescribeValidation(void)
+    {
+        ControlChannel::Fields fields;
+        fields.Flag("last_frame_validated", WasLastFrameValidated()).Flag("captured", s_HasCapture);
+        if (s_HasCapture)
+            fields.Object("values", DescribeCaptureValues());
+        return fields;
+    }
+
     // panel의 Capture, Log, Restore와 같은 일을 harness가 명령으로 한다.
     void RegisterCommands(void)
     {
-        ControlChannel::Register("validation", "validation capture: like Capture then Log. Needs a Validation view", [](const std::string& arguments, const ControlChannel::Reply& reply)
+        ControlChannel::RegisterState("validation", DescribeValidation);
+        ControlChannel::Register("validation", "validation capture | validation fit: capture is like Capture then Log. "
+            "fit is like Fit to Capture: it fits the Heatmap Range of the Ray Tracing View settings to p1 ~ p99 of the heatmap's metric in the last capture of this view. "
+            "Both need a Validation view", [](const std::string& arguments, const ControlChannel::Reply& reply)
         {
+            if (arguments == "fit" && s_Fit)
+            {
+                s_Fit(reply);
+                return;
+            }
             if (arguments != "capture")
             {
-                reply.Error("usage: validation capture");
+                reply.Error("usage: validation capture | validation fit");
                 return;
             }
             if (!WasLastFrameValidated())
@@ -469,10 +497,8 @@ namespace
             CaptureForRestore();
             const std::string line = DescribeCapture(s_Capture);
             Utility::Print((line + "\n").c_str());
-            ControlChannel::Fields values;
-            for (const auto& value : ParseLogLine(line))
-                values.Text(value.first, value.second);
-            reply.Ok(ControlChannel::Fields().Text("line", line).Object("values", values));
+            reply.Ok(ControlChannel::Fields().Text("line", line).Object("values", DescribeCaptureValues())
+                .Object("state", ControlChannel::GetState("validation")));
         });
 
         ControlChannel::Register("describe", "describe: the camera, sun and TAA as a line that restore takes", [](const std::string&, const ControlChannel::Reply& reply)
@@ -504,15 +530,26 @@ namespace
                 reply.Error("the line lacks the camera or sun. Only TAA was restored.");
                 return;
             }
-            reply.Ok(ControlChannel::Fields().Text("line", DescribeRestorableConditions()));
+            // TAA는 Engine Tuning에 있다.
+            ControlChannel::Fields state = ControlChannel::GetState("settings.Engine Tuning");
+            for (const std::string& path : s_SceneStatePaths)
+                state.Append(ControlChannel::GetState(path));
+            reply.Ok(ControlChannel::Fields().Text("line", DescribeRestorableConditions()).Object("state", state));
         });
     }
 }
 
-void RayQueryValidation::SetSceneConditions(const std::function<void(SceneConditions&)>& describe, const std::function<bool(const SceneConditions&)>& restore)
+void RayQueryValidation::SetFitCommand(const std::function<void(const ControlChannel::Reply&)>& fit)
+{
+    s_Fit = fit;
+}
+
+void RayQueryValidation::SetSceneConditions(const std::function<void(SceneConditions&)>& describe, const std::function<bool(const SceneConditions&)>& restore,
+    const std::vector<std::string>& statePaths)
 {
     s_DescribeScene = describe;
     s_RestoreScene = restore;
+    s_SceneStatePaths = statePaths;
 }
 
 const char* RayQueryValidation::GetModeLabel(Mode mode)

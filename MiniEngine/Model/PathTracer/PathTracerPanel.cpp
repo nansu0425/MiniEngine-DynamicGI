@@ -133,7 +133,8 @@ namespace
     void RegisterCommands(void)
     {
         ControlChannel::Register("pt", "pt status | pt reset | pt wait samples=<n>: the path tracer's progress. "
-            "reset starts over on the next frame that shows the path tracer. wait replies once it has accumulated n samples per pixel",
+            "reset starts over on the next frame that shows the path tracer, and while Show is on replies with state pt after that frame. "
+            "wait replies once it has accumulated n samples per pixel",
             [](const std::string& arguments, const ControlChannel::Reply& reply)
         {
             uint32_t samples = 0;
@@ -144,7 +145,11 @@ namespace
             else if (arguments == "reset")
             {
                 PathTracer::Reset();
-                reply.Ok();
+                const auto replyWithProgress = [reply] { reply.Ok(ControlChannel::Fields().Object("state", ControlChannel::GetState("pt"))); };
+                if (s_Show)
+                    ControlChannel::AfterFrames(1, replyWithProgress);
+                else
+                    replyWithProgress();
             }
             else if (sscanf_s(arguments.c_str(), "wait samples=%u", &samples) == 1)
             {
@@ -166,6 +171,7 @@ void PathTracerPanel::Initialize(void)
     PathTracer::Initialize();
     EditorSettings::Register(kSettingsSection, SaveSettings, LoadSettings);
     RegisterCommands();
+    ControlChannel::RegisterState("pt", DescribeProgress);
 }
 
 void PathTracerPanel::Shutdown(void)

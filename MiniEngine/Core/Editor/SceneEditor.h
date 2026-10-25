@@ -13,6 +13,9 @@ namespace SceneEditor
     public:
         virtual ~Object() {}
 
+        // harness가 editor 명령과 state에서 이 물체를 가리키는 이름
+        virtual const char* GetName() const = 0;
+
         // icon을 그리고 클릭으로 고르는 자리
         virtual Math::Vector3 GetPosition() const = 0;
         virtual void SetPosition(Math::Vector3 position) = 0;
@@ -30,6 +33,10 @@ namespace SceneEditor
 
     // camera를 이번 frame에 맞춘 뒤 ImGuiLayer::BeginFrame과 Render 사이에서 부른다.
     void Update(const Math::Camera& camera);
+
+    // harness가 icon click과 W, E key 대신 명령으로 고른 물체와 gizmo mode를 정하고, state의 editor로 읽는다.
+    // camera는 Update에 넘기는 것과 같은 camera이고 app이 끝날 때까지 살아 있어야 한다. icon의 화면 위치를 이것으로 투영한다.
+    void RegisterCommands(const Math::Camera& camera);
 
     // 아래 함수는 Object의 Draw와 Rotate 안에서 쓴다.
     float GetIconRadius(void);

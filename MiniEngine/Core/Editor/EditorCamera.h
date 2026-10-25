@@ -24,6 +24,10 @@ public:
     Pose GetPose() const;
     // Update를 기다리지 않고 camera에 바로 적용해, 같은 frame에 그리는 것부터 새 pose로 보게 한다.
     void SetPose(const Pose& pose);
+    // 위치는 그대로 두고 target을 보게 SetPose한다. 바로 위나 아래를 보면 heading이 정해지지 않으므로 그대로 둔다.
+    // target은 camera 위치와 달라야 한다.
+    void LookAt(Math::Vector3 target);
+    float GetMoveSpeed() const { return m_MoveSpeed; }
 
 private:
     Math::Matrix3 GetOrientation() const;

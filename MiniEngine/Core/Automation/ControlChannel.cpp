@@ -2,6 +2,7 @@
 #include "Core/Automation/ControlChannel.h"
 #include "Core/Display/Display.h"
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cmath>
@@ -56,6 +57,7 @@ namespace
 
     std::map<std::string, Command> s_Commands;
     std::map<std::string, std::string> s_Status;
+    std::map<std::string, std::function<Fields(void)>> s_StateGroups;
     std::vector<ScheduledAction> s_ScheduledActions;
 
     // 아래는 pipe thread와 main thread가 같이 쓴다.
@@ -318,7 +320,7 @@ namespace
 
 ControlChannel::Fields& ControlChannel::Fields::Text(const std::string& key, const std::string& value)
 {
-    m_Members.emplace_back(key, Quote(value));
+    m_Members.push_back({ key, Quote(value), nullptr });
     return *this;
 }
 
@@ -327,38 +329,76 @@ ControlChannel::Fields& ControlChannel::Fields::Float(const std::string& key, fl
     char text[32] = "null";
     if (std::isfinite(value))
         sprintf_s(text, "%.9g", value);
-    m_Members.emplace_back(key, text);
+    m_Members.push_back({ key, text, nullptr });
     return *this;
 }
 
 ControlChannel::Fields& ControlChannel::Fields::Integer(const std::string& key, int64_t value)
 {
-    m_Members.emplace_back(key, std::to_string(value));
+    m_Members.push_back({ key, std::to_string(value), nullptr });
     return *this;
 }
 
 ControlChannel::Fields& ControlChannel::Fields::Flag(const std::string& key, bool value)
 {
-    m_Members.emplace_back(key, value ? "true" : "false");
+    m_Members.push_back({ key, value ? "true" : "false", nullptr });
     return *this;
 }
 
 ControlChannel::Fields& ControlChannel::Fields::Object(const std::string& key, const Fields& value)
 {
-    m_Members.emplace_back(key, "{" + value.ToMembers() + "}");
+    m_Members.push_back({ key, std::string(), std::make_shared<Fields>(value) });
+    return *this;
+}
+
+ControlChannel::Fields& ControlChannel::Fields::Append(const Fields& other)
+{
+    m_Members.insert(m_Members.end(), other.m_Members.begin(), other.m_Members.end());
     return *this;
 }
 
 std::string ControlChannel::Fields::ToMembers(void) const
 {
     std::string members;
-    for (const auto& member : m_Members)
+    for (const Member& member : m_Members)
     {
         if (!members.empty())
             members += ",";
-        members += Quote(member.first) + ":" + member.second;
+        members += Quote(member.key) + ":" + (member.object != nullptr ? "{" + member.object->ToMembers() + "}" : member.value);
     }
     return members;
+}
+
+bool ControlChannel::Fields::Select(const std::string& path, Fields& selected, std::string& error) const
+{
+    const size_t keyEnd = path.find('.');
+    const std::string key = path.substr(0, keyEnd);
+    const auto member = std::find_if(m_Members.begin(), m_Members.end(), [&key](const Member& member) { return member.key == key; });
+    if (member == m_Members.end())
+    {
+        std::string keys;
+        for (const Member& candidate : m_Members)
+            keys += (keys.empty() ? "" : ", ") + candidate.key;
+        error = "no '" + key + "'. Keys here: " + keys;
+        return false;
+    }
+
+    selected = Fields();
+    if (keyEnd == std::string::npos)
+    {
+        selected.m_Members.push_back(*member);
+        return true;
+    }
+    if (member->object == nullptr)
+    {
+        error = "'" + key + "' is a value, not an object";
+        return false;
+    }
+    Fields inner;
+    if (!member->object->Select(path.substr(keyEnd + 1), inner, error))
+        return false;
+    selected.Object(key, inner);
+    return true;
 }
 
 void ControlChannel::Reply::Ok(const Fields& fields) const
@@ -388,6 +428,33 @@ ControlChannel::Fields ControlChannel::GetStatus(void)
     for (const auto& status : s_Status)
         fields.Text(status.first, status.second);
     return fields;
+}
+
+void ControlChannel::RegisterState(const std::string& group, const std::function<Fields(void)>& describe)
+{
+    s_StateGroups[group] = describe;
+}
+
+bool ControlChannel::GetState(const std::string& path, Fields& state, std::string& error)
+{
+    Fields whole;
+    whole.Integer("frame", Graphics::GetFrameCount());
+    for (const auto& group : s_StateGroups)
+        whole.Object(group.first, group.second());
+
+    if (path.empty())
+    {
+        state = whole;
+        return true;
+    }
+    return whole.Select(path, state, error);
+}
+
+ControlChannel::Fields ControlChannel::GetState(const std::string& path)
+{
+    Fields state;
+    std::string error;
+    return GetState(path, state, error) ? state : Fields();
 }
 
 void ControlChannel::AfterFrames(uint32_t frames, const std::function<void()>& action)

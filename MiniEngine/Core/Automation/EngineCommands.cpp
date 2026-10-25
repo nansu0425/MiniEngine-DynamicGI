@@ -67,7 +67,7 @@ namespace
         return joined;
     }
 
-    std::string GetGpuName(void)
+    std::string FindGpuName(void)
     {
         Microsoft::WRL::ComPtr<IDXGIFactory4> factory;
         Microsoft::WRL::ComPtr<IDXGIAdapter1> adapter;
@@ -77,6 +77,13 @@ namespace
             FAILED(adapter->GetDesc1(&desc)))
             return "unknown";
         return Utility::ToUTF8(desc.Description);
+    }
+
+    // state를 읽을 때마다 DXGI factory를 만들지 않으려고 한 번만 찾는다.
+    const std::string& GetGpuName(void)
+    {
+        static const std::string name = FindGpuName();
+        return name;
     }
 
     std::string GetExePath(void)
@@ -105,6 +112,69 @@ namespace
         for (int severity = 0; severity < (int)_countof(status.countBySeverity); ++severity)
             fields.Integer(Utility::ToLower(D3D12MessageLog::GetSeverityName((D3D12_MESSAGE_SEVERITY)severity)), (int64_t)status.countBySeverity[severity]);
         return fields;
+    }
+
+    Fields DescribeUI(void)
+    {
+        const RECT client = GetClientSize();
+        const RECT scene = ImGuiLayer::GetSceneViewport();
+        EditorSettings::Values panels;
+        EditorSettings::ReadSection("Panels", panels);
+        Fields open;
+        for (const auto& panel : panels)
+            open.Flag(panel.first, panel.second == "1");
+        return Fields()
+            .Flag("visible", ImGuiLayer::IsVisible())
+            .Object("client", Fields().Integer("width", client.right).Integer("height", client.bottom))
+            .Object("scene", Fields()
+                .Integer("left", scene.left)
+                .Integer("top", scene.top)
+                .Integer("width", Graphics::g_SceneColorBuffer.GetWidth())
+                .Integer("height", Graphics::g_SceneColorBuffer.GetHeight()))
+            .Object("panels", open);
+    }
+
+    Fields DescribeSection(const EditorSettings::Values& values)
+    {
+        Fields fields;
+        for (const auto& value : values)
+            fields.Text(value.first, value.second);
+        return fields;
+    }
+
+    Fields DescribeSettings(void)
+    {
+        Fields sections;
+        for (const std::string& section : EditorSettings::GetSectionNames())
+        {
+            EditorSettings::Values values;
+            EditorSettings::ReadSection(section, values);
+            sections.Object(section, DescribeSection(values));
+        }
+        return sections;
+    }
+
+    Fields DescribeEngine(void)
+    {
+        return Fields()
+            .Text("config", kConfiguration)
+            .Text("gpu", GetGpuName())
+            .Text("exe", GetExePath())
+            .Flag("hdr_output", Graphics::g_bEnableHDROutput)
+            .Flag("hdr_display", Graphics::g_bHDRDisplay)
+            .Object("d3d12_messages", DescribeD3D12Messages());
+    }
+
+    void ReplyState(const std::string& path, const Reply& reply)
+    {
+        Fields state;
+        std::string error;
+        if (!GetState(path, state, error))
+        {
+            reply.Error(error);
+            return;
+        }
+        reply.Ok(Fields().Object("state", state));
     }
 
     void ReplyStatus(const std::string&, const Reply& reply)
@@ -233,7 +303,7 @@ namespace
                 Fields().Object("rejected", rejected));
             return;
         }
-        reply.Ok(Fields().Object("values", applied));
+        reply.Ok(Fields().Object("values", applied).Object("state", GetState("settings." + section)));
     }
 
     void GetSettings(const std::string& section, const Reply& reply)
@@ -241,11 +311,7 @@ namespace
         EditorSettings::Values values;
         if (!ReadExistingSection(section, values, reply))
             return;
-
-        Fields fields;
-        for (const auto& value : values)
-            fields.Text(value.first, value.second);
-        reply.Ok(Fields().Object("values", fields));
+        reply.Ok(Fields().Object("values", DescribeSection(values)));
     }
 
     void HandleSettings(const std::string& arguments, const Reply& reply)
@@ -266,7 +332,7 @@ namespace
             return;
         }
         ImGuiLayer::SetVisible(arguments == "show");
-        AfterFrames(kFramesToSettleLayout, [reply] { reply.Ok(); });
+        AfterFrames(kFramesToSettleLayout, [reply] { reply.Ok(Fields().Object("state", GetState("ui"))); });
     }
 
     void SetPanelOpen(const std::string& arguments, const Reply& reply)
@@ -293,7 +359,7 @@ namespace
 
         panels[name] = action == "open" ? "1" : "0";
         EditorSettings::ApplySection("Panels", panels);
-        AfterFrames(kFramesToSettleLayout, [reply] { reply.Ok(); });
+        AfterFrames(kFramesToSettleLayout, [reply] { reply.Ok(Fields().Object("state", GetState("ui"))); });
     }
 
     // 예전 Log 줄과 같은 해상도로 재려고 client 크기를 맞춘다. 실제 창 크기 변경과 같은 WM_SIZE 경로를 지난다.
@@ -319,7 +385,7 @@ namespace
             if ((uint32_t)client.right != width || (uint32_t)client.bottom != height)
                 reply.Error("the client is " + FormatSize(client.right, client.bottom) + ". The screen may be too small.");
             else
-                reply.Ok(Fields().Text("client", FormatSize(width, height)));
+                reply.Ok(Fields().Text("client", FormatSize(width, height)).Object("state", GetState("ui")));
         });
     }
 
@@ -406,6 +472,15 @@ namespace ControlChannel
 {
     void RegisterEngineCommands(void)
     {
+        RegisterState("ui", DescribeUI);
+        RegisterState("settings", DescribeSettings);
+        RegisterState("engine", DescribeEngine);
+        Register("state", "state | state <path>: the scene, editor and engine state that harness checks are judged by. "
+            "<path> joins keys with '.', as in camera or settings.Engine Tuning, and keeps only that part. "
+            "Positions are in world units. Camera angles are in radians: heading turns about world up (+y), 0 looking toward -z and growing toward -x, "
+            "and pitch is up from the horizon. Sun elevation and azimuth are in degrees as sun set takes them. "
+            "aspect is width over height. Sizes and left, top are in client pixels from the top left. "
+            "settings has every section as settings get reads it. Commands that change the state reply with the changed part as state", ReplyState);
         Register("status", "status", ReplyStatus);
         Register("frames", "frames <n>: replies after n more frames", WaitFrames);
         Register("quit", "quit: exits as if the window were closed, saving the editor state", Quit);
