@@ -30,15 +30,15 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 2. UV 를 float32 로 (끝남: e059154)
 3. PT pass 와 누적 (끝남: dcc4615)
 4. tangent 와 normal map 규약 (끝남: f931539)
-5. Lambert path 와 furnace: sun 과 glTF BRDF 없이, Lambert 와 상수 sky 로 반사를 이어 가는 path 를 만든다. 1 spp 의 비용을 처음 잰다.
-6. Export 와 비교 script: 누적값을 float image 로 export 하고 script 로 비교한다. furnace 와 같은 Seed 의 재현을 수치로 확인한다.
+5. Lambert path 와 furnace (끝남: cf52623, a5060e3)
+6. Export 와 비교 script: 누적값을 float image 로 export 하고 script 로 비교한다. furnace 와 같은 Seed 의 재현을 수치로 확인한다. 작업 5 가 R11G11B10 의 scene capture 로 본 furnace 를 1e-4 로 다시 보고, shading normal 이 잃는 energy 와 Russian roulette 의 pixel 단위 bias 를 잰다. NaN 과 Inf 인 sample 은 누적하지 않고 센다.
 7. Sun: sun 의 직접광을 더하고, raster 의 sun 과 단위를 맞춘다.
 8. glTF BRDF: spec 을 따르는 BRDF 를 넣고 BRDF 단위의 test 로 확인한다.
 9. Sky: Environment 의 cubemap 을 sky 로 쓴다.
 10. Log 와 Restore: 측정 조건을 Log 한 줄로 남기고, app 을 다시 실행해도 그 줄로 되돌린다.
 11. Indirect Irradiance: DDGI 와 비교할 양을 누적하는 출력을 더한다.
 12. 수렴과 측정: 고정 시점에서 수렴과 bias 를 재고 ground truth 의 spp 를 정한다.
-13. Cornell box 와 외부 renderer: (a) 장면을 만들어 load 하고, (b) 외부 renderer 로 그린 image 와 비교한다. furnace 가 잡지 못하는 leak, self-hit, visibility 의 오류를 여기서 본다.
+13. Cornell box 와 외부 renderer: (a) 장면을 만들어 load 하고, (b) 외부 renderer 로 그린 image 와 비교한다. furnace 가 잡지 못하는 leak, self-hit, visibility, 방향 분포의 오류를 여기서 본다.
 
 ## 일정
 
@@ -48,7 +48,7 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 |---|---|
 | 10/24 | 끝남: 1, A, B, harness 의 D3D12 log 수집 (573dded) 과 그 log 로 찾은 Lighting 수정 (e8a2352), 문서 정리 |
 | 10/25 | 끝남: 2, 3, 4 |
-| 10/26 | 5, 6, 7 |
+| 10/26 | 끝남: 5. 6, 7 |
 | 10/27 | 8, 9, 10 |
 | 10/28 | 11, 12, 13 (a) |
 | 10/29 오전 | 13 (b) |
@@ -102,3 +102,4 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 - stratified sampler, blue noise: 수렴 시간이 문제가 될 때
 - infra 검증 5-4 ~ 5-7 의 mode: PT 에 그 문제로 보이는 결과가 나올 때 (323e185)
 - raster 의 irradiance cube 와 PT 의 sky irradiance 를 app 안에서 비교하는 mode
+- albedo 1 의 furnace 에서 16384 번 넘게 반사하고도 escape 하지 못한 path 가 어디에 갇혔는지 보는 일 (a5060e3): 작업 13 이나 PT 에서 leak, self-hit 로 보이는 결과가 나올 때
