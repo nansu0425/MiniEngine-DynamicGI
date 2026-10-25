@@ -6,6 +6,7 @@
 #include "Core/Editor/EditorSettings.h"
 #include "Core/Graphics/GraphicsCore.h"
 #include "Core/Graphics/Resource/BufferManager.h"
+#include "Core/Profiling/EngineProfiling.h"
 #include "Core/UI/ImGuiLayer.h"
 
 #include <algorithm>
@@ -402,6 +403,77 @@ namespace
         FrameCapture::Request(target, path, reply);
     }
 
+    // profile 명령이 frame마다 모으는 scope의 GPU time
+    struct GpuTimeMeasurement
+    {
+        std::wstring scope;
+        uint32_t frames;
+        uint32_t measured;
+        double sum;
+        float minimum;
+        float maximum;
+        Reply reply;
+    };
+
+    // Profiler는 frame을 시작할 때 시간을 읽어 들이고 명령은 그 뒤에 실행되므로, frame마다 한 번 읽으면 frame마다 새 값이다.
+    void MeasureNextFrame(const std::shared_ptr<GpuTimeMeasurement>& measurement)
+    {
+        AfterFrames(1, [measurement]
+        {
+            GpuTimeMeasurement& m = *measurement;
+            const std::string scope = Utility::ToUTF8(m.scope);
+            float cpu = 0.0f, gpu = 0.0f;
+            if (EngineProfiling::IsPaused())
+            {
+                m.reply.Error("the profiler was paused while measuring, so its times stopped changing");
+                return;
+            }
+            // 지난 frame에 scope를 지나지 않았으면 CPU time이 0이고, GPU time은 그 timer가 마지막으로 잰 값에 머문다.
+            if (!EngineProfiling::FindLastTimes(m.scope, cpu, gpu) || cpu <= 0.0f)
+            {
+                m.reply.Error("'" + scope + "' did not run in a frame it was measured in");
+                return;
+            }
+
+            m.sum += gpu;
+            m.minimum = m.measured == 0 ? gpu : std::min(m.minimum, gpu);
+            m.maximum = m.measured == 0 ? gpu : std::max(m.maximum, gpu);
+            if (++m.measured < m.frames)
+            {
+                MeasureNextFrame(measurement);
+                return;
+            }
+            m.reply.Ok(Fields()
+                .Text("scope", scope)
+                .Integer("frames", m.measured)
+                .Object("gpu_ms", Fields().Float("mean", (float)(m.sum / m.measured)).Float("min", m.minimum).Float("max", m.maximum)));
+        });
+    }
+
+    void MeasureGpuTime(const std::string& arguments, const Reply& reply)
+    {
+        const size_t framesStart = arguments.rfind(" frames=");
+        const std::string scope = framesStart == std::string::npos ? std::string() : Trim(arguments.substr(0, framesStart));
+        uint32_t frames = 0;
+        if (scope.empty() || sscanf_s(arguments.c_str() + framesStart, " frames=%u", &frames) != 1 || frames == 0)
+        {
+            reply.Error("usage: profile <scope> frames=<n>");
+            return;
+        }
+        if (EngineProfiling::IsPaused())
+        {
+            reply.Error("the profiler is paused, so its times do not change");
+            return;
+        }
+        float cpu = 0.0f, gpu = 0.0f;
+        if (!EngineProfiling::FindLastTimes(Utility::ToWide(scope), cpu, gpu))
+        {
+            reply.Error("no scope '" + scope + "' in the profiler");
+            return;
+        }
+        MeasureNextFrame(std::make_shared<GpuTimeMeasurement>(GpuTimeMeasurement{ Utility::ToWide(scope), frames, 0, 0.0, 0.0f, 0.0f, reply }));
+    }
+
     // harness가 log에서 명령 사이의 구간을 찾게 표시를 남긴다.
     void MarkLog(const std::string& arguments, const Reply& reply)
     {
@@ -491,6 +563,9 @@ namespace ControlChannel
         Register("window", "window client <W>x<H>", ResizeWindow);
         Register("capture", "capture scene|overlay|display <path without extension>: scene is the HDR before post effects as float32 .dds, "
             "overlay is the debug view layer as .png with premultiplied alpha, display is the presented image with UI as .png", CaptureFrame);
+        Register("profile", "profile <scope> frames=<n>: the GPU time in ms of the Profiler scope named <scope> (as in its Scope column) "
+            "over the next n frames, as mean, min and max. Fails if the scope does not run in one of those frames. "
+            "Release compiles the timers out", MeasureGpuTime);
         Register("log", "log mark <text>", MarkLog);
         Register("fault", "fault assert|exception|hang|d3d12_error: injects a failure in the next frame to test the harness. "
             "d3d12_error makes a D3D12 call that the debug layer rejects with an ERROR, and is refused when D3D12 messages are not logged", HandleFault);

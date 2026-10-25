@@ -36,10 +36,10 @@ harness 는 agent 가 ModelViewer 를 build, 실행하고 명령으로 조작, c
 - 근거: 573dded 의 log 만으로 Lighting resource 해제 누락 (e8a2352) 을 진단한 agent 가 보고한 불편이다. 어느 resource 가 남았는지 보려면 app.log 를 열어야 했고, 요약을 증거로 남기려면 옮겨 적어야 했고, 어느 명령이 message 를 냈는지 좁히려면 명령 사이에 `status` 를 끼워야 했다.
 - 함께 볼 것: Debug 의 CRT message 가 `\n` 으로 끝나지 않으면 `exit reason=` 줄이 그 뒤에 붙어 viewer.py 가 찾지 못할 수 있다 (`OnCrtReport`, 추측, 확인하지 않음).
 
-### 측정 (로드맵 작업 5, 6, 12 즈음)
+### 측정 (로드맵 작업 6 즈음)
 
-- 할 일: Profiler 의 GPU time 과 CPU time 을 명령으로 읽는다. PT 의 export 를 `pt` 명령으로 한다 (로드맵 작업 6 에 넣을지는 그때 사용자가 정한다).
-- 근거: 로드맵 작업 5, 12 가 PT 의 GPU time 을 재고, 작업 6 이 export 를 만든다.
+- 할 일: PT 의 export 를 `pt` 명령으로 한다 (로드맵 작업 6 에 넣을지는 그때 사용자가 정한다). Profiler 의 CPU time 이 필요해지면 `profile` 명령에 더한다.
+- 근거: 로드맵 작업 6 이 export 를 만든다.
 - 만들지 않기로 한 것: pixel 값이나 영역 통계를 읽는 명령. scene capture 의 DDS 를 Python 으로 읽으면 된다.
 
 ### pixtool wrapper (필요해질 때)

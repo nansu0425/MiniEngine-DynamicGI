@@ -39,6 +39,7 @@ public:
     {
         for (uint32_t i = 0; i < kHistorySize; ++i)
             m_RecentHistory[i] = 0.0f;
+        m_Recent = 0.0f;
         m_Average = 0.0f;
         m_Minimum = 0.0f;
         m_Maximum = 0.0f;
@@ -199,7 +200,23 @@ public:
 
     static void ShowTree( void );
 
+    static const NestedTimingTree* Find( const wstring& name ) { return sm_RootScope.FindBelow(name); }
+    float GetLastCpuTime( void ) const { return m_CpuTime.GetLast(); }
+    float GetLastGpuTime( void ) const { return m_GpuTime.GetLast(); }
+
 private:
+
+    const NestedTimingTree* FindBelow( const wstring& name ) const
+    {
+        for (const NestedTimingTree* node : m_Children)
+        {
+            if (node->m_Name == name)
+                return node;
+            if (const NestedTimingTree* found = node->FindBelow(name))
+                return found;
+        }
+        return nullptr;
+    }
 
     void ShowNode( void );
     void DeleteChildren( void )
@@ -260,6 +277,16 @@ namespace EngineProfiling
     bool IsPaused()
     {
         return Paused;
+    }
+
+    bool FindLastTimes(const wstring& scope, float& cpuMilliseconds, float& gpuMilliseconds)
+    {
+        const NestedTimingTree* node = NestedTimingTree::Find(scope);
+        if (node == nullptr)
+            return false;
+        cpuMilliseconds = node->GetLastCpuTime();
+        gpuMilliseconds = node->GetLastGpuTime();
+        return true;
     }
 
     void ShowFrameStats( void )

@@ -1399,6 +1399,29 @@ def check_rest_of_ui_commands(session, check):
     check('the state other than pt is as it was after the rest of the UI commands', not differing, ', '.join(differing))
 
 
+def check_profile(session, check, config):
+    """profile 이 PT 를 그리는 동안 그 scope 의 GPU time 을 frame 수만큼 모으고, 없는 scope 와 그리지 않는 scope 는 거절하는지 본다.
+    PT 의 Show 를 되돌려 놓는다."""
+    show = session.ask_ok('state settings.Path Tracer')['state']['settings']['Path Tracer']['Show']
+    unknown = session.ask('profile No Such Scope frames=1')
+    check('profile refuses a scope the profiler does not have', not unknown['ok'], unknown.get('error'))
+
+    session.ask_ok('settings set Path Tracer: Show=1')
+    session.ask_ok('frames 2')
+    measured = session.ask('profile Path Tracer frames=4')
+    if config == 'Release':
+        check('profile has no Path Tracer scope in Release, which compiles the timers out', not measured['ok'], measured.get('error'))
+    else:
+        gpu = measured.get('gpu_ms')
+        check('profile gives the GPU time of Path Tracer over 4 frames',
+              measured['ok'] and measured['frames'] == 4 and 0 < float(gpu['min']) <= float(gpu['mean']) <= float(gpu['max']), measured)
+        session.ask_ok('settings set Path Tracer: Show=0')
+        session.ask_ok('frames 2')
+        stopped = session.ask('profile Path Tracer frames=2')
+        check('profile fails for a scope that does not run', not stopped['ok'], stopped.get('error'))
+    session.ask_ok(f'settings set Path Tracer: Show={show}')
+
+
 def check_acceptance(session, check):
     """ACCEPTANCE_SCENARIO 를 run 과 같은 방식으로 실행하고, 단계마다 이름을 붙인 응답으로 판정한다. 요청한 값은 scenario 에서 읽는다.
     UI 를 숨긴 상태에서 부르고, camera, sun, editor 를 되돌려 놓는다."""
@@ -1730,6 +1753,7 @@ def selftest_running_app(args, check):
         check_pick(session, check)
         check_rest_of_ui_commands(session, check)
         check_acceptance(session, check)
+        check_profile(session, check, args.config)
 
         abandoned = Channel(instance['pipe'], 10)
         abandoned.send('frames 1000000')

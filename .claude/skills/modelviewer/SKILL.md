@@ -19,7 +19,7 @@ harness 로 할 수 없는 일을 만나면 그 일이 계획되어 있는지와
 
 ## 실행 loop
 
-1. `start` 로 띄운다. 기능 확인은 기본값 Debug 로, 시간은 `--config Profile` 로 잰다.
+1. `start` 로 띄운다. 기능 확인은 기본값 Debug 로, 시간은 `--config Profile` 로 잰다. pass 의 GPU time 은 `profile` 명령으로 읽는다.
 2. `do "state <path>"` 로 지금 상태를 읽고, `do "<명령>" "<명령>" ...` 로 조작한다. 서로 기다릴 필요가 없는 명령은 한 번의 `do` 에 묶는다.
 3. 지금 무엇이 보이는지는 `pick grid` 로 본다. 대략의 구도를 보고 싶으면 `shot display|scene|overlay` 로 capture 해 view PNG 를 Read 한다.
 4. `stop` 으로 끝낸다.
