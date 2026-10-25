@@ -27,13 +27,21 @@ namespace
     SceneHeapTable s_UAVs;
     ColorBuffer s_Accumulation;
 
-    // 누적한 image를 정하는 조건. Settings의 samplesPerFrame과 targetSamples는 쌓는 속도와 양만 정하므로 넣지 않는다.
+    // 누적한 image를 정하는 조건
     struct ImageConditions
     {
         // camera의 위치, 방향, FOV와 scene의 해상도가 정한다.
         CameraRays rays;
-        uint32_t seed;
+        PathTracer::Settings settings;
     };
+
+    // Settings의 samplesPerFrame과 targetSamples는 쌓는 속도와 양만 정하므로 비교하지 않는다.
+    bool HaveSameImage(const PathTracer::Settings& a, const PathTracer::Settings& b)
+    {
+        return a.seed == b.seed && a.maxBounces == b.maxBounces && a.russianRoulette == b.russianRoulette && a.skyRadiance == b.skyRadiance &&
+            a.geometricNormals == b.geometricNormals && a.furnace == b.furnace && a.furnaceAlbedo == b.furnaceAlbedo &&
+            a.furnaceEmission == b.furnaceEmission;
+    }
 
     // rasterSampleOffset은 비교하지 않는다. 그 값은 TAA jitter를 따라 frame마다 바뀌지만, PT는 pixel 격자 안의 위치를 스스로 고르므로
     // image가 그대로다. 비교하면 TAA를 켠 동안 frame마다 reset되어 sample이 쌓이지 않는다.
@@ -43,7 +51,7 @@ namespace
             XMVector3Equal(a.rays.topLeftCornerDirection, b.rays.topLeftCornerDirection) &&
             XMVector3Equal(a.rays.pixelStepRight, b.rays.pixelStepRight) &&
             XMVector3Equal(a.rays.pixelStepDown, b.rays.pixelStepDown) &&
-            a.seed == b.seed;
+            HaveSameImage(a.settings, b.settings);
     }
 
     bool s_ResetRequested = true;
@@ -56,6 +64,13 @@ namespace
         uint32_t Seed;
         uint32_t FirstSample;
         uint32_t NumSamples;
+        uint32_t MaxBounces;
+        uint32_t RussianRoulette;
+        uint32_t GeometricNormals;
+        uint32_t Furnace;
+        float SkyRadiance;
+        float FurnaceAlbedo;
+        float FurnaceEmission;
     };
 
     // SceneHeapTable.h의 규칙대로, 앞 frame의 dispatch가 읽고 있을 수 있는 buffer는 GPU를 기다린 뒤에 다시 만든다.
@@ -108,7 +123,7 @@ void PathTracer::Render(ComputeContext& context, const Settings& settings, const
     FitAccumulationTo(sceneColor);
 
     // 변경을 알려 주는 곳이 없으므로 쌓던 때의 조건과 견준다. Show를 끈 동안 바뀐 조건도 다시 켤 때 잡힌다.
-    const ImageConditions conditions = { DescribeCameraRays(camera, rasterViewport), settings.seed };
+    const ImageConditions conditions = { DescribeCameraRays(camera, rasterViewport), settings };
     if (s_ResetRequested || !HaveSameImage(conditions, s_Accumulated))
     {
         s_Accumulated = conditions;
@@ -123,6 +138,13 @@ void PathTracer::Render(ComputeContext& context, const Settings& settings, const
     constants.Seed = settings.seed;
     constants.FirstSample = s_Progress.samples;
     constants.NumSamples = s_Progress.samples < settings.targetSamples ? std::min(settings.samplesPerFrame, settings.targetSamples - s_Progress.samples) : 0;
+    constants.MaxBounces = settings.maxBounces;
+    constants.RussianRoulette = settings.russianRoulette ? 1 : 0;
+    constants.GeometricNormals = settings.geometricNormals ? 1 : 0;
+    constants.Furnace = settings.furnace ? 1 : 0;
+    constants.SkyRadiance = settings.skyRadiance;
+    constants.FurnaceAlbedo = settings.furnaceAlbedo;
+    constants.FurnaceEmission = settings.furnaceEmission;
 
     s_UAVs.PointTo(kAccumulationUAV, s_Accumulation, s_Accumulation.GetUAV());
     s_UAVs.PointTo(kSceneColorUAV, sceneColor, sceneColor.GetUAV());

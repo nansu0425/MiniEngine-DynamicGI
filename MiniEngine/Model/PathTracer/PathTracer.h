@@ -24,6 +24,21 @@ namespace PathTracer
         uint32_t targetSamples = 4096;
         // seed만 다른 두 누적은 같은 image의 서로 다른 추정이다.
         uint32_t seed = 0;
+        // path가 반사하는 횟수의 상한. 0이면 처음 맞은 곳의 emission과 camera에서 바로 보이는 sky만 본다.
+        uint32_t maxBounces = 64;
+        // PathTracerCS.hlsl의 kFirstRussianRouletteBounce번째 반사부터 throughput에 따라 path를 끊고 살아남은 path를 그만큼 키운다.
+        // 기대값은 그대로다.
+        bool russianRoulette = true;
+        // 모든 방향에서 같은 sky의 radiance. glTF의 emissive처럼 cd/m²로 읽는다.
+        float skyRadiance = 1.0f;
+
+        // shading normal 대신 geometric normal로 반사한다. shading normal은 README.md의 "camera 밖에서 본 doubleSided" 규칙 때문에
+        // geometric normal 아래로 고른 방향의 energy를 잃으므로, furnace의 답을 그 손실 없이 보려고 쓴다.
+        bool geometricNormals = false;
+        // 모든 surface의 albedo와 emission을 아래 값으로 둔다. sky도 상수이므로 답을 식으로 아는 장면이 된다.
+        bool furnace = false;
+        float furnaceAlbedo = 1.0f;
+        float furnaceEmission = 0.0f;
     };
 
     struct Progress
