@@ -12,7 +12,7 @@ editor.ini
 # harness 가 실행마다 복사해 쓰는 결정성 baseline
 !/scripts/harness-baseline/*.ini
 
-# scripts/viewer.py 가 남기는 build log 와 실행마다의 settings, log, capture
+# scripts/viewer.py 가 남기는 build log 와 실행마다의 settings, log, capture, 확인 script 가 만드는 test scene
 /MiniEngine/ModelViewer/Harness/
 
 # Python 이 module 을 import 할 때 만드는 bytecode cache
