@@ -29,7 +29,7 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 
 2. UV 를 float32 로 (끝남: e059154)
 3. PT pass 와 누적 (끝남: dcc4615)
-4. tangent 와 normal map 규약: engine 이 glTF 의 tangent 와 normal map 규약대로 읽는지 정답을 아는 test 로 확인하고, 다르면 고친다.
+4. tangent 와 normal map 규약 (끝남: f931539)
 5. Lambert path 와 furnace: sun 과 glTF BRDF 없이, Lambert 와 상수 sky 로 반사를 이어 가는 path 를 만든다. 1 spp 의 비용을 처음 잰다.
 6. Export 와 비교 script: 누적값을 float image 로 export 하고 script 로 비교한다. furnace 와 같은 Seed 의 재현을 수치로 확인한다.
 7. Sun: sun 의 직접광을 더하고, raster 의 sun 과 단위를 맞춘다.
@@ -47,7 +47,7 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 | 기한 | 끝낼 작업 |
 |---|---|
 | 10/24 | 끝남: 1, A, B, harness 의 D3D12 log 수집 (573dded) 과 그 log 로 찾은 Lighting 수정 (e8a2352), 문서 정리 |
-| 10/25 | 끝남: 2, 3. 남은 것: 4 |
+| 10/25 | 끝남: 2, 3, 4 |
 | 10/26 | 5, 6, 7 |
 | 10/27 | 8, 9, 10 |
 | 10/28 | 11, 12, 13 (a) |
@@ -72,8 +72,6 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 2. 작업 8, 12 에서 발표의 핵심이 아닌 측정
 3. 작업 10. 측정 시점을 손으로 되돌리고, 발표는 재현을 같은 실행 안에서만 보인다.
 4. 작업 11. 작업 12 를 화면의 radiance 로 재고, 발표는 DDGI 와 비교할 양을 정의로만 보인다.
-
-작업 4 는 빼지 않는다. PT 의 입력이 glTF 와 같고 spec 을 따른다는 것이 정답의 전제다.
 
 ## 발표
 
