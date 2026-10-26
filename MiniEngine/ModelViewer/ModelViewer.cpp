@@ -98,7 +98,7 @@ public:
     virtual Vector3 GetPosition() const override { return m_Properties.position; }
     virtual void SetPosition(Vector3 position) override { m_Properties.position = position; }
     virtual void Draw(const Camera& camera, bool selected) const override;
-    virtual void Rotate(const Camera& camera) override;
+    virtual void Rotate(const Camera& camera, ImGuizmo::MODE axes) override;
 
 private:
     Properties m_Properties;
@@ -661,10 +661,10 @@ void DirectionalLight::Draw(const Camera& camera, bool selected) const
         drawList->AddCircle(icon, radius * 1.2f, selectedColor, 0, thickness);
 }
 
-void DirectionalLight::Rotate(const Camera& camera)
+void DirectionalLight::Rotate(const Camera& camera, ImGuizmo::MODE axes)
 {
     Matrix4 transform(m_Properties.rotation, m_Properties.position);
-    if (!SceneEditor::Manipulate(camera, ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y | ImGuizmo::ROTATE_Z, ImGuizmo::LOCAL, transform))
+    if (!SceneEditor::Manipulate(camera, ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y | ImGuizmo::ROTATE_Z, axes, transform))
         return;
     // gizmo가 돌린 matrix는 float 오차로 직교에서 조금씩 벗어나므로 quaternion을 거쳐 직교 matrix로 되돌린다.
     m_Properties.rotation = Matrix3(Normalize(Quaternion((XMMATRIX)transform.Get3x3())));
@@ -689,7 +689,7 @@ void DirectionalLight::ShowPanel()
         if (ImGui::Button("Reset Transform"))
             ResetTransform();
         ImGui::SetItemTooltip("Sets the transform to no rotation at the origin, so the light goes along world -Z. The color and intensity stay.");
-        ImGui::TextDisabled("Select the light's icon and rotate it with the gizmo (E).");
+        ImGui::TextDisabled("Select the light's icon and rotate it with the gizmo (E). The Scene Editor panel picks local or world rings.");
     });
 }
 

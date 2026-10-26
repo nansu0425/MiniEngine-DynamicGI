@@ -15,6 +15,9 @@ namespace
     std::vector<SceneEditor::Object*> s_Objects;
     SceneEditor::Object* s_Selected = nullptr;
     GizmoMode s_GizmoMode = GizmoMode::Translate;
+    // rotate gizmo의 ring이 따르는 축. translate는 늘 world의 축이다.
+    ImGuizmo::MODE s_RotateAxes = ImGuizmo::LOCAL;
+    bool s_ShowPanel = false;
 
     // Unreal, Unity와 같은 key를 쓴다. camera를 조작하는 동안에는 이 key가 이동 key다.
     void UpdateGizmoMode(void)
@@ -32,7 +35,7 @@ namespace
     {
         if (s_GizmoMode == GizmoMode::Rotate)
         {
-            s_Selected->Rotate(camera);
+            s_Selected->Rotate(camera, s_RotateAxes);
             return;
         }
 
@@ -71,6 +74,33 @@ namespace
         return mode == GizmoMode::Rotate ? "rotate" : "translate";
     }
 
+    const char* GetAxesName(ImGuizmo::MODE axes)
+    {
+        return axes == ImGuizmo::WORLD ? "world" : "local";
+    }
+
+    void ShowPanelContent(void)
+    {
+        ImGui::Text("Selected: %s", s_Selected != nullptr ? s_Selected->GetName() : "none");
+        ImGui::SetItemTooltip("Click an icon in the scene to select it. Click empty space to deselect.");
+
+        ImGui::SeparatorText("Gizmo");
+        if (ImGui::RadioButton("Translate (W)", s_GizmoMode == GizmoMode::Translate))
+            s_GizmoMode = GizmoMode::Translate;
+        ImGui::SameLine();
+        if (ImGui::RadioButton("Rotate (E)", s_GizmoMode == GizmoMode::Rotate))
+            s_GizmoMode = GizmoMode::Rotate;
+
+        ImGui::SeparatorText("Rotate Axes");
+        if (ImGui::RadioButton("Local", s_RotateAxes == ImGuizmo::LOCAL))
+            s_RotateAxes = ImGuizmo::LOCAL;
+        ImGui::SetItemTooltip("The rings turn the object about its own axes.");
+        ImGui::SameLine();
+        if (ImGui::RadioButton("World", s_RotateAxes == ImGuizmo::WORLD))
+            s_RotateAxes = ImGuizmo::WORLD;
+        ImGui::SetItemTooltip("The rings turn the object about the world axes.");
+    }
+
     ControlChannel::Fields DescribeObject(const Camera& camera, const SceneEditor::Object& object)
     {
         const Vector3 position = object.GetPosition();
@@ -100,6 +130,7 @@ namespace
         return ControlChannel::Fields()
             .Text("selected", s_Selected != nullptr ? s_Selected->GetName() : "none")
             .Text("gizmo_mode", GetGizmoModeName(s_GizmoMode))
+            .Text("rotate_axes", GetAxesName(s_RotateAxes))
             .Object("objects", objects);
     }
 
@@ -139,15 +170,30 @@ namespace
         return false;
     }
 
+    bool SetRotateAxes(const std::string& name, std::string& error)
+    {
+        for (ImGuizmo::MODE axes : { ImGuizmo::LOCAL, ImGuizmo::WORLD })
+        {
+            if (name == GetAxesName(axes))
+            {
+                s_RotateAxes = axes;
+                return true;
+            }
+        }
+        error = "usage: editor axes local|world";
+        return false;
+    }
+
     void HandleEditorCommand(const std::string& arguments, const ControlChannel::Reply& reply)
     {
         const size_t actionEnd = arguments.find(' ');
         const std::string action = arguments.substr(0, actionEnd);
         const std::string value = actionEnd == std::string::npos ? std::string() : arguments.substr(actionEnd + 1);
-        std::string error = "usage: editor select <name>|none | editor mode translate|rotate";
+        std::string error = "usage: editor select <name>|none | editor mode translate|rotate | editor axes local|world";
         const bool done =
             action == "select" ? SelectByName(value, error) :
             action == "mode" ? SetGizmoMode(value, error) :
+            action == "axes" ? SetRotateAxes(value, error) :
             false;
         if (!done)
         {
@@ -172,6 +218,8 @@ void SceneEditor::RemoveObject(Object& object)
 
 void SceneEditor::Update(const Camera& camera)
 {
+    ImGuiLayer::ShowPanel("Scene Editor", s_ShowPanel, ShowPanelContent);
+
     if (!ImGuiLayer::BeginSceneGizmo())
         return;
 
@@ -197,8 +245,10 @@ void SceneEditor::RegisterCommands(const Camera& camera)
 {
     const Camera* projection = &camera;
     ControlChannel::RegisterState("editor", [projection] { return DescribeEditor(*projection); });
-    ControlChannel::Register("editor", "editor select <name>|none | editor mode translate|rotate: the object the gizmo edits and the gizmo mode, "
-        "as clicking an icon and pressing W or E do. state editor has them, and for each object its world position and, in front of the camera, "
+    ControlChannel::Register("editor", "editor select <name>|none | editor mode translate|rotate | editor axes local|world: the object the gizmo edits, "
+        "the gizmo mode and the axes the rotate rings follow, as clicking an icon, pressing W or E and the Scene Editor panel do. "
+        "local turns the object about its own axes and world about the world axes. translate always follows the world axes. "
+        "state editor has them, and for each object its world position and, in front of the camera, "
         "its icon's center in client pixels. on_screen is whether that center is in the scene. Icons and the gizmo are drawn only while the UI is shown",
         HandleEditorCommand);
 }

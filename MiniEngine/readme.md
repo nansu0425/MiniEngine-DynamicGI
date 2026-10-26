@@ -12,13 +12,13 @@
 * movement speed: mouse wheel while holding the right mouse button
 * pan: drag with the middle mouse button
 * toggle ImGui: F1
-* engine tuning, profiler, scene overlay, ray tracing, directional light: ImGui View menu
+* engine tuning, profiler, scene overlay, ray tracing, directional light, scene editor: ImGui View menu
 * ray tracing debug view: pick one view in the View section of the Ray Tracing panel. Off shows the raster image
 * ray query validation: pick a Validation view and what its Heatmap paints in the View section, then press Capture in the Validation section to read the last frame's counts and p50, p99, max. Fit to Capture sets a metric heatmap's range from the capture
 * validation log and restore: Log prints the capture with its camera, directional light rotation, TAA and resolution as one line to the Output window. Paste such a line under Restore to bring back the camera, light rotation and TAA. A different resolution or mode is shown as a warning
 * select: click an icon in the scene. Click empty space to deselect
-* gizmo mode of the selected object: W translate, E rotate (without holding the right mouse button)
-* directional light: select its icon and rotate it with the rotate gizmo. It is a KHR_lights_punctual directional light, so the light goes along its local -Z, as the arrow shows, and turning it about its local Z (the blue ring) leaves the light as it is. Its color and intensity (lux) are in the Directional Light panel, whose Reset Transform sets the transform to no rotation at the origin, so the light goes along world -Z
+* gizmo mode of the selected object: W translate, E rotate (without holding the right mouse button). The Scene Editor panel picks them too, and whether the rotate rings follow the object's own axes (Local) or the world axes (World). Translate always follows the world axes
+* directional light: select its icon and rotate it with the rotate gizmo. It is a KHR_lights_punctual directional light, so the light goes along its local -Z, as the arrow shows, and turning it about its local Z (the blue ring with Local axes) leaves the light as it is. Its color and intensity (lux) are in the Directional Light panel, whose Reset Transform sets the transform to no rotation at the origin, so the light goes along world -Z
 
 ## Editor state:
 On exit, ModelViewer saves its state in the working directory, or in the folder given by -settings_dir, and restores it on the next start.

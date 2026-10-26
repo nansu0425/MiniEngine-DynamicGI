@@ -4,9 +4,10 @@
 
 번호는 작업 7 의 완료 기준의 번호다. 이 script 밖에서 보는 기준:
   [L2] light set 이 값을 읽은 대로 바꾸고 받을 수 없는 값은 거절한다, [L3] position 은 화면을 바꾸지 않는다, [L5] describe 줄의 restore,
-  [L6] light reset (panel 의 Reset Transform) 이 transform 만 회전 없는 원점으로 둔다, [G1] rotate gizmo 의 display:
-  viewer.py selftest 의 check_light 와 editor 확인
-  [G2] rotate gizmo 를 끌어 돌리는 것, panel 의 Reset Transform 을 누르는 것: 사용자가 본다
+  [L6] light reset (panel 의 Reset Transform) 이 transform 만 회전 없는 원점으로 둔다, [G1] rotate gizmo 의 display,
+  [G3] editor axes (Scene Editor panel 의 Rotate Axes) 가 rotate ring 의 축을 local 과 world 로 바꾼다: viewer.py selftest 의
+  check_light 와 editor 확인
+  [G2] rotate gizmo 를 끌어 돌리는 것, panel 의 Rotate Axes 와 Reset Transform 을 누르는 것: 사용자가 본다
   [K1] raster 화면: viewer.py snapshot compare
   [K4] 다른 check script, [K5] viewer.py selftest, [K6] Debug, Profile, Release build, [K7] 문서
 

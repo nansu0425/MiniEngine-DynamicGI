@@ -1350,7 +1350,7 @@ def check_editor(session, check, changes):
         return session.ask_ok('state editor')['state']['editor']
 
     usage = session.ask_ok('help')['commands']['editor']
-    check('editor usage gives what it changes and the units', all(term in usage for term in ['select', 'mode', 'client pixels', 'world position']), usage)
+    check('editor usage gives what it changes and the units', all(term in usage for term in ['select', 'mode', 'axes', 'client pixels', 'world position']), usage)
 
     original = editor_state()
     start = session.ask_ok('state camera')['state']['camera']
@@ -1389,6 +1389,24 @@ def check_editor(session, check, changes):
           rotate_mode == 'rotate' and translate_mode == 'translate' and np.array_equal(rotate, rotate_again) and not np.array_equal(rotate, translate),
           f'{rotate_mode}, {translate_mode}, rotate twice equal {np.array_equal(rotate, rotate_again)}')
 
+    # 기본 light 의 축은 world 의 축과 다르므로 rotate gizmo 의 ring 이 다르게 놓인다.
+    session.ask_ok('editor mode rotate')
+    session.ask_ok('editor axes local')
+    local = gizmo_around_light('selftest-editor-axes-local')
+    record_change(session, changes, 'editor axes world', 'editor axes world', 'editor')
+    world_axes = editor_state()['rotate_axes']
+    world, world_again = gizmo_around_light('selftest-editor-axes-world'), gizmo_around_light('selftest-editor-axes-world-again')
+    record_change(session, changes, 'editor axes local', 'editor axes local', 'editor')
+    local_axes = editor_state()['rotate_axes']
+    before = editor_state()
+    unknown = session.ask('editor axes up')
+    check('editor axes sets the axes of the rotate rings, the display around the light differs between them but not within one, '
+          'and an unknown axes fails and changes nothing',
+          world_axes == 'world' and local_axes == 'local' and np.array_equal(world, world_again) and not np.array_equal(local, world)
+          and not unknown['ok'] and editor_state() == before,
+          f'{world_axes}, {local_axes}, world twice equal {np.array_equal(world, world_again)}, {unknown.get("error")}')
+    session.ask_ok('editor mode translate')
+
     # pose look-at light 뒤라 light 의 icon 이 scene 가운데에 있고, 다음 pose 에서는 가운데에서 벗어난다.
     camera = session.ask_ok('state camera')['state']['camera']
     poses = {'at the center': [camera[key] for key in ['x', 'y', 'z', 'heading', 'pitch']],
@@ -1408,6 +1426,7 @@ def check_editor(session, check, changes):
 
     session.ask_ok('editor select ' + original['selected'])
     session.ask_ok('editor mode ' + original['gizmo_mode'])
+    session.ask_ok('editor axes ' + original['rotate_axes'])
     session.ask_ok('ui hide')
     session.ask_ok('pose ' + ' '.join(str(start[key]) for key in ['x', 'y', 'z', 'heading', 'pitch']))
     session.ask_ok(f'frames {SETTLE_FRAMES}')
