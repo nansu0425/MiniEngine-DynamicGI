@@ -64,6 +64,4 @@ __declspec(align(256)) struct GlobalConstants
     Math::Vector3 CameraPos;
     Math::Vector3 SunDirection;
     Math::Vector3 SunIntensity;
-    float IBLRange;
-    float IBLBias;
 };

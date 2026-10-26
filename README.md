@@ -12,7 +12,7 @@
 
 ## 빌드와 실행
 
-1. asset 을 받는다. ModelViewer 가 쓰는 Sponza (KhronosGroup glTF-Sample-Assets) 와 IBL texture (upstream DirectX-Graphics-Samples) 는 용량 때문에 repo 에 두지 않는다.
+1. asset 을 받는다. ModelViewer 가 쓰는 Sponza (KhronosGroup glTF-Sample-Assets) 는 용량 때문에 repo 에 두지 않는다.
 
    ```powershell
    .\scripts\fetch-assets.ps1

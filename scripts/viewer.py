@@ -480,7 +480,7 @@ def default_model():
 
 
 def default_assets():
-    return [VIEWER_DIR / default_model(), VIEWER_DIR / 'Textures']
+    return [VIEWER_DIR / default_model()]
 
 
 def start_instance(config, model=None, build_first=True, gpu_validation=False):

@@ -207,12 +207,6 @@
     <FxCompile Include="Sponza\ModelViewerVS.hlsl">
       <ShaderType>Vertex</ShaderType>
     </FxCompile>
-    <FxCompile Include="Renderer\SkyboxPS.hlsl">
-      <ShaderType>Pixel</ShaderType>
-    </FxCompile>
-    <FxCompile Include="Renderer\SkyboxVS.hlsl">
-      <ShaderType>Vertex</ShaderType>
-    </FxCompile>
     <FxCompile Include="Raytracing\RayQuerySmokeTestCS.hlsl">
       <ShaderModel>6.5</ShaderModel>
     </FxCompile>

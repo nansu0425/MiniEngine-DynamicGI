@@ -20,7 +20,7 @@
 #include "Core/Effects/MotionBlur/MotionBlur.h"
 #include "Core/Effects/DepthOfField/DepthOfField.h"
 #include "Core/Effects/PostEffects/PostEffects.h"
-#include "Core/Effects/SSAO/SSAO.h"
+#include "Core/Effects/LinearDepth/LinearDepth.h"
 #include "Core/Effects/FXAA/FXAA.h"
 #include "Core/App/SystemTime.h"
 #include "Core/Particles/ParticleEffectManager.h"
@@ -526,77 +526,6 @@ void Sun::Rotate(const Camera& camera)
         g_SunOrientation = atan2f(z, x);
 }
 
-void ChangeIBLSet(EngineVar::ActionType);
-void ChangeIBLBias(EngineVar::ActionType);
-
-DynamicEnumVar g_IBLSet("Viewer/Lighting/Environment", ChangeIBLSet);
-std::vector<std::pair<TextureRef, TextureRef>> g_IBLTextures;
-NumVar g_IBLBias("Viewer/Lighting/Gloss Reduction", 2.0f, 0.0f, 10.0f, 1.0f, ChangeIBLBias);
-
-void ChangeIBLSet(EngineVar::ActionType)
-{
-    int setIdx = g_IBLSet - 1;
-    if (setIdx < 0)
-    {
-        Renderer::SetIBLTextures(nullptr, nullptr);
-    }
-    else
-    {
-        auto texturePair = g_IBLTextures[setIdx];
-        Renderer::SetIBLTextures(texturePair.first, texturePair.second);
-    }
-}
-
-void ChangeIBLBias(EngineVar::ActionType)
-{
-    Renderer::SetIBLBias(g_IBLBias);
-}
-
-#include <direct.h> // for _getcwd() to check data root path
-
-void LoadIBLTextures()
-{
-    char CWD[256];
-    _getcwd(CWD, 256);
-
-    Utility::Printf("Loading IBL environment maps\n");
-
-    WIN32_FIND_DATA ffd;
-    HANDLE hFind = FindFirstFile(L"Textures/*_diffuseIBL.dds", &ffd);
-
-    g_IBLSet.AddEnum(L"None");
-
-    if (hFind != INVALID_HANDLE_VALUE) do
-    {
-        if (ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
-            continue;
-
-       std::wstring diffuseFile = ffd.cFileName;
-       std::wstring baseFile = diffuseFile; 
-       baseFile.resize(baseFile.rfind(L"_diffuseIBL.dds"));
-       std::wstring specularFile = baseFile + L"_specularIBL.dds";
-
-       TextureRef diffuseTex = TextureManager::LoadDDSFromFile(L"Textures/" + diffuseFile);
-       if (diffuseTex.IsValid())
-       {
-           TextureRef specularTex = TextureManager::LoadDDSFromFile(L"Textures/" + specularFile);
-           if (specularTex.IsValid())
-           {
-               g_IBLSet.AddEnum(baseFile);
-               g_IBLTextures.push_back(std::make_pair(diffuseTex, specularTex));
-           }
-       }
-    }
-    while (FindNextFile(hFind, &ffd) != 0);
-
-    FindClose(hFind);
-
-    Utility::Printf("Found %u IBL environment map sets\n", g_IBLTextures.size());
-
-    if (g_IBLTextures.size() > 0)
-        g_IBLSet.Increment();
-}
-
 // scripts/viewer.py가 이 이름과 형식으로 기본 model 경로를 읽는다.
 const wchar_t kDefaultModel[] = L"glTF-Sample-Assets/Models/Sponza/glTF/Sponza.gltf";
 
@@ -607,15 +536,12 @@ void ModelViewer::Startup( void )
     FXAA::Enable = false;
     PostEffects::EnableHDR = true;
     PostEffects::EnableAdaptation = true;
-    SSAO::Enable = true;
 
     Renderer::Initialize();
     RayQuerySmokeTest::Run();
     RaytracingView::Initialize();
     RayPick::Initialize();
     PathTracerPanel::Initialize();
-
-    LoadIBLTextures();
 
     std::wstring gltfFileName;
 
@@ -680,8 +606,6 @@ void ModelViewer::Cleanup( void )
     RaytracingView::Shutdown();
     m_RaytracingScene.Destroy();
     m_ModelInst = nullptr;
-
-    g_IBLTextures.clear();
 
 #ifdef LEGACY_RENDERER
     Sponza::Cleanup();
@@ -794,9 +718,8 @@ void ModelViewer::RenderScene( void )
             sorter.RenderMeshes(MeshSorter::kZPass, gfxContext, globals);
         }
 
-        SSAO::Render(gfxContext, m_Camera);
+        LinearDepth::Update(gfxContext.GetComputeContext(), m_Camera.GetNearClip(), m_Camera.GetFarClip());
 
-        if (!SSAO::DebugDraw)
         {
             ScopedTimer _outerprof(L"Main Render", gfxContext);
 
@@ -819,15 +742,12 @@ void ModelViewer::RenderScene( void )
             {
                 ScopedTimer _prof(L"Render Color", gfxContext);
 
-                gfxContext.TransitionResource(g_SSAOFullScreen, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
                 gfxContext.TransitionResource(g_SceneDepthBuffer, D3D12_RESOURCE_STATE_DEPTH_READ);
                 gfxContext.SetRenderTarget(g_SceneColorBuffer.GetRTV(), g_SceneDepthBuffer.GetDSV_DepthReadOnly());
                 gfxContext.SetViewportAndScissor(viewport, scissor);
 
                 sorter.RenderMeshes(MeshSorter::kOpaque, gfxContext, globals);
             }
-
-            Renderer::DrawSkybox(gfxContext, m_Camera, viewport, scissor);
 
             sorter.RenderMeshes(MeshSorter::kTransparent, gfxContext, globals);
         }

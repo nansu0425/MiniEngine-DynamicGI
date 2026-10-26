@@ -7,13 +7,6 @@ $ErrorActionPreference = 'Stop'
 # Root 는 upstream 의 Upstream 폴더를 받아 두는 곳이고, Paths 는 둘 모두에 대한 상대 경로다 ('' 는 폴더 전체).
 $Sources = @(
     @{
-        Url = 'https://github.com/microsoft/DirectX-Graphics-Samples.git'
-        Commit = 'e5975f9b0744fc5096dd593ed72bf8f5c004164f'
-        Upstream = 'MiniEngine/ModelViewer/Textures'
-        Root = 'MiniEngine/ModelViewer/Textures'
-        Paths = @('')
-    },
-    @{
         Url = 'https://github.com/KhronosGroup/glTF-Sample-Assets.git'
         Commit = '8f492390ddc7a2ae221a1369ef560589cf8c70fb'
         # Models/Sponza/LICENSE.md 의 상대 link 가 맞도록 Root 아래에 upstream 경로를 그대로 둔다.

@@ -20,10 +20,10 @@ __pycache__/
 
 # scripts/fetch-assets.ps1 가 받아 오는 asset 과, 받다가 멈추면 남을 수 있는 폴더
 /MiniEngine/ModelViewer/glTF-Sample-Assets/
-/MiniEngine/ModelViewer/Textures/
 /MiniEngine/ModelViewer/*.partial/
-# fetch-assets.ps1 가 예전에 받던 옛 Sponza. 이제 쓰지 않으므로 지워도 된다.
+# fetch-assets.ps1 가 예전에 받던 옛 Sponza 와 Environment 의 cubemap. 이제 쓰지 않으므로 지워도 된다.
 /MiniEngine/ModelViewer/Sponza/
+/MiniEngine/ModelViewer/Textures/
 
 # scripts/fetch-references.ps1 가 받아 오는 reference repo
 /references/*

@@ -15,19 +15,14 @@
 
 Texture2D<float4> baseColorTexture          : register(t0);
 Texture2D<float3> metallicRoughnessTexture  : register(t1);
-Texture2D<float1> occlusionTexture          : register(t2);
 Texture2D<float3> emissiveTexture           : register(t3);
 Texture2D<float3> normalTexture             : register(t4);
 
 SamplerState baseColorSampler               : register(s0);
 SamplerState metallicRoughnessSampler       : register(s1);
-SamplerState occlusionSampler               : register(s2);
 SamplerState emissiveSampler                : register(s3);
 SamplerState normalSampler                  : register(s4);
 
-TextureCube<float3> radianceIBLTexture      : register(t10);
-TextureCube<float3> irradianceIBLTexture    : register(t11);
-Texture2D<float> texSSAO			        : register(t12);
 Texture2D<float> texSunShadow			    : register(t13);
 
 cbuffer MaterialConstants : register(b0)
@@ -46,9 +41,6 @@ cbuffer GlobalConstants : register(b1)
     float3 ViewerPos;
     float3 SunDirection;
     float3 SunIntensity;
-    float _pad;
-    float IBLRange;
-    float IBLBias;
 }
 
 struct VSOutput
@@ -194,28 +186,6 @@ float3 ShadeDirectionalLight(SurfaceProperties Surface, float3 L, float3 c_light
     return Light.NdotL * c_light * (diffuse + specular);
 }
 
-// Diffuse irradiance
-float3 Diffuse_IBL(SurfaceProperties Surface)
-{
-    // Assumption:  L = N
-
-    //return Surface.c_diff * irradianceIBLTexture.Sample(defaultSampler, Surface.N);
-
-    // This is nicer but more expensive, and specular can often drown out the diffuse anyway
-    float LdotH = saturate(dot(Surface.N, normalize(Surface.N + Surface.V)));
-    float fd90 = 0.5 + 2.0 * Surface.roughness * LdotH * LdotH;
-    float3 DiffuseBurley = Surface.c_diff * Fresnel_Shlick(1, fd90, Surface.NdotV);
-    return DiffuseBurley * irradianceIBLTexture.Sample(defaultSampler, Surface.N);
-}
-
-// Approximate specular IBL by sampling lower mips according to roughness.  Then modulate by Fresnel. 
-float3 Specular_IBL(SurfaceProperties Surface)
-{
-    float lod = Surface.roughness * IBLRange + IBLBias;
-    float3 specular = Fresnel_Shlick(Surface.c_spec, 1, Surface.NdotV);
-    return specular * radianceIBLTexture.SampleLevel(cubeMapSampler, reflect(-Surface.V, Surface.N), lod);
-}
-
 float3 ComputeNormal(VSOutput vsOutput)
 {
     float3 normal = normalize(vsOutput.normal);
@@ -256,7 +226,6 @@ float4 main(VSOutput vsOutput, bool isFrontFace : SV_IsFrontFace) : SV_Target0
     float4 baseColor = baseColorFactor * baseColorTexture.Sample(baseColorSampler, UVSET(BASECOLOR));
     float2 metallicRoughness = metallicRoughnessFactor * 
         metallicRoughnessTexture.Sample(metallicRoughnessSampler, UVSET(METALLICROUGHNESS)).bg;
-    float occlusion = occlusionTexture.Sample(occlusionSampler, UVSET(OCCLUSION));
     float3 emissive = emissiveFactor * emissiveTexture.Sample(emissiveSampler, UVSET(EMISSIVE));
     float3 normal = ComputeNormal(vsOutput);
     if (!isFrontFace)
@@ -279,17 +248,6 @@ float4 main(VSOutput vsOutput, bool isFrontFace : SV_IsFrontFace) : SV_Target0
     if (SurfaceOccludesSun(vsOutput.worldPos, Surface.V))
         sunShadow = 0.0;
     colorAccum += ShadeDirectionalLight(Surface, SunDirection, sunShadow * SunIntensity);
-
-    // occlusion texture와 SSAO는 간접광인 IBL만 가린다.
-    uint2 pixelPos = uint2(vsOutput.position.xy);
-    float ssao = texSSAO[pixelPos];
-
-    Surface.c_diff *= occlusion * ssao;
-    Surface.c_spec *= occlusion * ssao;
-
-    // Add IBL
-    colorAccum += Diffuse_IBL(Surface);
-    colorAccum += Specular_IBL(Surface);
 
     // TODO: Shade each light using Forward+ tiles
 

@@ -39,8 +39,6 @@
 #include "Output/Model/CompiledShaders/CutoutDepthVS.h"
 #include "Output/Model/CompiledShaders/CutoutDepthSkinVS.h"
 #include "Output/Model/CompiledShaders/CutoutDepthPS.h"
-#include "Output/Model/CompiledShaders/SkyboxVS.h"
-#include "Output/Model/CompiledShaders/SkyboxPS.h"
 
 #pragma warning(disable:4319) // '~': zero extending 'uint32_t' to 'uint64_t' of greater size
 
@@ -58,15 +56,10 @@ namespace Renderer
     DescriptorHeap s_SamplerHeap;
     std::vector<GraphicsPSO> sm_PSOs;
 
-    TextureRef s_RadianceCubeMap;
-    TextureRef s_IrradianceCubeMap;
-    float s_SpecularIBLRange;
-    float s_SpecularIBLBias;
     uint32_t g_SSAOFullScreenID;
     uint32_t g_ShadowBufferID;
 
     RootSignature m_RootSig;
-    GraphicsPSO m_SkyboxPSO(L"Renderer: Skybox PSO");
     GraphicsPSO m_DefaultPSO(L"Renderer: Default PSO"); // Not finalized.  Used as a template.
 
     DescriptorHandle m_CommonTextures;
@@ -211,15 +204,6 @@ void Renderer::Initialize(void)
     m_DefaultPSO.SetVertexShader(g_pDefaultVS, sizeof(g_pDefaultVS));
     m_DefaultPSO.SetPixelShader(g_pDefaultPS, sizeof(g_pDefaultPS));
 
-    // Skybox PSO
-
-    m_SkyboxPSO = m_DefaultPSO;
-    m_SkyboxPSO.SetDepthStencilState(DepthStateReadOnly);
-    m_SkyboxPSO.SetInputLayout(0, nullptr);
-    m_SkyboxPSO.SetVertexShader(g_pSkyboxVS, sizeof(g_pSkyboxVS));
-    m_SkyboxPSO.SetPixelShader(g_pSkyboxPS, sizeof(g_pSkyboxPS));
-    m_SkyboxPSO.Finalize();
-
     TextureManager::Initialize(L"");
 
     s_TextureHeap.Create(L"Scene Texture Descriptors", D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 4096);
@@ -235,6 +219,7 @@ void Renderer::Initialize(void)
     uint32_t DestCount = 8;
     uint32_t SourceCounts[] = { 1, 1, 1, 1, 1, 1, 1, 1 };
 
+    // t10 ~ t12는 이 renderer의 shader가 읽지 않는다. LEGACY_RENDERER의 Sponza shader가 t12와 그 뒤를 이 번호로 읽으므로 자리를 둔다.
     D3D12_CPU_DESCRIPTOR_HANDLE SourceTextures[] =
     {
         GetDefaultTexture(kBlackCubeMap),
@@ -281,41 +266,8 @@ void Renderer::UpdateGlobalDescriptors(void)
 
 }
 
-void Renderer::SetIBLTextures(TextureRef diffuseIBL, TextureRef specularIBL)
-{
-    s_RadianceCubeMap = specularIBL;
-    s_IrradianceCubeMap = diffuseIBL;
-
-    s_SpecularIBLRange = 0.0f;
-    if (s_RadianceCubeMap.IsValid())
-    {
-        ID3D12Resource* texRes = const_cast<ID3D12Resource*>(s_RadianceCubeMap.Get()->GetResource());
-        const D3D12_RESOURCE_DESC& texDesc = texRes->GetDesc();
-        s_SpecularIBLRange = Max(0.0f, (float)texDesc.MipLevels - 1);
-        s_SpecularIBLBias = Min(s_SpecularIBLBias, s_SpecularIBLRange);
-    }
-
-    uint32_t DestCount = 2;
-    uint32_t SourceCounts[] = { 1, 1 };
-
-    D3D12_CPU_DESCRIPTOR_HANDLE SourceTextures[] =
-    {
-        specularIBL.IsValid() ? specularIBL.GetSRV() : GetDefaultTexture(kBlackCubeMap),
-        diffuseIBL.IsValid() ? diffuseIBL.GetSRV() : GetDefaultTexture(kBlackCubeMap)
-    };
-
-    g_Device->CopyDescriptors(1, &m_CommonTextures, &DestCount, DestCount, SourceTextures, SourceCounts, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-}
-
-void Renderer::SetIBLBias(float LODBias)
-{
-    s_SpecularIBLBias = Min(LODBias, s_SpecularIBLRange);
-}
-
 void Renderer::Shutdown(void)
 {
-    s_RadianceCubeMap = nullptr;
-    s_IrradianceCubeMap = nullptr;
     Lighting::Shutdown();
     TextureManager::Shutdown();
     s_TextureHeap.Destroy();
@@ -448,39 +400,6 @@ uint8_t Renderer::GetPSO(uint16_t psoFlags)
     return (uint8_t)sm_PSOs.size() - 2;
 }
 
-void Renderer::DrawSkybox( GraphicsContext& gfxContext, const Camera& Camera, const D3D12_VIEWPORT& viewport, const D3D12_RECT& scissor )
-{
-    ScopedTimer _prof(L"Draw Skybox", gfxContext);
-
-    __declspec(align(16)) struct SkyboxVSCB
-    {
-        Matrix4 ProjInverse;
-        Matrix3 ViewInverse;
-    } skyVSCB;
-    skyVSCB.ProjInverse = Invert(Camera.GetProjMatrix());
-    skyVSCB.ViewInverse = Invert(Camera.GetViewMatrix()).Get3x3();
-
-    __declspec(align(16)) struct SkyboxPSCB
-    {
-        float TextureLevel;
-    } skyPSCB;
-    skyPSCB.TextureLevel = s_SpecularIBLBias;
-
-    gfxContext.SetRootSignature(m_RootSig);
-    gfxContext.SetPipelineState(m_SkyboxPSO);
-
-    gfxContext.TransitionResource(g_SceneDepthBuffer, D3D12_RESOURCE_STATE_DEPTH_READ);
-    gfxContext.TransitionResource(g_SceneColorBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
-    gfxContext.SetRenderTarget(g_SceneColorBuffer.GetRTV(), g_SceneDepthBuffer.GetDSV_DepthReadOnly());
-    gfxContext.SetViewportAndScissor(viewport, scissor);
-
-    gfxContext.SetDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, s_TextureHeap.GetHeapPointer());
-    gfxContext.SetDynamicConstantBufferView(kMeshConstants, sizeof(SkyboxVSCB), &skyVSCB);
-    gfxContext.SetDynamicConstantBufferView(kMaterialConstants, sizeof(SkyboxPSCB), &skyPSCB);
-    gfxContext.SetDescriptorTable(kCommonSRVs, m_CommonTextures);
-    gfxContext.Draw(3);
-}
-
 void MeshSorter::AddMesh( const Mesh& mesh, float distance,
     D3D12_GPU_VIRTUAL_ADDRESS meshCBV,
     D3D12_GPU_VIRTUAL_ADDRESS materialCBV,
@@ -571,8 +490,6 @@ void MeshSorter::RenderMeshes(
     // Set common shader constants
 	globals.ViewProjMatrix = m_Camera->GetViewProjMatrix();
 	globals.CameraPos = m_Camera->GetPosition();
-    globals.IBLRange = s_SpecularIBLRange - s_SpecularIBLBias;
-    globals.IBLBias = s_SpecularIBLBias;
 	context.SetDynamicConstantBufferView(kCommonCBV, sizeof(GlobalConstants), &globals);
 
 	if (m_BatchType == kShadows)
