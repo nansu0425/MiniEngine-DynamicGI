@@ -31,7 +31,7 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 3. PT pass 와 누적 (끝남: dcc4615)
 4. tangent 와 normal map 규약 (끝남: f931539)
 5. Lambert path 와 furnace (끝남: cf52623, a5060e3)
-6. Export 와 비교 script: 누적값을 float image 로 export 하고 script 로 비교한다. furnace 와 같은 Seed 의 재현을 수치로 확인한다. 작업 5 가 R11G11B10 의 scene capture 로 본 furnace 를 1e-4 로 다시 보고, shading normal 이 잃는 energy 와 Russian roulette 의 pixel 단위 bias 를 잰다. NaN 과 Inf 인 sample 은 누적하지 않고 센다.
+6. Export 와 비교 script (끝남: 4cdb55e, 2b33c11)
 7. Sun: sun 의 직접광을 더하고, raster 의 sun 과 단위를 맞춘다.
 8. glTF BRDF: spec 을 따르는 BRDF 를 넣고 BRDF 단위의 test 로 확인한다.
 9. Sky: Environment 의 cubemap 을 sky 로 쓴다.
@@ -48,7 +48,7 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 |---|---|
 | 10/24 | 끝남: 1, A, B, harness 의 D3D12 log 수집 (573dded) 과 그 log 로 찾은 Lighting 수정 (e8a2352), 문서 정리 |
 | 10/25 | 끝남: 2, 3, 4 |
-| 10/26 | 끝남: 5. 6, 7 |
+| 10/26 | 끝남: 5, 6. 7 |
 | 10/27 | 8, 9, 10 |
 | 10/28 | 11, 12, 13 (a) |
 | 10/29 오전 | 13 (b) |
@@ -103,3 +103,5 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 - infra 검증 5-4 ~ 5-7 의 mode: PT 에 그 문제로 보이는 결과가 나올 때 (323e185)
 - raster 의 irradiance cube 와 PT 의 sky irradiance 를 app 안에서 비교하는 mode
 - albedo 1 의 furnace 에서 16384 번 넘게 반사하고도 escape 하지 못한 path 가 어디에 갇혔는지 보는 일 (a5060e3): 작업 13 이나 PT 에서 leak, self-hit 로 보이는 결과가 나올 때
+- PT panel 의 Export button: script 없이 사람이 PT 의 값을 export 할 일이 생길 때. 지금은 harness 의 `capture pt` 로만 export 한다 (2b33c11).
+- NaN 이나 Inf 라서 버린 sample 수를 panel 에 보이는 일: 작업 8 부터 PT 에 NaN 이나 Inf 가 생겨 사람이 실행 중에 봐야 할 때. 지금은 export 의 a 로만 센다 (2b33c11).
