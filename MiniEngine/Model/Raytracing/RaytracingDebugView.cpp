@@ -18,7 +18,7 @@ namespace
     {
         "Hit T", "Instance", "Front Face",
         "Geometry Normal", "Shading Normal", "UV0", "Base Color", "Metallic", "Roughness", "Emissive",
-        "Sun Visibility", "Sun Culling Difference"
+        "Light Visibility", "Light Culling Difference"
     };
     static_assert(_countof(kViewLabels) == RaytracingDebugView::kNumViews, "view label 개수가 View와 다르다");
 
@@ -35,7 +35,7 @@ namespace
         float NearZ;
         float FarZ;
         uint32_t CullSingleSidedBackFaces;
-        XMFLOAT3 SunDirection;
+        XMFLOAT3 LightDirection;
     };
 }
 
@@ -60,7 +60,7 @@ const char* RaytracingDebugView::GetViewLabel(View view)
 }
 
 void RaytracingDebugView::Render(ComputeContext& context, View view, bool cullSingleSidedBackFaces, const Camera& camera, const D3D12_VIEWPORT& rasterViewport,
-    const RaytracingScene& scene, const Vector3& sunDirection, ColorBuffer& target)
+    const RaytracingScene& scene, const Vector3& lightDirection, ColorBuffer& target)
 {
     ScopedTimer _prof(L"Raytracing Debug View", context);
 
@@ -70,7 +70,7 @@ void RaytracingDebugView::Render(ComputeContext& context, View view, bool cullSi
     constants.NearZ = camera.GetNearClip();
     constants.FarZ = camera.GetFarClip();
     constants.CullSingleSidedBackFaces = cullSingleSidedBackFaces;
-    XMStoreFloat3(&constants.SunDirection, sunDirection);
+    XMStoreFloat3(&constants.LightDirection, lightDirection);
 
     s_OutputUAV.PointTo(0, target, target.GetUAV());
 

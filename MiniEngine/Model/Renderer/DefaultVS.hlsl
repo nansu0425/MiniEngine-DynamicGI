@@ -26,10 +26,10 @@ cbuffer MeshConstants : register(b0)
 cbuffer GlobalConstants : register(b1)
 {
     float4x4 ViewProjMatrix;
-    float4x4 SunShadowMatrix;
+    float4x4 ShadowMatrix;
     float3 ViewerPos;
-    float3 SunDirection;
-    float3 SunIntensity;
+    float3 LightDirection;
+    float3 LightIntensity;
 }
 
 #ifdef ENABLE_SKINNING
@@ -71,7 +71,7 @@ struct VSOutput
     float2 uv1 : TEXCOORD1;
 #endif
     float3 worldPos : TEXCOORD2;
-    float3 sunShadowCoord : TEXCOORD3;
+    float3 shadowCoord : TEXCOORD3;
 };
 
 [RootSignature(Renderer_RootSig)]
@@ -112,7 +112,7 @@ VSOutput main(VSInput vsInput)
 
     vsOutput.worldPos = mul(WorldMatrix, position).xyz;
     vsOutput.position = mul(ViewProjMatrix, float4(vsOutput.worldPos, 1.0));
-    vsOutput.sunShadowCoord = mul(SunShadowMatrix, float4(vsOutput.worldPos, 1.0)).xyz;
+    vsOutput.shadowCoord = mul(ShadowMatrix, float4(vsOutput.worldPos, 1.0)).xyz;
     vsOutput.normal = mul(WorldIT, normal);
 #ifndef NO_TANGENT_FRAME
     vsOutput.tangent = float4(mul(WorldIT, tangent.xyz), tangent.w);

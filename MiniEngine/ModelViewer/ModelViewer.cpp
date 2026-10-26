@@ -97,7 +97,7 @@ private:
 
     ModelInstance m_ModelInst;
     RaytracingScene m_RaytracingScene;
-    ShadowCamera m_SunShadowCamera;
+    ShadowCamera m_ShadowCamera;
     Sun m_Sun;
 };
 
@@ -684,19 +684,19 @@ void ModelViewer::RenderScene( void )
     else
     {
         // Update global constants
-        Vector3 SunDirection = GetSunDirection();
-        // sun이 어느 방향에 있어도 shadow map이 model 전체를 덮게 bounding sphere를 감싼다.
-        // ShadowCamera는 자기 위치에서 sun 쪽으로만 depth를 담으므로 위치를 sun 반대편 끝에 둔다.
+        Vector3 LightDirection = GetSunDirection();
+        // directional light가 어느 방향에 있어도 shadow map이 model 전체를 덮게 bounding sphere를 감싼다.
+        // ShadowCamera는 자기 위치에서 light 쪽으로만 depth를 담으므로 위치를 light 반대편 끝에 둔다.
         Scalar ShadowRadius = m_ModelInst.GetRadius();
-        m_SunShadowCamera.UpdateMatrix(-SunDirection, m_ModelInst.GetCenter() - SunDirection * ShadowRadius, Vector3(ShadowRadius * 2.0f),
+        m_ShadowCamera.UpdateMatrix(-LightDirection, m_ModelInst.GetCenter() - LightDirection * ShadowRadius, Vector3(ShadowRadius * 2.0f),
             (uint32_t)g_ShadowBuffer.GetWidth(), (uint32_t)g_ShadowBuffer.GetHeight(), 16);
 
         GlobalConstants globals;
         globals.ViewProjMatrix = m_Camera.GetViewProjMatrix();
-        globals.SunShadowMatrix = m_SunShadowCamera.GetShadowMatrix();
+        globals.ShadowMatrix = m_ShadowCamera.GetShadowMatrix();
         globals.CameraPos = m_Camera.GetPosition();
-        globals.SunDirection = SunDirection;
-        globals.SunIntensity = Vector3(Scalar(g_SunLightIntensity));
+        globals.LightDirection = LightDirection;
+        globals.LightIntensity = Vector3(Scalar(g_SunLightIntensity));
 
         // Begin rendering depth
         gfxContext.TransitionResource(g_SceneDepthBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, true);
@@ -724,10 +724,10 @@ void ModelViewer::RenderScene( void )
             ScopedTimer _outerprof(L"Main Render", gfxContext);
 
             {
-                ScopedTimer _prof(L"Sun Shadow Map", gfxContext);
+                ScopedTimer _prof(L"Shadow Map", gfxContext);
 
                 MeshSorter shadowSorter(MeshSorter::kShadows);
-				shadowSorter.SetCamera(m_SunShadowCamera);
+				shadowSorter.SetCamera(m_ShadowCamera);
 				shadowSorter.SetDepthStencilTarget(g_ShadowBuffer);
 
                 m_ModelInst.Render(shadowSorter);

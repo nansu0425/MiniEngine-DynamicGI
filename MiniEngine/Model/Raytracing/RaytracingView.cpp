@@ -253,12 +253,12 @@ void RaytracingView::ShowSection(void)
 }
 
 void RaytracingView::Render(ComputeContext& context, const Math::Camera& camera, const D3D12_VIEWPORT& rasterViewport, DepthBuffer& rasterDepth,
-    const RaytracingScene& scene, const Math::Vector3& sunDirection, ColorBuffer& target)
+    const RaytracingScene& scene, const Math::Vector3& lightDirection, ColorBuffer& target)
 {
     if (s_Selection.group == kDebug)
     {
         RaytracingDebugView::Render(context, (RaytracingDebugView::View)s_Selection.view, !s_ShowSingleSidedBackFaces,
-            camera, rasterViewport, scene, sunDirection, target);
+            camera, rasterViewport, scene, lightDirection, target);
     }
     else if (s_Selection.group == kValidation)
     {

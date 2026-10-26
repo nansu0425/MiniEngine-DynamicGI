@@ -60,8 +60,8 @@ __declspec(align(256)) struct MaterialConstants
 __declspec(align(256)) struct GlobalConstants
 {
     Math::Matrix4 ViewProjMatrix;
-    Math::Matrix4 SunShadowMatrix;
+    Math::Matrix4 ShadowMatrix;
     Math::Vector3 CameraPos;
-    Math::Vector3 SunDirection;
-    Math::Vector3 SunIntensity;
+    Math::Vector3 LightDirection;
+    Math::Vector3 LightIntensity;
 };

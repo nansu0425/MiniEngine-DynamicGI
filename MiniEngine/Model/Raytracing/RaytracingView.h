@@ -21,5 +21,5 @@ namespace RaytracingView
     void ShowSection(void);
     // 고른 view가 없으면 아무것도 그리지 않는다. 인자의 뜻은 RaytracingDebugView::Render, RayQueryValidation::Render와 같다.
     void Render(ComputeContext& context, const Math::Camera& camera, const D3D12_VIEWPORT& rasterViewport, DepthBuffer& rasterDepth,
-        const RaytracingScene& scene, const Math::Vector3& sunDirection, ColorBuffer& target);
+        const RaytracingScene& scene, const Math::Vector3& lightDirection, ColorBuffer& target);
 }

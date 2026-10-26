@@ -14,8 +14,8 @@ static const uint kBaseColor = 6;
 static const uint kMetallic = 7;
 static const uint kRoughness = 8;
 static const uint kEmissive = 9;
-static const uint kSunVisibility = 10;
-static const uint kSunCullingDifference = 11;
+static const uint kLightVisibility = 10;
+static const uint kLightCullingDifference = 11;
 
 cbuffer Constants : register(b0)
 {
@@ -24,7 +24,7 @@ cbuffer Constants : register(b0)
     float NearZ;
     float FarZ;
     uint CullSingleSidedBackFaces;
-    float3 SunDirection;
+    float3 LightDirection;
 };
 
 RWTexture2D<float4> Output : register(u0);
@@ -88,28 +88,28 @@ uint DebugViewRayFlags()
     return CullSingleSidedBackFaces != 0 ? kCullSingleSidedBackFaces : RAY_FLAG_NONE;
 }
 
-// 면이 sun을 가리면 false를 돌려준다 (DescribeSurfaceRay).
-bool DescribeSunRay(HitSurface surface, out RayDesc ray)
+// 면이 directional light를 가리면 false를 돌려준다 (DescribeSurfaceRay).
+bool DescribeLightRay(HitSurface surface, out RayDesc ray)
 {
-    return DescribeSurfaceRay(surface.position, surface.geometryNormal, SunDirection, ray);
+    return DescribeSurfaceRay(surface.position, surface.geometryNormal, LightDirection, ray);
 }
 
-// sun이 보이면 흰색, 가려지면 검정이다.
-float3 SunVisibilityColor(RayHit hit)
+// directional light가 보이면 흰색, 가려지면 검정이다.
+float3 LightVisibilityColor(RayHit hit)
 {
     RayDesc ray;
-    if (!DescribeSunRay(GetHitSurface(hit), ray))
+    if (!DescribeLightRay(GetHitSurface(hit), ray))
         return 0.0;
     return IsOccluded(ray, DebugViewRayFlags()) ? 0.0 : 1.0;
 }
 
-// sun을 향한 ray가 single-sided material의 뒷면을 cull할 때와 하지 않을 때 결과가 다른 곳을 빨강으로 칠한다.
-// 빨강은 ray가 single-sided 면을 뒤에서 만나 지나가고, 그 뒤에 sun을 가리는 다른 면이 없는 곳이다.
-// 나머지는 Sun Visibility와 같다.
-float3 SunCullingDifferenceColor(RayHit hit)
+// directional light를 향한 ray가 single-sided material의 뒷면을 cull할 때와 하지 않을 때 결과가 다른 곳을 빨강으로 칠한다.
+// 빨강은 ray가 single-sided 면을 뒤에서 만나 지나가고, 그 뒤에 directional light를 가리는 다른 면이 없는 곳이다.
+// 나머지는 Light Visibility와 같다.
+float3 LightCullingDifferenceColor(RayHit hit)
 {
     RayDesc ray;
-    if (!DescribeSunRay(GetHitSurface(hit), ray))
+    if (!DescribeLightRay(GetHitSurface(hit), ray))
         return 0.0;
 
     const bool occludedWithCulling = IsOccluded(ray, kCullSingleSidedBackFaces);
@@ -126,10 +126,10 @@ float3 HitColor(RayHit hit)
         return InstanceColor(hit.instanceIndex);
     if (View == kFrontFace)
         return FrontFaceColor(hit.frontFace);
-    if (View == kSunVisibility)
-        return SunVisibilityColor(hit);
-    if (View == kSunCullingDifference)
-        return SunCullingDifferenceColor(hit);
+    if (View == kLightVisibility)
+        return LightVisibilityColor(hit);
+    if (View == kLightCullingDifference)
+        return LightCullingDifferenceColor(hit);
     return SurfaceColor(GetHitSurface(hit));
 }
 

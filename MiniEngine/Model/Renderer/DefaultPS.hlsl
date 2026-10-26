@@ -23,7 +23,7 @@ SamplerState metallicRoughnessSampler       : register(s1);
 SamplerState emissiveSampler                : register(s3);
 SamplerState normalSampler                  : register(s4);
 
-Texture2D<float> texSunShadow			    : register(t13);
+Texture2D<float> texShadow			    : register(t13);
 
 cbuffer MaterialConstants : register(b0)
 {
@@ -37,10 +37,10 @@ cbuffer MaterialConstants : register(b0)
 cbuffer GlobalConstants : register(b1)
 {
     float4x4 ViewProj;
-    float4x4 SunShadowMatrix;
+    float4x4 ShadowMatrix;
     float3 ViewerPos;
-    float3 SunDirection;
-    float3 SunIntensity;
+    float3 LightDirection;
+    float3 LightIntensity;
 }
 
 struct VSOutput
@@ -55,7 +55,7 @@ struct VSOutput
     float2 uv1 : TEXCOORD1;
 #endif
     float3 worldPos : TEXCOORD2;
-    float3 sunShadowCoord : TEXCOORD3;
+    float3 shadowCoord : TEXCOORD3;
 };
 
 // Numeric constants
@@ -209,14 +209,14 @@ float3 ComputeNormal(VSOutput vsOutput)
 #endif
 }
 
-// 면이 sun을 가리는지는 README.md의 "camera 밖에서 본 doubleSided"가 정한다.
+// 면이 directional light를 가리는지는 README.md의 "camera 밖에서 본 doubleSided"가 정한다.
 // vertex normal은 면을 따라 휘므로 면의 방향은 worldPos의 미분으로 구한다.
-bool SurfaceOccludesSun(float3 worldPos, float3 V)
+bool SurfaceOccludesLight(float3 worldPos, float3 V)
 {
     float3 geometryNormal = cross(ddx(worldPos), ddy(worldPos));
     if (dot(geometryNormal, V) < 0.0)
         geometryNormal = -geometryNormal;
-    return dot(geometryNormal, SunDirection) <= 0.0;
+    return dot(geometryNormal, LightDirection) <= 0.0;
 }
 
 [RootSignature(Renderer_RootSig)]
@@ -244,10 +244,10 @@ float4 main(VSOutput vsOutput, bool isFrontFace : SV_IsFrontFace) : SV_Target0
     // Begin accumulating light starting with emissive
     float3 colorAccum = emissive;
 
-    float sunShadow = texSunShadow.SampleCmpLevelZero( shadowSampler, vsOutput.sunShadowCoord.xy, vsOutput.sunShadowCoord.z );
-    if (SurfaceOccludesSun(vsOutput.worldPos, Surface.V))
-        sunShadow = 0.0;
-    colorAccum += ShadeDirectionalLight(Surface, SunDirection, sunShadow * SunIntensity);
+    float shadow = texShadow.SampleCmpLevelZero( shadowSampler, vsOutput.shadowCoord.xy, vsOutput.shadowCoord.z );
+    if (SurfaceOccludesLight(vsOutput.worldPos, Surface.V))
+        shadow = 0.0;
+    colorAccum += ShadeDirectionalLight(Surface, LightDirection, shadow * LightIntensity);
 
     // TODO: Shade each light using Forward+ tiles
 
