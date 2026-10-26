@@ -49,7 +49,6 @@ Russian roulette 를 켠 것과 끈 것을 잰다.
 
 import argparse
 import shutil
-import subprocess
 import sys
 import time
 from pathlib import Path
@@ -58,19 +57,14 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from imagefiles import ImageFileError, read_dds_rgba32f
-from viewer import (HARNESS_DIR, LIVE_DEVICE_ID, PREVIEW_EXPOSURE, REPO_ROOT, HarnessError, Session, capture, describe_d3d12,
-                    make_view, start_instance, stop_instance)
+from pathtracerchecks import (BASE, EMISSION_FURNACE, FURNACE_SAMPLES, RECORD, SECTION, WHITE_FURNACE, Checks, append_record_row,
+                              code_version, describe_machine, path_tracer_state, set_path_tracer, stop_and_check)
+from viewer import HARNESS_DIR, PREVIEW_EXPOSURE, HarnessError, Session, capture, make_view, start_instance, stop_instance
 
 KEPT_DIR = HARNESS_DIR / 'kept' / 'lambert-path'
-RECORD = REPO_ROOT / 'docs' / 'reference-path-tracer-measurements.md'
 COST_RECORD_SECTION = '## 작업 5: 1 spp 의 GPU time'
-SECTION = 'Path Tracer'
 
-FURNACE_SAMPLES = 16
 SCENE_SAMPLES = 256
-# albedo 1 의 Sponza 에서 FURNACE_SAMPLES 의 path 가 모두 escape 하는 반사 횟수. Seed 0 에서 1.0 이 아닌 pixel 이 1024 번에서 5292 개,
-# 4096 번에서 12 개, 16384 번에서 1 개였다.
-WHITE_FURNACE_BOUNCES = 65536
 BOUNCE_STEPS = [1, 2, 4, 16, 64]
 # Max Bounces 16 과 64 의 capture 는 bit 까지 같았다. 16 번 뒤의 반사가 더하는 빛이 장면의 pixel 값 (평균 0.004) 에서
 # R11G11B10 의 반 ulp (0.004 근처에서 약 3e-5) 보다 작은 것으로 본다 (추측).
@@ -84,12 +78,6 @@ COST_FRAMES = 256
 # 가장 느린 run 은 Russian roulette 를 끈 장면의 SCENE_SAMPLES 로, Debug 에서 1 분쯤 걸린다.
 WAIT_TIMEOUT = 900
 
-BASE = {'Show': 1, 'Samples per Frame': 1, 'Seed': 0, 'Sky Radiance': 1, 'Max Bounces': 64, 'Russian Roulette': 1,
-        'Geometric Normals': 0, 'Furnace': 0, 'Furnace Albedo': 1, 'Furnace Emission': 0}
-WHITE_FURNACE = BASE | {'Furnace': 1, 'Furnace Albedo': 1, 'Furnace Emission': 0, 'Geometric Normals': 1,
-                        'Max Bounces': WHITE_FURNACE_BOUNCES, 'Russian Roulette': 0}
-EMISSION_FURNACE = BASE | {'Furnace': 1, 'Furnace Albedo': 0.5, 'Furnace Emission': 0.5, 'Geometric Normals': 1, 'Max Bounces': 64,
-                           'Russian Roulette': 0}
 SCENE = BASE
 
 # [9] 에서 바꿔 보는 값. 모두 BASE 와 다르다.
@@ -99,25 +87,6 @@ PACE_SETTING_CHANGES = {'Samples per Frame': 2, 'Target Samples': 8192}
 # [8] 에서 끝내기 전에 두는 값. BASE 와도 IMAGE_SETTING_CHANGES 와도 달라서 editor.ini 에서 이 run 이 쓴 값인지 알 수 있다.
 SAVED_SETTINGS = {'Max Bounces': 7, 'Russian Roulette': 0, 'Sky Radiance': 0.25, 'Geometric Normals': 1, 'Furnace': 1,
                   'Furnace Albedo': 0.75, 'Furnace Emission': 0.125, 'Seed': 3}
-
-
-class Checks:
-    def __init__(self):
-        self.failures = []
-
-    def __call__(self, name, passed, detail=''):
-        print(f'{"PASS" if passed else "FAIL"}  {name}' + (f': {detail}' if detail != '' else ''), flush=True)
-        if not passed:
-            self.failures.append(name)
-        return passed
-
-
-def set_path_tracer(session, settings):
-    return session.ask_ok(f'settings set {SECTION}: ' + '; '.join(f'{key}={value}' for key, value in settings.items()))
-
-
-def path_tracer_state(session):
-    return session.ask_ok('state pt')['state']['pt']
 
 
 def accumulate(session, name, settings, samples):
@@ -257,19 +226,10 @@ def read_ini_section(path, section):
 
 
 def check_stopped(instance, check):
-    stopped = stop_instance(instance)
-    check('quit ends the app normally', stopped['result'] == 'quit' and stopped['exit_reason'] == 'normal',
-          f'{stopped["result"]}, exit reason={stopped["exit_reason"]}')
+    stop_and_check(instance, check)
     saved = read_ini_section(Path(instance['run_dir']) / 'editor.ini', SECTION)
     expected = {key: str(value) for key, value in SAVED_SETTINGS.items()}
     check('[8] editor.ini keeps the path tracer settings', {key: saved.get(key) for key in expected} == expected, saved)
-
-    d3d12 = stopped['d3d12']
-    lines = '; '.join(describe_d3d12(d3d12))
-    running = [message for message in d3d12['running'].values() if message['severity'] in ('CORRUPTION', 'ERROR', 'WARNING')]
-    check('no D3D12 corruption, error or warning while running', d3d12['logged'] and not running, lines)
-    at_exit = {id: message['count'] for id, message in (d3d12['at_exit'] or {}).items()}
-    check(f'the D3D12 exit report has only one #{LIVE_DEVICE_ID} LIVE_DEVICE', at_exit == {LIVE_DEVICE_ID: 1}, lines)
 
 
 def command_check(args):
@@ -294,28 +254,6 @@ def command_check(args):
     return 1 if check.failures else 0
 
 
-def code_version():
-    """잴 때의 HEAD. commit 하지 않은 변경이 있으면 + 를 붙인다."""
-    def git(*arguments):
-        return subprocess.run(['git', *arguments], cwd=REPO_ROOT, capture_output=True, text=True, check=True).stdout.strip()
-    return git('rev-parse', '--short', 'HEAD') + ('+' if git('status', '--porcelain') else '')
-
-
-def append_record_row(section, cells):
-    """RECORD 의 section 에 있는 표의 끝에 한 줄을 더한다."""
-    lines = RECORD.read_text(encoding='utf-8').splitlines(keepends=True)
-    try:
-        start = next(index for index, line in enumerate(lines) if line.rstrip() == section)
-    except StopIteration:
-        raise HarnessError(f'{RECORD} has no section "{section}"')
-    end = next((index for index in range(start + 1, len(lines)) if lines[index].startswith('## ')), len(lines))
-    table = [index for index in range(start + 1, end) if lines[index].startswith('|')]
-    if not table:
-        raise HarnessError(f'the section "{section}" of {RECORD} has no table')
-    lines.insert(table[-1] + 1, '| ' + ' | '.join(cells) + ' |\n')
-    RECORD.write_text(''.join(lines), encoding='utf-8')
-
-
 def command_cost(args):
     code = code_version()
     instance = start_instance('Profile', build_first=not args.no_build)
@@ -324,11 +262,8 @@ def command_cost(args):
         session = Session(instance)
         try:
             session.ask_ok('ui hide')
-            engine = session.ask_ok('state engine')['state']['engine']
-            ui = session.ask_ok('state ui')['state']['ui']['scene']
-            scene = f'{ui["width"]}x{ui["height"]}'
-            print(f'{engine["config"]}, {engine["gpu"]}, scene {scene}, Max Bounces {SCENE["Max Bounces"]}, '
-                  f'Samples per Frame {SCENE["Samples per Frame"]}')
+            config, gpu, scene = describe_machine(session)
+            print(f'{config}, {gpu}, scene {scene}, Max Bounces {SCENE["Max Bounces"]}, Samples per Frame {SCENE["Samples per Frame"]}')
             for russian_roulette in (1, 0):
                 set_path_tracer(session, SCENE | {'Russian Roulette': russian_roulette, 'Target Samples': 1 << 20})
                 session.ask_ok('pt reset')
@@ -337,7 +272,7 @@ def command_cost(args):
                 state = 'on' if russian_roulette else 'off'
                 print(f'Russian roulette {state}: GPU time over {COST_FRAMES} frames '
                       f'mean {measured["mean"]} ms, min {measured["min"]} ms, max {measured["max"]} ms')
-                rows.append([time.strftime('%Y-%m-%d'), code, engine['config'], engine['gpu'], scene, str(SCENE['Max Bounces']), state,
+                rows.append([time.strftime('%Y-%m-%d'), code, config, gpu, scene, str(SCENE['Max Bounces']), state,
                              str(COST_FRAMES)] + [f'{float(measured[key]):.3f}' for key in ('mean', 'min', 'max')])
         finally:
             session.close()
