@@ -34,6 +34,7 @@ harness 로 할 수 없는 일을 만나면 그 일이 계획되어 있는지와
 - display: UI 흐름과 panel 내용을 볼 때 쓴다.
 - scene: 수치는 원본 DDS 로 비교한다. view PNG 는 고정 exposure 로 만든 보기용이다.
 - overlay: debug view 와 heatmap 만 볼 때 쓴다.
+- pt: path tracer 의 값은 scene 이 아니라 이것으로 비교한다. scene 은 R11G11B10 으로 양자화한 값이다. 비교의 식은 `scripts/imagecompare.py` 에 있다.
 - 수치를 재는 shot 은 `ui hide` 뒤에 찍는다. UI 가 보이면 scene 크기가 dock 배치를 따른다.
 
 ## 결정성

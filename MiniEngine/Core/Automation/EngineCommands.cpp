@@ -397,7 +397,7 @@ namespace
         FrameCapture::Target target;
         if (!FrameCapture::FindTarget(arguments.substr(0, targetEnd), target) || path.empty())
         {
-            reply.Error("usage: capture scene|overlay|display <path without extension>");
+            reply.Error("usage: capture scene|overlay|display|pt <path without extension>");
             return;
         }
         FrameCapture::Request(target, path, reply);
@@ -561,8 +561,10 @@ namespace ControlChannel
         Register("ui", "ui show|hide: same as F1. Hidden, the scene fills the client", SetUIVisible);
         Register("panel", "panel <name> open|close: same as the View menu", SetPanelOpen);
         Register("window", "window client <W>x<H>", ResizeWindow);
-        Register("capture", "capture scene|overlay|display <path without extension>: scene is the HDR before post effects as float32 .dds, "
-            "overlay is the debug view layer as .png with premultiplied alpha, display is the presented image with UI as .png", CaptureFrame);
+        Register("capture", "capture scene|overlay|display|pt <path without extension>: scene is the HDR before post effects as float32 .dds, "
+            "overlay is the debug view layer as .png with premultiplied alpha, display is the presented image with UI as .png, "
+            "pt is the path tracer's accumulation as float32 .dds with the mean in rgb and the samples it added in a. "
+            "pt replies on the next frame even while Show is off, and fails if the path tracer has not been shown", CaptureFrame);
         Register("profile", "profile <scope> frames=<n>: the GPU time in ms of the Profiler scope named <scope> (as in its Scope column) "
             "over the next n frames, as mean, min and max. Fails if the scope does not run in one of those frames. "
             "Release compiles the timers out", MeasureGpuTime);

@@ -23,7 +23,7 @@ cbuffer Constants : register(b0)
 };
 
 // u register의 순서는 PathTracer.cpp의 UAV와 같다.
-// rgb는 지금까지 더한 sample의 평균, a는 더한 sample 수다.
+// rgb는 지금까지 더한 sample의 평균, a는 더한 sample 수다. NaN이나 Inf인 sample은 더하지 않으므로, dispatch한 sample 수와 a의 차가 그 수다.
 RWTexture2D<float4> Accumulation : register(u0);
 RWTexture2D<float3> SceneColor : register(u1);
 
@@ -106,6 +106,9 @@ void main(uint2 pixel : SV_DispatchThreadID)
         // pixel 격자의 [x, x + 1) x [y, y + 1)에서 고르게 고른 위치라 평균이 pixel의 box filter가 된다.
         const RayDesc cameraRay = GetCameraRay(Rays, float2(pixel) + random.rand2());
         const float3 radiance = TraceRadiance(cameraRay, random);
+        // 하나라도 더하면 그 뒤로 평균이 NaN이나 Inf에 머문다. 값을 잘라 더하는 것은 bias이므로 버린다.
+        if (!all(isfinite(radiance)))
+            continue;
         accumulated.a += 1.0;
         accumulated.rgb += (radiance - accumulated.rgb) / accumulated.a;
     }

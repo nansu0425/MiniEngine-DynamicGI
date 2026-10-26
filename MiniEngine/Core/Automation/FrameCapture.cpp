@@ -27,6 +27,7 @@ namespace
         { "scene", ".dds", DXGI_FORMAT_R32G32B32A32_FLOAT },
         { "overlay", ".png", DXGI_FORMAT_R8G8B8A8_UNORM },
         { "display", ".png", DXGI_FORMAT_R8G8B8A8_UNORM },
+        { "pt", ".dds", DXGI_FORMAT_R32G32B32A32_FLOAT },
     };
     static_assert(_countof(kTargets) == kNumTargets, "target 개수가 Target과 다르다");
 
@@ -53,7 +54,7 @@ namespace
             fileImage = converted.GetImage(0, 0, 0);
         }
 
-        if (target == kScene)
+        if (target == kScene || target == kPathTracer)
             return SaveToDDSFile(*fileImage, DDS_FLAGS_NONE, path.c_str());
 
         // present는 backbuffer의 alpha를 쓰지 않아 그 값이 정해져 있지 않으므로 버린다.
@@ -113,6 +114,12 @@ void FrameCapture::Capture(Target target, CommandContext& context, PixelBuffer& 
     const std::string statePath = pending->second.pathWithoutExtension + ".state.json";
     const ControlChannel::Reply reply = pending->second.reply;
     s_PendingCaptures.erase(pending);
+
+    if (buffer.GetResource() == nullptr)
+    {
+        reply.Error(std::string(kTargets[target].name) + " has not been drawn yet");
+        return;
+    }
 
     ReadbackBuffer readback;
     const uint32_t rowPitch = context.ReadbackTexture(readback, buffer);

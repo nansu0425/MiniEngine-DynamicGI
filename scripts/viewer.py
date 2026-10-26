@@ -610,7 +610,7 @@ def describe_difference(first, second):
 
 def make_view(original, target, view, crop, max_width, exposure):
     from PIL import Image
-    if target == 'scene':
+    if target in ('scene', 'pt'):
         image = Image.fromarray(tone_map_for_view(read_dds_rgba32f(original), exposure))
     else:
         # overlay 는 premultiplied alpha 라서 RGB 가 곧 검은 바탕에 합성한 색이다. display 에는 alpha 가 없다.
@@ -1929,10 +1929,10 @@ def main():
 
     command = add_command('shot', 'capture a target and write a small PNG to look at, '
                                   'with the state of the captured frame as JSON next to it', command_shot)
-    command.add_argument('target', choices=['scene', 'overlay', 'display'])
+    command.add_argument('target', choices=['scene', 'overlay', 'display', 'pt'])
     command.add_argument('--crop', type=parse_crop, metavar='X,Y,W,H', help='in original pixels')
     command.add_argument('--max-width', type=int, default=PREVIEW_MAX_WIDTH)
-    command.add_argument('--exposure', type=float, default=PREVIEW_EXPOSURE, help='for the scene view only')
+    command.add_argument('--exposure', type=float, default=PREVIEW_EXPOSURE, help='for the scene and pt views only')
 
     command = add_command('stop', 'quit the running instance, killing it if it hangs, and summarize its log with the D3D12 messages. '
                                   'Exits with 1 unless the app ended normally, whatever the messages', command_stop)

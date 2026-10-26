@@ -2,6 +2,7 @@
 #include "Model/Raytracing/CameraRays.h"
 #include "Model/Raytracing/RaytracingScene.h"
 #include "Model/Raytracing/SceneHeapTable.h"
+#include "Core/Automation/FrameCapture.h"
 #include "Core/Camera/Camera.h"
 #include "Core/Display/Display.h"
 #include "Core/Graphics/GraphicsCore.h"
@@ -163,4 +164,9 @@ void PathTracer::Render(ComputeContext& context, const Settings& settings, const
         s_Progress.samples += constants.NumSamples;
         s_Progress.seconds += GetMeasuredFrameTime();
     }
+}
+
+void PathTracer::Capture(ComputeContext& context)
+{
+    FrameCapture::Capture(FrameCapture::kPathTracer, context, s_Accumulation);
 }

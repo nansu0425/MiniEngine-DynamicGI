@@ -16,6 +16,8 @@ namespace FrameCapture
         kOverlay,
         // UI까지 합성해 present하는 backbuffer. PNG로 쓴다.
         kDisplay,
+        // path tracer의 누적 buffer. scene에 쓰기 전의 값을 그대로 남기려고 R32G32B32A32_FLOAT DDS로 쓴다. 채널의 뜻은 PathTracerCS.hlsl에 있다.
+        kPathTracer,
         kNumTargets
     };
 

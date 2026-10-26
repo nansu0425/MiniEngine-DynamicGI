@@ -61,4 +61,7 @@ namespace PathTracer
     // camera ray는 rasterViewport로 그린 raster의 pixel 격자를 따른다. sceneColor는 raster가 그린 scene이고, 그 크기로 누적해 그 위에 평균을 쓴다.
     void Render(ComputeContext& context, const Settings& settings, const Math::Camera& camera, const D3D12_VIEWPORT& rasterViewport,
         const RaytracingScene& scene, ColorBuffer& sceneColor);
+
+    // harness의 capture pt에 지금까지 누적한 buffer로 답한다. Render를 부르지 않는 frame에도 불러서, 누적을 멈춘 동안에도 답하게 한다.
+    void Capture(ComputeContext& context);
 }

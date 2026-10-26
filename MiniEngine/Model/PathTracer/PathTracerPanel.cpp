@@ -36,6 +36,7 @@ namespace
         s_Settings.samplesPerFrame = std::max(1u, std::min(s_Settings.samplesPerFrame, kMaxSamplesPerFrame));
         s_Settings.targetSamples = std::max(1u, std::min(s_Settings.targetSamples, kMaxTargetSamples));
         s_Settings.maxBounces = std::min(s_Settings.maxBounces, kMaxBounces);
+        // inf는 막지 않는다. scripts/check-path-tracer-export.py가 inf로 두어 NaN과 Inf인 sample을 만든다.
         s_Settings.skyRadiance = std::max(0.0f, s_Settings.skyRadiance);
         // albedo가 1을 넘으면 반사할 때마다 energy가 늘어 path의 값이 반사 횟수의 상한을 따라 끝없이 커진다.
         s_Settings.furnaceAlbedo = std::max(0.0f, std::min(s_Settings.furnaceAlbedo, 1.0f));
@@ -259,4 +260,5 @@ void PathTracerPanel::Render(ComputeContext& context, const Math::Camera& camera
 {
     if (s_Show)
         PathTracer::Render(context, s_Settings, camera, rasterViewport, scene, sceneColor);
+    PathTracer::Capture(context);
 }
