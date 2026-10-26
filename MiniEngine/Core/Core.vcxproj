@@ -142,6 +142,7 @@
     <ClInclude Include="Graphics\Descriptor\SamplerManager.h" />
     <ClInclude Include="Graphics\Resource\ShadowBuffer.h" />
     <ClInclude Include="Camera\ShadowCamera.h" />
+    <ClInclude Include="Effects\LinearDepth\LinearDepth.h" />
     <ClInclude Include="Effects\SSAO\SSAO.h" />
     <ClInclude Include="App\SystemTime.h" />
     <ClInclude Include="Effects\TemporalEffects\TemporalEffects.h" />
@@ -210,6 +211,7 @@
     <ClCompile Include="Graphics\Descriptor\SamplerManager.cpp" />
     <ClCompile Include="Graphics\Resource\ShadowBuffer.cpp" />
     <ClCompile Include="Camera\ShadowCamera.cpp" />
+    <ClCompile Include="Effects\LinearDepth\LinearDepth.cpp" />
     <ClCompile Include="Effects\SSAO\SSAO.cpp" />
     <ClCompile Include="App\SystemTime.cpp" />
     <ClCompile Include="Effects\TemporalEffects\TemporalEffects.cpp" />
@@ -335,7 +337,7 @@
     <FxCompile Include="Display\ImageScaling\LanczosVerticalPS.hlsl">
       <ShaderType>Pixel</ShaderType>
     </FxCompile>
-    <FxCompile Include="Effects\SSAO\LinearizeDepthCS.hlsl" />
+    <FxCompile Include="Effects\LinearDepth\LinearizeDepthCS.hlsl" />
     <FxCompile Include="Display\MagnifyPixelsPS.hlsl">
       <ShaderType>Pixel</ShaderType>
     </FxCompile>

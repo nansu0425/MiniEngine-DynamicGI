@@ -18,10 +18,10 @@
 #include "Core/Graphics/Command/CommandContext.h"
 #include "Core/Camera/Camera.h"
 #include "Core/Effects/TemporalEffects/TemporalEffects.h"
+#include "Core/Effects/LinearDepth/LinearDepth.h"
 
 #include "Output/Core/CompiledShaders/AoPrepareDepthBuffers1CS.h"
 #include "Output/Core/CompiledShaders/AoPrepareDepthBuffers2CS.h"
-#include "Output/Core/CompiledShaders/LinearizeDepthCS.h"
 #include "Output/Core/CompiledShaders/DebugSSAOCS.h"
 #include "Output/Core/CompiledShaders/AoRender1CS.h"
 #include "Output/Core/CompiledShaders/AoRender2CS.h"
@@ -65,8 +65,6 @@ namespace SSAO
     NumVar Accentuation("Graphics/SSAO/Accentuation", 0.1f, 0.0f, 1.0f, 0.1f);
 
     IntVar HierarchyDepth("Graphics/SSAO/Hierarchy Depth", 3, 1, 4);
-
-    void LinearizeZ(ComputeContext& Context, DepthBuffer& Depth, ColorBuffer& LinearDepth, float zMagic);
 }
 
 namespace
@@ -78,7 +76,6 @@ namespace
     ComputePSO s_Render2CS(L"SSAO: Render 2 CS");
     ComputePSO s_BlurUpsampleBlend[2] = { { L"SSAO: Blur Upsample Blend Low Q. CS" }, { L"SSAO: Blur Upsample Blend High Q. CS" } };	// Blend the upsampled result with the next higher resolution
     ComputePSO s_BlurUpsampleFinal[2] = { { L"SSAO: Blur Upsample Final Low Q. CS" }, { L"SSAO: Blur Upsample Final High Q. CS" } };	// Don't blend the result, just upsample it
-    ComputePSO s_LinearizeDepthCS(L"SSAO: Linearize Depth CS");
     ComputePSO s_DebugSSAOCS(L"SSAO: Debug CS");
 
     float SampleThickness[12];	// Pre-computed sample thicknesses
@@ -103,7 +100,6 @@ void SSAO::Initialize( void )
 
     CreatePSO( s_DepthPrepare1CS, g_pAoPrepareDepthBuffers1CS );
     CreatePSO( s_DepthPrepare2CS, g_pAoPrepareDepthBuffers2CS );
-    CreatePSO( s_LinearizeDepthCS,  g_pLinearizeDepthCS );
     CreatePSO( s_DebugSSAOCS, g_pDebugSSAOCS );
     CreatePSO( s_Render1CS, g_pAoRender1CS );
     CreatePSO( s_Render2CS, g_pAoRender2CS );
@@ -290,29 +286,6 @@ namespace SSAO
     }
 }
 
-void SSAO::LinearizeZ(ComputeContext& Context, const Camera& camera, uint32_t FrameIndex)
-{
-    DepthBuffer& Depth = g_SceneDepthBuffer;
-    ColorBuffer& LinearDepth = g_LinearDepth[FrameIndex];
-    const float NearClipDist = camera.GetNearClip();
-    const float FarClipDist = camera.GetFarClip();
-    const float zMagic = (FarClipDist - NearClipDist) / NearClipDist;
-
-    LinearizeZ(Context, Depth, LinearDepth, zMagic);
-}
-
-void SSAO::LinearizeZ(ComputeContext& Context, DepthBuffer& Depth, ColorBuffer& LinearDepth, float zMagic)
-{
-    Context.SetRootSignature(s_RootSignature);
-    Context.TransitionResource(Depth, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-    Context.SetConstants(0, zMagic);
-    Context.SetDynamicDescriptor(3, 0, Depth.GetDepthSRV());
-    Context.TransitionResource(LinearDepth, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-    Context.SetDynamicDescriptors(2, 0, 1, &LinearDepth.GetUAV());
-    Context.SetPipelineState(s_LinearizeDepthCS);
-    Context.Dispatch2D(LinearDepth.GetWidth(), LinearDepth.GetHeight(), 16, 16);
-}
-
 void SSAO::Render( GraphicsContext& GfxContext, const Camera& camera )
 {
     const float* pProjMat = reinterpret_cast<const float*>(&camera.GetProjMatrix());
@@ -340,7 +313,7 @@ void SSAO::Render( GraphicsContext& GfxContext, const float* ProjMat, float Near
         ComputeContext& Context = GfxContext.GetComputeContext();
 
         if (ComputeLinearZ)
-            LinearizeZ(Context, Depth, LinearDepth, zMagic);
+            LinearDepth::Update(Context, NearClipDist, FarClipDist);
 
         if (DebugDraw)
         {

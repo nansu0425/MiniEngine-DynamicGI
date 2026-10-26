@@ -17,6 +17,7 @@
 #include "Core/Graphics/Resource/BufferManager.h"
 #include "Core/Profiling/GpuTimeManager.h"
 #include "Core/Effects/PostEffects/PostEffects.h"
+#include "Core/Effects/LinearDepth/LinearDepth.h"
 #include "Core/Effects/SSAO/SSAO.h"
 #include "Core/Graphics/Resource/ColorBuffer.h"
 #include "Core/App/SystemTime.h"
@@ -429,6 +430,7 @@ void Graphics::Initialize(bool RequireInlineRaytracing)
     GpuTimeManager::Initialize(4096);
     TemporalEffects::Initialize();
     PostEffects::Initialize();
+    LinearDepth::Initialize();
     SSAO::Initialize();
     ParticleEffectManager::Initialize(3840, 2160);
 }
