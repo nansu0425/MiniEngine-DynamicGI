@@ -44,6 +44,8 @@ D3D12_MESSAGE_LOG_HEADER = ENGINE_DIR / 'Core' / 'Automation' / 'D3D12MessageLog
 PACKAGES_CONFIG = ENGINE_DIR / 'Core' / 'packages.config'
 SOURCE_DIRS = [ENGINE_DIR / 'Core', ENGINE_DIR / 'Model']
 SOURCE_SUFFIXES = {'.cpp', '.h', '.inl', '.hlsl', '.hlsli'}
+# source 위치가 있는 MSBuild error 줄. DXC 를 부르는 FxCompile 은 source 를 project 폴더 기준 상대 경로로 적는다.
+MSBUILD_ERROR_WITH_SOURCE = re.compile(r'^(?P<source>[^(:]+)(?P<rest>\([\d,-]+\): .*\[(?P<project>[^\]]+\.vcxproj)\])$')
 
 CONFIGS = ['Debug', 'Profile', 'Release']
 # 기능 확인은 debug layer 가 켜지는 Debug 로 한다. 시간은 Profile 에서 잰다.
@@ -570,8 +572,16 @@ def build(config):
                '-p:PreferredToolArchitecture=x64', '-m', '-nologo', '-v:minimal', f'-flp:logfile={log};verbosity=normal']
     started = time.monotonic()
     completed = subprocess.run(command, capture_output=True, text=True, errors='replace')
-    errors = sorted({line.strip() for line in completed.stdout.splitlines() if re.search(r': (fatal )?error ', line)})
+    errors = sorted({openable_error(line.strip()) for line in completed.stdout.splitlines() if re.search(r': (fatal )?error ', line)})
     return {'ok': completed.returncode == 0, 'seconds': time.monotonic() - started, 'errors': errors, 'log': str(log)}
+
+
+def openable_error(line):
+    """어느 project 의 error 인지 몰라도 source 를 열 수 있게, source 의 상대 경로를 절대 경로로 바꾼 error 줄."""
+    match = MSBUILD_ERROR_WITH_SOURCE.match(line)
+    if match is None or Path(match['source']).is_absolute():
+        return line
+    return f'{Path(match["project"]).parent / match["source"]}{match["rest"]}'
 
 
 def newest_source_mtime():
