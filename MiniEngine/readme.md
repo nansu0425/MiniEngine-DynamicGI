@@ -18,7 +18,7 @@
 * validation log and restore: Log prints the capture with its camera, directional light rotation, TAA and resolution as one line to the Output window. Paste such a line under Restore to bring back the camera, light rotation and TAA. A different resolution or mode is shown as a warning
 * select: click an icon in the scene. Click empty space to deselect
 * gizmo mode of the selected object: W translate, E rotate (without holding the right mouse button)
-* directional light: select its icon and rotate it with the rotate gizmo. It is a KHR_lights_punctual directional light, so the light goes along its local -Z, as the arrow shows, and turning it about its local Z (the blue ring) leaves the light as it is. Its color and intensity (lux) are in the Directional Light panel
+* directional light: select its icon and rotate it with the rotate gizmo. It is a KHR_lights_punctual directional light, so the light goes along its local -Z, as the arrow shows, and turning it about its local Z (the blue ring) leaves the light as it is. Its color and intensity (lux) are in the Directional Light panel, whose Reset Transform sets the transform to no rotation at the origin, so the light goes along world -Z
 
 ## Editor state:
 On exit, ModelViewer saves its state in the working directory, or in the folder given by -settings_dir, and restores it on the next start.

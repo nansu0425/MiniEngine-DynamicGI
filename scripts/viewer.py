@@ -1199,7 +1199,7 @@ def check_light(session, check, changes):
         session.ask_ok(f'settings set {LIGHT_SECTION}: ' + '; '.join(f'{key}={value}' for key, value in values.items()))
 
     usage = session.ask_ok('help')['commands']['light']
-    check('light usage gives the units and axes', all(term in usage for term in ['degrees', '+x', '+z', '+y', '-Z', 'world units', 'lux']), usage)
+    check('light usage gives the units and axes', all(term in usage for term in ['degrees', '+x', '+z', '+y', '-Z', 'world units', 'lux', 'reset']), usage)
 
     original, original_saved = light_state(), saved()
     direction = vector_of(original['direction'])
@@ -1283,6 +1283,15 @@ def check_light(session, check, changes):
           light['color'] == {'r': '0.5', 'g': '0.25', 'b': 1} and light['intensity'] == '2.5'
           and values['Color'] == '0.5,0.25,1' and values['Intensity'] == '2.5',
           f'{light["color"]}, {light["intensity"]}; saved {values["Color"]}, {values["Intensity"]}')
+
+    session.ask_ok('light set direction=0.3,0.8,0.5 position=1,2,3')
+    record_change(session, changes, 'light reset', 'light reset', 'light')
+    light = light_state()
+    check('light reset sets the transform to no rotation at the origin and keeps the color and intensity',
+          np.array_equal(quaternion_of(light['rotation']), [0, 0, 0, 1]) and np.array_equal(vector_of(light['direction']), [0, 0, 1])
+          and np.array_equal(vector_of(light['position']), [0, 0, 0])
+          and light['color'] == {'r': '0.5', 'g': '0.25', 'b': 1} and light['intensity'] == '2.5',
+          str(light))
 
     restore_saved(original_saved)
     check('light is back as it was', light_state() == original, f'{original} -> {light_state()}')

@@ -88,7 +88,10 @@ public:
     // light에 수직인 면의 illuminance (lux). spec은 color를 흰색 light의 intensity에 곱하는 값으로 정한다 (README.md:96).
     Vector3 GetIlluminance() const { return m_Properties.color * Scalar(m_Properties.intensity); }
 
-    // View 메뉴의 Directional Light panel. color와 intensity를 바꾼다.
+    // 회전이 없는 transform으로 둔다. 빛은 world의 -Z로 가고 icon은 원점에 놓인다. color와 intensity는 그대로다.
+    void ResetTransform();
+
+    // View 메뉴의 Directional Light panel. color와 intensity를 바꾸고 transform을 되돌린다.
     void ShowPanel();
 
     virtual const char* GetName() const override { return "Directional Light"; }
@@ -166,6 +169,12 @@ DirectionalLight::DirectionalLight()
     m_Properties.position = Vector3(kZero);
     m_Properties.color = Vector3(1.0f, 1.0f, 1.0f);
     m_Properties.intensity = kDefaultLightIntensity;
+}
+
+void DirectionalLight::ResetTransform()
+{
+    m_Properties.rotation = Matrix3(kIdentity);
+    m_Properties.position = Vector3(kZero);
 }
 
 bool IsColor(Vector3 color)
@@ -574,8 +583,9 @@ void RegisterLight(DirectionalLight& light)
         [&light](EditorSettings::Values& values) { SaveLightSettings(light, values); },
         [&light](const EditorSettings::Values& values) { LoadLightSettings(light, values); });
     ControlChannel::RegisterState("light", [&light] { return DescribeLight(light); });
-    ControlChannel::Register("light", "light set <key>=<value> ...: the directional light, as its rotate and translate gizmos and the Directional Light panel "
-        "change it. It is a KHR_lights_punctual directional light and goes along the local -Z of its transform. "
+    ControlChannel::Register("light", "light set <key>=<value> ... | light reset: the directional light, as its rotate and translate gizmos and the "
+        "Directional Light panel change it. reset sets the transform to no rotation at the origin, so the light goes along world -Z, "
+        "and keeps the color and intensity, as Reset Transform in the panel does. It is a KHR_lights_punctual directional light and goes along the local -Z of its transform. "
         "rotation=<x>,<y>,<z>,<w> is the quaternion of the transform, as a glTF node's rotation. "
         "direction=<x>,<y>,<z> points from a surface toward the light, the local +Z, and is normalized. "
         "elevation=<degrees> is up from the horizon, -90 to 90. azimuth=<degrees> turns about +y from +x toward +z, 0 to 360. "
@@ -586,9 +596,15 @@ void RegisterLight(DirectionalLight& light)
         "Nothing is set unless every value reads back as given. state light has these keys, with the direction the lighting uses",
         [&light](const std::string& arguments, const ControlChannel::Reply& reply)
     {
+        if (arguments == "reset")
+        {
+            light.ResetTransform();
+            reply.Ok(ControlChannel::Fields().Object("state", ControlChannel::GetState("light")));
+            return;
+        }
         if (arguments.compare(0, 4, "set ") != 0)
         {
-            reply.Error("usage: light set <key>=<value> ... . state light reads the light");
+            reply.Error("usage: light set <key>=<value> ... | light reset. state light reads the light");
             return;
         }
         SetLight(light, arguments.substr(4), reply);
@@ -666,9 +682,13 @@ void DirectionalLight::ShowPanel()
             m_Properties.intensity = std::max(0.0f, m_Properties.intensity);
         ImGui::SetItemTooltip("Illuminance on a surface facing the light, in lux.");
 
+        ImGui::SeparatorText("Transform");
         const Vector3 direction = GetDirection();
         ImGui::Text("Toward the light: %.3f, %.3f, %.3f", (float)direction.GetX(), (float)direction.GetY(), (float)direction.GetZ());
         ImGui::Text("Elevation %.2f, azimuth %.2f degrees", GetElevation(direction), GetAzimuth(direction));
+        if (ImGui::Button("Reset Transform"))
+            ResetTransform();
+        ImGui::SetItemTooltip("Sets the transform to no rotation at the origin, so the light goes along world -Z. The color and intensity stay.");
         ImGui::TextDisabled("Select the light's icon and rotate it with the gizmo (E).");
     });
 }
