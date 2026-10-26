@@ -33,11 +33,11 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 5. Lambert path 와 furnace (끝남: cf52623, a5060e3)
 6. Export 와 비교 script (끝남: 4cdb55e, 2b33c11)
 
-- C. Raster 의 IBL 제거: raster 가 IBL 과, IBL 에만 쓰던 SSAO 와 occlusion texture 를 쓰지 않는다. skybox 는 Environment 의 radiance cube 를 mip 0 으로 그린다.
+- C. Raster 의 IBL 과 Environment 제거: raster 가 IBL 과, IBL 에만 쓰던 SSAO 와 occlusion texture, Environment 의 cubemap 을 쓰지 않는다. sky 는 작업 9 전까지 그리지 않는다.
 
 7. Directional Light: sun 을 KHR_lights_punctual 의 directional light 로 바꾸고, gizmo 로 그 transform 을 조작한다. raster 는 그 light 를 spec 의 단위로 받고, PT 는 그 직접광을 더한다.
 8. glTF BRDF: spec 을 따르는 BRDF 를 넣고 BRDF 단위의 test 로 확인한다. raster 의 directional light 항도 같은 BRDF 를 쓴다.
-9. Sky: Environment 의 cubemap 을 sky 로 쓴다.
+9. Sky: 상수 sky 를 한 곳에 두고 raster 의 배경과 PT 가 같이 쓴다.
 10. Log 와 Restore: 측정 조건을 Log 한 줄로 남기고, app 을 다시 실행해도 그 줄로 되돌린다.
 11. Indirect Irradiance: DDGI 와 비교할 양을 누적하는 출력을 더한다.
 12. 수렴과 측정: 고정 시점에서 수렴과 bias 를 재고 ground truth 의 spp 를 정한다.
@@ -63,8 +63,9 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 ### 순서의 이유
 
 - 작업 4 는 normal 을 쓰는 shading (작업 5 부터) 앞이다. PT 가 정답이므로 그 입력이 먼저 spec 을 따라야 하고, 늦게 고치면 그 뒤의 확인과 측정을 다시 해야 한다. 작업 1, A, B, 2 도 같은 이유로 앞에 두었다.
-- 작업 5, 6 은 답을 식으로 아는 furnace 로 path loop 를 먼저 확인한다. 작업 7 ~ 9 는 그 loop 에 directional light, glTF BRDF, sky 를 하나씩 더한다.
+- 작업 5, 6 은 답을 식으로 아는 furnace 로 path loop 를 먼저 확인한다. 작업 7, 8 은 그 loop 에 directional light 와 glTF BRDF 를 하나씩 더한다.
 - 작업 C 는 작업 7 앞이다. raster 의 빛을 directional light 와 emission 으로 먼저 줄여서, 작업 7 이 raster 에서 바꾸는 빛을 directional light 하나로 둔다.
+- 작업 9 는 작업 7 뒤다. 상수 sky 의 값은 directional light 의 lux 와의 비로 정하므로 그 단위가 먼저 있어야 한다.
 - 작업 10 은 작업 11, 12 앞이다. 측정의 고정 시점과 작업 13 의 camera 가 Restore 를 쓰고, 발표가 restart 뒤의 재현을 보일 수 있다.
 - 작업 13 은 마지막이다. 독립된 estimator 와 맞춰 보는 가장 강한 근거지만 원인 찾기의 상한을 알 수 없으므로, 작업 12 뒤에 두어 발표의 핵심 자료를 먼저 확보한다. (a) 를 하는 동안 작업 12 의 GPU run 을 돌린다.
 
@@ -83,7 +84,7 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 
 - PT 의 입력을 spec 에 맞춘 것: 1, A, B, 2, 4
 - PT 가 맞다는 근거: furnace (5, 6), BRDF 단위의 test (8), 수렴과 bias (12), 외부 renderer 와의 비교 (13)
-- raster 에서 IBL 을 뺀 이유, directional light 의 단위와 BRDF 를 고른 이유: C, 7, 8
+- raster 에서 IBL 과 Environment 를 빼고 sky 를 상수로 둔 이유, directional light 의 단위와 BRDF 를 고른 이유: C, 7, 8, 9
 - 같은 시점의 raster 와 PT, restart 뒤의 재현: 9, 10
 - DDGI 가 비교할 양과, DDGI 가 계산하지 않는 path 의 몫: 11, 12
 - 비용 (GPU time, ground truth 까지의 시간): 5, 12
@@ -103,7 +104,7 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 
 - TANGENT 가 없을 때 MikkTSpace 로 tangent 를 만드는 일 (`Specification.adoc:1759`): TANGENT 없이 normal map 을 쓰는 asset 을 처음 쓸 때. 계획은 7b3ba43 의 이 문서 작업 4 (a) 에 있다.
 - metal 의 multiple scattering: rough 한 metal 의 energy 손실이 결과를 바꾸는 장면이나 RT Reflection 전
-- sky 의 importance sampling 과 MIS: sky 가 firefly 를 만들거나 수렴을 막을 때
+- 방향에 따라 다른 sky 와 그 importance sampling, MIS: 상수 sky 로는 볼 수 없는 결과가 필요해질 때. 그때 맞는 sky 를 구하거나 만든다.
 - emissive triangle 의 NEE: 작은 emitter 가 수렴을 막을 때
 - stratified sampler, blue noise: 수렴 시간이 문제가 될 때
 - infra 검증 5-4 ~ 5-7 의 mode: PT 에 그 문제로 보이는 결과가 나올 때 (323e185)
