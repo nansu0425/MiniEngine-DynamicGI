@@ -33,7 +33,7 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 5. Lambert path 와 furnace (끝남: cf52623, a5060e3)
 6. Export 와 비교 script (끝남: 4cdb55e, 2b33c11)
 
-- C. Raster 의 IBL 과 Environment 제거: raster 가 IBL 과, IBL 에만 쓰던 SSAO 와 occlusion texture, Environment 의 cubemap 을 쓰지 않는다. sky 는 작업 9 전까지 그리지 않는다.
+- C. Raster 의 IBL 과 Environment 제거 (끝남: 64b37fb, a5dd835, 35e8e58)
 
 7. Directional Light: sun 을 KHR_lights_punctual 의 directional light 로 바꾸고, gizmo 로 그 transform 을 조작한다. raster 는 그 light 를 spec 의 단위로 받고, PT 는 그 직접광을 더한다.
 8. glTF BRDF: spec 을 따르는 BRDF 를 넣고 BRDF 단위의 test 로 확인한다. raster 의 directional light 항도 같은 BRDF 를 쓴다.
@@ -51,7 +51,7 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 |---|---|
 | 10/24 | 끝남: 1, A, B, harness 의 D3D12 log 수집 (573dded) 과 그 log 로 찾은 Lighting 수정 (e8a2352), 문서 정리 |
 | 10/25 | 끝남: 2, 3, 4 |
-| 10/26 | 끝남: 5, 6. C, 7 |
+| 10/26 | 끝남: 5, 6, C. 7 |
 | 10/27 | 8, 9, 10 |
 | 10/28 | 11, 12, 13 (a) |
 | 10/29 오전 | 13 (b) |
@@ -110,4 +110,5 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 - infra 검증 5-4 ~ 5-7 의 mode: PT 에 그 문제로 보이는 결과가 나올 때 (323e185)
 - albedo 1 의 furnace 에서 16384 번 넘게 반사하고도 escape 하지 못한 path 가 어디에 갇혔는지 보는 일 (a5060e3): 작업 13 이나 PT 에서 leak, self-hit 로 보이는 결과가 나올 때
 - PT panel 의 Export button: script 없이 사람이 PT 의 값을 export 할 일이 생길 때. 지금은 harness 의 `capture pt` 로만 export 한다 (2b33c11).
+- Engine Tuning 의 Graphics/SSAO 항목을 없애는 일: ModelViewer 는 SSAO 를 돌리지 않지만 engine 의 SSAO module 이 남아 있어 효과 없는 항목이 보인다. legacy Sponza renderer 를 지울 때 (35e8e58)
 - NaN 이나 Inf 라서 버린 sample 수를 panel 에 보이는 일: 작업 8 부터 PT 에 NaN 이나 Inf 가 생겨 사람이 실행 중에 봐야 할 때. 지금은 export 의 a 로만 센다 (2b33c11).
