@@ -1,0 +1,30 @@
+{
+    // cwd 는 Visual Studio 의 기본 작업 폴더인 project 폴더다. 그래야 VS 로 띄울 때와 같은 asset 경로, editor.ini, imgui.ini 를 쓴다.
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "ModelViewer Debug",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/MiniEngine/Build/x64/Debug/Output/ModelViewer/ModelViewer.exe",
+            "cwd": "${workspaceFolder}/MiniEngine/ModelViewer",
+            "preLaunchTask": "build Debug"
+        },
+        {
+            "name": "ModelViewer Profile",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/MiniEngine/Build/x64/Profile/Output/ModelViewer/ModelViewer.exe",
+            "cwd": "${workspaceFolder}/MiniEngine/ModelViewer",
+            "preLaunchTask": "build Profile"
+        },
+        {
+            "name": "ModelViewer Release",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/MiniEngine/Build/x64/Release/Output/ModelViewer/ModelViewer.exe",
+            "cwd": "${workspaceFolder}/MiniEngine/ModelViewer",
+            "preLaunchTask": "build Release"
+        }
+    ]
+}

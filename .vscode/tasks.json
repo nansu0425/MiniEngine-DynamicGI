@@ -1,0 +1,30 @@
+{
+    // MSBuild 를 직접 부르지 않고 viewer.py 의 build 를 거친다. Visual Studio 와 pch 가 호환되는 MSBuild 와 option 을 그쪽이 고른다.
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build Debug",
+            "type": "process",
+            "command": "python",
+            "args": ["${workspaceFolder}/scripts/viewer.py", "build", "--config", "Debug"],
+            "group": { "kind": "build", "isDefault": true },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "build Profile",
+            "type": "process",
+            "command": "python",
+            "args": ["${workspaceFolder}/scripts/viewer.py", "build", "--config", "Profile"],
+            "group": "build",
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "build Release",
+            "type": "process",
+            "command": "python",
+            "args": ["${workspaceFolder}/scripts/viewer.py", "build", "--config", "Release"],
+            "group": "build",
+            "problemMatcher": "$msCompile"
+        }
+    ]
+}
