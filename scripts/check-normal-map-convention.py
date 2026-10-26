@@ -51,6 +51,7 @@ from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from gltfwriter import GLTF_FLOAT, GLTF_UNSIGNED_SHORT, BufferBuilder, flatten
+from imagemasks import column_groups, eroded
 from viewer import HARNESS_DIR, SETTLE_FRAMES
 
 SCENE_DIR = HARNESS_DIR / 'normal-map-convention'
@@ -206,31 +207,6 @@ def command_make(args):
 
 def capture_path(name):
     return SCENE_DIR / f'{name.replace(" ", "-")}.png'
-
-
-def eroded(mask, pixels):
-    for _ in range(pixels):
-        inner = mask.copy()
-        inner[1:, :] &= mask[:-1, :]
-        inner[:-1, :] &= mask[1:, :]
-        inner[:, 1:] &= mask[:, :-1]
-        inner[:, :-1] &= mask[:, 1:]
-        inner[[0, -1], :] = False
-        inner[:, [0, -1]] = False
-        mask = inner
-    return mask
-
-
-def column_groups(mask):
-    """mask 를 pixel 이 있는 column 이 이어진 덩어리로 나눈 mask 의 list. 왼쪽부터다."""
-    columns = np.concatenate([[False], mask.any(axis=0), [False]])
-    edges = np.flatnonzero(columns[1:] != columns[:-1])
-    groups = []
-    for start, end in zip(edges[::2], edges[1::2]):
-        group = np.zeros_like(mask)
-        group[:, start:end] = mask[:, start:end]
-        groups.append(group)
-    return groups
 
 
 def decoded_normals(capture, group):

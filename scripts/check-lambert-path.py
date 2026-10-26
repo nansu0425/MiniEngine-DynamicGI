@@ -56,9 +56,10 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from checks import Checks, stop_and_check
 from imagefiles import ImageFileError, read_dds_rgba32f
-from pathtracerchecks import (BASE, EMISSION_FURNACE, FURNACE_SAMPLES, RECORD, SECTION, WHITE_FURNACE, Checks, append_record_row,
-                              code_version, describe_machine, path_tracer_state, set_path_tracer, stop_and_check)
+from pathtracerchecks import (BASE, EMISSION_FURNACE, FURNACE_SAMPLES, RECORD, SECTION, WHITE_FURNACE, append_record_row, code_version,
+                              describe_machine, path_tracer_state, set_path_tracer)
 from viewer import HARNESS_DIR, PREVIEW_EXPOSURE, HarnessError, Session, capture, make_view, start_instance, stop_instance
 
 KEPT_DIR = HARNESS_DIR / 'kept' / 'lambert-path'
