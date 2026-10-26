@@ -135,9 +135,8 @@ BOUNCE_STEPS = [1, 2, 4]
 WAIT_TIMEOUT = 900
 DIRECT = BASE | {'Sky Radiance': 0, 'Max Bounces': 1, 'Russian Roulette': 0, 'Target Samples': PT_SAMPLES}
 BEFORE_VIEWS = {'Debug: Sun Visibility': 'Debug: Light Visibility', 'Debug: Sun Culling Difference': 'Debug: Light Culling Difference'}
-# 이 light 의 이름이 sun 이던 때의 기록과, 이 script 의 판정 자체
+# 이 light 의 이름이 sun 이던 때의 기록. 이 script 의 판정 자체는 SUN_EXCLUDED_PATHS 가 뺀다.
 SUN_EXCEPTIONS = [
-    ('docs/reference-path-tracer-roadmap.md', '7. Directional Light: sun 을'),
     ('docs/harness-roadmap.md', 'agent 가 sun 의 translate gizmo'),
 ]
 SUN_EXCLUDED_PATHS = [':!*.pdf', ':!MiniEngine/Model/Loader/json.hpp', ':!MiniEngine/Model/Sponza', ':!scripts/check-directional-light.py']

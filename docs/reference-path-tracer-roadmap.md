@@ -35,7 +35,7 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 
 - C. Raster 의 IBL 과 Environment 제거 (끝남: 64b37fb, a5dd835, 35e8e58)
 
-7. Directional Light: sun 을 KHR_lights_punctual 의 directional light 로 바꾸고, gizmo 로 그 transform 을 조작한다. raster 는 그 light 를 spec 의 단위로 받고, PT 는 그 직접광을 더한다.
+7. Directional Light (끝남: f57e319, c24314b, 648aea9, 7d8148f, c8610b9, 665bea1)
 8. glTF BRDF: spec 을 따르는 BRDF 를 넣고 BRDF 단위의 test 로 확인한다. raster 의 directional light 항도 같은 BRDF 를 쓴다.
 9. Sky: 상수 sky 를 한 곳에 두고 raster 의 배경과 PT 가 같이 쓴다.
 10. Log 와 Restore: 측정 조건을 Log 한 줄로 남기고, app 을 다시 실행해도 그 줄로 되돌린다.
@@ -51,7 +51,7 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 |---|---|
 | 10/24 | 끝남: 1, A, B, harness 의 D3D12 log 수집 (573dded) 과 그 log 로 찾은 Lighting 수정 (e8a2352), 문서 정리 |
 | 10/25 | 끝남: 2, 3, 4 |
-| 10/26 | 끝남: 5, 6, C. 7 |
+| 10/26 | 끝남: 5, 6, C, 7 |
 | 10/27 | 8, 9, 10 |
 | 10/28 | 11, 12, 13 (a) |
 | 10/29 오전 | 13 (b) |
@@ -112,3 +112,6 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 - PT panel 의 Export button: script 없이 사람이 PT 의 값을 export 할 일이 생길 때. 지금은 harness 의 `capture pt` 로만 export 한다 (2b33c11).
 - Engine Tuning 의 Graphics/SSAO 항목을 없애는 일: ModelViewer 는 SSAO 를 돌리지 않지만 engine 의 SSAO module 이 남아 있어 효과 없는 항목이 보인다. legacy Sponza renderer 를 지울 때 (35e8e58)
 - NaN 이나 Inf 라서 버린 sample 수를 panel 에 보이는 일: 작업 8 부터 PT 에 NaN 이나 Inf 가 생겨 사람이 실행 중에 봐야 할 때. 지금은 export 의 a 로만 센다 (2b33c11).
+- normal map 이 없는 material 의 shading normal 을 vertex normal 그대로 두는 일: 작업 13 (a) 의 Cornell box 처럼 normal map 이 없는 장면을 정답으로 쓰기 전. 지금은 그런 material 에도 기본 flat normal texture (8 bit 의 128, 128, 255) 를 적용해 PT 의 shading normal 이 0.3° 쯤 기울고, check-directional-light.py 의 [P4] 가 그 오차를 허용한다 (c8610b9).
+- vertex normal 을 float 로 담는 일: shading normal 의 오차가 측정에 보일 때. 지금은 R10G10B10A2 로 담아 성분마다 1/1023 까지 다르다 (c8610b9).
+- 일반 game engine 처럼 transform 을 편집하는 일 (translate 의 Local 과 World, Inspector 의 수치 입력, snap, undo): 이 로드맵 밖에서 따로 한다. 지금은 rotate 만 Local 과 World 를 고르고, 수치는 harness 의 light set 으로만 넣는다 (665bea1).
