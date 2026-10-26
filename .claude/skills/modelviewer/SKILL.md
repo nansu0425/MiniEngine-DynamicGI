@@ -1,6 +1,6 @@
 ---
 name: modelviewer
-description: ModelViewer 를 build, run, drive, screenshot, verify 하는 harness (scripts/viewer.py). 코드를 고친 뒤 실제 app 에서 동작을 확인할 때, app 을 띄워 camera, sun, 설정, panel, editor 의 선택을 명령으로 바꾸고 그 상태를 state 로 읽을 때, 화면에 무엇이 보이는지 pick 으로 볼 때, 화면을 capture 해 볼 때, crash 와 hang 을 판정할 때 쓴다.
+description: ModelViewer 를 build, run, drive, screenshot, verify 하는 harness (scripts/viewer.py). 코드를 고친 뒤 실제 app 에서 동작을 확인할 때, app 을 띄워 camera, directional light, 설정, panel, editor 의 선택을 명령으로 바꾸고 그 상태를 state 로 읽을 때, 화면에 무엇이 보이는지 pick 으로 볼 때, 화면을 capture 해 볼 때, crash 와 hang 을 판정할 때 쓴다.
 ---
 
 # ModelViewer harness
@@ -15,7 +15,7 @@ harness 로 할 수 없는 일을 만나면 그 일이 계획되어 있는지와
 - OS 를 거쳐야만 보이는 것은 computer use 로 본다 (아래 computer use 절). computer use 를 쓸 수 없는 session 에서는 그것을 사용자에게 확인해 달라고 부탁한다.
 - D3D12 debug layer 의 message 를 봐야 하면 Debug 로 띄운다. `start` 는 다른 config 에 `-debug 1` 을 주지 않으므로 debug layer 가 꺼져 message 자체가 생기지 않는다 (`start` 가 상태를 알린다).
 - DXGI message 는 harness 로도 computer use 로도 볼 수 없으므로 사용자에게 확인을 부탁한다.
-- UI 와 mouse 로 바꾸는 상태는 같은 상태를 바꾸는 명령으로 바꾼다. gizmo 가 바꾸는 sun 의 방향과 위치, icon click 과 W, E 가 바꾸는 editor 의 선택과 gizmo mode 도 그렇다. 명령은 `do help` 에 있다. gizmo 를 화면으로 보고 판단하거나 끌지 않는다 (근거는 `docs/harness-roadmap.md` 의 보류한 결정).
+- UI 와 mouse 로 바꾸는 상태는 같은 상태를 바꾸는 명령으로 바꾼다. gizmo 가 바꾸는 directional light 의 rotation 과 위치, icon click 과 W, E 가 바꾸는 editor 의 선택과 gizmo mode 도 그렇다. 명령은 `do help` 에 있다. gizmo 를 화면으로 보고 판단하거나 끌지 않는다 (근거는 `docs/harness-roadmap.md` 의 보류한 결정).
 
 ## 실행 loop
 
@@ -88,7 +88,7 @@ harness 로 할 수 없는 일을 만나면 그 일이 계획되어 있는지와
 - 조작 (결과는 판정 절에 따라 `state` 로 확인한다)
   - ImGui menu 와 panel 은 left click 으로 다룬다. F1 로 UI 를 숨겼다 되돌려도 dock 배치는 남는다.
   - 키를 누른 채 두려면 `hold_key` 를 쓴다.
-  - gizmo 는 끌지 않는다. gizmo 가 바꾸는 상태는 `sun set` 과 `editor` 로 바꾼다 (쓰는 범위 절).
+  - gizmo 는 끌지 않는다. gizmo 가 바꾸는 상태는 `light set` 과 `editor` 로 바꾼다 (쓰는 범위 절).
   - computer use 는 오른쪽과 가운데 button 을 누른 채 둘 수 없어서 camera 를 움직이지 못한다 (camera 조작법은 `MiniEngine/readme.md` 의 Controls). camera 는 `pose` 와 `pose look-at` 으로 옮긴다.
 - Esc 로 끝내면 정상 종료된다. Esc 는 DirectInput 으로 읽으므로 ModelViewer 창이 foreground 여야 한다. 끝난 뒤에는 `stop` 으로 instance 를 정리하고 log 요약을 본다.
 
@@ -96,7 +96,7 @@ harness 로 할 수 없는 일을 만나면 그 일이 계획되어 있는지와
 
 ```
 python scripts/viewer.py start
-python scripts/viewer.py do "ui hide" "state sun" "sun set elevation=20 azimuth=200" "pick grid 16x9"
+python scripts/viewer.py do "ui hide" "state light" "light set elevation=20 azimuth=200" "pick grid 16x9"
 python scripts/viewer.py do "settings set Ray Tracing View: View=Validation: Depth Comparison" "frames 2" "validation capture" "validation fit"
 python scripts/viewer.py shot overlay --max-width 640
 python scripts/viewer.py run scripts/harness-scenarios/acceptance.txt

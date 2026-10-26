@@ -40,7 +40,7 @@ cbuffer GlobalConstants : register(b1)
     float4x4 ShadowMatrix;
     float3 ViewerPos;
     float3 LightDirection;
-    float3 LightIntensity;
+    float3 LightIlluminance;
 }
 
 struct VSOutput
@@ -247,7 +247,7 @@ float4 main(VSOutput vsOutput, bool isFrontFace : SV_IsFrontFace) : SV_Target0
     float shadow = texShadow.SampleCmpLevelZero( shadowSampler, vsOutput.shadowCoord.xy, vsOutput.shadowCoord.z );
     if (SurfaceOccludesLight(vsOutput.worldPos, Surface.V))
         shadow = 0.0;
-    colorAccum += ShadeDirectionalLight(Surface, LightDirection, shadow * LightIntensity);
+    colorAccum += ShadeDirectionalLight(Surface, LightDirection, shadow * LightIlluminance);
 
     // TODO: Shade each light using Forward+ tiles
 

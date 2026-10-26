@@ -12,7 +12,7 @@ app 을 Debug 로 세 번 띄우고 끝내며, 이미 띄운 harness instance �
 float 의 bit 가 같다는 뜻이다.
 
 test scene 은 xy 평면의 quad 셋을 x 축을 따라 놓은 것이다. -model 의 OrbitCamera 는 model 중심의 +z 쪽에서 -z 를 본다
-(OrbitCamera::Update). 모든 material 은 흰 baseColor, metallic 0, roughness 1 이고, light 는 sun set direction=LIGHT_DIRECTION 으로
+(OrbitCamera::Update). 모든 material 은 흰 baseColor, metallic 0, roughness 1 이고, light 는 light set direction=LIGHT_DIRECTION 으로
 quad 의 뒤쪽 위에 둔다.
 
   dark: +z 를 향해 light 를 등지고, emission 이 없다.
@@ -158,7 +158,7 @@ def run_test_scene(scene, build_first, check):
         session = Session(instance)
         try:
             session.ask_ok('ui hide')
-            session.ask_ok('sun set direction=' + ','.join(f'{value:g}' for value in LIGHT_DIRECTION))
+            session.ask_ok('light set direction=' + ','.join(f'{value:g}' for value in LIGHT_DIRECTION))
             session.ask_ok(f'frames {SETTLE_FRAMES}')
             rgb = read_dds_rgba32f(capture(session, 'scene', f'{scene}-scene'))[..., :3]
             session.ask_ok('settings set Ray Tracing View: View=Debug: Front Face')

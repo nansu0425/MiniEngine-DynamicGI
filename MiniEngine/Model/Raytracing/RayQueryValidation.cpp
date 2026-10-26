@@ -84,7 +84,7 @@ namespace
         float jitterX;
         float jitterY;
         bool taa;
-        // camera와 sun처럼 app이 정한 조건
+        // camera와 directional light처럼 app이 정한 조건
         RayQueryValidation::SceneConditions scene;
     };
 
@@ -382,7 +382,7 @@ namespace
         return values;
     }
 
-    // TAA는 직접 되돌리고 camera와 sun은 app에 맡긴다. 해상도와 mode는 사용자가 바꾸도록 차이만 기록한다.
+    // TAA는 직접 되돌리고 camera와 directional light는 app에 맡긴다. 해상도와 mode는 사용자가 바꾸도록 차이만 기록한다.
     void Restore(const std::string& line)
     {
         const RayQueryValidation::SceneConditions values = ParseLogLine(line);
@@ -407,7 +407,7 @@ namespace
     {
         const ImVec4 kWarningColor(1.0f, 0.75f, 0.2f, 1.0f);
         if (!s_Restored.sceneRestored)
-            ImGui::TextColored(kWarningColor, "Warning: the camera and sun are not restored. The line lacks them.");
+            ImGui::TextColored(kWarningColor, "Warning: the camera and light are not restored. The line lacks them.");
         if (s_Restored.taa)
             ImGui::TextColored(kWarningColor, "Warning: TAA was on in the line, so its jitter cannot be reproduced.");
 
@@ -437,7 +437,7 @@ namespace
             Restore(s_RestoreLine);
         ImGui::EndDisabled();
         ImGui::SetItemTooltip(s_RestoreScene ?
-            "Sets the camera, sun and TAA as in the line. The resolution and the TAA jitter are not restored." :
+            "Sets the camera, light and TAA as in the line. The resolution and the TAA jitter are not restored." :
             "Needs the editor camera.");
 
         if (s_HasRestored)
@@ -501,7 +501,7 @@ namespace
                 .Object("state", ControlChannel::GetState("validation")));
         });
 
-        ControlChannel::Register("describe", "describe: the camera, sun and TAA as a line that restore takes", [](const std::string&, const ControlChannel::Reply& reply)
+        ControlChannel::Register("describe", "describe: the camera, directional light and TAA as a line that restore takes", [](const std::string&, const ControlChannel::Reply& reply)
         {
             if (!s_DescribeScene)
             {
@@ -527,7 +527,7 @@ namespace
             Restore(arguments);
             if (!s_Restored.sceneRestored)
             {
-                reply.Error("the line lacks the camera or sun. Only TAA was restored.");
+                reply.Error("the line lacks the camera or light. Only TAA was restored.");
                 return;
             }
             // TAA는 Engine Tuning에 있다.
@@ -642,7 +642,7 @@ void RayQueryValidation::ShowSection(void)
     if (ImGui::Button("Log"))
         Utility::Print((DescribeCapture(s_Capture) + "\n").c_str());
     ImGui::EndDisabled();
-    ImGui::SetItemTooltip("Prints the capture with its camera, sun, TAA and resolution as one line to the Output window.");
+    ImGui::SetItemTooltip("Prints the capture with its camera, light, TAA and resolution as one line to the Output window.");
 
     if (s_HasCapture)
         ShowCapture(s_Capture);

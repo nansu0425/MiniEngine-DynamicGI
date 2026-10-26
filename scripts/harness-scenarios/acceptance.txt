@@ -3,14 +3,14 @@
 # baseline 의 client 1920x1080 에서 UI 를 숨기면 scene 의 가운데 pixel 은 960 540 이다.
 ui hide
 
-# 1. sun 을 낮게 둔다. 판정: state 의 sun 이 요청한 고도와 방위이고, raw 값 (Engine Tuning 의 Sun Orientation, Inclination) 이 그 방향을 만든다.
-sun_before = state sun
-sun set elevation=20 azimuth=200
+# 1. directional light 를 낮게 둔다. 판정: state 의 light 가 요청한 고도와 방위이고, editor.ini 에 남는 Direction 이 그 방향이다.
+light_before = state light
+light set elevation=20 azimuth=200
 lit = state
 
-# 2. Sun 을 고르고 rotate gizmo 를 띄운 채 display 를 찍는다. 판정: state editor 와, 그 image 를 그린 frame 의 state 파일.
+# 2. Directional Light 를 고르고 rotate gizmo 를 띄운 채 display 를 찍는다. 판정: state editor 와, 그 image 를 그린 frame 의 state 파일.
 ui show
-editor select Sun
+editor select Directional Light
 editor mode rotate
 gizmo = capture display {shots}/acceptance-rotate-gizmo
 selection = state editor

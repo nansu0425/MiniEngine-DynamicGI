@@ -46,7 +46,8 @@
         "sparse": [
             "/LICENSE.adoc",
             "/LICENSES/CC-BY-4.0.txt",
-            "/specification/2.0/"
+            "/specification/2.0/",
+            "/extensions/2.0/Khronos/KHR_lights_punctual/"
         ]
     },
     {

@@ -1146,7 +1146,8 @@ def check_state(session, check):
     session.ask_ok(f'frames {SETTLE_FRAMES}')
 
 
-SUN_KEYS = {key: f'Viewer/Lighting/Sun {key.title()}' for key in ['orientation', 'inclination']} | {'intensity': 'Viewer/Lighting/Sun Light Intensity'}
+LIGHT_OBJECT = 'Directional Light'
+LIGHT_SECTION = 'Directional Light'
 
 
 def vector_of(fields):
@@ -1154,16 +1155,14 @@ def vector_of(fields):
     return np.array([float(fields[axis]) for axis in 'xyz'])
 
 
+def numbers_of(text):
+    import numpy as np
+    return np.array([float(value) for value in text.split(',')])
+
+
 def degrees_between(first, second):
     difference = (first - second) % 360.0
     return min(difference, 360.0 - difference)
-
-
-def sun_direction_of(orientation, inclination):
-    """ModelViewer.cpp 의 GetSunDirection 과 같은 식. 그 식은 π 대신 3.14159 를 쓴다."""
-    import numpy as np
-    theta, phi = float(orientation), float(inclination) * 3.14159 * 0.5
-    return np.array([np.cos(theta) * np.cos(phi), np.sin(phi), np.sin(theta) * np.cos(phi)])
 
 
 def elevation_and_azimuth_of(direction):
@@ -1171,100 +1170,122 @@ def elevation_and_azimuth_of(direction):
     return np.degrees(np.arcsin(direction[1])), np.degrees(np.arctan2(direction[2], direction[0])) % 360.0
 
 
-def check_sun(session, check, changes):
-    """sun set 이 gizmo 와 Engine Tuning 이 바꾸는 raw 값을 바꾸고, state sun 이 조명이 쓰는 방향과 맞는지 본다.
-    UI 를 숨기고 TAA 를 끈 상태에서 부르고, sun 을 처음 상태로 되돌려 놓는다."""
+def rotate(quaternion, vector):
+    """x, y, z, w 순서의 단위 quaternion 으로 vector 를 돌린다."""
+    import numpy as np
+    axis, w = np.asarray(quaternion[:3], dtype=float), float(quaternion[3])
+    vector = np.asarray(vector, dtype=float)
+    twice = 2.0 * np.cross(axis, vector)
+    return vector + w * twice + np.cross(axis, twice)
+
+
+def quaternion_of(fields):
+    import numpy as np
+    return np.array([float(fields[axis]) for axis in 'xyzw'])
+
+
+def check_light(session, check, changes):
+    """light set 이 gizmo 와 panel 이 바꾸는 값을 바꾸고, state light 가 조명이 쓰는 방향과 editor.ini 에 남는 값에 맞는지 본다.
+    UI 를 숨기고 TAA 를 끈 상태에서 부르고, light 를 처음 상태로 되돌려 놓는다."""
     import numpy as np
 
-    def raw_sun():
-        values = session.ask_ok('settings get Engine Tuning')['values']
-        return {key: values[name] for key, name in SUN_KEYS.items()}
+    def light_state():
+        return session.ask_ok('state light')['state']['light']
 
-    def sun_state():
-        return session.ask_ok('state sun')['state']['sun']
+    def saved():
+        return session.ask_ok(f'settings get {LIGHT_SECTION}')['values']
 
-    def restore_raw(raw):
-        session.ask_ok('settings set Engine Tuning: ' + '; '.join(f'{SUN_KEYS[key]}={raw[key]}' for key in ['orientation', 'inclination']))
+    def restore_saved(values):
+        session.ask_ok(f'settings set {LIGHT_SECTION}: ' + '; '.join(f'{key}={value}' for key, value in values.items()))
 
-    usage = session.ask_ok('help')['commands']['sun']
-    check('sun usage gives the units and axes', all(term in usage for term in ['degrees', '+x', '+z', '+y', 'world units']), usage)
+    usage = session.ask_ok('help')['commands']['light']
+    check('light usage gives the units and axes', all(term in usage for term in ['degrees', '+x', '+z', '+y', '-Z', 'world units', 'lux']), usage)
 
-    original_raw, original = raw_sun(), sun_state()
-    expected = sun_direction_of(original_raw['orientation'], original_raw['inclination'])
+    original, original_saved = light_state(), saved()
     direction = vector_of(original['direction'])
     elevation, azimuth = elevation_and_azimuth_of(direction)
-    check('state sun direction is GetSunDirection of the raw Sun Orientation and Inclination, and elevation, azimuth are of that direction',
-          np.abs(direction - expected).max() <= 1e-6 and abs(float(original['elevation']) - elevation) <= 1e-4
-          and degrees_between(float(original['azimuth']), azimuth) <= 1e-4,
-          f'{original["direction"]} vs {expected.tolist()}; elevation {original["elevation"]} vs {elevation}, azimuth {original["azimuth"]} vs {azimuth}')
+    check('state light direction is the +Z of its rotation and the Direction saved in editor.ini, and elevation, azimuth are of that direction',
+          np.abs(rotate(quaternion_of(original['rotation']), [0, 0, 1]) - direction).max() <= 1e-6
+          and np.array_equal(numbers_of(original_saved['Direction']).astype(np.float32), direction.astype(np.float32))
+          and abs(float(original['elevation']) - elevation) <= 1e-4 and degrees_between(float(original['azimuth']), azimuth) <= 1e-4,
+          f'{original["rotation"]}, {original["direction"]}, saved {original_saved["Direction"]}; '
+          f'elevation {original["elevation"]} vs {elevation}, azimuth {original["azimuth"]} vs {azimuth}')
 
     session.ask_ok(f'frames {SETTLE_FRAMES}')
-    reference = read_dds_rgba32f(capture(session, 'scene', 'selftest-sun-before'))
+    reference = read_dds_rgba32f(capture(session, 'scene', 'selftest-light-before'))
 
     misread = []
-    for elevation, azimuth in [(30, 120), (5, 350)]:
-        record_change(session, changes, f'sun set elevation={elevation} azimuth={azimuth}', f'sun set elevation={elevation} azimuth={azimuth}', 'sun')
-        sun, raw = sun_state(), raw_sun()
-        if (abs(float(sun['elevation']) - elevation) > 1e-4 or degrees_between(float(sun['azimuth']), azimuth) > 1e-4
-                or raw['orientation'] == original_raw['orientation'] or raw['inclination'] == original_raw['inclination']):
-            misread.append(f'{elevation},{azimuth} read {sun["elevation"]},{sun["azimuth"]} raw {raw}')
-    check('sun set elevation, azimuth reads them back and changes the raw values', not misread, '; '.join(misread))
+    for elevation, azimuth in [(30, 120), (5, 350), (-20, 45)]:
+        record_change(session, changes, f'light set elevation={elevation} azimuth={azimuth}', f'light set elevation={elevation} azimuth={azimuth}', 'light')
+        light = light_state()
+        if abs(float(light['elevation']) - elevation) > 1e-4 or degrees_between(float(light['azimuth']), azimuth) > 1e-4:
+            misread.append(f'{elevation},{azimuth} read {light["elevation"]},{light["azimuth"]}')
+    check('light set elevation, azimuth reads them back, below the horizon too', not misread, '; '.join(misread))
 
     session.ask_ok(f'frames {SETTLE_FRAMES}')
-    lowered = read_dds_rgba32f(capture(session, 'scene', 'selftest-sun-lowered'))
-    restore_raw(original_raw)
+    lowered = read_dds_rgba32f(capture(session, 'scene', 'selftest-light-lowered'))
+    restore_saved(original_saved)
     session.ask_ok(f'frames {SETTLE_FRAMES}')
-    returned = read_dds_rgba32f(capture(session, 'scene', 'selftest-sun-returned'))
-    check('scene changes with the sun elevation and is bit-identical once the raw values come back',
+    returned = read_dds_rgba32f(capture(session, 'scene', 'selftest-light-returned'))
+    check('scene changes with the light direction and is bit-identical once the saved values come back',
           not np.array_equal(reference.view(np.uint32), lowered.view(np.uint32)) and np.array_equal(reference.view(np.uint32), returned.view(np.uint32)),
           describe_difference(reference, returned))
 
     requested = np.array([0.3, 0.8, 0.5])
-    record_change(session, changes, 'sun set direction', 'sun set direction=0.3,0.8,0.5', 'sun')
-    read = vector_of(sun_state()['direction'])
-    check('sun set direction reads back as the normalized direction', np.abs(read - requested / np.linalg.norm(requested)).max() <= 1e-5, read.tolist())
+    record_change(session, changes, 'light set direction', 'light set direction=0.3,0.8,0.5', 'light')
+    read = vector_of(light_state()['direction'])
+    check('light set direction reads back as the normalized direction', np.abs(read - requested / np.linalg.norm(requested)).max() <= 1e-5, read.tolist())
+
+    rotation = np.array([0.1, -0.7, 0.2, 0.6])
+    rotation /= np.linalg.norm(rotation)
+    record_change(session, changes, 'light set rotation', 'light set rotation=' + ','.join(f'{value:.9g}' for value in rotation), 'light')
+    light = light_state()
+    read = quaternion_of(light['rotation'])
+    check('light set rotation reads back as the normalized quaternion, and the direction is its +Z',
+          abs(abs(float(np.dot(read, rotation))) - 1.0) <= 1e-6 and np.abs(vector_of(light['direction']) - rotate(rotation, [0, 0, 1])).max() <= 1e-6,
+          f'{light["rotation"]} vs {rotation.tolist()}, direction {light["direction"]}')
 
     whole = without_time_varying(session.ask_ok('state')['state'])
     accepted = []
-    for request in ['elevation=-1', 'elevation=91', 'direction=1,-0.5,0', 'direction=0,0,0', 'intensity=0.5', 'intensity=-1',
-                    'elevation=abc', 'direction=1,2', 'color=1', 'elevation=10 direction=1,1,1', 'elevation=10 elevation=20', '']:
-        response = session.ask(f'sun set {request}')
+    for request in ['elevation=-91', 'elevation=91', 'direction=0,0,0', 'rotation=0,0,0,0', 'intensity=-1', 'color=1.5,0,0', 'color=1,1',
+                    'elevation=abc', 'direction=1,2', 'brightness=1', 'elevation=10 direction=1,1,1', 'rotation=0,0,0,1 direction=0,1,0',
+                    'elevation=10 elevation=20', '']:
+        response = session.ask(f'light set {request}')
         if response['ok'] or without_time_varying(session.ask_ok('state')['state']) != whole:
             accepted.append(request or '(nothing)')
-    check('sun set out of range or malformed fails and changes nothing', not accepted, ', '.join(accepted))
+    check('light set out of range or malformed fails and changes nothing', not accepted, ', '.join(accepted))
 
-    before = sun_state()
-    zenith = session.ask_ok('sun set direction=0,1,0')
-    after = sun_state()
-    noted = session.ask_ok(f'sun set intensity={original["intensity"]}')
-    check('sun set to the zenith says it keeps the azimuth and keeps it',
-          'azimuth' in zenith.get('note', '') and abs(float(after['elevation']) - 90) <= 1e-4
-          and degrees_between(float(after['azimuth']), float(before['azimuth'])) <= 1e-4 and 'note' not in noted,
-          f'{zenith.get("note")}; azimuth {before["azimuth"]} -> {after["azimuth"]}')
+    below = session.ask_ok('light set direction=0,-1,0')['state']['light']
+    zenith = session.ask_ok('light set elevation=90')
+    check('light set takes a direction straight down, and says a vertical direction has no azimuth',
+          float(below['elevation']) == -90 and float(below['azimuth']) == 0 and 'azimuth' in zenith.get('note', '')
+          and float(zenith['state']['light']['elevation']) == 90,
+          f'{below["elevation"]}, {below["azimuth"]}; {zenith.get("note")}')
 
-    session.ask_ok('sun set elevation=40 azimuth=200')
-    described, set_sun = session.ask_ok('describe')['line'], sun_state()
-    session.ask_ok('sun set elevation=20 azimuth=10')
+    session.ask_ok('light set elevation=40 azimuth=200')
+    described, set_light = session.ask_ok('describe')['line'], light_state()
+    session.ask_ok('light set elevation=20 azimuth=10')
     session.ask_ok(f'restore {described}')
-    check('restore of the describe line after sun set gives that sun again', sun_state() == set_sun, f'{set_sun} -> {sun_state()}')
+    check('restore of the describe line after light set gives that light again', light_state() == set_light, f'{set_light} -> {light_state()}')
 
-    restore_raw(original_raw)
+    restore_saved(original_saved)
     position = {'x': '100.5', 'y': '200.25', 'z': '-300.75'}
-    record_change(session, changes, 'sun set position', 'sun set position=' + ','.join(position[axis] for axis in 'xyz'), 'sun')
+    record_change(session, changes, 'light set position', 'light set position=' + ','.join(position[axis] for axis in 'xyz'), 'light')
     session.ask_ok(f'frames {SETTLE_FRAMES}')
-    moved = read_dds_rgba32f(capture(session, 'scene', 'selftest-sun-moved'))
-    check('sun set position reads back as given and leaves the scene bit-identical',
-          {axis: str(value) for axis, value in sun_state()['position'].items()} == position and np.array_equal(reference.view(np.uint32), moved.view(np.uint32)),
+    moved = read_dds_rgba32f(capture(session, 'scene', 'selftest-light-moved'))
+    check('light set position reads back as given and leaves the scene bit-identical',
+          {axis: str(value) for axis, value in light_state()['position'].items()} == position and np.array_equal(reference.view(np.uint32), moved.view(np.uint32)),
           describe_difference(reference, moved))
 
-    record_change(session, changes, 'sun set intensity', 'sun set intensity=2.5', 'sun')
-    intensity = sun_state()['intensity']
-    check('sun set intensity is the raw Sun Light Intensity', str(intensity) == raw_sun()['intensity'] and abs(float(intensity) - 2.5) <= 2.5e-6,
-          f'{intensity} vs {raw_sun()["intensity"]}')
+    record_change(session, changes, 'light set color, intensity', 'light set color=0.5,0.25,1 intensity=2.5', 'light')
+    light, values = light_state(), saved()
+    check('light set color and intensity read back as given and are what editor.ini keeps',
+          light['color'] == {'r': '0.5', 'g': '0.25', 'b': 1} and light['intensity'] == '2.5'
+          and values['Color'] == '0.5,0.25,1' and values['Intensity'] == '2.5',
+          f'{light["color"]}, {light["intensity"]}; saved {values["Color"]}, {values["Intensity"]}')
 
-    session.ask_ok('settings set Engine Tuning: ' + '; '.join(f'{SUN_KEYS[key]}={original_raw[key]}' for key in SUN_KEYS))
-    session.ask_ok('sun set position=' + ','.join(str(original['position'][axis]) for axis in 'xyz'))
-    check('sun is back as it was', sun_state() == original, f'{original} -> {sun_state()}')
+    restore_saved(original_saved)
+    check('light is back as it was', light_state() == original, f'{original} -> {light_state()}')
 
 
 def check_look_at(session, check, changes):
@@ -1324,26 +1345,26 @@ def check_editor(session, check, changes):
 
     original = editor_state()
     start = session.ask_ok('state camera')['state']['camera']
-    sun = vector_of(original['objects']['Sun']['position'])
+    light = vector_of(original['objects'][LIGHT_OBJECT]['position'])
 
-    record_change(session, changes, 'editor select Sun', 'editor select Sun', 'editor')
+    record_change(session, changes, f'editor select {LIGHT_OBJECT}', f'editor select {LIGHT_OBJECT}', 'editor')
     selected = editor_state()['selected']
     record_change(session, changes, 'editor select none', 'editor select none', 'editor')
     unselected = editor_state()['selected']
     before = editor_state()
     unknown = session.ask('editor select Moon')
     check('editor select picks the object or none, and an unknown name fails with the names and changes nothing',
-          selected == 'Sun' and unselected == 'none' and not unknown['ok'] and 'Sun' in unknown.get('error', '') and editor_state() == before,
+          selected == LIGHT_OBJECT and unselected == 'none' and not unknown['ok'] and LIGHT_OBJECT in unknown.get('error', '') and editor_state() == before,
           f'{selected}, {unselected}, {unknown.get("error")}')
 
     session.ask_ok('ui show')
-    session.ask_ok('editor select Sun')
-    session.ask_ok('pose look-at ' + ' '.join(repr(float(value)) for value in sun))
+    session.ask_ok(f'editor select {LIGHT_OBJECT}')
+    session.ask_ok('pose look-at ' + ' '.join(repr(float(value)) for value in light))
     session.ask_ok('frames 2')
 
-    def gizmo_around_sun(name):
+    def gizmo_around_light(name):
         session.ask_ok('frames 2')
-        icon = editor_state()['objects']['Sun']['screen']
+        icon = editor_state()['objects'][LIGHT_OBJECT]['screen']
         x, y = round(float(icon['x'])), round(float(icon['y']))
         image = np.asarray(Image.open(capture(session, 'display', name)))
         # ImGuizmo 의 gizmo 는 scene 높이의 몇 % 크기라 icon 을 중심으로 이 정도면 덮는다.
@@ -1351,15 +1372,15 @@ def check_editor(session, check, changes):
 
     record_change(session, changes, 'editor mode rotate', 'editor mode rotate', 'editor')
     rotate_mode = editor_state()['gizmo_mode']
-    rotate, rotate_again = gizmo_around_sun('selftest-editor-rotate'), gizmo_around_sun('selftest-editor-rotate-again')
+    rotate, rotate_again = gizmo_around_light('selftest-editor-rotate'), gizmo_around_light('selftest-editor-rotate-again')
     record_change(session, changes, 'editor mode translate', 'editor mode translate', 'editor')
     translate_mode = editor_state()['gizmo_mode']
-    translate = gizmo_around_sun('selftest-editor-translate')
-    check('editor mode sets the gizmo mode, and the display around the sun differs between the modes but not within one',
+    translate = gizmo_around_light('selftest-editor-translate')
+    check('editor mode sets the gizmo mode, and the display around the light differs between the modes but not within one',
           rotate_mode == 'rotate' and translate_mode == 'translate' and np.array_equal(rotate, rotate_again) and not np.array_equal(rotate, translate),
           f'{rotate_mode}, {translate_mode}, rotate twice equal {np.array_equal(rotate, rotate_again)}')
 
-    # pose look-at sun 뒤라 sun 이 scene 가운데에 있고, 다음 pose 에서는 가운데에서 벗어난다.
+    # pose look-at light 뒤라 light 의 icon 이 scene 가운데에 있고, 다음 pose 에서는 가운데에서 벗어난다.
     camera = session.ask_ok('state camera')['state']['camera']
     poses = {'at the center': [camera[key] for key in ['x', 'y', 'z', 'heading', 'pitch']],
              'off the center': [camera['x'], camera['y'], camera['z'], float(camera['heading']) + 0.15, float(camera['pitch']) - 0.1]}
@@ -1367,13 +1388,13 @@ def check_editor(session, check, changes):
     for name, pose in poses.items():
         session.ask_ok('pose ' + ' '.join(str(value) for value in pose))
         state = session.ask_ok('state')['state']
-        icon, expected = state['editor']['objects']['Sun'], project_to_scene(state['camera'], state['ui']['scene'], sun)
+        icon, expected = state['editor']['objects'][LIGHT_OBJECT], project_to_scene(state['camera'], state['ui']['scene'], light)
         screen = np.array([float(icon['screen'][axis]) for axis in 'xy']) if 'screen' in icon else None
         if expected is None or screen is None or not icon['on_screen'] or np.abs(screen - expected).max() > 0.5:
             off.append(f'{name}: {icon} vs {None if expected is None else expected.tolist()}')
-    session.ask_ok('pose look-at ' + ' '.join(repr(float(value)) for value in vector_of(camera) * 2 - sun))
-    hidden = editor_state()['objects']['Sun']
-    check('state editor gives the icon where the camera projects the sun, and no position behind the camera',
+    session.ask_ok('pose look-at ' + ' '.join(repr(float(value)) for value in vector_of(camera) * 2 - light))
+    hidden = editor_state()['objects'][LIGHT_OBJECT]
+    check('state editor gives the icon where the camera projects the light, and no position behind the camera',
           not off and hidden['on_screen'] is False and 'screen' not in hidden, '; '.join(off) or str(hidden))
 
     session.ask_ok('editor select ' + original['selected'])
@@ -1581,8 +1602,8 @@ def check_rest_of_ui_commands(session, check):
     line = session.ask_ok('describe')['line']
     camera = start['camera']
     session.ask_ok('pose ' + ' '.join(repr(float(camera[key]) + 10) for key in ['x', 'y', 'z']) + f' {camera["heading"]} {camera["pitch"]}')
-    session.ask_ok('sun set elevation=40')
-    change('restore', f'restore {line}', 'settings.Engine Tuning', 'camera', 'sun')
+    session.ask_ok('light set elevation=40')
+    change('restore', f'restore {line}', 'settings.Engine Tuning', 'camera', 'light')
 
     check_changes(check, 'window, settings set Editor Camera, Ray Tracing View and Path Tracer, pt reset and restore change the state '
                          'and reply with the changed part', changes)
@@ -1619,7 +1640,7 @@ def check_profile(session, check, config):
 
 def check_acceptance(session, check):
     """ACCEPTANCE_SCENARIO 를 run 과 같은 방식으로 실행하고, 단계마다 이름을 붙인 응답으로 판정한다. 요청한 값은 scenario 에서 읽는다.
-    UI 를 숨긴 상태에서 부르고, camera, sun, editor 를 되돌려 놓는다."""
+    UI 를 숨긴 상태에서 부르고, camera, light, editor 를 되돌려 놓는다."""
     import numpy as np
 
     lines = scenario_lines(ACCEPTANCE_SCENARIO)
@@ -1634,16 +1655,15 @@ def check_acceptance(session, check):
         if not check('the acceptance scenario runs to the end', failed is None, failed['error'] if failed else ''):
             return
 
-        requested = dict(item.split('=') for item in argument_of('sun set ').split())
+        requested = dict(item.split('=') for item in argument_of('light set ').split())
         lit = responses['lit']['state']
-        sun, raw = lit['sun'], lit['settings']['Engine Tuning']
-        direction = sun_direction_of(float(raw[SUN_KEYS['orientation']]), float(raw[SUN_KEYS['inclination']]))
-        check('acceptance 1: state sun is at the elevation and azimuth sun set asked for, and the raw values make that direction',
-              abs(float(sun['elevation']) - float(requested['elevation'])) <= 1e-4
-              and degrees_between(float(sun['azimuth']), float(requested['azimuth'])) <= 1e-4
-              and np.abs(direction - vector_of(sun['direction'])).max() <= 1e-6 and sun != responses['sun_before']['state']['sun'],
-              f'asked {requested}; elevation {sun["elevation"]}, azimuth {sun["azimuth"]}, direction {sun["direction"]}, '
-              f'orientation {raw[SUN_KEYS["orientation"]]}, inclination {raw[SUN_KEYS["inclination"]]}')
+        light, saved = lit['light'], numbers_of(lit['settings'][LIGHT_SECTION]['Direction'])
+        check('acceptance 1: state light is at the elevation and azimuth light set asked for, and editor.ini keeps that direction',
+              abs(float(light['elevation']) - float(requested['elevation'])) <= 1e-4
+              and degrees_between(float(light['azimuth']), float(requested['azimuth'])) <= 1e-4
+              and np.array_equal(saved.astype(np.float32), vector_of(light['direction']).astype(np.float32))
+              and light != responses['light_before']['state']['light'],
+              f'asked {requested}; elevation {light["elevation"]}, azimuth {light["azimuth"]}, direction {light["direction"]}, saved {saved.tolist()}')
 
         wanted = {'selected': argument_of('editor select '), 'gizmo_mode': argument_of('editor mode ')}
         editor = responses['selection']['state']['editor']
@@ -1940,11 +1960,11 @@ def selftest_running_app(args, check):
         check_fit_needs_a_capture(session, check)
         check_state(session, check)
         changes = []
-        check_sun(session, check, changes)
+        check_light(session, check, changes)
         check_look_at(session, check, changes)
         check_editor(session, check, changes)
         check_validation_fit(session, check, changes)
-        check_changes(check, 'sun set, pose look-at, editor and validation fit change the state and reply with the changed part', changes)
+        check_changes(check, 'light set, pose look-at, editor and validation fit change the state and reply with the changed part', changes)
         check_pick(session, check)
         check_rest_of_ui_commands(session, check)
         check_acceptance(session, check)

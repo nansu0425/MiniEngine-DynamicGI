@@ -55,7 +55,7 @@ namespace RayQueryValidation
 
     // Log가 수치와 함께 한 줄에 찍고 Restore가 그 줄에서 되돌리는 장면의 조건. key와 value에는 '='와 ';'를 쓰지 않는다.
     typedef std::map<std::string, std::string> SceneConditions;
-    // camera와 sun처럼 app이 가진 조건은 app이 정한다. restore는 필요한 key가 없으면 false를 돌려준다.
+    // camera와 directional light처럼 app이 가진 조건은 app이 정한다. restore는 필요한 key가 없으면 false를 돌려준다.
     // statePaths는 그 조건이 있는 state의 path이고, restore 명령이 바꾼 것을 응답할 때 쓴다. 정하지 않으면 Restore는 비활성이다.
     void SetSceneConditions(const std::function<void(SceneConditions&)>& describe, const std::function<bool(const SceneConditions&)>& restore,
         const std::vector<std::string>& statePaths);

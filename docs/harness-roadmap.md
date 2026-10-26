@@ -56,7 +56,7 @@ harness 는 agent 가 ModelViewer 를 build, 실행하고 명령으로 조작, c
 
 ### 사람의 입력을 흉내 내는 조작
 
-- harness 는 mouse 와 keyboard 입력이나 UI click 을 흉내 내어 app 을 조작하지 않는다. 판정은 `state` 로 하고, UI 와 gizmo 가 바꾸는 상태는 같은 상태를 바꾸는 의미 단위 명령 (예: `sun set elevation= azimuth=`, `editor mode`) 으로 바꾼다. screenshot 은 참고로만 본다.
+- harness 는 mouse 와 keyboard 입력이나 UI click 을 흉내 내어 app 을 조작하지 않는다. 판정은 `state` 로 하고, UI 와 gizmo 가 바꾸는 상태는 같은 상태를 바꾸는 의미 단위 명령 (예: `light set elevation= azimuth=`, `editor mode`) 으로 바꾼다. screenshot 은 참고로만 본다.
   - agent 가 sun 의 translate gizmo 를 rotate gizmo 로 잘못 보고, translate gizmo 를 옮긴 뒤 sun 이 돌지 않은 것이 이상하다고 보고한 일이 있었다. image 로 UI 의 상태를 판단하는 것은 믿을 수 없고, 입력을 흉내 내는 조작은 click 할 곳과 결과를 그 판단에 기댄다.
 - 다시 볼 조건: WASD 나 gizmo drag 같은 입력 처리 코드 자체를 harness 로 검사해야 할 때. 그때까지 그 확인은 사용자가 한다.
 

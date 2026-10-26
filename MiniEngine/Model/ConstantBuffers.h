@@ -62,6 +62,7 @@ __declspec(align(256)) struct GlobalConstants
     Math::Matrix4 ViewProjMatrix;
     Math::Matrix4 ShadowMatrix;
     Math::Vector3 CameraPos;
+    // surface에서 directional light를 향하는 방향과, light에 수직인 면의 illuminance (lux)
     Math::Vector3 LightDirection;
-    Math::Vector3 LightIntensity;
+    Math::Vector3 LightIlluminance;
 };

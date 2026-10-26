@@ -29,7 +29,7 @@ cbuffer GlobalConstants : register(b1)
     float4x4 ShadowMatrix;
     float3 ViewerPos;
     float3 LightDirection;
-    float3 LightIntensity;
+    float3 LightIlluminance;
 }
 
 #ifdef ENABLE_SKINNING

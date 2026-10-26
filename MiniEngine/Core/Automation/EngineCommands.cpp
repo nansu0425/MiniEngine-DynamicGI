@@ -550,7 +550,7 @@ namespace ControlChannel
         Register("state", "state | state <path>: the scene, editor and engine state that harness checks are judged by. "
             "<path> joins keys with '.', as in camera or settings.Engine Tuning, and keeps only that part. "
             "Positions are in world units. Camera angles are in radians: heading turns about world up (+y), 0 looking toward -z and growing toward -x, "
-            "and pitch is up from the horizon. Sun elevation and azimuth are in degrees as sun set takes them. "
+            "and pitch is up from the horizon. Light elevation and azimuth are in degrees as light set takes them. "
             "aspect is width over height. Sizes and left, top are in client pixels from the top left. "
             "settings has every section as settings get reads it. Commands that change the state reply with the changed part as state", ReplyState);
         Register("status", "status", ReplyStatus);
