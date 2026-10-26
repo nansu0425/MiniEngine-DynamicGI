@@ -781,6 +781,191 @@ def command_stop(args):
     return 0 if result['exit_reason'] == 'normal' else 1
 
 
+# --- snapshot -----------------------------------------------------------------------------
+
+SNAPSHOT_DIR = HARNESS_DIR / 'kept' / 'snapshots'
+# harness baseline 의 시점과, 해가 닿는 곳과 닿지 않는 곳이 고루 보이도록 고른 기본 model 의 시점
+SNAPSHOT_POSES = {
+    'start': None,
+    'courtyard-up': '0 300 0 1.5708 1.2',
+    'shadowed-wall': '1500 150 0 1.5708 0.05',
+    'gallery': '-1200 150 400 -1.5708 0.1',
+}
+# harness baseline 은 결정성을 위해 이 app 의 기본 효과를 끈다 (scripts/harness-baseline/editor.ini). app-default 는 사용자가 보는 화면이다.
+SNAPSHOT_SETTINGS = {
+    'baseline': {},
+    'app-default': {'Graphics/AA/TAA/Enable': 'on', 'Graphics/Motion Blur/Enable': 'on', 'Graphics/HDR/Adaptive Exposure': 'on'},
+}
+# adaptive exposure 가 수렴하고 TAA 의 history 가 차도록 시점마다 기다리는 frame 수. Adaptation Rate 0.05 에서 충분하다고 본다 (추측).
+SNAPSHOT_SETTLE_FRAMES = {'baseline': SETTLE_FRAMES, 'app-default': 300}
+# scene 에서 이만큼 넘게 달라진 pixel 을 차이 mask 에 흰색으로 칠한다. TAA 의 jitter 같은 작은 차이와 구별하려는 것이다.
+SNAPSHOT_LARGE_CHANGE = 0.25
+SNAPSHOT_PANEL_SIZE = (640, 360)
+# compare 가 CHANGED 로 표시하는 기준. snapshot save 가 같은 code 를 두 번 띄워 잰 차이의 몇 배를 넘고, scene 의 일정 비율도 넘어야 한다.
+# 같은 code 의 실행 사이에서 크게 바뀐 pixel 은 scene 의 0.12% 까지였고, 한 시점에서도 실행에 따라 0.00% ~ 0.04% 로 흔들렸다.
+# SSAO 와 함께 linear depth 가 빠진 bug 는 0.30% ~ 6.74% 였다.
+SNAPSHOT_SAME_CODE_FACTOR = 4
+SNAPSHOT_SAME_CODE_FLOOR = 0.001
+
+
+def baseline_pose():
+    """harness baseline 의 editor.ini 가 정하는 시점을 pose 명령의 인자로."""
+    import configparser
+    ini = configparser.ConfigParser(delimiters=('=',), comment_prefixes=(';',), interpolation=None)
+    ini.optionxform = str
+    ini.read(BASELINE_DIR / 'editor.ini', encoding='utf-8')
+    camera = ini['Editor Camera']
+    return ' '.join(camera[key] for key in ['Position X', 'Position Y', 'Position Z', 'Heading', 'Pitch'])
+
+
+def code_revision():
+    """HEAD 의 짧은 hash. commit 하지 않은 변경이 있으면 + 를 붙인다."""
+    def git(*arguments):
+        return subprocess.run(['git', *arguments], cwd=REPO_ROOT, capture_output=True, text=True, check=True).stdout.strip()
+    return git('rev-parse', '--short', 'HEAD') + ('+' if git('status', '--porcelain') else '')
+
+
+def capture_snapshot(config, build_first, folder):
+    """SNAPSHOT_SETTINGS x SNAPSHOT_POSES 의 scene 과 display 를 folder 에 찍고, 찍은 shot 과 app 의 끝을 돌려준다."""
+    folder.mkdir(parents=True)
+    instance = start_instance(config, build_first=build_first)
+    shots = []
+    try:
+        session = Session(instance)
+        try:
+            session.ask_ok('ui hide')
+            for settings_name, settings in SNAPSHOT_SETTINGS.items():
+                if settings:
+                    session.ask_ok('settings set Engine Tuning: ' + '; '.join(f'{key}={value}' for key, value in settings.items()))
+                for pose_name, pose in SNAPSHOT_POSES.items():
+                    session.ask_ok(f'pose {pose or baseline_pose()}')
+                    session.ask_ok(f'frames {SNAPSHOT_SETTLE_FRAMES[settings_name]}')
+                    name = f'{settings_name}-{pose_name}'
+                    for target in ['scene', 'display']:
+                        session.ask_ok(f'capture {target} {folder / f"{name}-{target}"}')
+                    shots.append(name)
+        finally:
+            session.close()
+    except HarnessError:
+        stop_instance(instance, kill_now=True)
+        raise
+    return shots, stop_instance(instance)
+
+
+def snapshot_ended_well(stopped):
+    running = [message for message in stopped['d3d12']['running'].values() if message['severity'] in ('CORRUPTION', 'ERROR', 'WARNING')]
+    return stopped['exit_reason'] == 'normal' and stopped['d3d12']['logged'] and not running
+
+
+def describe_snapshot_end(stopped):
+    return [f'app: {stopped["result"]}; exit reason={stopped["exit_reason"]}'] + describe_d3d12(stopped['d3d12'])
+
+
+def shot_change(before_folder, after_folder, name):
+    """한 shot 에서 scene 이 바뀐 pixel 과 크게 바뀐 pixel 의 mask, after 의 NaN 과 Inf 수, display 가 바뀐 pixel 수."""
+    import numpy as np
+    from PIL import Image
+    before = read_dds_rgba32f(before_folder / f'{name}-scene.dds')[..., :3]
+    after = read_dds_rgba32f(after_folder / f'{name}-scene.dds')[..., :3]
+    if before.shape != after.shape:
+        raise HarnessError(f'{name}: scene is {before.shape} before and {after.shape} after')
+    changed = np.any(before.view(np.uint32) != after.view(np.uint32), axis=2)
+    relative = np.abs(np.nan_to_num(after - before)).max(axis=2) / np.maximum(np.abs(before).max(axis=2), 1e-3)
+    displays = [np.asarray(Image.open(folder / f'{name}-display.png').convert('RGB')) for folder in (before_folder, after_folder)]
+    return {'changed': changed, 'large': changed & (relative > SNAPSHOT_LARGE_CHANGE),
+            'nonfinite': int(np.count_nonzero(~np.isfinite(after).all(axis=2))),
+            'display_changed': int(np.count_nonzero(np.any(displays[0] != displays[1], axis=2)))}
+
+
+def change_counts(change):
+    return {'changed': int(change['changed'].sum()), 'large': int(change['large'].sum()), 'pixels': int(change['changed'].size)}
+
+
+def exceeds_same_code(counts, same_code):
+    """같은 code 로 찍어도 생기는 차이보다 크게 바뀌었는가. 같은 code 에서 바뀌지 않은 shot 은 한 pixel 이라도 바뀌면 크다."""
+    if same_code['changed'] == 0:
+        return counts['changed'] > 0
+    return counts['large'] / counts['pixels'] > max(SNAPSHOT_SAME_CODE_FACTOR * same_code['large'] / same_code['pixels'],
+                                                    SNAPSHOT_SAME_CODE_FLOOR)
+
+
+def change_sheet(before_folder, after_folder, name, change):
+    """before display, after display, scene 의 차이 mask 를 나란히 놓은 image."""
+    import numpy as np
+    from PIL import Image
+    mask = np.zeros(change['changed'].shape, dtype=np.uint8)
+    mask[change['changed']] = 96
+    mask[change['large']] = 255
+    width, height = SNAPSHOT_PANEL_SIZE
+    sheet = Image.new('RGB', (width * 3 + 20, height), (255, 0, 255))
+    panels = [Image.open(before_folder / f'{name}-display.png'), Image.open(after_folder / f'{name}-display.png'), Image.fromarray(mask)]
+    for index, panel in enumerate(panels):
+        sheet.paste(panel.convert('RGB').resize(SNAPSHOT_PANEL_SIZE, Image.LANCZOS), (index * (width + 10), 0))
+    return sheet
+
+
+def command_snapshot_save(args):
+    folder = SNAPSHOT_DIR / args.name
+    if folder.exists():
+        if not args.replace:
+            raise HarnessError(f'{folder} exists. Use --replace to take it again')
+        shutil.rmtree(folder)
+    shots, stopped = capture_snapshot(args.config, not args.no_build, folder)
+    ended_well = snapshot_ended_well(stopped)
+    for line in describe_snapshot_end(stopped):
+        print(line)
+    # TAA 와 adaptive exposure 는 같은 code 에서도 실행마다 결과를 바꾸므로, 한 번 더 띄워 그 차이를 compare 의 기준으로 남긴다.
+    same_code_folder = folder / 'same-code'
+    _, stopped = capture_snapshot(args.config, False, same_code_folder)
+    ended_well &= snapshot_ended_well(stopped)
+    for line in describe_snapshot_end(stopped):
+        print(line)
+    same_code = {name: change_counts(shot_change(folder, same_code_folder, name)) for name in shots}
+    manifest = {'code': code_revision(), 'config': args.config, 'created': time.strftime('%Y-%m-%d %H:%M:%S'), 'shots': shots,
+                'poses': {name: pose or baseline_pose() for name, pose in SNAPSHOT_POSES.items()}, 'settings': SNAPSHOT_SETTINGS,
+                'same_code': same_code}
+    (folder / 'snapshot.json').write_text(json.dumps(manifest, indent=2), encoding='utf-8')
+    for name in shots:
+        counts = same_code[name]
+        print(f'same code {name}: {counts["changed"]} pixels changed, {counts["large"]} by more than {SNAPSHOT_LARGE_CHANGE:.0%}')
+    print(f'saved {len(shots)} shots of {manifest["code"]} to {folder}')
+    return 0 if ended_well else 1
+
+
+def command_snapshot_compare(args):
+    before_folder = SNAPSHOT_DIR / args.name
+    manifest_path = before_folder / 'snapshot.json'
+    if not manifest_path.exists():
+        raise HarnessError(f'no snapshot {before_folder}. Take it with snapshot save {args.name} before changing the code')
+    manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+    poses = {name: pose or baseline_pose() for name, pose in SNAPSHOT_POSES.items()}
+    if manifest['poses'] != poses or manifest['settings'] != SNAPSHOT_SETTINGS or manifest['config'] != args.config:
+        raise HarnessError(f'{args.name} was taken with other poses, settings or config. Take a new snapshot with this viewer.py')
+
+    after_folder = before_folder / f'compare-{time.strftime("%Y%m%d-%H%M%S")}'
+    shots, stopped = capture_snapshot(args.config, not args.no_build, after_folder)
+    lines = [f'before: {manifest["code"]} ({manifest["created"]}), after: {code_revision()}',
+             f'CHANGED marks a shot that changed more than two runs of the before code did (more than {SNAPSHOT_SAME_CODE_FACTOR}x '
+             f'the pixels changed by more than {SNAPSHOT_LARGE_CHANGE:.0%}, and more than {SNAPSHOT_SAME_CODE_FLOOR:.2%} of the scene)']
+    nonfinite = 0
+    for name in shots:
+        change = shot_change(before_folder, after_folder, name)
+        change_sheet(before_folder, after_folder, name, change).save(after_folder / f'{name}-sheet.png')
+        counts, same_code = change_counts(change), manifest['same_code'][name]
+        nonfinite += change['nonfinite']
+        lines.append(f'{"CHANGED" if exceeds_same_code(counts, same_code) else "same   "} {name}: scene {counts["changed"]} pixels changed '
+                     f'({counts["changed"] / counts["pixels"]:.2%}), {counts["large"]} by more than {SNAPSHOT_LARGE_CHANGE:.0%} '
+                     f'({counts["large"] / counts["pixels"]:.2%}; same code {same_code["large"] / same_code["pixels"]:.2%}), '
+                     f'{change["nonfinite"]} NaN or Inf after; display {change["display_changed"]} pixels changed')
+    lines += describe_snapshot_end(stopped)
+    lines.append(f'sheets (before display, after display, scene change: gray changed, white by more than {SNAPSHOT_LARGE_CHANGE:.0%}): '
+                 f'{after_folder}')
+    (after_folder / 'report.txt').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+    for line in lines:
+        print(line)
+    return 0 if snapshot_ended_well(stopped) and nonfinite == 0 else 1
+
+
 def hash_user_settings():
     return {str(path): hashlib.sha256(path.read_bytes()).hexdigest() if path.exists() else None for path in USER_SETTINGS}
 
@@ -1937,6 +2122,30 @@ def main():
     command = add_command('stop', 'quit the running instance, killing it if it hangs, and summarize its log with the D3D12 messages. '
                                   'Exits with 1 unless the app ended normally, whatever the messages', command_stop)
     command.add_argument('--kill', action='store_true', help='kill without sending quit')
+
+    command = add_command('snapshot', 'take the scene and display of fixed poses with the harness baseline and with the app defaults '
+                                      '(TAA, motion blur, adaptive exposure) before changing the code, then compare the same shots after it',
+                          None)
+    actions = command.add_subparsers(dest='action', required=True)
+    action = actions.add_parser('save', help=f'start a new instance and keep the shots in {SNAPSHOT_DIR}/<name>',
+                                description=f'start a new instance and keep the shots in {SNAPSHOT_DIR}/<name>')
+    action.set_defaults(handler=command_snapshot_save)
+    action.add_argument('name')
+    action.add_argument('--replace', action='store_true', help='take the snapshot again under the same name')
+    add_config(action)
+    action.add_argument('--no-build', action='store_true')
+    action = actions.add_parser('compare', help='take the same shots in a new instance and report the change of each shot, '
+                                                'with a sheet of before, after and the changed pixels. '
+                                                'Exits with 1 if the app did not end normally, logged a D3D12 corruption, error or warning, '
+                                                'or drew NaN or Inf',
+                                description='take the same shots in a new instance and report the change of each shot, '
+                                            'with a sheet of before, after and the changed pixels. '
+                                            'Exits with 1 if the app did not end normally, logged a D3D12 corruption, error or warning, '
+                                            'or drew NaN or Inf')
+    action.set_defaults(handler=command_snapshot_compare)
+    action.add_argument('name')
+    add_config(action)
+    action.add_argument('--no-build', action='store_true')
 
     command = add_command('selftest', 'check the harness itself', command_selftest)
     add_config(command)
