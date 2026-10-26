@@ -134,6 +134,7 @@
     <None Include="Raytracing\RaytracingScene.hlsli" />
     <None Include="Raytracing\HitSurface.hlsli" />
     <None Include="Raytracing\SurfaceRayOrigin.hlsli" />
+    <None Include="Raytracing\SurfaceRay.hlsli" />
     <None Include="PathTracer\LambertBrdf.hlsli" />
     <None Include="Raytracing\CameraRays.hlsli" />
     <None Include="Raytracing\RayQueryValidationStats.hlsli" />

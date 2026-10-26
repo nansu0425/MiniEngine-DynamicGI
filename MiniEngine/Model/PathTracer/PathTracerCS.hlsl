@@ -1,6 +1,6 @@
 #include "Model/Raytracing/CameraRays.hlsli"
 #include "Model/Raytracing/HitSurface.hlsli"
-#include "Model/Raytracing/SurfaceRayOrigin.hlsli"
+#include "Model/Raytracing/SurfaceRay.hlsli"
 #include "Model/PathTracer/LambertBrdf.hlsli"
 #include "Core/Shaders/Random.hlsli"
 
@@ -73,9 +73,7 @@ float3 TraceRadiance(RayDesc ray, inout Random random)
         if (bounces == MaxBounces)
             return radiance;
 
-        ray.Direction = SampleLambertDirection(vertex.normal, random.rand2());
-        // README.md의 "camera 밖에서 본 doubleSided": 면이 geometric normal로 그 방향을 등지면 가려진 것으로 친다.
-        if (dot(vertex.geometryNormal, ray.Direction) <= 0.0)
+        if (!DescribeSurfaceRay(vertex.position, vertex.geometryNormal, SampleLambertDirection(vertex.normal, random.rand2()), ray))
             return radiance;
         // Lambert의 f cos / pdf는 albedo다 (SampleLambertDirection).
         throughput *= vertex.albedo;
@@ -88,10 +86,6 @@ float3 TraceRadiance(RayDesc ray, inout Random random)
                 return radiance;
             throughput /= survival;
         }
-
-        ray.Origin = SurfaceRayOrigin(vertex.position, vertex.geometryNormal);
-        ray.TMin = 0.0;
-        ray.TMax = 1e30;
     }
 }
 

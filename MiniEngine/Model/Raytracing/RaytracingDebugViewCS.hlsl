@@ -1,6 +1,6 @@
 #include "Model/Raytracing/CameraRays.hlsli"
 #include "Model/Raytracing/HitSurface.hlsli"
-#include "Model/Raytracing/SurfaceRayOrigin.hlsli"
+#include "Model/Raytracing/SurfaceRay.hlsli"
 #include "Core/Shaders/ShaderUtility.hlsli"
 
 // RaytracingDebugView.h의 View와 같은 값이다.
@@ -88,14 +88,10 @@ uint DebugViewRayFlags()
     return CullSingleSidedBackFaces != 0 ? kCullSingleSidedBackFaces : RAY_FLAG_NONE;
 }
 
-// 면이 sun을 가리는지는 README.md의 "camera 밖에서 본 doubleSided"가 정한다. 면이 sun을 가리면 ray를 쏠 필요가 없어 false를 돌려준다.
+// 면이 sun을 가리면 false를 돌려준다 (DescribeSurfaceRay).
 bool DescribeSunRay(HitSurface surface, out RayDesc ray)
 {
-    ray.Origin = SurfaceRayOrigin(surface.position, surface.geometryNormal);
-    ray.Direction = SunDirection;
-    ray.TMin = 0.0;
-    ray.TMax = 1e30;
-    return dot(surface.geometryNormal, SunDirection) > 0.0;
+    return DescribeSurfaceRay(surface.position, surface.geometryNormal, SunDirection, ray);
 }
 
 // sun이 보이면 흰색, 가려지면 검정이다.
