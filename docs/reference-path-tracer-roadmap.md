@@ -20,7 +20,7 @@ def659b 의 이 문서에는 미리 조사해 둔 설계 (출력, BRDF, light, s
 
 ## 작업
 
-commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키므로 번호를 바꾸지 않는다. 작업 1 뒤에 더한 두 작업은 글자 A, B 로 적는다.
+commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키므로 번호를 바꾸지 않는다. 번호를 정한 뒤에 더한 작업은 글자로 적는다. A, B 는 작업 1 뒤에, C 는 작업 6 뒤에 더했다.
 
 1. base color 와 emissive texture 의 sRGB decode (끝남: 7b3ba43)
 
@@ -32,8 +32,11 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 4. tangent 와 normal map 규약 (끝남: f931539)
 5. Lambert path 와 furnace (끝남: cf52623, a5060e3)
 6. Export 와 비교 script (끝남: 4cdb55e, 2b33c11)
-7. Sun: sun 의 직접광을 더하고, raster 의 sun 과 단위를 맞춘다.
-8. glTF BRDF: spec 을 따르는 BRDF 를 넣고 BRDF 단위의 test 로 확인한다.
+
+- C. Raster 의 IBL 제거: raster 가 IBL 과, IBL 에만 쓰던 SSAO 와 occlusion texture 를 쓰지 않는다. skybox 는 Environment 의 radiance cube 를 mip 0 으로 그린다.
+
+7. Directional Light: sun 을 KHR_lights_punctual 의 directional light 로 바꾸고, gizmo 로 그 transform 을 조작한다. raster 는 그 light 를 spec 의 단위로 받고, PT 는 그 직접광을 더한다.
+8. glTF BRDF: spec 을 따르는 BRDF 를 넣고 BRDF 단위의 test 로 확인한다. raster 의 directional light 항도 같은 BRDF 를 쓴다.
 9. Sky: Environment 의 cubemap 을 sky 로 쓴다.
 10. Log 와 Restore: 측정 조건을 Log 한 줄로 남기고, app 을 다시 실행해도 그 줄로 되돌린다.
 11. Indirect Irradiance: DDGI 와 비교할 양을 누적하는 출력을 더한다.
@@ -48,7 +51,7 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 |---|---|
 | 10/24 | 끝남: 1, A, B, harness 의 D3D12 log 수집 (573dded) 과 그 log 로 찾은 Lighting 수정 (e8a2352), 문서 정리 |
 | 10/25 | 끝남: 2, 3, 4 |
-| 10/26 | 끝남: 5, 6. 7 |
+| 10/26 | 끝남: 5, 6. C, 7 |
 | 10/27 | 8, 9, 10 |
 | 10/28 | 11, 12, 13 (a) |
 | 10/29 오전 | 13 (b) |
@@ -60,7 +63,8 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 ### 순서의 이유
 
 - 작업 4 는 normal 을 쓰는 shading (작업 5 부터) 앞이다. PT 가 정답이므로 그 입력이 먼저 spec 을 따라야 하고, 늦게 고치면 그 뒤의 확인과 측정을 다시 해야 한다. 작업 1, A, B, 2 도 같은 이유로 앞에 두었다.
-- 작업 5, 6 은 답을 식으로 아는 furnace 로 path loop 를 먼저 확인한다. 작업 7 ~ 9 는 그 loop 에 sun, glTF BRDF, sky 를 하나씩 더한다.
+- 작업 5, 6 은 답을 식으로 아는 furnace 로 path loop 를 먼저 확인한다. 작업 7 ~ 9 는 그 loop 에 directional light, glTF BRDF, sky 를 하나씩 더한다.
+- 작업 C 는 작업 7 앞이다. raster 의 빛을 directional light 와 emission 으로 먼저 줄여서, 작업 7 이 raster 에서 바꾸는 빛을 directional light 하나로 둔다.
 - 작업 10 은 작업 11, 12 앞이다. 측정의 고정 시점과 작업 13 의 camera 가 Restore 를 쓰고, 발표가 restart 뒤의 재현을 보일 수 있다.
 - 작업 13 은 마지막이다. 독립된 estimator 와 맞춰 보는 가장 강한 근거지만 원인 찾기의 상한을 알 수 없으므로, 작업 12 뒤에 두어 발표의 핵심 자료를 먼저 확보한다. (a) 를 하는 동안 작업 12 의 GPU run 을 돌린다.
 
@@ -79,16 +83,18 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 
 - PT 의 입력을 spec 에 맞춘 것: 1, A, B, 2, 4
 - PT 가 맞다는 근거: furnace (5, 6), BRDF 단위의 test (8), 수렴과 bias (12), 외부 renderer 와의 비교 (13)
-- sun 의 단위와 BRDF 를 고른 이유: 7, 8
+- raster 에서 IBL 을 뺀 이유, directional light 의 단위와 BRDF 를 고른 이유: C, 7, 8
 - 같은 시점의 raster 와 PT, restart 뒤의 재현: 9, 10
 - DDGI 가 비교할 양과, DDGI 가 계산하지 않는 path 의 몫: 11, 12
 - 비용 (GPU time, ground truth 까지의 시간): 5, 12
 
 ## 범위 밖
 
-- PT 가 쓰지 않는 raster 코드를 spec 에 맞추는 일. raster 는 기준이 아니므로 raster 와 수치로 비교하는 검증도 하지 않는다 (8432ed7).
+- raster 에서 directional light 항 밖의 shader 코드 (normal map, emission, alpha mask 의 적용) 를 spec 에 맞추는 일
+- raster 의 visibility 를 PT 와 같게 만드는 일. raster 는 directional light 의 visibility 를 shadow map 으로 근사한다.
+- raster 와 PT 를 수치로 비교하는 검증. 작업 8 뒤에도 둘의 차이에 shadow map 의 근사와 위의 shader 코드가 섞인다.
 - BLEND material, skinned mesh, animation 과 instance 변경, 여러 ModelInstance
-- glTF 의 KHR_lights_punctual light 를 load 하는 일, point 와 spot light, sun 의 angular size
+- glTF 의 KHR_lights_punctual light 를 load 하는 일, point 와 spot light, directional light 의 angular size
 - lens model, denoiser, texture LOD
 - Sponza 가 쓰지 않는 loader 기능. 그 기능을 처음 쓰는 asset 의 작업이 다룬다.
 - asset 의 값을 고치는 일. 알려진 결함이 있어도 공개된 그대로 쓴다.
@@ -101,7 +107,6 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 - emissive triangle 의 NEE: 작은 emitter 가 수렴을 막을 때
 - stratified sampler, blue noise: 수렴 시간이 문제가 될 때
 - infra 검증 5-4 ~ 5-7 의 mode: PT 에 그 문제로 보이는 결과가 나올 때 (323e185)
-- raster 의 irradiance cube 와 PT 의 sky irradiance 를 app 안에서 비교하는 mode
 - albedo 1 의 furnace 에서 16384 번 넘게 반사하고도 escape 하지 못한 path 가 어디에 갇혔는지 보는 일 (a5060e3): 작업 13 이나 PT 에서 leak, self-hit 로 보이는 결과가 나올 때
 - PT panel 의 Export button: script 없이 사람이 PT 의 값을 export 할 일이 생길 때. 지금은 harness 의 `capture pt` 로만 export 한다 (2b33c11).
 - NaN 이나 Inf 라서 버린 sample 수를 panel 에 보이는 일: 작업 8 부터 PT 에 NaN 이나 Inf 가 생겨 사람이 실행 중에 봐야 할 때. 지금은 export 의 a 로만 센다 (2b33c11).
