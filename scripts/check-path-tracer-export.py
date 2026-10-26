@@ -37,7 +37,7 @@ shading normal: shading normal 둘레에서 고른 방향이 geometric normal �
        furnace 는 path 가 escape 할 때까지 반사마다 손실이 쌓인 값이라 albedo 1 에서만 나오는 크기다.
 
 Russian roulette:
-  [R1] furnace 를 끈 Sponza 를 SCENE_SAMPLES 만큼 Russian roulette off (A) 와 on (B) 로, 각각 Seed 0 과 1 로 쌓은 네 export 의 r 이
+  [R1] furnace 와 directional light 를 끈 Sponza 를 SCENE_SAMPLES 만큼 Russian roulette off (A) 와 on (B) 로, 각각 Seed 0 과 1 로 쌓은 네 export 의 r 이
        AGREEMENT_LIMIT 이하다. r^2 ~ 1 + bias^2 / noise^2 이므로 bias 의 rms 가 noise 의 0.14 배 아래라는 뜻이다. r, bias, noise 를 찍는다.
        Seed 0 과 1 이 독립이 아니면 분모가 작아져 r 이 커지므로 Seed 의 독립도 같이 본다.
 
@@ -70,7 +70,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from checks import Checks, stop_and_check
 from imagecompare import agreement
 from imagefiles import ImageFileError, read_dds_rgba32f
-from pathtracerchecks import (BASE, EMISSION_FURNACE, FURNACE_SAMPLES, RECORD, WHITE_FURNACE, append_record_row, code_version,
+from pathtracerchecks import (BASE, EMISSION_FURNACE, FURNACE_SAMPLES, RECORD, light_by_sky_only, WHITE_FURNACE, append_record_row, code_version,
                               describe_machine, path_tracer_state, set_path_tracer)
 from viewer import HARNESS_DIR, PREVIEW_EXPOSURE, HarnessError, Session, capture, make_view, shots_dir, start_instance, stop_instance
 
@@ -277,6 +277,7 @@ def command_check(args):
         session = Session(instance)
         try:
             session.ask_ok('ui hide')
+            light_by_sky_only(session)
             machine = describe_machine(session)
             accumulate = Accumulations(session)
             escaped = check_furnaces(accumulate, check)

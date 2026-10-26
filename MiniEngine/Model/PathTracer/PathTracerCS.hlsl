@@ -20,12 +20,17 @@ cbuffer Constants : register(b0)
     float SkyRadiance;
     float FurnaceAlbedo;
     float FurnaceEmission;
+    // surface에서 directional light를 향하는 단위 vector와, light에 수직인 면의 illuminance (lux)
+    float3 LightDirection;
+    float3 LightIlluminance;
 };
 
 // u register의 순서는 PathTracer.cpp의 UAV와 같다.
 // rgb는 지금까지 더한 sample의 평균, a는 더한 sample 수다. NaN이나 Inf인 sample은 더하지 않으므로, dispatch한 sample 수와 a의 차가 그 수다.
 RWTexture2D<float4> Accumulation : register(u0);
 RWTexture2D<float3> SceneColor : register(u1);
+
+static const float kPi = 3.14159265358979323846;
 
 // 몇 번째 반사부터 Russian roulette로 path를 끊는지. 앞의 반사에서 끊으면 아끼는 trace는 적고 분산만 커진다.
 static const uint kFirstRussianRouletteBounce = 3;
@@ -56,12 +61,25 @@ PathVertex GetPathVertex(RayHit hit)
     return vertex;
 }
 
+// directional light의 빛이 vertex에서 한 번 반사해 path를 거슬러 가는 radiance. light는 방향 하나에서만 오므로 반사 방향을 골라서는
+// 맞을 수 없어 여기서만 더한다. furnace는 답을 식으로 알도록 light를 끈다.
+float3 ReflectDirectionalLight(PathVertex vertex)
+{
+    if (Furnace != 0 || all(LightIlluminance == 0.0))
+        return 0.0;
+    RayDesc ray;
+    if (!DescribeSurfaceRay(vertex.position, vertex.geometryNormal, LightDirection, ray) || IsOccluded(ray, kCullSingleSidedBackFaces))
+        return 0.0;
+    // Lambert의 f는 albedo / π다. illuminance는 light에 수직인 면의 값이므로 normal과의 cos를 곱한다.
+    return vertex.albedo / kPi * LightIlluminance * max(0.0, dot(vertex.normal, LightDirection));
+}
+
 // ray를 따라 camera 쪽으로 오는 radiance를 path 하나로 추정한다.
 float3 TraceRadiance(RayDesc ray, inout Random random)
 {
     float3 radiance = 0.0;
     float3 throughput = 1.0;
-    // bounces는 path가 지금까지 반사한 횟수다. 반사할 때마다 다음 hit의 emission이나 sky를 하나 더 본다.
+    // bounces는 path가 지금까지 반사한 횟수다. 반사 하나는 그 vertex에서 반사한 directional light와, 다음 hit의 emission이나 sky를 더한다.
     for (uint bounces = 0;; ++bounces)
     {
         RayHit hit;
@@ -72,6 +90,8 @@ float3 TraceRadiance(RayDesc ray, inout Random random)
         radiance += throughput * vertex.emission;
         if (bounces == MaxBounces)
             return radiance;
+
+        radiance += throughput * ReflectDirectionalLight(vertex);
 
         if (!DescribeSurfaceRay(vertex.position, vertex.geometryNormal, SampleLambertDirection(vertex.normal, random.rand2()), ray))
             return radiance;

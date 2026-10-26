@@ -55,7 +55,8 @@ namespace
         ImGui::InputScalar("Seed", ImGuiDataType_U32, &s_Settings.seed, &step);
         ImGui::SetItemTooltip("Accumulations that differ only in the seed are independent estimates of the same image.");
         ImGui::InputScalar("Max Bounces", ImGuiDataType_U32, &s_Settings.maxBounces, &step);
-        ImGui::SetItemTooltip("Most reflections a path makes. 0 sees only the emission of the first hit and the sky seen directly.");
+        ImGui::SetItemTooltip("Most reflections a path makes. 0 sees only the emission of the first hit and the sky seen directly, "
+            "and 1 adds the directional light reflected there.");
         ImGui::Checkbox("Russian Roulette", &s_Settings.russianRoulette);
         ImGui::SetItemTooltip("After the first few reflections, ends paths at random by their throughput and weights the survivors up. Unbiased.");
         ImGui::InputFloat("Sky Radiance", &s_Settings.skyRadiance);
@@ -66,7 +67,8 @@ namespace
         ImGui::SetItemTooltip("Reflects about the geometric normal instead of the shading normal, "
             "so no energy is lost to directions below the geometric normal.");
         ImGui::Checkbox("Furnace", &s_Settings.furnace);
-        ImGui::SetItemTooltip("Gives every surface the albedo and emission below. With the constant sky, the answer is known.");
+        ImGui::SetItemTooltip("Gives every surface the albedo and emission below and turns off the directional light. "
+            "With the constant sky, the answer is known.");
         ImGui::InputFloat("Furnace Albedo", &s_Settings.furnaceAlbedo);
         ImGui::InputFloat("Furnace Emission", &s_Settings.furnaceEmission);
         ImGui::SetItemTooltip("In cd/m2. With albedo a < 1 and the sky at emission / (1 - a), every pixel is the sky radiance.");
@@ -256,9 +258,9 @@ void PathTracerPanel::Update(void)
 }
 
 void PathTracerPanel::Render(ComputeContext& context, const Math::Camera& camera, const D3D12_VIEWPORT& rasterViewport,
-    const RaytracingScene& scene, ColorBuffer& sceneColor)
+    const RaytracingScene& scene, const Math::Vector3& lightDirection, const Math::Vector3& lightIlluminance, ColorBuffer& sceneColor)
 {
     if (s_Show)
-        PathTracer::Render(context, s_Settings, camera, rasterViewport, scene, sceneColor);
+        PathTracer::Render(context, s_Settings, camera, rasterViewport, scene, lightDirection, lightIlluminance, sceneColor);
     PathTracer::Capture(context);
 }

@@ -34,6 +34,8 @@ namespace
         // camera의 위치, 방향, FOV와 scene의 해상도가 정한다.
         CameraRays rays;
         PathTracer::Settings settings;
+        Vector3 lightDirection;
+        Vector3 lightIlluminance;
     };
 
     // Settings의 samplesPerFrame과 targetSamples는 쌓는 속도와 양만 정하므로 비교하지 않는다.
@@ -52,6 +54,7 @@ namespace
             XMVector3Equal(a.rays.topLeftCornerDirection, b.rays.topLeftCornerDirection) &&
             XMVector3Equal(a.rays.pixelStepRight, b.rays.pixelStepRight) &&
             XMVector3Equal(a.rays.pixelStepDown, b.rays.pixelStepDown) &&
+            XMVector3Equal(a.lightDirection, b.lightDirection) && XMVector3Equal(a.lightIlluminance, b.lightIlluminance) &&
             HaveSameImage(a.settings, b.settings);
     }
 
@@ -72,6 +75,9 @@ namespace
         float SkyRadiance;
         float FurnaceAlbedo;
         float FurnaceEmission;
+        // HLSL의 cbuffer처럼 float3가 16 byte 경계를 넘지 않도록 Vector3로 둔다.
+        Vector3 LightDirection;
+        Vector3 LightIlluminance;
     };
 
     // SceneHeapTable.h의 규칙대로, 앞 frame의 dispatch가 읽고 있을 수 있는 buffer는 GPU를 기다린 뒤에 다시 만든다.
@@ -117,14 +123,14 @@ PathTracer::Progress PathTracer::GetProgress(void)
 }
 
 void PathTracer::Render(ComputeContext& context, const Settings& settings, const Camera& camera, const D3D12_VIEWPORT& rasterViewport,
-    const RaytracingScene& scene, ColorBuffer& sceneColor)
+    const RaytracingScene& scene, const Vector3& lightDirection, const Vector3& lightIlluminance, ColorBuffer& sceneColor)
 {
     ScopedTimer _prof(L"Path Tracer", context);
 
     FitAccumulationTo(sceneColor);
 
     // 변경을 알려 주는 곳이 없으므로 쌓던 때의 조건과 견준다. Show를 끈 동안 바뀐 조건도 다시 켤 때 잡힌다.
-    const ImageConditions conditions = { DescribeCameraRays(camera, rasterViewport), settings };
+    const ImageConditions conditions = { DescribeCameraRays(camera, rasterViewport), settings, lightDirection, lightIlluminance };
     if (s_ResetRequested || !HaveSameImage(conditions, s_Accumulated))
     {
         s_Accumulated = conditions;
@@ -146,6 +152,8 @@ void PathTracer::Render(ComputeContext& context, const Settings& settings, const
     constants.SkyRadiance = settings.skyRadiance;
     constants.FurnaceAlbedo = settings.furnaceAlbedo;
     constants.FurnaceEmission = settings.furnaceEmission;
+    constants.LightDirection = lightDirection;
+    constants.LightIlluminance = lightIlluminance;
 
     s_UAVs.PointTo(kAccumulationUAV, s_Accumulation, s_Accumulation.GetUAV());
     s_UAVs.PointTo(kSceneColorUAV, sceneColor, sceneColor.GetUAV());

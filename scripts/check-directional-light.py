@@ -1,4 +1,4 @@
-"""directional light 가 KHR_lights_punctual 의 정의대로 raster 에 들어가는지 판정한다.
+"""directional light 가 KHR_lights_punctual 의 정의대로 raster 와 PT 에 들어가는지 판정한다.
 
   python scripts/check-directional-light.py check   # 아래 기준을 판정한다
 
@@ -11,7 +11,8 @@
   [K4] 다른 check script, [K5] viewer.py selftest, [K6] Debug, Profile, Release build, [K7] 문서
 
 app 을 Debug 로 Sponza 에서 한 번, test scene 에서 한 번 띄우고 끝내며, 이미 띄운 harness instance 는 먼저 끝낸다. 하나라도 실패하면 exit 1
-이다. 실행마다 끝낼 때 실행 중의 D3D12 CORRUPTION, ERROR, WARNING 이 0 이고 종료 때 LIVE_DEVICE 하나만 남는지도 본다.
+이다. 실행마다 끝낼 때 실행 중의 D3D12 CORRUPTION, ERROR, WARNING 이 0 이고 종료 때 LIVE_DEVICE 하나만 남는지도 본다. PT 의 값은 capture pt
+의 float export 로 본다.
 
 light:
   [L1] state light 의 direction 이 rotation (quaternion) 으로 돌린 +Z 와 1e-6 안에서 같고, editor.ini 에 남는 Direction 과 float 로 같다.
@@ -19,22 +20,52 @@ light:
        값에서 같다. settings set 은 app 이 시작할 때 editor.ini 를 읽는 것과 같은 load 를 부른다. 그 editor.ini 의 Engine Tuning 에
        Viewer/Lighting 의 예전 light 항목이 없다.
 
-raster (test scene): quad 는 Front Face view 의 앞면 pixel 을 가장자리 EDGE_PIXELS 깎은 것이다.
-  [P5] (raster) color COLOR 와 intensity 2 배의 raster scene capture 가 흰색, 원래 intensity 의 capture 의 channel 별 배수와 앞면 pixel
-       에서 bit 까지 같다. 2 의 거듭제곱 배는 float 의 반올림 없이 곱해진다.
+PT 의 직접광 (test scene): Max Bounces 1, Sky Radiance 0, Russian roulette off 다. sky 와 emission 이 0 이라 path 의 값은 처음 맞은 곳에서
+반사한 light 뿐이고 그 값은 pixel 안의 어디에 맞아도 같으므로 분산이 0 이다. quad 는 Front Face view 의 앞면 pixel 을 가장자리 EDGE_PIXELS
+깎아 column 이 이어진 덩어리로 나누고, 덩어리 안을 Light Visibility view 의 흰색 (보임) 과 검정 (가려짐) 으로 나눈다.
+  [P1] Geometric Normals 를 켜면 보이는 pixel 이 모두 albedo x color x intensity x cos / π 와 상대 PT_TOLERANCE 안에서 같다. cos 는
+       light 와 geometric normal 의 cos 이고, albedo 0.5, intensity 는 float 의 π 라서 cos 가 1 이면 0.5 cd/m² 다. geometric normal 은
+       float 의 vertex 위치로 구하므로 식과 float 오차만큼만 다르다.
+  [P2] Max Bounces 0 이면 모든 pixel 이 0 이다. light 를 등진 quad (back) 는 Light Visibility 가 모두 검정이고 PT 도 0 이다.
+  [P3] 가려진 pixel 은 0 이다. single-sided occluder 는 그 뒷면이 receiver 를 향하므로 README 의 "camera 밖에서 본 doubleSided" 대로
+       그림자를 만들지 않고 (single 의 검정 pixel 0 개), doubleSided occluder 는 MIN_SHADOW_PIXELS 이상의 그림자를 만든다.
+  [P4] Geometric Normals 를 끄면 보이는 pixel 의 cos 가 vertex NORMAL 로 구한 cos 와 SHADING_COSINE_TOLERANCE 안에서 같다. shading normal
+       이 geometric normal 과 다른 quad (tilted, away) 에서 두 cos 는 그보다 훨씬 다르고, away 는 shading normal 이 light 를 등져 0 이다.
+       허용 오차는 PT 가 받는 shading normal 의 오차다. normal map 이 없는 material 에도 기본 flat normal texture (8 bit 의 128, 128,
+       255) 를 적용해 (0.0039, 0.0039, 1) 로 기울고, vertex normal 은 R10G10B10A2 로 저장해 성분마다 1/1023 까지 다르다.
+  [P5] color COLOR 와 intensity 2 배의 PT export 가 흰색, 원래 intensity 의 export 의 channel 별 배수와 rgb 의 bit 까지 같다. raster scene
+       capture 도 앞면 pixel 에서 그렇다. 2 의 거듭제곱 배는 float 의 반올림 없이 곱해진다.
   [R1] intensity 0 이면 raster 의 앞면 pixel 이 모두 0 이다. test scene 에는 emission 이 없다.
+
+PT 의 직접광 (Sponza): harness baseline 의 시점, Russian roulette off, Sky Radiance 0, PT_SAMPLES spp 다.
+  [P6] Max Bounces 1 과 Geometric Normals on 으로 SPONZA_LIGHTS 의 방향마다 쌓는다. Light Visibility 의 검정을 깎은 pixel 에서 PT 가 0 이
+       아닌 것 (가려졌는데 밝음) 과, 흰색을 깎은 pixel 에서 Base Color 가 0 이 아니고 Metallic 이 1 이 아닌데 (Lambert 의 albedo 가 있는데)
+       PT 가 0 인 것 (보이는데 어두움) 이 각각 그 region 의 MISMATCH_FRACTION 이하이고, 4 방향으로 이어진 가장 큰 덩어리가
+       MAX_MISMATCH_CLUSTER pixel 이하다. 깎은 흰색과 검정이 각각 MIN_REGION_PIXELS 이상이고 NaN 이나 Inf 인 sample 이 없다.
+       Light Visibility 는 pixel 가운데의 ray 하나로, PT 는 pixel 안을 고르게 쏜 ray 로 정하므로 sub-pixel 의 틈에서 갈린다. 작업 7 을
+       판정할 때 그런 pixel 은 alpha test 하는 잎과 그 잎의 그림자에 흩어져 있었다 (pick 으로 66 개 중 47 개가 alpha test). 그림자 ray 의
+       출발점이나 culling 이 틀리면 면을 따라 이어진 덩어리로 어긋난다.
+  [P7] Geometric Normals off, 같은 Seed 로 Max Bounces 를 1, 2, 4 로 올리면 어떤 pixel 도 PT_SAMPLES ulp 보다 더 어두워지지 않고 평균은
+       매번 커진다. light 는 RNG 를 쓰지 않으므로 path 가 앞 run 의 path 를 그대로 이어 가며, x2 부터 반사한 light 와 반사 횟수의
+       off-by-one 을 본다. 누적의 running mean 은 float 로 sample 마다 반올림하므로, sample 이 모두 같거나 밝아도 평균의 마지막 bit 는
+       sample 수만큼까지 어두워질 수 있다. 작업 7 을 판정할 때 그런 pixel 은 1 ~ 2 ulp 였다.
+  [P8] PT 를 쌓는 동안 light 의 direction, color, intensity 를 바꾸면 pt 의 resets 가 1 늘고, position 을 바꾸면 늘지 않는다.
 
 그대로인 것 (Sponza): before 는 작업 7 전 (a9423e3) 에 같은 조건으로 찍어 BEFORE_DIR 에 둔 capture 다 (BEFORE_DIR/manifest.json).
   [K2] 기본 light 에서 Light Visibility, Light Culling Difference 의 overlay 가 before 의 Sun Visibility, Sun Culling Difference 와 같다.
+  [K3] intensity 0 으로 쌓은 PT export 가 before 와 rgba 의 bit 까지 같다. light 를 끄면 작업 7 전의 path 가 그대로 남는다.
 
 source:
   [K8] tracked 와 untracked (ignore 하지 않은) 파일에서 sun 의 세 표기가 SUN_EXCEPTIONS 밖에 없다.
+
+test scene 의 PT 와 Sponza 의 직접광은 발표에 쓰도록 KEPT_DIR 에 DDS 와 보기용 PNG 로 남긴다.
 """
 
 import argparse
 import configparser
 import json
 import math
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -48,7 +79,9 @@ from checks import Checks, stop_and_check
 from gltfwriter import GLTF_FLOAT, GLTF_UNSIGNED_SHORT, BufferBuilder, flatten
 from imagefiles import ImageFileError, read_dds_rgba32f
 from imagemasks import column_groups, eroded
-from viewer import HARNESS_DIR, REPO_ROOT, SETTLE_FRAMES, VIEWER_DIR, HarnessError, Session, capture, start_instance, stop_instance
+from pathtracerchecks import BASE, set_path_tracer
+from viewer import (HARNESS_DIR, PREVIEW_EXPOSURE, REPO_ROOT, SETTLE_FRAMES, VIEWER_DIR, HarnessError, Session, capture, make_view,
+                    start_instance, stop_instance)
 
 SCENE_DIR = HARNESS_DIR / 'directional-light'
 SCENE_NAME = 'DirectionalLight'
@@ -61,8 +94,13 @@ LIGHT_DIRECTION = (0.0, 0.8, 0.6)
 INTENSITY = float(np.float32(math.pi))
 ALBEDO = 0.5
 COLOR = (1.0, 0.5, 0.25)
+PT_TOLERANCE = 1e-5
+# 기본 flat normal texture 의 기울기 |(0.0039, 0.0039)| = 0.0055 와 R10G10B10A2 normal 의 성분마다 1/1023 을 더한 |Δn| 의 상한 0.0073 보다
+# 조금 크게 잡았다.
+SHADING_COSINE_TOLERANCE = 0.0075
 EDGE_PIXELS = 2
 MIN_PIXELS = 300
+MIN_SHADOW_PIXELS = 300
 FRONT_FACE_COLOR = (0, 255, 0)
 
 QUAD_POSITIONS = [(-1.0, 1.0, 0.0), (1.0, 1.0, 0.0), (1.0, -1.0, 0.0), (-1.0, -1.0, 0.0)]
@@ -85,6 +123,16 @@ QUADS = [
     SimpleNamespace(name='double', x=7.5, normal=(0.0, 0.0, 1.0), rotation=(0.0, 0.0, 0.0, 1.0), occluder='doubleSided'),
 ]
 
+# low 는 harness baseline 의 시점에 보이는 곳과 가려진 곳이 둘 다 있는 낮은 방향이다. 고도 20 에서는 모든 방위에서 보이는 곳이 없었다.
+SPONZA_LIGHTS = {'default': None, 'low': 'elevation=30 azimuth=180'}
+PT_SAMPLES = 4
+MIN_REGION_PIXELS = 1000
+# 작업 7 을 판정할 때 기본 방향에서 가려졌는데 밝은 pixel 은 3.4e-5, 보이는데 어두운 pixel 은 1.9e-5 였다.
+MISMATCH_FRACTION = 1e-4
+MAX_MISMATCH_CLUSTER = 4
+BOUNCE_STEPS = [1, 2, 4]
+WAIT_TIMEOUT = 900
+DIRECT = BASE | {'Sky Radiance': 0, 'Max Bounces': 1, 'Russian Roulette': 0, 'Target Samples': PT_SAMPLES}
 BEFORE_VIEWS = {'Debug: Sun Visibility': 'Debug: Light Visibility', 'Debug: Sun Culling Difference': 'Debug: Light Culling Difference'}
 # 이 light 의 이름이 sun 이던 때의 기록과, 이 script 의 판정 자체
 SUN_EXCEPTIONS = [
@@ -136,12 +184,31 @@ def write_test_scene():
     (SCENE_DIR / f'{SCENE_NAME}.gltf').write_text(json.dumps(gltf, indent=2), encoding='utf-8')
 
 
+def keep(path, target):
+    KEPT_DIR.mkdir(parents=True, exist_ok=True)
+    kept = KEPT_DIR / path.name
+    shutil.copy2(path, kept)
+    make_view(kept, target, kept.with_suffix('.png'), None, 1 << 16, PREVIEW_EXPOSURE)
+
+
 def overlay(session, view, name):
     session.ask_ok(f'settings set Ray Tracing View: View={view}')
     session.ask_ok(f'frames {SETTLE_FRAMES}')
     image = np.asarray(Image.open(capture(session, 'overlay', name)).convert('RGB'))
     session.ask_ok('settings set Ray Tracing View: View=Off')
     return image
+
+
+def accumulate(session, settings, name, keep_it=False):
+    """settings 로 처음부터 쌓은 PT export 의 rgba 와, NaN 이나 Inf 라서 버린 sample 수."""
+    set_path_tracer(session, settings)
+    session.ask_ok('pt reset')
+    samples = session.ask_ok(f'pt wait samples={settings["Target Samples"]}', timeout=WAIT_TIMEOUT)['samples']
+    path = capture(session, 'pt', name)
+    rgba = read_dds_rgba32f(path)
+    if keep_it:
+        keep(path, 'pt')
+    return rgba, int(np.sum(samples - rgba[..., 3]))
 
 
 def light_state(session):
@@ -161,6 +228,23 @@ def rotate(quaternion, vector):
 def set_light(session, values):
     """editor.ini 의 key 와 value 로 light 를 정한다."""
     session.ask_ok(f'settings set {LIGHT_SECTION}: ' + '; '.join(f'{key}={value}' for key, value in values.items()))
+
+
+def largest_cluster(mask):
+    """mask 에서 4 방향으로 이어진 가장 큰 덩어리의 pixel 수"""
+    left = {(int(y), int(x)) for y, x in zip(*np.nonzero(mask))}
+    largest = 0
+    while left:
+        stack, size = [left.pop()], 0
+        while stack:
+            y, x = stack.pop()
+            size += 1
+            for neighbor in ((y + 1, x), (y - 1, x), (y, x + 1), (y, x - 1)):
+                if neighbor in left:
+                    left.remove(neighbor)
+                    stack.append(neighbor)
+        largest = max(largest, size)
+    return largest
 
 
 def same_bits(a, b):
@@ -193,6 +277,69 @@ def check_before(session, check):
             differing.append(f'{name}: {int(np.count_nonzero(np.any(now != before, axis=2)))} pixels')
     check(f'[K2] the light visibility views are as before ({manifest["code"]})', not differing, '; '.join(differing))
 
+    entry = manifest['files']['start-pt.dds']
+    session.ask_ok(f'pose {entry["pose"]}')
+    session.ask_ok('light set intensity=0')
+    now, _ = accumulate(session, entry['path tracer'], 'after-start-pt')
+    before = read_dds_rgba32f(BEFORE_DIR / 'start-pt.dds')
+    differing = np.any(now.view(np.uint32) != before.view(np.uint32), axis=2)
+    check(f'[K3] the path tracer with intensity 0 is bit-identical to before ({manifest["code"]})', not differing.any(),
+          f'{int(differing.sum())} pixels differ')
+
+
+def check_sponza_direct(session, check, start_pose, default_light):
+    for name, request in SPONZA_LIGHTS.items():
+        session.ask_ok(f'pose {start_pose}')
+        set_light(session, default_light)
+        if request:
+            session.ask_ok(f'light set {request}')
+        visibility = overlay(session, 'Debug: Light Visibility', f'sponza-{name}-visibility')
+        base_color = overlay(session, 'Debug: Base Color', f'sponza-{name}-base-color')
+        metallic = overlay(session, 'Debug: Metallic', f'sponza-{name}-metallic')
+        rgba, invalid = accumulate(session, DIRECT | {'Geometric Normals': 1}, f'sponza-{name}-direct', keep_it=True)
+        dark = np.all(rgba[..., :3] == 0.0, axis=2)
+        occluded = eroded(np.all(visibility == 0, axis=2), EDGE_PIXELS)
+        visible = eroded(np.all(visibility == 255, axis=2), EDGE_PIXELS)
+        no_albedo = np.all(base_color == 0, axis=2) | np.all(metallic == 255, axis=2)
+        mismatches = {'occluded but lit': (occluded & ~dark, occluded), 'visible but dark': (visible & dark & ~no_albedo, visible)}
+        details, passed = [], invalid == 0
+        for label, (mismatch, region) in mismatches.items():
+            fraction = float(mismatch.sum()) / max(int(region.sum()), 1)
+            cluster = largest_cluster(mismatch) if fraction <= MISMATCH_FRACTION else None
+            passed = passed and region.sum() >= MIN_REGION_PIXELS and cluster is not None and cluster <= MAX_MISMATCH_CLUSTER
+            details.append(f'{label} {int(mismatch.sum())} of {int(region.sum())} ({fraction:.1e}), largest cluster {cluster}')
+        check(f'[P6] {name}: the direct light follows Light Visibility but for scattered sub-pixel gaps', passed,
+              '; '.join(details) + f'; {invalid} invalid samples')
+    set_light(session, default_light)
+
+
+def check_bounces(session, check, start_pose):
+    session.ask_ok(f'pose {start_pose}')
+    images = [accumulate(session, DIRECT | {'Max Bounces': bounces}, f'sponza-bounces-{bounces}')[0][..., :3] for bounces in BOUNCE_STEPS]
+    # 양수 float 는 bit 를 정수로 읽은 차가 ulp 수다.
+    darker = [int(np.count_nonzero(np.any(earlier.view(np.int32) - later.view(np.int32) > PT_SAMPLES, axis=2)))
+              for earlier, later in zip(images, images[1:])]
+    means = [float(image.mean()) for image in images]
+    check(f'[P7] raising Max Bounces through {BOUNCE_STEPS} darkens no pixel by more than {PT_SAMPLES} ulps and raises the mean each time',
+          not any(darker) and all(later > earlier for earlier, later in zip(means, means[1:])),
+          f'darker pixels {darker}, means {[round(mean, 6) for mean in means]}')
+
+
+def check_resets(session, check):
+    set_path_tracer(session, DIRECT | {'Target Samples': 1 << 20})
+    session.ask_ok('pt reset')
+    session.ask_ok('pt wait samples=2', timeout=WAIT_TIMEOUT)
+    counts = {}
+    for name, request in [('direction', 'direction=0.3,0.8,0.5'), ('color', 'color=1,0.5,0.25'), ('intensity', 'intensity=2'),
+                          ('position', 'position=10,20,30')]:
+        before = session.ask_ok('state pt')['state']['pt']['resets']
+        session.ask_ok(f'light set {request}')
+        session.ask_ok('frames 2')
+        counts[name] = session.ask_ok('state pt')['state']['pt']['resets'] - before
+    check('[P8] changing the light direction, color or intensity starts the path tracer over, and its position does not',
+          counts == {'direction': 1, 'color': 1, 'intensity': 1, 'position': 0}, str(counts))
+    set_path_tracer(session, {'Show': 0})
+
 
 def run_sponza(build_first, check):
     """Sponza 의 판정을 하고, 끝낼 때 editor.ini 에 남은 light 와 그때의 state light 를 돌려준다."""
@@ -202,8 +349,14 @@ def run_sponza(build_first, check):
         session = Session(instance)
         try:
             session.ask_ok('ui hide')
+            camera = session.ask_ok('state camera')['state']['camera']
+            start_pose = ' '.join(str(camera[key]) for key in ['x', 'y', 'z', 'heading', 'pitch'])
+            default_light = session.ask_ok(f'settings get {LIGHT_SECTION}')['values']
             check_saved_direction(session, check)
             check_before(session, check)
+            check_sponza_direct(session, check, start_pose, default_light)
+            check_bounces(session, check, start_pose)
+            check_resets(session, check)
             session.ask_ok('light set direction=0.2,0.9,-0.3 color=0.75,0.5,0.25 intensity=2.5 position=10,20,30')
             stored = light_state(session)
         finally:
@@ -235,19 +388,58 @@ def check_stored(session, check, stored):
           loaded == stored.state and not old, f'{stored.state} -> {loaded}; Engine Tuning {old}')
 
 
-def judge_raster(check, front_face, raster):
+def judge_quads(check, front_face, visibility, images, raster):
     front = np.all(front_face == FRONT_FACE_COLOR, axis=2)
     groups = column_groups(eroded(front, EDGE_PIXELS))
     sizes = [int(group.sum()) for group in groups]
     if not check(f'the test scene shows {len(QUADS)} quads of at least {MIN_PIXELS} pixels', len(groups) == len(QUADS) and min(sizes, default=0) >= MIN_PIXELS,
                  f'{len(groups)} groups of {sizes} pixels after trimming {EDGE_PIXELS} edge pixels'):
         return
+    light = np.array(images.light_direction)
+    visible = eroded(np.all(visibility == 255, axis=2), EDGE_PIXELS)
+    occluded = eroded(np.all(visibility == 0, axis=2), EDGE_PIXELS)
+
+    def expected(cosine):
+        return ALBEDO * INTENSITY * max(cosine, 0.0) / math.pi
+
+    geometric_wrong, shading_wrong, shadows = [], [], {}
+    for quad, group in zip(QUADS, groups):
+        geometric = rotate(np.array(quad.rotation), np.array([0.0, 0.0, 1.0]))
+        shading = rotate(np.array(quad.rotation), np.array(quad.normal) / np.linalg.norm(quad.normal))
+        lit = images.geometric[group & visible][:, :3]
+        value = expected(float(geometric @ light))
+        if lit.size and (np.any(lit != 0.0) if value == 0.0 else np.abs(lit / value - 1.0).max() > PT_TOLERANCE):
+            geometric_wrong.append(f'{quad.name}: visible {lit.min():.9g} ~ {lit.max():.9g}, expected {value:.9g}')
+        lit = images.shading[group & visible][:, :3]
+        value = expected(float(shading @ light))
+        if lit.size and np.abs(lit - value).max() > expected(SHADING_COSINE_TOLERANCE):
+            shading_wrong.append(f'{quad.name}: visible {lit.min():.9g} ~ {lit.max():.9g}, expected {value:.9g}')
+        for normals, image in [('shading', images.shading), ('geometric', images.geometric)]:
+            dark = image[group & occluded][:, :3]
+            if dark.size and np.any(dark != 0.0):
+                geometric_wrong.append(f'{quad.name} {normals} normals: {int(np.count_nonzero(np.any(dark != 0.0, axis=1)))} occluded pixels are lit')
+        shadows[quad.name] = int((group & occluded).sum())
+
+    check('[P1] with Geometric Normals on every visible pixel is albedo x color x intensity x cos / pi of the geometric normal, '
+          'and [P3] every occluded pixel is 0', not geometric_wrong, '; '.join(geometric_wrong))
+    check(f'[P4] with Geometric Normals off the cos is of the vertex NORMAL within {SHADING_COSINE_TOLERANCE}', not shading_wrong,
+          '; '.join(shading_wrong))
+    back = groups[[quad.name for quad in QUADS].index('back')]
+    check('[P2] Max Bounces 0 gives 0 everywhere, and the quad facing away from the light is occluded and 0',
+          not np.any(images.no_bounce[..., :3]) and not (back & visible).any() and not np.any(images.shading[back][:, :3]),
+          f'{int(np.count_nonzero(np.any(images.no_bounce[..., :3] != 0, axis=2)))} pixels are not 0 with Max Bounces 0')
+    check('[P3] a single-sided occluder seen from behind casts no shadow, and a doubleSided one does',
+          shadows['single'] == 0 and shadows['double'] >= MIN_SHADOW_PIXELS, f'shadow pixels {shadows}')
+
     color = np.array(COLOR, dtype=np.float32)
+    pt_colored = same_bits(images.colored[..., :3], images.shading[..., :3] * color)
+    pt_doubled = same_bits(images.doubled[..., :3], images.shading[..., :3] * np.float32(2.0))
     mask = eroded(front, EDGE_PIXELS)
-    colored = same_bits(raster.colored[mask], raster.white[mask] * color)
-    doubled = same_bits(raster.doubled[mask], raster.white[mask] * np.float32(2.0))
-    check(f'[P5] (raster) the raster scales by color {COLOR} and by twice the intensity to the bit', colored and doubled,
-          f'color {colored}, intensity {doubled}')
+    raster_colored = same_bits(raster.colored[mask], raster.white[mask] * color)
+    raster_doubled = same_bits(raster.doubled[mask], raster.white[mask] * np.float32(2.0))
+    check(f'[P5] the path tracer and the raster scale by color {COLOR} and by twice the intensity to the bit',
+          pt_colored and pt_doubled and raster_colored and raster_doubled,
+          f'path tracer color {pt_colored}, intensity {pt_doubled}; raster color {raster_colored}, intensity {raster_doubled}')
     check('[R1] the raster draws 0 on every front pixel with intensity 0', not np.any(raster.dark[mask]),
           f'{int(np.count_nonzero(np.any(raster.dark[mask] != 0, axis=1)))} pixels are not 0')
 
@@ -266,6 +458,7 @@ def run_test_scene(build_first, check, stored):
             check_stored(session, check, stored)
             direction = ','.join(f'{value:g}' for value in LIGHT_DIRECTION)
             session.ask_ok(f'light set direction={direction} color=1,1,1 intensity={INTENSITY!r} position=0,0,0')
+            light_direction = vector_of(light_state(session)['direction'])
 
             raster = SimpleNamespace(white=scene_rgb(session, 'raster-white'))
             session.ask_ok(f'light set color={",".join(str(value) for value in COLOR)}')
@@ -277,6 +470,16 @@ def run_test_scene(build_first, check, stored):
             session.ask_ok(f'light set intensity={INTENSITY!r}')
 
             front_face = overlay(session, 'Debug: Front Face', 'front-face')
+            visibility = overlay(session, 'Debug: Light Visibility', 'light-visibility')
+            images = SimpleNamespace(light_direction=light_direction)
+            images.shading = accumulate(session, DIRECT, 'pt-shading', keep_it=True)[0]
+            images.geometric = accumulate(session, DIRECT | {'Geometric Normals': 1}, 'pt-geometric')[0]
+            images.no_bounce = accumulate(session, DIRECT | {'Max Bounces': 0}, 'pt-no-bounce')[0]
+            session.ask_ok(f'light set color={",".join(str(value) for value in COLOR)}')
+            images.colored = accumulate(session, DIRECT, 'pt-colored')[0]
+            session.ask_ok(f'light set color=1,1,1 intensity={2 * INTENSITY!r}')
+            images.doubled = accumulate(session, DIRECT, 'pt-doubled')[0]
+            set_path_tracer(session, {'Show': 0})
         finally:
             session.close()
         stop_and_check(instance, check)
@@ -284,7 +487,7 @@ def run_test_scene(build_first, check, stored):
         check('the test scene ran to the end', False, str(error))
         stop_instance(instance, kill_now=True)
         return
-    judge_raster(check, front_face, raster)
+    judge_quads(check, front_face, visibility, images, raster)
 
 
 # --- source ---------------------------------------------------------------------------------
@@ -303,6 +506,7 @@ def command_check(args):
     stored = run_sponza(not args.no_build, check)
     run_test_scene(False, check, stored)
     check_sun_name(check)
+    print(f'kept captures: {KEPT_DIR}')
     print(f'{len(check.failures)} failed' if check.failures else 'all passed')
     return 1 if check.failures else 0
 

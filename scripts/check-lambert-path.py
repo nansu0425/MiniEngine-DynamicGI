@@ -24,7 +24,8 @@ FURNACE_SAMPLES 로 본다. sky 는 늘 Sky Radiance 1 이다.
   [4] Geometric Normals 를 끈 white furnace (Russian roulette off): 모든 pixel 이 1.0 이하다. shading normal 이 energy 를 만들지 않는
       것을 본다. 평균은 shading normal 이 잃는 energy 의 첫 수치로 찍는다.
 
-장면은 furnace 를 끈 Sponza 다. Sponza 에는 emission 이 없고 albedo 가 1 이하라 radiance 가 Sky Radiance 를 넘을 수 없다.
+장면은 furnace 와 directional light 를 끈 Sponza 다. Sponza 에는 emission 이 없고 albedo 가 1 이하라 radiance 가 Sky Radiance 를 넘을 수
+없다.
 
   [5] Max Bounces 64, SCENE_SAMPLES 에서 Russian roulette 를 끈 run 과 켠 run 모두 모든 pixel 이 [0, 1] 안이고 NaN, Inf 가 없다.
   [6] Russian roulette 를 끄고 Max Bounces 를 BOUNCE_STEPS 로 올리면 같은 Seed 와 FURNACE_SAMPLES 에서 어떤 pixel 도 어두워지지
@@ -58,7 +59,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from checks import Checks, stop_and_check
 from imagefiles import ImageFileError, read_dds_rgba32f
-from pathtracerchecks import (BASE, EMISSION_FURNACE, FURNACE_SAMPLES, RECORD, SECTION, WHITE_FURNACE, append_record_row, code_version,
+from pathtracerchecks import (BASE, EMISSION_FURNACE, FURNACE_SAMPLES, RECORD, light_by_sky_only, SECTION, WHITE_FURNACE, append_record_row, code_version,
                               describe_machine, path_tracer_state, set_path_tracer)
 from viewer import HARNESS_DIR, PREVIEW_EXPOSURE, HarnessError, Session, capture, make_view, start_instance, stop_instance
 
@@ -240,6 +241,7 @@ def command_check(args):
         session = Session(instance)
         try:
             session.ask_ok('ui hide')
+            light_by_sky_only(session)
             check_furnaces(session, check)
             check_scene(session, check)
             check_resets(session, check)
@@ -263,6 +265,7 @@ def command_cost(args):
         session = Session(instance)
         try:
             session.ask_ok('ui hide')
+            light_by_sky_only(session)
             config, gpu, scene = describe_machine(session)
             print(f'{config}, {gpu}, scene {scene}, Max Bounces {SCENE["Max Bounces"]}, Samples per Frame {SCENE["Samples per Frame"]}')
             for russian_roulette in (1, 0):

@@ -33,6 +33,11 @@ def set_path_tracer(session, settings):
     return session.ask_ok(f'settings set {SECTION}: ' + '; '.join(f'{key}={value}' for key, value in settings.items()))
 
 
+def light_by_sky_only(session):
+    """directional light 를 끈다. 작업 5, 6 의 기준과 측정 기록은 sky 만 비추는 장면에서 정했다. furnace 는 light 를 스스로 끈다."""
+    return session.ask_ok('light set intensity=0')
+
+
 def path_tracer_state(session):
     return session.ask_ok('state pt')['state']['pt']
 
