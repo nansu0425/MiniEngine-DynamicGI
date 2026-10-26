@@ -14,7 +14,13 @@ harness 는 agent 가 ModelViewer 를 build, 실행하고 명령으로 조작, c
 ### 여러 frame 에 걸친 camera 움직임 (필요해질 때)
 
 - 할 일: camera 가 여러 frame 에 걸쳐 움직이게 해서 motion vector 를 쓰는 경로 (예: TAA) 를 검사한다. 입력 주입으로 할지 pose 를 frame 마다 옮기는 명령으로 할지는 그때 정한다. 조작 수단으로서의 입력 주입은 만들지 않는다 (보류한 결정).
-- 근거: `pose` 는 velocity 를 만들지 않으므로, motion vector 를 쓰는 경로는 지금 검사할 수 없다.
+- 근거: `pose` 는 velocity 를 만들지 않으므로, motion vector 를 쓰는 경로는 지금 검사할 수 없다. `snapshot` 도 camera 가 멈춘 shot 만 찍는다.
+
+### 기본 효과를 켠 불변식 (필요해질 때)
+
+- 할 일: app 의 기본 효과 (TAA, motion blur, adaptive exposure) 를 켠 채로, 작업과 관계없이 늘 성립해야 하는 불변식을 모아 rendering 을 바꾸는 작업마다 돌린다. 예를 들어 camera 가 멈추면 motion blur 가 화면을 바꾸지 않는다.
+- 근거: 로드맵 작업 C 의 첫 판정은 baseline 에서만 해서, SSAO pass 와 함께 빠진 linear depth 가 motion blur 를 번지게 한 것을 놓쳤다 (`scripts/check-raster-lighting.py` 의 [13]). `snapshot compare` 가 같은 code 의 차이보다 큰 변화를 표시하지만, 그 변화가 bug 인지는 agent 가 sheet 를 보고 판단한다. 불변식은 bit 단위로 판정한다.
+- 때: `snapshot compare` 가 놓친 회귀가 다시 나오거나, 같은 불변식을 여러 작업의 check script 가 따로 갖게 될 때
 
 ### Validation view 를 끈 뒤의 비결정성 원인 (필요해질 때)
 
