@@ -180,8 +180,11 @@ constexpr float kDefaultLightIntensity = 4.0f * XM_PI;
 
 const char kSkyLightSettingsSection[] = "Sky Light";
 
-// path tracer의 설정에 있던 Sky Radiance의 기본값을 옮겼다.
-constexpr float kDefaultSkyLightIntensity = 1.0f;
+// 맑은 날 한낮에 해가 비추는 면과, 해를 가리고 맑은 하늘 전체만 받는 그늘의 illuminance 비를 directional light의 기본 intensity에
+// 맞춘다. Wikipedia "Daylight"의 illuminance 표는 둘을 111,000 lux (Bright sunlight)와 20,000 lux (Shade illuminated by entire
+// clear blue sky, midday)로 든다. 표에는 출처 표기가 없고 값도 어림이다. 모든 방향에서 radiance가 L인 sky 아래에서 위를 향한 면은
+// πL lux를 받으므로 πL : kDefaultLightIntensity = 20,000 : 111,000이다. 그늘을 만든 물체가 가리는 하늘은 무시했다.
+constexpr float kDefaultSkyLightIntensity = kDefaultLightIntensity / XM_PI * (20000.0f / 111000.0f);
 
 // direction을 그대로 +Z로 두고 +Y를 world의 위쪽에 가깝게 둔 rotation. direction은 단위 vector다.
 Matrix3 MakeRotationToward(Vector3 direction)
