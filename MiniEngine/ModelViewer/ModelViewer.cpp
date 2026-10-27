@@ -65,10 +65,10 @@ using Renderer::MeshSorter;
 // KHR_lights_punctual의 directional light (references/glTF/extensions/2.0/Khronos/KHR_lights_punctual/README.md:110).
 // 무한히 멀어서 감쇠하지 않고, 자기 transform의 local -Z 방향으로 빛을 낸다. transform의 위치는 조명에 영향을 주지 않고,
 // scene editor에서 light를 보고 고르는 자리다.
-class DirectionalLight : public SceneEditor::Object
+class DirectionalLight : public SceneEditor::IconObject
 {
 public:
-    // gizmo, light set 명령, panel, editor.ini가 바꾸는 값
+    // gizmo, light set 명령, Details panel, editor.ini가 바꾸는 값
     struct Properties
     {
         // GetX, GetY, GetZ가 local의 +X, +Y, +Z를 world에서 본 방향이다. 조명이 쓰는 +Z를 계산 없이 그대로 읽도록
@@ -93,10 +93,9 @@ public:
     // 회전이 없는 transform으로 둔다. 빛은 world의 -Z로 가고 icon은 원점에 놓인다. color와 intensity는 그대로다.
     void ResetTransform();
 
-    // View 메뉴의 Directional Light panel. color와 intensity를 바꾸고 transform을 되돌린다.
-    void ShowPanel();
-
     virtual const char* GetName() const override { return "Directional Light"; }
+    // color와 intensity를 바꾸고 transform을 되돌린다.
+    virtual void ShowDetails() override;
     virtual Vector3 GetPosition() const override { return m_Properties.position; }
     virtual void SetPosition(Vector3 position) override { m_Properties.position = position; }
     virtual void Draw(const Camera& camera, bool selected) const override;
@@ -104,17 +103,16 @@ public:
 
 private:
     Properties m_Properties;
-    bool m_ShowPanel = false;
 };
 
 // ray가 아무 면도 만나지 않을 때 받는 빛. 무한히 먼 sky가 모든 방향에서 같은 radiance를 낸다.
 // ray tracing으로 간접광을 구하는 곳 (path tracer, 앞으로의 DDGI)이 miss에서 이 radiance를 쓴다. raster는 이 빛으로 surface를 비추지
 // 않고 camera에서 바로 보이는 배경으로만 그린다. raster에는 sky의 visibility가 없어서 surface에 더하면 sky가 가려진 실내까지 밝아지고,
 // 그 빛은 DDGI가 구한다.
-class SkyLight
+class SkyLight : public SceneEditor::Object
 {
 public:
-    // panel, editor.ini, settings 명령이 바꾸는 값
+    // Details panel, editor.ini, settings 명령이 바꾸는 값
     struct Properties
     {
         // directional light처럼 color는 linear RGB이고 성분마다 0 ~ 1이며, intensity와 곱한 것이 빛이다. intensity는 lux가 아니라
@@ -131,12 +129,31 @@ public:
     // 모든 방향에서 같은 radiance (cd/m²)
     Vector3 GetRadiance() const { return m_Properties.color * Scalar(m_Properties.intensity); }
 
-    // View 메뉴의 Sky Light panel
-    void ShowPanel();
+    // 무한히 멀어 icon을 둘 자리가 없으므로 Scene Hierarchy로만 고른다.
+    virtual const char* GetName() const override { return "Sky Light"; }
+    virtual void ShowDetails() override;
 
 private:
     Properties m_Properties;
-    bool m_ShowPanel = false;
+};
+
+// scene에 놓인 glTF model. 스스로 보이므로 icon이 없다. 아직 바꿀 수 있는 설정이 없어 Details panel에 model의 정보만 보인다.
+class SceneModel : public SceneEditor::Object
+{
+public:
+    explicit SceneModel(const ModelInstance& instance) : m_Instance(instance) {}
+
+    // 이름은 file 이름에서 확장자를 뺀 것이다.
+    void SetPath(const std::string& path);
+    const std::string& GetPath() const { return m_Path; }
+
+    virtual const char* GetName() const override { return m_Name.c_str(); }
+    virtual void ShowDetails() override;
+
+private:
+    const ModelInstance& m_Instance;
+    std::string m_Path;
+    std::string m_Name;
 };
 
 class ModelViewer : public GameCore::IGameApp
@@ -163,6 +180,7 @@ private:
     D3D12_RECT m_MainScissor;
 
     ModelInstance m_ModelInst;
+    SceneModel m_SceneModel{ m_ModelInst };
     RaytracingScene m_RaytracingScene;
     ShadowCamera m_ShadowCamera;
     DirectionalLight m_Light;
@@ -344,20 +362,37 @@ void RegisterSkyLight(SkyLight& sky)
     ControlChannel::RegisterState("sky", [&sky] { return DescribeSkyLight(sky); });
 }
 
-void SkyLight::ShowPanel()
+void SkyLight::ShowDetails()
 {
-    ImGuiLayer::ShowPanel("Sky Light", m_ShowPanel, [this]
-    {
-        float color[3] = { m_Properties.color.GetX(), m_Properties.color.GetY(), m_Properties.color.GetZ() };
-        if (ImGui::ColorEdit3("Color", color, ImGuiColorEditFlags_Float))
-            m_Properties.color = Min(Max(Vector3(color[0], color[1], color[2]), Vector3(kZero)), Vector3(1.0f, 1.0f, 1.0f));
-        ImGui::SetItemTooltip("Linear RGB, each 0 to 1.");
-        if (ImGui::DragFloat("Intensity", &m_Properties.intensity, 0.01f, 0.0f, FLT_MAX, "%.3f cd/m2"))
-            m_Properties.intensity = std::max(0.0f, m_Properties.intensity);
-        ImGui::SetItemTooltip("Radiance of the sky in every direction, in cd/m2. An upward surface open to the whole sky receives "
-            "pi times this in lux.");
-        ImGui::TextDisabled("Rays that hit nothing see this light. The raster does not light surfaces with it and draws it only as the background.");
-    });
+    float color[3] = { m_Properties.color.GetX(), m_Properties.color.GetY(), m_Properties.color.GetZ() };
+    if (ImGui::ColorEdit3("Color", color, ImGuiColorEditFlags_Float))
+        m_Properties.color = Min(Max(Vector3(color[0], color[1], color[2]), Vector3(kZero)), Vector3(1.0f, 1.0f, 1.0f));
+    ImGui::SetItemTooltip("Linear RGB, each 0 to 1.");
+    if (ImGui::DragFloat("Intensity", &m_Properties.intensity, 0.01f, 0.0f, FLT_MAX, "%.3f cd/m2"))
+        m_Properties.intensity = std::max(0.0f, m_Properties.intensity);
+    ImGui::SetItemTooltip("Radiance of the sky in every direction, in cd/m2. An upward surface open to the whole sky receives "
+        "pi times this in lux.");
+    ImGui::TextDisabled("Rays that hit nothing see this light. The raster does not light surfaces with it and draws it only as the background.");
+}
+
+void SceneModel::SetPath(const std::string& path)
+{
+    m_Path = path;
+    m_Name = Utility::RemoveExtension(Utility::RemoveBasePath(path));
+}
+
+void SceneModel::ShowDetails()
+{
+    const Model& model = m_Instance.GetModel();
+    const AxisAlignedBox bounds = m_Instance.GetAxisAlignedBox();
+    const Vector3 min = bounds.GetMin();
+    const Vector3 max = bounds.GetMax();
+    ImGui::TextWrapped("glTF: %s", m_Path.c_str());
+    ImGui::Text("Meshes: %u, nodes: %u", model.m_NumMeshes, model.m_NumNodes);
+    ImGui::Text("Bounds min: %.2f, %.2f, %.2f", (float)min.GetX(), (float)min.GetY(), (float)min.GetZ());
+    ImGui::Text("Bounds max: %.2f, %.2f, %.2f", (float)max.GetX(), (float)max.GetY(), (float)max.GetZ());
+    ImGui::SetItemTooltip("World-space axis-aligned bounds, as state model gives them.");
+    ImGui::TextDisabled("Read only. The model has no settings to change yet.");
 }
 
 std::string FormatFloat(float value)
@@ -660,7 +695,7 @@ ControlChannel::Fields DescribeLight(const DirectionalLight& light)
 // 받은 값과 다시 읽은 고도와 방위가 같다고 보는 차이. degree와 radian을 오가며 생기는 float 오차보다 크게 잡았다.
 constexpr float kLightDegreesTolerance = 1e-4f;
 
-// gizmo와 panel이 바꾸는 값을 같은 방식으로 바꾼다.
+// gizmo와 Details panel이 바꾸는 값을 같은 방식으로 바꾼다.
 // 받지 않는 값이 하나라도 있으면 아무것도 바꾸지 않도록, 값의 사본에 먼저 적용해 읽어 본다.
 void SetLight(DirectionalLight& light, const std::string& arguments, const ControlChannel::Reply& reply)
 {
@@ -797,9 +832,9 @@ void RegisterLight(DirectionalLight& light)
         [&light](EditorSettings::Values& values) { SaveLightSettings(light, values); },
         [&light](const EditorSettings::Values& values) { LoadLightSettings(light, values); });
     ControlChannel::RegisterState("light", [&light] { return DescribeLight(light); });
-    ControlChannel::Register("light", "light set <key>=<value> ... | light reset: the directional light, as its rotate and translate gizmos and the "
-        "Directional Light panel change it. reset sets the transform to no rotation at the origin, so the light goes along world -Z, "
-        "and keeps the color and intensity, as Reset Transform in the panel does. It is a KHR_lights_punctual directional light and goes along the local -Z of its transform. "
+    ControlChannel::Register("light", "light set <key>=<value> ... | light reset: the directional light, as its rotate and translate gizmos and its "
+        "Details panel change it. reset sets the transform to no rotation at the origin, so the light goes along world -Z, "
+        "and keeps the color and intensity, as Reset Transform in the Details panel does. It is a KHR_lights_punctual directional light and goes along the local -Z of its transform. "
         "rotation=<x>,<y>,<z>,<w> is the quaternion of the transform, as a glTF node's rotation. "
         "direction=<x>,<y>,<z> points from a surface toward the light, the local +Z, and is normalized. "
         "elevation=<degrees> is up from the horizon, -90 to 90. azimuth=<degrees> turns about +y from +x toward +z, 0 to 360. "
@@ -884,27 +919,24 @@ void DirectionalLight::Rotate(const Camera& camera, ImGuizmo::MODE axes)
     m_Properties.rotation = Matrix3(Normalize(Quaternion((XMMATRIX)transform.Get3x3())));
 }
 
-void DirectionalLight::ShowPanel()
+void DirectionalLight::ShowDetails()
 {
-    ImGuiLayer::ShowPanel("Directional Light", m_ShowPanel, [this]
-    {
-        float color[3] = { m_Properties.color.GetX(), m_Properties.color.GetY(), m_Properties.color.GetZ() };
-        if (ImGui::ColorEdit3("Color", color, ImGuiColorEditFlags_Float))
-            m_Properties.color = Min(Max(Vector3(color[0], color[1], color[2]), Vector3(kZero)), Vector3(1.0f, 1.0f, 1.0f));
-        ImGui::SetItemTooltip("Linear RGB, each 0 to 1.");
-        if (ImGui::DragFloat("Intensity", &m_Properties.intensity, 0.05f, 0.0f, FLT_MAX, "%.3f lux"))
-            m_Properties.intensity = std::max(0.0f, m_Properties.intensity);
-        ImGui::SetItemTooltip("Illuminance on a surface facing the light, in lux.");
+    float color[3] = { m_Properties.color.GetX(), m_Properties.color.GetY(), m_Properties.color.GetZ() };
+    if (ImGui::ColorEdit3("Color", color, ImGuiColorEditFlags_Float))
+        m_Properties.color = Min(Max(Vector3(color[0], color[1], color[2]), Vector3(kZero)), Vector3(1.0f, 1.0f, 1.0f));
+    ImGui::SetItemTooltip("Linear RGB, each 0 to 1.");
+    if (ImGui::DragFloat("Intensity", &m_Properties.intensity, 0.05f, 0.0f, FLT_MAX, "%.3f lux"))
+        m_Properties.intensity = std::max(0.0f, m_Properties.intensity);
+    ImGui::SetItemTooltip("Illuminance on a surface facing the light, in lux.");
 
-        ImGui::SeparatorText("Transform");
-        const Vector3 direction = GetDirection();
-        ImGui::Text("Toward the light: %.3f, %.3f, %.3f", (float)direction.GetX(), (float)direction.GetY(), (float)direction.GetZ());
-        ImGui::Text("Elevation %.2f, azimuth %.2f degrees", GetElevation(direction), GetAzimuth(direction));
-        if (ImGui::Button("Reset Transform"))
-            ResetTransform();
-        ImGui::SetItemTooltip("Sets the transform to no rotation at the origin, so the light goes along world -Z. The color and intensity stay.");
-        ImGui::TextDisabled("Select the light's icon and rotate it with the gizmo (E). The Scene Editor panel picks local or world rings.");
-    });
+    ImGui::SeparatorText("Transform");
+    const Vector3 direction = GetDirection();
+    ImGui::Text("Toward the light: %.3f, %.3f, %.3f", (float)direction.GetX(), (float)direction.GetY(), (float)direction.GetZ());
+    ImGui::Text("Elevation %.2f, azimuth %.2f degrees", GetElevation(direction), GetAzimuth(direction));
+    if (ImGui::Button("Reset Transform"))
+        ResetTransform();
+    ImGui::SetItemTooltip("Sets the transform to no rotation at the origin, so the light goes along world -Z. The color and intensity stay.");
+    ImGui::TextDisabled("Rotate the light with the gizmo (E). The Scene Editor panel picks local or world rings.");
 }
 
 // scripts/viewer.py가 이 이름과 형식으로 기본 model 경로를 읽는다.
@@ -967,10 +999,12 @@ void ModelViewer::Startup( void )
         m_CameraController.reset(new OrbitCamera(m_Camera, m_ModelInst.GetBoundingSphere(), Vector3(kYUnitVector)));
     RegisterPoseCommand(editorCamera);
     ControlChannel::RegisterState("camera", [this, editorCamera] { return DescribeCamera(m_Camera, editorCamera); });
-    const std::string modelPath = Utility::ToUTF8(gltfFileName.empty() ? std::wstring(kDefaultModel) : gltfFileName);
-    ControlChannel::RegisterState("model", [this, modelPath] { return DescribeModel(modelPath, m_ModelInst); });
+    m_SceneModel.SetPath(Utility::ToUTF8(gltfFileName.empty() ? std::wstring(kDefaultModel) : gltfFileName));
+    ControlChannel::RegisterState("model", [this] { return DescribeModel(m_SceneModel.GetPath(), m_ModelInst); });
 
+    SceneEditor::AddObject(m_SceneModel);
     SceneEditor::AddObject(m_Light);
+    SceneEditor::AddObject(m_SkyLight);
     SceneEditor::RegisterCommands(m_Camera);
     RegisterLight(m_Light);
     RegisterSkyLight(m_SkyLight);
@@ -982,7 +1016,9 @@ void ModelViewer::Cleanup( void )
     UnregisterMeasurementConditions();
     EditorSettings::Unregister(kSkyLightSettingsSection);
     EditorSettings::Unregister(kLightSettingsSection);
+    SceneEditor::RemoveObject(m_SkyLight);
     SceneEditor::RemoveObject(m_Light);
+    SceneEditor::RemoveObject(m_SceneModel);
     PathTracerPanel::Shutdown();
     RayPick::Shutdown();
     RaytracingView::Shutdown();
@@ -1015,8 +1051,6 @@ void ModelViewer::Update( float deltaT )
     m_CameraController->Update(deltaT);
 
     SceneEditor::Update(m_Camera);
-    m_Light.ShowPanel();
-    m_SkyLight.ShowPanel();
     RaytracingPanel::Update();
     PathTracerPanel::Update();
 

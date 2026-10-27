@@ -18,6 +18,8 @@ namespace
     // rotate gizmo의 ring이 따르는 축. translate는 늘 world의 축이다.
     ImGuizmo::MODE s_RotateAxes = ImGuizmo::LOCAL;
     bool s_ShowPanel = false;
+    bool s_ShowHierarchy = false;
+    bool s_ShowDetails = false;
 
     // Unreal, Unity와 같은 key를 쓴다. camera를 조작하는 동안에는 이 key가 이동 key다.
     void UpdateGizmoMode(void)
@@ -31,17 +33,17 @@ namespace
             s_GizmoMode = GizmoMode::Rotate;
     }
 
-    void EditSelected(const Camera& camera)
+    void EditSelected(const Camera& camera, SceneEditor::IconObject& selected)
     {
         if (s_GizmoMode == GizmoMode::Rotate)
         {
-            s_Selected->Rotate(camera, s_RotateAxes);
+            selected.Rotate(camera, s_RotateAxes);
             return;
         }
 
-        Matrix4 transform(AffineTransform(s_Selected->GetPosition()));
+        Matrix4 transform(AffineTransform(selected.GetPosition()));
         if (SceneEditor::Manipulate(camera, ImGuizmo::TRANSLATE, ImGuizmo::WORLD, transform))
-            s_Selected->SetPosition(Vector3(transform.GetW()));
+            selected.SetPosition(Vector3(transform.GetW()));
     }
 
     // icon이 cursor 아래에 있는 물체 중 icon 중심이 cursor에 가장 가까운 것
@@ -54,7 +56,8 @@ namespace
         for (SceneEditor::Object* object : s_Objects)
         {
             ImVec2 icon;
-            if (!SceneEditor::ProjectToScene(camera, object->GetPosition(), icon))
+            const SceneEditor::IconObject* iconObject = object->AsIconObject();
+            if (iconObject == nullptr || !SceneEditor::ProjectToScene(camera, iconObject->GetPosition(), icon))
                 continue;
 
             const float dx = icon.x - cursor.x;
@@ -82,7 +85,7 @@ namespace
     void ShowPanelContent(void)
     {
         ImGui::Text("Selected: %s", s_Selected != nullptr ? s_Selected->GetName() : "none");
-        ImGui::SetItemTooltip("Click an icon in the scene to select it. Click empty space to deselect.");
+        ImGui::SetItemTooltip("Click an object in the Scene Hierarchy or its icon in the scene to select it. Click empty space in the scene to deselect.");
 
         ImGui::SeparatorText("Gizmo");
         if (ImGui::RadioButton("Translate (W)", s_GizmoMode == GizmoMode::Translate))
@@ -101,7 +104,31 @@ namespace
         ImGui::SetItemTooltip("The rings turn the object about the world axes.");
     }
 
-    ControlChannel::Fields DescribeObject(const Camera& camera, const SceneEditor::Object& object)
+    void ShowHierarchyContent(void)
+    {
+        for (SceneEditor::Object* object : s_Objects)
+        {
+            if (ImGui::Selectable(object->GetName(), object == s_Selected))
+                s_Selected = object;
+        }
+    }
+
+    void ShowDetailsContent(void)
+    {
+        if (s_Selected == nullptr)
+        {
+            ImGui::TextDisabled("Select an object in the Scene Hierarchy or click its icon in the scene.");
+            return;
+        }
+
+        ImGui::SeparatorText(s_Selected->GetName());
+        // 물체마다 Color처럼 같은 label의 widget이 있으므로, 고른 물체가 바뀌면 ImGui가 다른 widget으로 보게 한다.
+        ImGui::PushID(s_Selected);
+        s_Selected->ShowDetails();
+        ImGui::PopID();
+    }
+
+    ControlChannel::Fields DescribeIcon(const Camera& camera, const SceneEditor::IconObject& object)
     {
         const Vector3 position = object.GetPosition();
         ControlChannel::Fields fields;
@@ -125,8 +152,11 @@ namespace
     ControlChannel::Fields DescribeEditor(const Camera& camera)
     {
         ControlChannel::Fields objects;
-        for (const SceneEditor::Object* object : s_Objects)
-            objects.Object(object->GetName(), DescribeObject(camera, *object));
+        for (SceneEditor::Object* object : s_Objects)
+        {
+            const SceneEditor::IconObject* iconObject = object->AsIconObject();
+            objects.Object(object->GetName(), iconObject != nullptr ? DescribeIcon(camera, *iconObject) : ControlChannel::Fields());
+        }
         return ControlChannel::Fields()
             .Text("selected", s_Selected != nullptr ? s_Selected->GetName() : "none")
             .Text("gizmo_mode", GetGizmoModeName(s_GizmoMode))
@@ -218,6 +248,8 @@ void SceneEditor::RemoveObject(Object& object)
 
 void SceneEditor::Update(const Camera& camera)
 {
+    ImGuiLayer::ShowPanel("Scene Hierarchy", s_ShowHierarchy, ShowHierarchyContent);
+    ImGuiLayer::ShowPanel("Details", s_ShowDetails, ShowDetailsContent);
     ImGuiLayer::ShowPanel("Scene Editor", s_ShowPanel, ShowPanelContent);
 
     if (!ImGuiLayer::BeginSceneGizmo())
@@ -226,10 +258,13 @@ void SceneEditor::Update(const Camera& camera)
     UpdateGizmoMode();
 
     for (Object* object : s_Objects)
-        object->Draw(camera, object == s_Selected);
+    {
+        if (const IconObject* iconObject = object->AsIconObject())
+            iconObject->Draw(camera, object == s_Selected);
+    }
 
-    if (s_Selected != nullptr)
-        EditSelected(camera);
+    if (s_Selected != nullptr && s_Selected->AsIconObject() != nullptr)
+        EditSelected(camera, *s_Selected->AsIconObject());
 
     // gizmo나 다른 창 위의 click은 ImGui가 mouse를 가져가므로 물체를 고르는 데 쓰지 않는다.
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::GetIO().WantCaptureMouse &&
@@ -245,11 +280,13 @@ void SceneEditor::RegisterCommands(const Camera& camera)
 {
     const Camera* projection = &camera;
     ControlChannel::RegisterState("editor", [projection] { return DescribeEditor(*projection); });
-    ControlChannel::Register("editor", "editor select <name>|none | editor mode translate|rotate | editor axes local|world: the object the gizmo edits, "
-        "the gizmo mode and the axes the rotate rings follow, as clicking an icon, pressing W or E and the Scene Editor panel do. "
+    ControlChannel::Register("editor", "editor select <name>|none | editor mode translate|rotate | editor axes local|world: the selected object, "
+        "whose settings the Details panel shows and which the gizmo edits, the gizmo mode and the axes the rotate rings follow, "
+        "as clicking an object in the Scene Hierarchy panel or its icon, pressing W or E and the Scene Editor panel do. "
         "local turns the object about its own axes and world about the world axes. translate always follows the world axes. "
-        "state editor has them, and for each object its world position and, in front of the camera, "
-        "its icon's center in client pixels. on_screen is whether that center is in the scene. Icons and the gizmo are drawn only while the UI is shown",
+        "state editor has them, and the objects in the order of the Scene Hierarchy panel, each with its world position and, in front of the camera, "
+        "its icon's center in client pixels. on_screen is whether that center is in the scene. An object without an icon, "
+        "such as the Sky Light or the model, has neither and no gizmo. Icons and the gizmo are drawn only while the UI is shown",
         HandleEditorCommand);
 }
 

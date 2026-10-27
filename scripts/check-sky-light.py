@@ -23,8 +23,8 @@ LIVE_DEVICE 하나만 남는지도 본다.
   [4] PT 를 쌓는 동안 Color 나 Intensity 를 바꾸면 pt 의 resets 가 1 늘고 samples 를 처음부터 센다. Intensity 의 inf 는 받고
       (check-path-tracer-export.py 가 쓴다) NaN 과 음수는 받지 않는다. 끝내기 전에 둔 SAVED_SKY_LIGHT 가 editor.ini 의 Sky Light
       section 에 남는다.
-  [5] state sky 의 color 와 intensity 가 settings 의 Sky Light 와 같은 값이고, View 메뉴의 panel 목록 (Panels section) 에 Sky Light 가
-      있다.
+  [5] state sky 의 color 와 intensity 가 settings 의 Sky Light 와 같은 값이고, Scene Hierarchy panel 의 목록 (state editor 의 objects)
+      에 Sky Light 가 있어 Details panel 에서 그 값을 바꿀 수 있다.
 
 keep 은 기본 시점 (harness baseline 의 pose) 과 SKY_POSE 에서 PT 를 끈 display 와 PT 를 Material glTF 로 KEEP_SAMPLES 만큼 쌓은
 display 를 찍는다. harness baseline 이라 Adaptation 이 꺼져 있고 Exposure 가 같다.
@@ -46,6 +46,9 @@ from pathtracerchecks import BASE, SKY_COLOR, SKY_LIGHT_SECTION, SKY_RADIANCE, p
 from viewer import HARNESS_DIR, SETTLE_FRAMES, HarnessError, Session, baseline_pose, capture, start_instance, stop_instance
 
 KEPT_DIR = HARNESS_DIR / 'kept' / 'sky-light'
+
+# Scene Hierarchy panel 과 editor 명령이 Sky Light 를 가리키는 이름
+SKY_LIGHT_OBJECT = 'Sky Light'
 
 # check-raster-lighting.py 가 sky 를 보던 시점이다. courtyard 가운데에서 위를 본다.
 SKY_POSE = '0 300 0 1.5708 1.2'
@@ -191,8 +194,8 @@ def check_state(session, check):
     expected = {'Color': format_color(color), 'Intensity': f'{intensity:.9g}'}
     check('[5] state sky has the values of the Sky Light settings', shown == settings == expected,
           f'state sky {shown}, settings {settings}')
-    panels = session.ask_ok('state settings.Panels')['state']['settings']['Panels']
-    check('[5] the View menu has the Sky Light panel', SKY_LIGHT_SECTION in panels, f'panels {sorted(panels)}')
+    objects = session.ask_ok('state editor')['state']['editor']['objects']
+    check('[5] the Scene Hierarchy lists the Sky Light', SKY_LIGHT_OBJECT in objects, f'objects {list(objects)}')
 
 
 def read_ini_section(path, section):
