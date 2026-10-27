@@ -38,13 +38,14 @@ namespace
         PathTracer::Settings settings;
         Vector3 lightDirection;
         Vector3 lightIlluminance;
+        Vector3 skyRadiance;
     };
 
     // Settings의 samplesPerFrame과 targetSamples는 쌓는 속도와 양만 정하므로 비교하지 않는다.
     bool HaveSameImage(const PathTracer::Settings& a, const PathTracer::Settings& b)
     {
         return a.material == b.material && a.seed == b.seed && a.maxBounces == b.maxBounces && a.russianRoulette == b.russianRoulette &&
-            a.skyRadiance == b.skyRadiance && a.geometricNormals == b.geometricNormals && a.furnace == b.furnace &&
+            a.geometricNormals == b.geometricNormals && a.furnace == b.furnace &&
             a.furnaceAlbedo == b.furnaceAlbedo && a.furnaceEmission == b.furnaceEmission;
     }
 
@@ -57,7 +58,7 @@ namespace
             XMVector3Equal(a.rays.pixelStepRight, b.rays.pixelStepRight) &&
             XMVector3Equal(a.rays.pixelStepDown, b.rays.pixelStepDown) &&
             XMVector3Equal(a.lightDirection, b.lightDirection) && XMVector3Equal(a.lightIlluminance, b.lightIlluminance) &&
-            HaveSameImage(a.settings, b.settings);
+            XMVector3Equal(a.skyRadiance, b.skyRadiance) && HaveSameImage(a.settings, b.settings);
     }
 
     bool s_ResetRequested = true;
@@ -74,12 +75,15 @@ namespace
         uint32_t RussianRoulette;
         uint32_t GeometricNormals;
         uint32_t Furnace;
-        float SkyRadiance;
         float FurnaceAlbedo;
         float FurnaceEmission;
-        // HLSL의 cbuffer처럼 float3가 16 byte 경계를 넘지 않도록 Vector3로 둔다.
+        // HLSL은 float3를 앞의 scalar가 남긴 자리에 16 byte 경계를 넘지 않는 한 채운다. 아래의 Vector3처럼 float3가 16 byte 경계에서
+        // 시작하도록 그 자리를 채운다.
+        float Padding;
+        // HLSL의 cbuffer처럼 float3가 16 byte 경계를 넘지 않도록 Vector3로 둔다. Vector3는 16 byte를 차지하므로 뒤에 scalar를 두지 않는다.
         Vector3 LightDirection;
         Vector3 LightIlluminance;
+        Vector3 SkyRadiance;
     };
 
     // SceneHeapTable.h의 규칙대로, 앞 frame의 dispatch가 읽고 있을 수 있는 buffer는 GPU를 기다린 뒤에 다시 만든다.
@@ -129,14 +133,14 @@ PathTracer::Progress PathTracer::GetProgress(void)
 }
 
 void PathTracer::Render(ComputeContext& context, const Settings& settings, const Camera& camera, const D3D12_VIEWPORT& rasterViewport,
-    const RaytracingScene& scene, const Vector3& lightDirection, const Vector3& lightIlluminance, ColorBuffer& sceneColor)
+    const RaytracingScene& scene, const Vector3& lightDirection, const Vector3& lightIlluminance, const Vector3& skyRadiance, ColorBuffer& sceneColor)
 {
     ScopedTimer _prof(L"Path Tracer", context);
 
     FitAccumulationTo(sceneColor);
 
     // 변경을 알려 주는 곳이 없으므로 쌓던 때의 조건과 견준다. Show를 끈 동안 바뀐 조건도 다시 켤 때 잡힌다.
-    const ImageConditions conditions = { DescribeCameraRays(camera, rasterViewport), settings, lightDirection, lightIlluminance };
+    const ImageConditions conditions = { DescribeCameraRays(camera, rasterViewport), settings, lightDirection, lightIlluminance, skyRadiance };
     if (s_ResetRequested || !HaveSameImage(conditions, s_Accumulated))
     {
         s_Accumulated = conditions;
@@ -155,11 +159,11 @@ void PathTracer::Render(ComputeContext& context, const Settings& settings, const
     constants.RussianRoulette = settings.russianRoulette ? 1 : 0;
     constants.GeometricNormals = settings.geometricNormals ? 1 : 0;
     constants.Furnace = settings.furnace ? 1 : 0;
-    constants.SkyRadiance = settings.skyRadiance;
     constants.FurnaceAlbedo = settings.furnaceAlbedo;
     constants.FurnaceEmission = settings.furnaceEmission;
     constants.LightDirection = lightDirection;
     constants.LightIlluminance = lightIlluminance;
+    constants.SkyRadiance = skyRadiance;
 
     s_UAVs.PointTo(kAccumulationUAV, s_Accumulation, s_Accumulation.GetUAV());
     s_UAVs.PointTo(kSceneColorUAV, sceneColor, sceneColor.GetUAV());

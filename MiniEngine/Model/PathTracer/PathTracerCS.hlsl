@@ -25,12 +25,14 @@ cbuffer Constants : register(b0)
     uint RussianRoulette;
     uint GeometricNormals;
     uint Furnace;
-    float SkyRadiance;
     float FurnaceAlbedo;
     float FurnaceEmission;
+    float Padding;
     // surface에서 directional light를 향하는 단위 vector와, light에 수직인 면의 illuminance (lux)
     float3 LightDirection;
     float3 LightIlluminance;
+    // ray가 아무 면도 만나지 않을 때 받는 sky light의 radiance (cd/m²). 모든 방향에서 같다.
+    float3 SkyRadiance;
 };
 
 // u register의 순서는 PathTracer.cpp의 UAV와 같다.

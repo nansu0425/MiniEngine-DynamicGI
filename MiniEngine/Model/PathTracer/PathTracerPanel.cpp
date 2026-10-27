@@ -39,8 +39,6 @@ namespace
         s_Settings.samplesPerFrame = std::max(1u, std::min(s_Settings.samplesPerFrame, kMaxSamplesPerFrame));
         s_Settings.targetSamples = std::max(1u, std::min(s_Settings.targetSamples, kMaxTargetSamples));
         s_Settings.maxBounces = std::min(s_Settings.maxBounces, kMaxBounces);
-        // inf는 막지 않는다. scripts/check-path-tracer-export.py가 inf로 두어 NaN과 Inf인 sample을 만든다.
-        s_Settings.skyRadiance = std::max(0.0f, s_Settings.skyRadiance);
         // albedo가 1을 넘으면 반사할 때마다 energy가 늘어 path의 값이 반사 횟수의 상한을 따라 끝없이 커진다.
         s_Settings.furnaceAlbedo = std::max(0.0f, std::min(s_Settings.furnaceAlbedo, 1.0f));
         s_Settings.furnaceEmission = std::max(0.0f, s_Settings.furnaceEmission);
@@ -68,8 +66,6 @@ namespace
             "and 1 adds the directional light reflected there.");
         ImGui::Checkbox("Russian Roulette", &s_Settings.russianRoulette);
         ImGui::SetItemTooltip("After the first few reflections, ends paths at random by their throughput and weights the survivors up. Unbiased.");
-        ImGui::InputFloat("Sky Radiance", &s_Settings.skyRadiance);
-        ImGui::SetItemTooltip("Radiance of the sky in every direction, in cd/m2.");
 
         ImGui::SeparatorText("Validation");
         ImGui::Checkbox("Geometric Normals", &s_Settings.geometricNormals);
@@ -77,11 +73,11 @@ namespace
             "so no energy is lost to directions below the geometric normal.");
         ImGui::Checkbox("Furnace", &s_Settings.furnace);
         ImGui::SetItemTooltip("Gives every surface the albedo and emission below and turns off the directional light. "
-            "With the constant sky, the answer is known. With glTF the albedo scales the BRDF of base color 1, metallic 0 and the material's "
-            "roughness, which reflects all light from every direction.");
+            "As the Sky Light is the same in every direction, the answer is known. With glTF the albedo scales the BRDF of base color 1, "
+            "metallic 0 and the material's roughness, which reflects all light from every direction.");
         ImGui::InputFloat("Furnace Albedo", &s_Settings.furnaceAlbedo);
         ImGui::InputFloat("Furnace Emission", &s_Settings.furnaceEmission);
-        ImGui::SetItemTooltip("In cd/m2. With albedo a < 1 and the sky at emission / (1 - a), every pixel is the sky radiance.");
+        ImGui::SetItemTooltip("In cd/m2. With albedo a < 1 and the Sky Light at emission / (1 - a), every pixel is the Sky Light's radiance.");
         ClampSettings();
 
         if (ImGui::Button("Reset"))
@@ -120,7 +116,6 @@ namespace
         values["Seed"] = std::to_string(s_Settings.seed);
         values["Max Bounces"] = std::to_string(s_Settings.maxBounces);
         values["Russian Roulette"] = FormatFlag(s_Settings.russianRoulette);
-        values["Sky Radiance"] = FormatFloat(s_Settings.skyRadiance);
         values["Geometric Normals"] = FormatFlag(s_Settings.geometricNormals);
         values["Furnace"] = FormatFlag(s_Settings.furnace);
         values["Furnace Albedo"] = FormatFloat(s_Settings.furnaceAlbedo);
@@ -171,7 +166,6 @@ namespace
         ReadUInt(values, "Seed", s_Settings.seed);
         ReadUInt(values, "Max Bounces", s_Settings.maxBounces);
         ReadFlag(values, "Russian Roulette", s_Settings.russianRoulette);
-        ReadFloat(values, "Sky Radiance", s_Settings.skyRadiance);
         ReadFlag(values, "Geometric Normals", s_Settings.geometricNormals);
         ReadFlag(values, "Furnace", s_Settings.furnace);
         ReadFloat(values, "Furnace Albedo", s_Settings.furnaceAlbedo);
@@ -282,9 +276,10 @@ void PathTracerPanel::Update(void)
 }
 
 void PathTracerPanel::Render(ComputeContext& context, const Math::Camera& camera, const D3D12_VIEWPORT& rasterViewport,
-    const RaytracingScene& scene, const Math::Vector3& lightDirection, const Math::Vector3& lightIlluminance, ColorBuffer& sceneColor)
+    const RaytracingScene& scene, const Math::Vector3& lightDirection, const Math::Vector3& lightIlluminance, const Math::Vector3& skyRadiance,
+    ColorBuffer& sceneColor)
 {
     if (s_Show)
-        PathTracer::Render(context, s_Settings, camera, rasterViewport, scene, lightDirection, lightIlluminance, sceneColor);
+        PathTracer::Render(context, s_Settings, camera, rasterViewport, scene, lightDirection, lightIlluminance, skyRadiance, sceneColor);
     PathTracer::Capture(context);
 }

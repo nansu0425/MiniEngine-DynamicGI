@@ -41,13 +41,11 @@ namespace PathTracer
         // PathTracerCS.hlsl의 kFirstRussianRouletteBounce번째 반사부터 throughput에 따라 path를 끊고 살아남은 path를 그만큼 키운다.
         // 기대값은 그대로다.
         bool russianRoulette = true;
-        // 모든 방향에서 같은 sky의 radiance. glTF의 emissive처럼 cd/m²로 읽는다.
-        float skyRadiance = 1.0f;
 
         // shading normal 대신 geometric normal로 반사한다. shading normal은 README.md의 "camera 밖에서 본 doubleSided" 규칙 때문에
         // geometric normal 아래로 고른 방향의 energy를 잃으므로, furnace의 답을 그 손실 없이 보려고 쓴다.
         bool geometricNormals = false;
-        // 모든 surface의 albedo와 emission을 아래 값으로 두고 directional light를 끈다. sky도 상수이므로 답을 식으로 아는 장면이 된다.
+        // 모든 surface의 albedo와 emission을 아래 값으로 두고 directional light를 끈다. sky light는 모든 방향에서 같으므로 답을 식으로 아는 장면이 된다.
         // glTF에서는 baseColor 1, metallic 0, material의 roughness인 BRDF에 albedo를 곱해, 모든 view 방향에서 directional albedo가 albedo다.
         bool furnace = false;
         float furnaceAlbedo = 1.0f;
@@ -73,8 +71,10 @@ namespace PathTracer
 
     // camera ray는 rasterViewport로 그린 raster의 pixel 격자를 따른다. sceneColor는 raster가 그린 scene이고, 그 크기로 누적해 그 위에 평균을 쓴다.
     // lightDirection은 surface에서 directional light를 향하는 단위 vector이고, lightIlluminance는 light에 수직인 면의 illuminance (lux)다.
+    // skyRadiance는 ray가 아무 면도 만나지 않을 때 받는 sky light의 radiance (cd/m²)이고 모든 방향에서 같다.
     void Render(ComputeContext& context, const Settings& settings, const Math::Camera& camera, const D3D12_VIEWPORT& rasterViewport,
-        const RaytracingScene& scene, const Math::Vector3& lightDirection, const Math::Vector3& lightIlluminance, ColorBuffer& sceneColor);
+        const RaytracingScene& scene, const Math::Vector3& lightDirection, const Math::Vector3& lightIlluminance, const Math::Vector3& skyRadiance,
+        ColorBuffer& sceneColor);
 
     // harness의 capture pt에 지금까지 누적한 buffer로 답한다. Render를 부르지 않는 frame에도 불러서, 누적을 멈춘 동안에도 답하게 한다.
     void Capture(ComputeContext& context);

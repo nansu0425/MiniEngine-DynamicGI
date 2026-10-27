@@ -46,7 +46,7 @@ Russian roulette:
        Samples per Frame 4 로 다시 쌓은 export 가 rgba 의 bit 까지 같다. 뒤의 둘은 그 사이에 누적이 다시 시작된 것도 본다.
        sample 번호가 frame 과 무관하게 reset 뒤의 순번이므로 Samples per Frame 은 image 를 바꾸지 않는다.
 
-NaN 과 Inf: Sky Radiance 를 inf 로 두고 white furnace 를 Max Bounces INVALID_BOUNCES 로 쌓는다. escape 한 path 만 sky 를 본다.
+NaN 과 Inf: Sky Light 의 Intensity 를 inf 로 두고 white furnace 를 Max Bounces INVALID_BOUNCES 로 쌓는다. escape 한 path 만 sky 를 본다.
   [V1] albedo 1 이면 escape 한 path 가 Inf 다.
   [V2] albedo 0 이면 escape 한 path 가 0 x Inf = NaN 이다.
   둘 다 모든 pixel 의 a 가 escape 하지 못한 path 수 FURNACE_SAMPLES x (1 - X_WF(INVALID_BOUNCES)) 와 같고 rgb 가 0 이다. 더한 sample 과
@@ -71,7 +71,7 @@ from checks import Checks, stop_and_check
 from imagecompare import agreement
 from imagefiles import ImageFileError, read_dds_rgba32f
 from pathtracerchecks import (BASE, EMISSION_FURNACE, FURNACE_SAMPLES, RECORD, light_by_sky_only, WHITE_FURNACE, append_record_row, code_version,
-                              describe_machine, path_tracer_state, set_path_tracer)
+                              describe_machine, path_tracer_state, set_path_tracer, SKY_RADIANCE)
 from viewer import HARNESS_DIR, PREVIEW_EXPOSURE, HarnessError, Session, capture, make_view, shots_dir, start_instance, stop_instance
 
 KEPT_DIR = HARNESS_DIR / 'kept' / 'path-tracer-export'
@@ -163,7 +163,7 @@ def check_furnaces(accumulate, check):
 def check_invalid_samples(accumulate, check, escaped):
     expected = np.rint(FURNACE_SAMPLES * (1.0 - escaped[..., 0]))
     for name, albedo, kind in (('[V1]', 1, 'Inf'), ('[V2]', 0, 'NaN')):
-        settings = WHITE_FURNACE | {'Max Bounces': INVALID_BOUNCES, 'Sky Radiance': 'inf', 'Furnace Albedo': albedo}
+        settings = WHITE_FURNACE | {'Max Bounces': INVALID_BOUNCES, SKY_RADIANCE: 'inf', 'Furnace Albedo': albedo}
         image, _ = accumulate(f'invalid-{kind.lower()}', settings, FURNACE_SAMPLES, finite=False)
         added = image[..., 3]
         mismatched = int(np.count_nonzero(added != expected))

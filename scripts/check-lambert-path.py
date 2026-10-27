@@ -12,7 +12,7 @@ furnace 의 답을 그런 값으로 골라 bit 로 비교한다. 1.0 근처에�
 
 PT 의 Material 은 pathtracerchecks.BASE 의 Lambert 다. Lambert 의 f cos / pdf 는 albedo 이고 PT 는 그 값을 곱하므로
 (PathTracerCS.hlsl), albedo 가 1 이나 0.5 이면 throughput 은 fp32 에서 정확하고 아래 furnace 의 답은 bit 단위로 맞아야 한다. furnace 는
-Geometric Normals 를 켜서 normal map 이 잃는 energy 를 빼고, 분산이 0 이라 FURNACE_SAMPLES 로 본다. sky 는 늘 Sky Radiance 1 이다.
+Geometric Normals 를 켜서 normal map 이 잃는 energy 를 빼고, 분산이 0 이라 FURNACE_SAMPLES 로 본다. sky 는 늘 흰 Sky Light 의 Intensity 1 이다.
 
   [1] white furnace (albedo 1, emission 0, Max Bounces WHITE_FURNACE_BOUNCES): Russian roulette 를 끈 run 과 켠 run 모두 모든 pixel 이
       1.0 이다. throughput 의 정규화와 sky 로의 escape, throughput 이 1 이면 Russian roulette 가 path 를 끊지 않는 것을 본다.
@@ -24,7 +24,7 @@ Geometric Normals 를 켜서 normal map 이 잃는 energy 를 빼고, 분산이 
   [4] Geometric Normals 를 끈 white furnace (Russian roulette off): 모든 pixel 이 1.0 이하다. shading normal 이 energy 를 만들지 않는
       것을 본다. 평균은 shading normal 이 잃는 energy 의 첫 수치로 찍는다.
 
-장면은 furnace 와 directional light 를 끈 Sponza 다. Sponza 에는 emission 이 없고 albedo 가 1 이하라 radiance 가 Sky Radiance 를 넘을 수
+장면은 furnace 와 directional light 를 끈 Sponza 다. Sponza 에는 emission 이 없고 albedo 가 1 이하라 radiance 가 Sky Light 의 radiance 를 넘을 수
 없다.
 
   [5] Max Bounces 64, SCENE_SAMPLES 에서 Russian roulette 를 끈 run 과 켠 run 모두 모든 pixel 이 [0, 1] 안이고 NaN, Inf 가 없다.
@@ -60,7 +60,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from checks import Checks, stop_and_check
 from imagefiles import ImageFileError, read_dds_rgba32f
 from pathtracerchecks import (BASE, EMISSION_FURNACE, FURNACE_SAMPLES, RECORD, light_by_sky_only, SECTION, WHITE_FURNACE, append_record_row, code_version,
-                              describe_machine, path_tracer_state, set_path_tracer)
+                              describe_machine, path_tracer_state, set_path_tracer, SKY_RADIANCE)
 from viewer import HARNESS_DIR, PREVIEW_EXPOSURE, HarnessError, Session, capture, make_view, start_instance, stop_instance
 
 KEPT_DIR = HARNESS_DIR / 'kept' / 'lambert-path'
@@ -83,12 +83,12 @@ WAIT_TIMEOUT = 900
 SCENE = BASE
 
 # [9] 에서 바꿔 보는 값. 모두 BASE 와 다르다.
-IMAGE_SETTING_CHANGES = {'Material': 'glTF', 'Seed': 1, 'Max Bounces': 63, 'Russian Roulette': 0, 'Sky Radiance': 2, 'Geometric Normals': 1,
+IMAGE_SETTING_CHANGES = {'Material': 'glTF', 'Seed': 1, 'Max Bounces': 63, 'Russian Roulette': 0, SKY_RADIANCE: 2, 'Geometric Normals': 1,
                          'Furnace': 1, 'Furnace Albedo': 0.5, 'Furnace Emission': 0.5}
 PACE_SETTING_CHANGES = {'Samples per Frame': 2, 'Target Samples': 8192}
 # [8] 에서 끝내기 전에 두는 값. BASE 와도 IMAGE_SETTING_CHANGES 와도 달라서 editor.ini 에서 이 run 이 쓴 값인지 알 수 있다. 두 값뿐인
 # Material 은 IMAGE_SETTING_CHANGES 와 같지만 [9] 가 BASE 로 되돌린 뒤에 바꾸므로 같은 것을 알 수 있다.
-SAVED_SETTINGS = {'Material': 'glTF', 'Max Bounces': 7, 'Russian Roulette': 0, 'Sky Radiance': 0.25, 'Geometric Normals': 1, 'Furnace': 1,
+SAVED_SETTINGS = {'Material': 'glTF', 'Max Bounces': 7, 'Russian Roulette': 0, 'Geometric Normals': 1, 'Furnace': 1,
                   'Furnace Albedo': 0.75, 'Furnace Emission': 0.125, 'Seed': 3}
 
 

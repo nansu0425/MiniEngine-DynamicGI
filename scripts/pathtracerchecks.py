@@ -20,18 +20,41 @@ FURNACE_SAMPLES = 16
 # 4096 번에서 12 개, 16384 번에서 1 개였다.
 WHITE_FURNACE_BOUNCES = 65536
 
+SKY_LIGHT_SECTION = 'Sky Light'
+# PT 가 miss 에서 받는 radiance 는 PT 의 설정이 아니라 Sky Light 의 color 와 intensity 다. 이 둘도 PT 의 image 를 정하므로 PT 의 설정과
+# 같은 dict 에 '<section>: <key>' 로 적고, set_path_tracer 가 그 section 에 넘긴다. 확인들은 흰 Sky Light 의 intensity 를 radiance 로 쓴다.
+SKY_COLOR = f'{SKY_LIGHT_SECTION}: Color'
+SKY_RADIANCE = f'{SKY_LIGHT_SECTION}: Intensity'
+
 # 작업 5 ~ 7 의 기준과 측정 기록은 Lambert 로 정했으므로 Material 을 Lambert 로 둔다. glTF BRDF 의 확인은 check-gltf-brdf.py 가 한다.
-BASE = {'Show': 1, 'Material': 'Lambert', 'Samples per Frame': 1, 'Seed': 0, 'Sky Radiance': 1, 'Max Bounces': 64, 'Russian Roulette': 1,
-        'Geometric Normals': 0, 'Furnace': 0, 'Furnace Albedo': 1, 'Furnace Emission': 0}
+BASE = {'Show': 1, 'Material': 'Lambert', 'Samples per Frame': 1, 'Seed': 0, SKY_COLOR: '1,1,1', SKY_RADIANCE: 1, 'Max Bounces': 64,
+        'Russian Roulette': 1, 'Geometric Normals': 0, 'Furnace': 0, 'Furnace Albedo': 1, 'Furnace Emission': 0}
 WHITE_FURNACE = BASE | {'Furnace': 1, 'Furnace Albedo': 1, 'Furnace Emission': 0, 'Geometric Normals': 1,
                         'Max Bounces': WHITE_FURNACE_BOUNCES, 'Russian Roulette': 0}
-# 해는 어디서나 emission / (1 - albedo) = Sky Radiance = 1 이다.
+# 해는 어디서나 emission / (1 - albedo) = Sky Light 의 radiance = 1 이다.
 EMISSION_FURNACE = BASE | {'Furnace': 1, 'Furnace Albedo': 0.5, 'Furnace Emission': 0.5, 'Geometric Normals': 1, 'Max Bounces': 64,
                            'Russian Roulette': 0}
 
 
 def set_path_tracer(session, settings):
-    return session.ask_ok(f'settings set {SECTION}: ' + '; '.join(f'{key}={value}' for key, value in settings.items()))
+    """settings 의 '<section>: <key>' 는 그 section 에, 나머지는 PT 의 설정에 넣고 PT 의 설정을 넣은 응답을 돌려준다."""
+    sections = {}
+    for key, value in settings.items():
+        section, separator, name = key.partition(': ')
+        if not separator:
+            section, name = SECTION, key
+        sections.setdefault(section, {})[name] = value
+    replies = {section: session.ask_ok(f'settings set {section}: ' + '; '.join(f'{key}={value}' for key, value in values.items()))
+               for section, values in sections.items()}
+    return replies.get(SECTION)
+
+
+def from_recorded(settings):
+    """작업 9 전에 기록한 PT 설정을 지금의 key 로. 그때 sky 는 PT 의 Sky Radiance 였고 지금은 흰 Sky Light 의 Intensity 다."""
+    if 'Sky Radiance' not in settings:
+        return settings
+    kept = {key: value for key, value in settings.items() if key != 'Sky Radiance'}
+    return kept | {SKY_COLOR: '1,1,1', SKY_RADIANCE: settings['Sky Radiance']}
 
 
 def light_by_sky_only(session):

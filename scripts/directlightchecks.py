@@ -13,7 +13,7 @@ from PIL import Image
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from imagefiles import read_dds_rgba32f
 from imagemasks import eroded
-from pathtracerchecks import BASE, set_path_tracer
+from pathtracerchecks import BASE, SKY_RADIANCE, set_path_tracer
 from viewer import SETTLE_FRAMES, capture
 
 LIGHT_SECTION = 'Directional Light'
@@ -27,7 +27,7 @@ MISMATCH_FRACTION = 1e-4
 MAX_MISMATCH_CLUSTER = 4
 BOUNCE_STEPS = [1, 2, 4]
 WAIT_TIMEOUT = 900
-DIRECT = BASE | {'Sky Radiance': 0, 'Max Bounces': 1, 'Russian Roulette': 0, 'Target Samples': PT_SAMPLES}
+DIRECT = BASE | {SKY_RADIANCE: 0, 'Max Bounces': 1, 'Russian Roulette': 0, 'Target Samples': PT_SAMPLES}
 
 
 def overlay(session, view, name):

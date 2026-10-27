@@ -21,7 +21,7 @@ light:
        값에서 같다. settings set 은 app 이 시작할 때 editor.ini 를 읽는 것과 같은 load 를 부른다. 그 editor.ini 의 Engine Tuning 에
        Viewer/Lighting 의 예전 light 항목이 없다.
 
-PT 의 직접광 (test scene): Max Bounces 1, Sky Radiance 0, Russian roulette off 다. sky 와 emission 이 0 이라 path 의 값은 처음 맞은 곳에서
+PT 의 직접광 (test scene): Max Bounces 1, Sky Light 0, Russian roulette off 다. sky 와 emission 이 0 이라 path 의 값은 처음 맞은 곳에서
 반사한 light 뿐이고 그 값은 pixel 안의 어디에 맞아도 같으므로 분산이 0 이다. quad 는 Front Face view 의 앞면 pixel 을 가장자리 EDGE_PIXELS
 깎아 column 이 이어진 덩어리로 나누고, 덩어리 안을 Light Visibility view 의 흰색 (보임) 과 검정 (가려짐) 으로 나눈다.
   [P1] Geometric Normals 를 켜면 보이는 pixel 이 모두 albedo x color x intensity x cos / π 와 상대 PT_TOLERANCE 안에서 같다. cos 는
@@ -38,7 +38,7 @@ PT 의 직접광 (test scene): Max Bounces 1, Sky Radiance 0, Russian roulette o
        capture 도 앞면 pixel 에서 그렇다. 2 의 거듭제곱 배는 float 의 반올림 없이 곱해진다.
   [R1] intensity 0 이면 raster 의 앞면 pixel 이 모두 0 이다. test scene 에는 emission 이 없다.
 
-PT 의 직접광 (Sponza): harness baseline 의 시점, Russian roulette off, Sky Radiance 0, PT_SAMPLES spp 다. 판정은 check-gltf-brdf.py 도
+PT 의 직접광 (Sponza): harness baseline 의 시점, Russian roulette off, Sky Light 0, PT_SAMPLES spp 다. 판정은 check-gltf-brdf.py 도
 쓰도록 directlightchecks.py 에 있고, 아래의 대문자 이름도 거기 있다.
   [P6] Max Bounces 1 과 Geometric Normals on 으로 SPONZA_LIGHTS 의 방향마다 쌓는다. Light Visibility 의 검정을 깎은 pixel 에서 PT 가 0 이
        아닌 것 (가려졌는데 밝음) 과, 흰색을 깎은 pixel 에서 Base Color 가 0 이 아니고 Metallic 이 1 이 아닌데 (Lambert 의 albedo 가 있는데)
@@ -83,7 +83,7 @@ from imagefiles import ImageFileError, read_dds_rgba32f
 from directlightchecks import (DIRECT, EDGE_PIXELS, LIGHT_SECTION, WAIT_TIMEOUT, accumulate_export, check_bounces, check_sponza_direct,
                                overlay, set_light)
 from imagemasks import column_groups, eroded
-from pathtracerchecks import set_path_tracer
+from pathtracerchecks import from_recorded, set_path_tracer
 from viewer import (HARNESS_DIR, PREVIEW_EXPOSURE, REPO_ROOT, SETTLE_FRAMES, VIEWER_DIR, HarnessError, Session, capture, make_view,
                     start_instance, stop_instance)
 
@@ -238,7 +238,7 @@ def check_before(session, check):
     session.ask_ok(f'pose {entry["pose"]}')
     session.ask_ok('light set intensity=0')
     # before 는 PT 에 Lambert 밖의 Material 이 없던 때에 찍었다.
-    now, _ = accumulate(session, entry['path tracer'] | {'Material': 'Lambert'}, 'after-start-pt')
+    now, _ = accumulate(session, from_recorded(entry['path tracer']) | {'Material': 'Lambert'}, 'after-start-pt')
     before = read_dds_rgba32f(BEFORE_DIR / 'start-pt.dds')
     differing = np.any(now.view(np.uint32) != before.view(np.uint32), axis=2)
     check(f'[K3] the path tracer with intensity 0 is bit-identical to before ({manifest["code"]})', not differing.any(),

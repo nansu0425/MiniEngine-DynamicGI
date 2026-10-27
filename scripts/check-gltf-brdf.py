@@ -43,7 +43,7 @@ cell 이고, 하한이 걸리지 않는 작은 roughness 는 node 사이의 값�
 
 test scene: +z 를 보는 flat quad 를 roughness QUAD_ROUGHNESS x metallic QUAD_METALLIC 의 격자로 두고 baseColor 는 QUAD_COLORS 에서
 돌려 쓴다 (texture 없는 material factor). light 는 direction LIGHT_DIRECTION, intensity float 의 π 다. quad 의 pixel 은 Front Face view 의
-앞면을 가장자리 EDGE_PIXELS 깎고 column 과 row 로 나눈 것이다. PT 는 Material glTF, Max Bounces 1, Sky Radiance 0, Russian roulette off,
+앞면을 가장자리 EDGE_PIXELS 깎고 column 과 row 로 나눈 것이다. PT 는 Material glTF, Max Bounces 1, Sky Light 0, Russian roulette off,
 16 spp 다. sky 와 emission 이 0 이라 path 의 값은 처음 맞은 곳의 직접광뿐이다.
   [S3] NEE 의 절대값: Geometric Normals on 의 PT export 가 quad 마다 3 x 3 pick 점에서 참조의 f(v, l) E max(0, n_g·l) 와 channel 마다
        상대 S3_TOLERANCE 안이다. v 는 pick 의 위치에서 state camera 의 위치로 가는 방향, n_g 는 pick 의 normal 이다.
@@ -122,7 +122,7 @@ from gltfwriter import GLTF_FLOAT, GLTF_UNSIGNED_SHORT, BufferBuilder, flatten
 from imagecompare import agreement, rmse
 from imagefiles import ImageFileError, read_dds_rgba32f
 from imagemasks import column_groups, eroded
-from pathtracerchecks import BASE, FURNACE_SAMPLES, SECTION, WHITE_FURNACE, path_tracer_state, set_path_tracer
+from pathtracerchecks import BASE, FURNACE_SAMPLES, SECTION, SKY_RADIANCE, WHITE_FURNACE, from_recorded, path_tracer_state, set_path_tracer
 from viewer import (BASELINE_DIR, HARNESS_DIR, PREVIEW_EXPOSURE, REPO_ROOT, SETTLE_FRAMES, SNAPSHOT_DIR, SNAPSHOT_POSES, VIEWER_DIR, HarnessError,
                     Session, baseline_pose, capture, make_view, start_instance, stop_instance)
 
@@ -173,18 +173,18 @@ LIGHT_DIRECTION = (0.0, 0.8, 0.6)
 INTENSITY = float(np.float32(math.pi))
 FRONT_FACE_COLOR = (0, 255, 0)
 MIN_QUAD_PIXELS = 100
-TEST_DIRECT = BASE | GLTF | {'Sky Radiance': 0, 'Max Bounces': 1, 'Russian Roulette': 0, 'Target Samples': 16}
+TEST_DIRECT = BASE | GLTF | {SKY_RADIANCE: 0, 'Max Bounces': 1, 'Russian Roulette': 0, 'Target Samples': 16}
 S3_TOLERANCE = 1e-3
 R11G11B10_MANTISSA = (6, 6, 5)
 
 AGREEMENT_LIMIT = 1.01
 EXACT_RMSE = 1e-6
-ONE_REFLECTION_FURNACE = BASE | GLTF | {'Furnace': 1, 'Furnace Albedo': 1, 'Furnace Emission': 1, 'Sky Radiance': 1, 'Max Bounces': 1,
+ONE_REFLECTION_FURNACE = BASE | GLTF | {'Furnace': 1, 'Furnace Albedo': 1, 'Furnace Emission': 1, SKY_RADIANCE: 1, 'Max Bounces': 1,
                                         'Geometric Normals': 1, 'Russian Roulette': 0, 'Target Samples': FURNACE_SAMPLES}
 ONE_REFLECTION_TOLERANCE = 1e-3
 # courtyard-up 에는 sky 가 보여 miss pixel 이 있다.
 ONE_REFLECTION_POSES = ['start', 'courtyard-up']
-EMISSION_FURNACE_GLTF = BASE | GLTF | {'Furnace': 1, 'Furnace Albedo': 0.875, 'Furnace Emission': 0.125, 'Sky Radiance': 1, 'Max Bounces': 256,
+EMISSION_FURNACE_GLTF = BASE | GLTF | {'Furnace': 1, 'Furnace Albedo': 0.875, 'Furnace Emission': 0.125, SKY_RADIANCE: 1, 'Max Bounces': 256,
                                        'Geometric Normals': 1, 'Target Samples': FURNACE_SAMPLES}
 SPONZA_SCENE = BASE | GLTF | {'Geometric Normals': 0, 'Max Bounces': 64, 'Russian Roulette': 1, 'Target Samples': 256}
 EXPOSURE_STOPS = [-2, -1, 0, 1, 2]
@@ -809,7 +809,7 @@ def check_lambert_bits(session, check):
     entry = manifest['files']['start-pt.dds']
     session.ask_ok(f'pose {entry["pose"]}')
     set_light(session, entry['directional light'])
-    now, _ = export(session, entry['path tracer'] | {'Material': 'Lambert'}, 'lambert-start-pt')
+    now, _ = export(session, from_recorded(entry['path tracer']) | {'Material': 'Lambert'}, 'lambert-start-pt')
     before = read_dds_rgba32f(BEFORE_DIR / 'start-pt.dds')
     differing = np.any(now.view(np.uint32) != before.view(np.uint32), axis=2)
     check(f'[S5] Material Lambert accumulates the same rgba bits as before ({manifest["code"]})', not differing.any(),

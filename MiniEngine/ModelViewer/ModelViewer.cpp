@@ -106,6 +106,37 @@ private:
     bool m_ShowPanel = false;
 };
 
+// ray가 아무 면도 만나지 않을 때 받는 빛. 무한히 먼 sky가 모든 방향에서 같은 radiance를 낸다.
+// ray tracing으로 간접광을 구하는 곳 (path tracer, 앞으로의 DDGI)이 miss에서 이 radiance를 쓴다. raster는 이 빛으로 surface를 비추지
+// 않는다. raster에는 sky의 visibility가 없어서 surface에 더하면 sky가 가려진 실내까지 밝아지고, 그 빛은 DDGI가 구한다.
+class SkyLight
+{
+public:
+    // panel, editor.ini, settings 명령이 바꾸는 값
+    struct Properties
+    {
+        // directional light처럼 color는 linear RGB이고 성분마다 0 ~ 1이며, intensity와 곱한 것이 빛이다. intensity는 lux가 아니라
+        // radiance (cd/m²)이고 0 이상이다. ray가 받는 값이 radiance이고 glTF의 emissive도 cd/m²다.
+        Vector3 color;
+        float intensity;
+    };
+
+    SkyLight();
+
+    const Properties& GetProperties() const { return m_Properties; }
+    void SetProperties(const Properties& properties) { m_Properties = properties; }
+
+    // 모든 방향에서 같은 radiance (cd/m²)
+    Vector3 GetRadiance() const { return m_Properties.color * Scalar(m_Properties.intensity); }
+
+    // View 메뉴의 Sky Light panel
+    void ShowPanel();
+
+private:
+    Properties m_Properties;
+    bool m_ShowPanel = false;
+};
+
 class ModelViewer : public GameCore::IGameApp
 {
 public:
@@ -133,6 +164,7 @@ private:
     RaytracingScene m_RaytracingScene;
     ShadowCamera m_ShadowCamera;
     DirectionalLight m_Light;
+    SkyLight m_SkyLight;
 };
 
 CREATE_APPLICATION( ModelViewer )
@@ -144,6 +176,11 @@ const Vector3 kDefaultLightDirection(0.335837096f, 0.923879147f, -0.18346864f);
 // spec의 기본 intensity는 1 lux이지만, 기본 화면과 harness baseline의 Exposure가 맞춰 둔 밝기를 지키도록 4π로 둔다. 그 Exposure를
 // 맞출 때의 raster는 diffuse에 1/π가 없어 intensity 4로 지금의 4π만큼 밝았다.
 constexpr float kDefaultLightIntensity = 4.0f * XM_PI;
+
+const char kSkyLightSettingsSection[] = "Sky Light";
+
+// path tracer의 설정에 있던 Sky Radiance의 기본값을 옮겼다.
+constexpr float kDefaultSkyLightIntensity = 1.0f;
 
 // direction을 그대로 +Z로 두고 +Y를 world의 위쪽에 가깝게 둔 rotation. direction은 단위 vector다.
 Matrix3 MakeRotationToward(Vector3 direction)
@@ -250,6 +287,72 @@ void LoadLightSettings(DirectionalLight& light, const EditorSettings::Values& va
     if (intensity != values.end() && ReadNumbers(intensity->second, &number, 1) && number >= 0.0f)
         properties.intensity = number;
     light.SetProperties(properties);
+}
+
+SkyLight::SkyLight()
+{
+    m_Properties.color = Vector3(1.0f, 1.0f, 1.0f);
+    m_Properties.intensity = kDefaultSkyLightIntensity;
+}
+
+void SaveSkyLightSettings(const SkyLight& sky, EditorSettings::Values& values)
+{
+    const SkyLight::Properties& properties = sky.GetProperties();
+    values["Color"] = FormatVector(properties.color);
+    char text[32];
+    sprintf_s(text, "%.9g", properties.intensity);
+    values["Intensity"] = text;
+}
+
+// 받을 수 없는 값은 건너뛰고 그 값은 그대로 둔다. directional light와 달리 intensity의 inf는 받는다.
+// scripts/check-path-tracer-export.py가 inf로 두어 path tracer에 NaN과 Inf인 sample을 만든다.
+void LoadSkyLightSettings(SkyLight& sky, const EditorSettings::Values& values)
+{
+    SkyLight::Properties properties = sky.GetProperties();
+    const auto color = values.find("Color");
+    Vector3 readColor;
+    if (color != values.end() && ReadVector(color->second, readColor) && IsColor(readColor))
+        properties.color = readColor;
+    const auto intensity = values.find("Intensity");
+    float number = 0.0f;
+    if (intensity != values.end() && sscanf_s(intensity->second.c_str(), "%f", &number) == 1 && !std::isnan(number) && number >= 0.0f)
+        properties.intensity = number;
+    sky.SetProperties(properties);
+}
+
+// state의 sky
+ControlChannel::Fields DescribeSkyLight(const SkyLight& sky)
+{
+    const SkyLight::Properties& properties = sky.GetProperties();
+    return ControlChannel::Fields()
+        .Object("color", ControlChannel::Fields()
+            .Float("r", properties.color.GetX()).Float("g", properties.color.GetY()).Float("b", properties.color.GetZ()))
+        .Float("intensity", properties.intensity);
+}
+
+// sky light를 editor.ini의 section과 harness의 settings 명령, state로 읽고 바꾸게 한다.
+void RegisterSkyLight(SkyLight& sky)
+{
+    EditorSettings::Register(kSkyLightSettingsSection,
+        [&sky](EditorSettings::Values& values) { SaveSkyLightSettings(sky, values); },
+        [&sky](const EditorSettings::Values& values) { LoadSkyLightSettings(sky, values); });
+    ControlChannel::RegisterState("sky", [&sky] { return DescribeSkyLight(sky); });
+}
+
+void SkyLight::ShowPanel()
+{
+    ImGuiLayer::ShowPanel("Sky Light", m_ShowPanel, [this]
+    {
+        float color[3] = { m_Properties.color.GetX(), m_Properties.color.GetY(), m_Properties.color.GetZ() };
+        if (ImGui::ColorEdit3("Color", color, ImGuiColorEditFlags_Float))
+            m_Properties.color = Min(Max(Vector3(color[0], color[1], color[2]), Vector3(kZero)), Vector3(1.0f, 1.0f, 1.0f));
+        ImGui::SetItemTooltip("Linear RGB, each 0 to 1.");
+        if (ImGui::DragFloat("Intensity", &m_Properties.intensity, 0.01f, 0.0f, FLT_MAX, "%.3f cd/m2"))
+            m_Properties.intensity = std::max(0.0f, m_Properties.intensity);
+        ImGui::SetItemTooltip("Radiance of the sky in every direction, in cd/m2. An upward surface open to the whole sky receives "
+            "pi times this in lux.");
+        ImGui::TextDisabled("Rays that hit nothing see this light. The raster does not light surfaces with it.");
+    });
 }
 
 bool ReadCondition(const RayQueryValidation::SceneConditions& conditions, const char* key, float& value)
@@ -766,10 +869,12 @@ void ModelViewer::Startup( void )
     SceneEditor::AddObject(m_Light);
     SceneEditor::RegisterCommands(m_Camera);
     RegisterLight(m_Light);
+    RegisterSkyLight(m_SkyLight);
 }
 
 void ModelViewer::Cleanup( void )
 {
+    EditorSettings::Unregister(kSkyLightSettingsSection);
     EditorSettings::Unregister(kLightSettingsSection);
     SceneEditor::RemoveObject(m_Light);
     PathTracerPanel::Shutdown();
@@ -805,6 +910,7 @@ void ModelViewer::Update( float deltaT )
 
     SceneEditor::Update(m_Camera);
     m_Light.ShowPanel();
+    m_SkyLight.ShowPanel();
     RaytracingPanel::Update();
     PathTracerPanel::Update();
 
@@ -943,7 +1049,7 @@ void ModelViewer::RenderScene( void )
     // scene color의 마지막 pass 뒤에 덮어써서, PT가 raster와 같은 bloom, exposure, tone mapping을 거쳐 두 화면을 같은 조건으로 견주게 한다.
     // raster는 그대로 그린다. ray tracing view의 validation이 raster의 depth를 읽는다.
     PathTracerPanel::Render(gfxContext.GetComputeContext(), m_Camera, m_MainViewport, m_RaytracingScene, m_Light.GetDirection(), m_Light.GetIlluminance(),
-        g_SceneColorBuffer);
+        m_SkyLight.GetRadiance(), g_SceneColorBuffer);
 
     gfxContext.Finish();
 
