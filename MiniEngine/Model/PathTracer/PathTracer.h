@@ -17,8 +17,18 @@ namespace Math
 // 누적한 평균이 서로 다른 image의 sample을 섞지 않도록, image를 정하는 조건이 쌓을 때와 달라지면 처음부터 다시 쌓는다.
 namespace PathTracer
 {
+    // 반사의 BRDF. Material마다 따로 compile한 shader로 그린다 (PathTracerCS.hlsl의 LAMBERT_MATERIAL).
+    enum class Material
+    {
+        // glTF의 metallic-roughness BRDF (Core/Shaders/GltfBrdf.hlsli). 정답은 이것으로 만든다.
+        kGltf,
+        // albedo가 baseColor x (1 - metallic)인 Lambert. 반사마다의 f cos / pdf가 albedo라서 furnace의 답을 bit로 알 수 있다.
+        kLambert,
+    };
+
     struct Settings
     {
+        Material material = Material::kGltf;
         // pixel마다 한 frame에 더하는 sample 수
         uint32_t samplesPerFrame = 1;
         // 이만큼 쌓으면 trace를 멈추고 평균만 보인다.
@@ -38,6 +48,7 @@ namespace PathTracer
         // geometric normal 아래로 고른 방향의 energy를 잃으므로, furnace의 답을 그 손실 없이 보려고 쓴다.
         bool geometricNormals = false;
         // 모든 surface의 albedo와 emission을 아래 값으로 두고 directional light를 끈다. sky도 상수이므로 답을 식으로 아는 장면이 된다.
+        // glTF에서는 baseColor 1, metallic 0, material의 roughness인 BRDF에 albedo를 곱해, 모든 view 방향에서 directional albedo가 albedo다.
         bool furnace = false;
         float furnaceAlbedo = 1.0f;
         float furnaceEmission = 0.0f;

@@ -7,6 +7,8 @@
 *.hlsl eol=crlf
 *.vcxproj eol=crlf
 *.sln eol=crlf
+# scripts/gltfbrdf.py 가 만드는 파일. script 가 CRLF 로 쓰므로 checkout 도 그렇게 해서, 다시 만든 파일과 byte 로 견줄 수 있게 한다.
+MiniEngine/Core/Shaders/GltfBrdfTables.hlsli eol=crlf
 
 # Explicitly declare resource files as binary
 *.bin binary

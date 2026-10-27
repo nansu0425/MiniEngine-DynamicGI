@@ -23,6 +23,9 @@ namespace
     bool s_Show = false;
     PathTracer::Settings s_Settings;
 
+    // PathTracer::Material의 순서이고, editor.ini와 settings 명령이 이 이름으로 읽고 쓴다.
+    const char* kMaterialNames[] = { "glTF", "Lambert" };
+
     // pt wait samples=<n>이 기다리는 sample 수와 그 응답
     struct SampleWait
     {
@@ -48,6 +51,12 @@ namespace
         ImGui::Checkbox("Show", &s_Show);
         ImGui::SetItemTooltip("Draws the path tracer over the raster scene before post effects. Off, it stops accumulating and keeps what it has.");
 
+        int material = (int)s_Settings.material;
+        if (ImGui::Combo("Material", &material, kMaterialNames, IM_ARRAYSIZE(kMaterialNames)))
+            s_Settings.material = (PathTracer::Material)material;
+        ImGui::SetItemTooltip("glTF reflects by the glTF metallic-roughness BRDF, the answer to compare with. Lambert reflects diffusely "
+            "with albedo base color x (1 - metallic), so the furnaces have answers to the bit.");
+
         const uint32_t step = 1;
         ImGui::InputScalar("Samples per Frame", ImGuiDataType_U32, &s_Settings.samplesPerFrame, &step);
         ImGui::InputScalar("Target Samples", ImGuiDataType_U32, &s_Settings.targetSamples);
@@ -68,7 +77,8 @@ namespace
             "so no energy is lost to directions below the geometric normal.");
         ImGui::Checkbox("Furnace", &s_Settings.furnace);
         ImGui::SetItemTooltip("Gives every surface the albedo and emission below and turns off the directional light. "
-            "With the constant sky, the answer is known.");
+            "With the constant sky, the answer is known. With glTF the albedo scales the BRDF of base color 1, metallic 0 and the material's "
+            "roughness, which reflects all light from every direction.");
         ImGui::InputFloat("Furnace Albedo", &s_Settings.furnaceAlbedo);
         ImGui::InputFloat("Furnace Emission", &s_Settings.furnaceEmission);
         ImGui::SetItemTooltip("In cd/m2. With albedo a < 1 and the sky at emission / (1 - a), every pixel is the sky radiance.");
@@ -104,6 +114,7 @@ namespace
     void SaveSettings(EditorSettings::Values& values)
     {
         values["Show"] = FormatFlag(s_Show);
+        values["Material"] = kMaterialNames[(int)s_Settings.material];
         values["Samples per Frame"] = std::to_string(s_Settings.samplesPerFrame);
         values["Target Samples"] = std::to_string(s_Settings.targetSamples);
         values["Seed"] = std::to_string(s_Settings.seed);
@@ -131,6 +142,18 @@ namespace
             value = read;
     }
 
+    void ReadMaterial(const EditorSettings::Values& values, PathTracer::Material& material)
+    {
+        const auto text = values.find("Material");
+        if (text == values.end())
+            return;
+        for (int index = 0; index < IM_ARRAYSIZE(kMaterialNames); ++index)
+        {
+            if (text->second == kMaterialNames[index])
+                material = (PathTracer::Material)index;
+        }
+    }
+
     void ReadFloat(const EditorSettings::Values& values, const char* key, float& value)
     {
         const auto text = values.find(key);
@@ -142,6 +165,7 @@ namespace
     void LoadSettings(const EditorSettings::Values& values)
     {
         ReadFlag(values, "Show", s_Show);
+        ReadMaterial(values, s_Settings.material);
         ReadUInt(values, "Samples per Frame", s_Settings.samplesPerFrame);
         ReadUInt(values, "Target Samples", s_Settings.targetSamples);
         ReadUInt(values, "Seed", s_Settings.seed);

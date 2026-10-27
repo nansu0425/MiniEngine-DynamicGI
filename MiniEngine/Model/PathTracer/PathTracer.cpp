@@ -11,6 +11,7 @@
 #include "Core/Graphics/Resource/ColorBuffer.h"
 
 #include "Output/Model/CompiledShaders/PathTracerCS.h"
+#include "Output/Model/CompiledShaders/PathTracerLambertCS.h"
 
 #include <algorithm>
 
@@ -21,7 +22,8 @@ namespace
 {
     enum RootParameter { kConstants, kScene, kOutputs = kScene + RaytracingScene::kNumRootParameters, kNumRootParameters };
     RootSignature s_RootSignature;
-    ComputePSO s_PSO(L"Path Tracer");
+    // PathTracer::Material 순서다.
+    ComputePSO s_PSOs[] = { ComputePSO(L"Path Tracer glTF"), ComputePSO(L"Path Tracer Lambert") };
 
     // PathTracerCS.hlsl의 u register 순서다.
     enum UAV { kAccumulationUAV, kSceneColorUAV, kNumUAVs };
@@ -41,9 +43,9 @@ namespace
     // Settings의 samplesPerFrame과 targetSamples는 쌓는 속도와 양만 정하므로 비교하지 않는다.
     bool HaveSameImage(const PathTracer::Settings& a, const PathTracer::Settings& b)
     {
-        return a.seed == b.seed && a.maxBounces == b.maxBounces && a.russianRoulette == b.russianRoulette && a.skyRadiance == b.skyRadiance &&
-            a.geometricNormals == b.geometricNormals && a.furnace == b.furnace && a.furnaceAlbedo == b.furnaceAlbedo &&
-            a.furnaceEmission == b.furnaceEmission;
+        return a.material == b.material && a.seed == b.seed && a.maxBounces == b.maxBounces && a.russianRoulette == b.russianRoulette &&
+            a.skyRadiance == b.skyRadiance && a.geometricNormals == b.geometricNormals && a.furnace == b.furnace &&
+            a.furnaceAlbedo == b.furnaceAlbedo && a.furnaceEmission == b.furnaceEmission;
     }
 
     // rasterSampleOffset은 비교하지 않는다. 그 값은 TAA jitter를 따라 frame마다 바뀌지만, PT는 pixel 격자 안의 위치를 스스로 고르므로
@@ -100,9 +102,13 @@ void PathTracer::Initialize(void)
     s_RootSignature[kOutputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, kNumUAVs);
     s_RootSignature.Finalize(L"Path Tracer");
 
-    s_PSO.SetRootSignature(s_RootSignature);
-    s_PSO.SetComputeShader(g_pPathTracerCS, sizeof(g_pPathTracerCS));
-    s_PSO.Finalize();
+    s_PSOs[(int)Material::kGltf].SetComputeShader(g_pPathTracerCS, sizeof(g_pPathTracerCS));
+    s_PSOs[(int)Material::kLambert].SetComputeShader(g_pPathTracerLambertCS, sizeof(g_pPathTracerLambertCS));
+    for (ComputePSO& pso : s_PSOs)
+    {
+        pso.SetRootSignature(s_RootSignature);
+        pso.Finalize();
+    }
 
     s_UAVs.Create(kNumUAVs);
 }
@@ -159,7 +165,7 @@ void PathTracer::Render(ComputeContext& context, const Settings& settings, const
     s_UAVs.PointTo(kSceneColorUAV, sceneColor, sceneColor.GetUAV());
 
     context.SetRootSignature(s_RootSignature);
-    context.SetPipelineState(s_PSO);
+    context.SetPipelineState(s_PSOs[(int)settings.material]);
     context.TransitionResource(s_Accumulation, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
     context.TransitionResource(sceneColor, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
     context.SetDynamicConstantBufferView(kConstants, sizeof(constants), &constants);

@@ -5,7 +5,7 @@ normal 이 잃는 energy 와 Russian roulette 의 pixel 단위 bias 를 잰다.
   python scripts/check-path-tracer-export.py check --record   # 모두 통과하면 [N1], [R1] 에서 잰 값을 RECORD 에 덧붙인다
 
 app 을 직접 띄우고 끝내며, 이미 띄운 harness instance 는 먼저 끝낸다. 하나라도 실패하면 exit 1 이다. 작업 5 의 확인은
-check-lambert-path.py 가 따로 한다.
+check-lambert-path.py 가 따로 한다. PT 의 Material 은 pathtracerchecks.BASE 의 Lambert 다. glTF BRDF 는 check-gltf-brdf.py 가 본다.
 
 export 는 capture pt 가 쓰는 누적 buffer 의 DDS 다. rgb 는 평균, a 는 더한 sample 수다. 옆의 state 파일의 pt.samples 는 dispatch 한
 sample 수이므로, 그 차가 NaN 이나 Inf 라서 더하지 않은 sample 수다. r 의 식과 뜻은 imagecompare.py 에 있다.

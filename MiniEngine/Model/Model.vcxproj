@@ -95,6 +95,7 @@
     <ClInclude Include="Raytracing\SceneHeapTable.h" />
     <ClInclude Include="PathTracer\PathTracer.h" />
     <ClInclude Include="PathTracer\PathTracerPanel.h" />
+    <ClInclude Include="PathTracer\BrdfTest.h" />
     <ClInclude Include="Renderer\Renderer.h" />
     <ClInclude Include="Sponza\SponzaRenderer.h" />
     <ClInclude Include="Loader\TextureConvert.h" />
@@ -123,6 +124,7 @@
     <ClCompile Include="Raytracing\SceneHeapTable.cpp" />
     <ClCompile Include="PathTracer\PathTracer.cpp" />
     <ClCompile Include="PathTracer\PathTracerPanel.cpp" />
+    <ClCompile Include="PathTracer\BrdfTest.cpp" />
     <ClCompile Include="Renderer\Renderer.cpp" />
     <ClCompile Include="Sponza\SponzaRenderer.cpp" />
     <ClCompile Include="Loader\TextureConvert.cpp" />
@@ -222,6 +224,10 @@
     <FxCompile Include="PathTracer\PathTracerCS.hlsl">
       <ShaderModel>6.5</ShaderModel>
     </FxCompile>
+    <FxCompile Include="PathTracer\PathTracerLambertCS.hlsl">
+      <ShaderModel>6.5</ShaderModel>
+    </FxCompile>
+    <FxCompile Include="PathTracer\BrdfTestCS.hlsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <Import Project="$([MSBuild]::GetDirectoryNameOfFileAbove('$(MSBuildThisFileDirectory)', 'vcpkg.json'))\vcpkg\DirectX.vcpkg.targets" />

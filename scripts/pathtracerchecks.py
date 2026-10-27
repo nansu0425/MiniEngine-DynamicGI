@@ -20,7 +20,8 @@ FURNACE_SAMPLES = 16
 # 4096 번에서 12 개, 16384 번에서 1 개였다.
 WHITE_FURNACE_BOUNCES = 65536
 
-BASE = {'Show': 1, 'Samples per Frame': 1, 'Seed': 0, 'Sky Radiance': 1, 'Max Bounces': 64, 'Russian Roulette': 1,
+# 작업 5 ~ 7 의 기준과 측정 기록은 Lambert 로 정했으므로 Material 을 Lambert 로 둔다. glTF BRDF 의 확인은 check-gltf-brdf.py 가 한다.
+BASE = {'Show': 1, 'Material': 'Lambert', 'Samples per Frame': 1, 'Seed': 0, 'Sky Radiance': 1, 'Max Bounces': 64, 'Russian Roulette': 1,
         'Geometric Normals': 0, 'Furnace': 0, 'Furnace Albedo': 1, 'Furnace Emission': 0}
 WHITE_FURNACE = BASE | {'Furnace': 1, 'Furnace Albedo': 1, 'Furnace Emission': 0, 'Geometric Normals': 1,
                         'Max Bounces': WHITE_FURNACE_BOUNCES, 'Russian Roulette': 0}

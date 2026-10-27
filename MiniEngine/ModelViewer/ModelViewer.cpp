@@ -33,6 +33,7 @@
 #include "Model/Raytracing/RayQueryValidation.h"
 #include "Model/Raytracing/RayPick.h"
 #include "Model/PathTracer/PathTracerPanel.h"
+#include "Model/PathTracer/BrdfTest.h"
 #include "Model/Loader/glTF.h"
 #include "Model/Renderer/Renderer.h"
 #include "Model/Model.h"
@@ -140,8 +141,9 @@ const char kLightSettingsSection[] = "Directional Light";
 
 // 예전에 방위 -0.5 rad와 고도 0.75 x 90°로 정하던 기본 방향을 bit 단위로 옮겨서, 기본 화면이 그때와 같다.
 const Vector3 kDefaultLightDirection(0.335837096f, 0.923879147f, -0.18346864f);
-// spec의 기본 intensity는 1 lux이지만, 기본 화면과 harness baseline의 Exposure가 맞춰 둔 밝기를 지키도록 4로 둔다.
-constexpr float kDefaultLightIntensity = 4.0f;
+// spec의 기본 intensity는 1 lux이지만, 기본 화면과 harness baseline의 Exposure가 맞춰 둔 밝기를 지키도록 4π로 둔다. 그 Exposure를
+// 맞출 때의 raster는 diffuse에 1/π가 없어 intensity 4로 지금의 4π만큼 밝았다.
+constexpr float kDefaultLightIntensity = 4.0f * XM_PI;
 
 // direction을 그대로 +Z로 두고 +Y를 world의 위쪽에 가깝게 둔 rotation. direction은 단위 vector다.
 Matrix3 MakeRotationToward(Vector3 direction)
@@ -709,6 +711,7 @@ void ModelViewer::Startup( void )
     RaytracingView::Initialize();
     RayPick::Initialize();
     PathTracerPanel::Initialize();
+    BrdfTest::Initialize();
 
     std::wstring gltfFileName;
 

@@ -237,7 +237,8 @@ def check_before(session, check):
     entry = manifest['files']['start-pt.dds']
     session.ask_ok(f'pose {entry["pose"]}')
     session.ask_ok('light set intensity=0')
-    now, _ = accumulate(session, entry['path tracer'], 'after-start-pt')
+    # before 는 PT 에 Lambert 밖의 Material 이 없던 때에 찍었다.
+    now, _ = accumulate(session, entry['path tracer'] | {'Material': 'Lambert'}, 'after-start-pt')
     before = read_dds_rgba32f(BEFORE_DIR / 'start-pt.dds')
     differing = np.any(now.view(np.uint32) != before.view(np.uint32), axis=2)
     check(f'[K3] the path tracer with intensity 0 is bit-identical to before ({manifest["code"]})', not differing.any(),
