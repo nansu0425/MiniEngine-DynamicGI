@@ -11,6 +11,7 @@
 #include "Core/Graphics/Resource/DepthBuffer.h"
 #include "Core/Graphics/Resource/ReadbackBuffer.h"
 #include "Core/Automation/ControlChannel.h"
+#include "Core/Editor/MeasurementConditions.h"
 
 #include "Output/Model/CompiledShaders/RayQueryValidationCS.h"
 
@@ -304,14 +305,6 @@ namespace
 
     const char* kLogPrefix = "[Ray Query Validation] ";
 
-    // Log 한 줄의 "key=value; key=value" 형식으로 이어 쓴다.
-    void AppendCondition(std::string& conditions, const std::string& key, const std::string& value)
-    {
-        if (!conditions.empty())
-            conditions += "; ";
-        conditions += key + "=" + value;
-    }
-
     // Capture의 조건과 수치를 "key=value; key=value" 한 줄로 쓴다. 숫자는 다시 읽어도 같은 float가 되는 자릿수로 쓴다.
     std::string DescribeCapture(const Capture& capture)
     {
@@ -320,7 +313,7 @@ namespace
         const Stats& stats = capture.stats;
 
         std::string conditions;
-        const auto add = [&conditions](const std::string& key, const std::string& value) { AppendCondition(conditions, key, value); };
+        const auto add = [&conditions](const std::string& key, const std::string& value) { MeasurementConditions::AppendValue(conditions, key, value); };
         char text[256];
 
         add("mode", mode.label);
@@ -359,33 +352,16 @@ namespace
             s_DescribeScene(scene);
 
         std::string conditions;
-        AppendCondition(conditions, "taa", TemporalEffects::EnableTAA ? "on" : "off");
+        MeasurementConditions::AppendValue(conditions, "taa", TemporalEffects::EnableTAA ? "on" : "off");
         for (const auto& condition : scene)
-            AppendCondition(conditions, condition.first, condition.second);
+            MeasurementConditions::AppendValue(conditions, condition.first, condition.second);
         return conditions;
-    }
-
-    RayQueryValidation::SceneConditions ParseLogLine(const std::string& line)
-    {
-        RayQueryValidation::SceneConditions values;
-        const size_t prefix = line.find(kLogPrefix);
-        size_t start = prefix == std::string::npos ? 0 : prefix + strlen(kLogPrefix);
-        while (start < line.size())
-        {
-            const size_t end = std::min(line.find("; ", start), line.size());
-            const std::string token = line.substr(start, end - start);
-            const size_t separator = token.find('=');
-            if (separator != std::string::npos)
-                values[token.substr(0, separator)] = token.substr(separator + 1);
-            start = end + 2;
-        }
-        return values;
     }
 
     // TAA는 직접 되돌리고 camera와 directional light는 app에 맡긴다. 해상도와 mode는 사용자가 바꾸도록 차이만 기록한다.
     void Restore(const std::string& line)
     {
-        const RayQueryValidation::SceneConditions values = ParseLogLine(line);
+        const RayQueryValidation::SceneConditions values = MeasurementConditions::Parse(line);
         const auto value = [&values](const char* key)
         {
             const auto found = values.find(key);
@@ -455,7 +431,7 @@ namespace
     ControlChannel::Fields DescribeCaptureValues(void)
     {
         ControlChannel::Fields values;
-        for (const auto& value : ParseLogLine(DescribeCapture(s_Capture)))
+        for (const auto& value : MeasurementConditions::Parse(DescribeCapture(s_Capture)))
             values.Text(value.first, value.second);
         return values;
     }
