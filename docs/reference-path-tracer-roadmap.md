@@ -37,8 +37,8 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 
 7. Directional Light (끝남: f57e319, c24314b, 648aea9, 7d8148f, c8610b9, 665bea1)
 8. glTF BRDF (끝남: 5ac463b, d9a4e3f, 77271b2)
-9. Sky: 상수 sky 를 한 곳에 두고 raster 의 배경과 PT 가 같이 쓴다.
-10. Log 와 Restore: 측정 조건을 Log 한 줄로 남기고, app 을 다시 실행해도 그 줄로 되돌린다.
+9. Sky Light (끝남: 63404ca, a99f3fe, 319d723, f5b807e)
+10. Log 와 Restore: 측정 조건을 Log 한 줄로 남기고, app 을 다시 실행해도 그 줄로 되돌린다. 지금의 Log 는 camera 와 directional light 만 남기므로 작업 9 의 Sky Light 를 더한다.
 11. Indirect Irradiance: DDGI 와 비교할 양을 누적하는 출력을 더한다.
 12. 수렴과 측정: 고정 시점에서 수렴과 bias 를 재고 ground truth 의 spp 를 정한다.
 13. Cornell box 와 외부 renderer: (a) 장면을 만들어 load 하고, (b) 외부 renderer 로 그린 image 와 비교한다. furnace 가 잡지 못하는 leak, self-hit, visibility, 방향 분포의 오류를 여기서 본다.
@@ -52,7 +52,7 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 | 10/24 | 끝남: 1, A, B, harness 의 D3D12 log 수집 (573dded) 과 그 log 로 찾은 Lighting 수정 (e8a2352), 문서 정리 |
 | 10/25 | 끝남: 2, 3, 4 |
 | 10/26 | 끝남: 5, 6, C, 7 |
-| 10/27 | 끝남: 8. 9, 10 |
+| 10/27 | 끝남: 8, 9. 10 |
 | 10/28 | 11, 12, 13 (a) |
 | 10/29 오전 | 13 (b) |
 | 10/29 | 발표 자료 |
@@ -106,6 +106,7 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 - metal 의 multiple scattering (`Specification.adoc:3637` 이 권한다): rough 한 metal 의 energy 손실이 결과를 바꾸는 장면이나 RT Reflection 전. 지금은 single scattering 이라 baseColor 1, roughness 1 인 metal 이 수직에서 0.31 만 반사한다 (작업 8 의 `kept/gltf-brdf/brdf/cells.json`).
 - glTF BRDF 의 coupling table 을 grazing 에서 더 촘촘히 두는 일: E_s 의 보간 오차가 μ ≥ 0.03 에서 3.0e-4, 그 아래에서 7.3e-4 까지이고 energy 가 느는 쪽은 3.4e-4 까지다 (`scripts/gltfbrdf.py`). 작업 12 의 bias 가 grazing 에 몰릴 때
 - 방향에 따라 다른 sky 와 그 importance sampling, MIS: 상수 sky 로는 볼 수 없는 결과가 필요해질 때. 그때 맞는 sky 를 구하거나 만든다.
+- 상수 Sky Light 의 NEE 와 MIS: 작업 12 가 sky 에서 오는 빛 때문에 수렴이 느리다고 잴 때. 상수 sky 의 방향을 cosine 으로 고르면 pdf 가 Lambert 의 BRDF sampling 과 같아서 얻는 것이 적다. Sponza 의 실내에서는 sky 가 courtyard 로만 보이므로, 그 구멍 쪽을 고르는 portal sampling 이 있어야 효과를 볼 것이다 (추측).
 - emissive triangle 의 NEE: 작은 emitter 가 수렴을 막을 때
 - stratified sampler, blue noise: 수렴 시간이 문제가 될 때
 - glTF 의 caustic 이 남기는 흰 점을 줄이는 일: 작업 12 가 아래 시점에서 수렴을 재고, 흰 점이 수렴 목표를 막을 때. 햇빛이 roughness 가 0 에 가까운 texel 에서 반사되어 다른 면을 비추는 path 는 그 texel 의 NEE 로만 드물게 찾으므로, 아주 큰 sample 이 어두운 곳에 흰 점으로 남는다 (아래 값에서 한 추론). 작업 8 을 끝낼 때 복도 시점 (pose `-1479.30859 211.686859 395.723236 -1.53974497 -0.124806166`, light direction `0,0.970682025,-0.24036777`, intensity 4, Max Bounces 64, Russian roulette on, 4096 spp) 에서 잰 값:
