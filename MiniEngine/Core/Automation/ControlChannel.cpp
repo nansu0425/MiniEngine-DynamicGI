@@ -357,6 +357,23 @@ ControlChannel::Fields& ControlChannel::Fields::Append(const Fields& other)
     return *this;
 }
 
+ControlChannel::Fields& ControlChannel::Fields::Merge(const Fields& other)
+{
+    for (const Member& member : other.m_Members)
+    {
+        const auto same = std::find_if(m_Members.begin(), m_Members.end(), [&member](const Member& existing) { return existing.key == member.key; });
+        if (same != m_Members.end() && same->object != nullptr && member.object != nullptr)
+        {
+            // object는 다른 Fields와 공유할 수 있으므로 고치기 전에 사본으로 바꾼다.
+            same->object = std::make_shared<Fields>(*same->object);
+            same->object->Merge(*member.object);
+        }
+        else
+            m_Members.push_back(member);
+    }
+    return *this;
+}
+
 std::string ControlChannel::Fields::ToMembers(void) const
 {
     std::string members;

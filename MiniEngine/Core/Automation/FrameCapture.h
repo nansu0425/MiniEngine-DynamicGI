@@ -25,6 +25,7 @@ namespace FrameCapture
     bool FindTarget(const std::string& name, Target& target);
 
     // target이 다음에 다 그려졌을 때 pathWithoutExtension에 확장자를 붙여 쓰고, reply로 그 경로와 크기를 돌려준다.
+    // 옆에는 그 frame의 state와, 조건을 되돌릴 수 있으면 그 조건의 줄 (MeasurementConditions)을 남긴다.
     void Request(Target target, const std::string& pathWithoutExtension, const ControlChannel::Reply& reply);
 
     // target이 다 그려진 곳에서 부른다. 요청이 없으면 아무것도 하지 않는다.

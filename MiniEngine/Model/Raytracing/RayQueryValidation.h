@@ -1,9 +1,6 @@
 #pragma once
 
 #include <functional>
-#include <map>
-#include <string>
-#include <vector>
 
 class ComputeContext;
 class ColorBuffer;
@@ -53,17 +50,10 @@ namespace RayQueryValidation
     // validation fit이 panel의 Fit to Capture와 같은 일을 하게 한다. heatmap은 고른 view와 함께 RaytracingView가 가지므로 그쪽이 정하고 응답한다.
     void SetFitCommand(const std::function<void(const ControlChannel::Reply&)>& fit);
 
-    // Log가 수치와 함께 한 줄에 찍고 Restore가 그 줄에서 되돌리는 장면의 조건. key와 value에는 '='와 ';'를 쓰지 않는다.
-    typedef std::map<std::string, std::string> SceneConditions;
-    // camera와 directional light처럼 app이 가진 조건은 app이 정한다. restore는 필요한 key가 없으면 false를 돌려준다.
-    // statePaths는 그 조건이 있는 state의 path이고, restore 명령이 바꾼 것을 응답할 때 쓴다. 정하지 않으면 Restore는 비활성이다.
-    void SetSceneConditions(const std::function<void(SceneConditions&)>& describe, const std::function<bool(const SceneConditions&)>& restore,
-        const std::vector<std::string>& statePaths);
-
     void Initialize(void);
     void Shutdown(void);
     // Ray Tracing panel의 Validation section 내용. Capture는 바로 앞 frame의 집계를 읽어 보여 주고,
-    // Log는 그 수치를 측정 조건과 함께 한 줄로 찍으며, Restore는 그 한 줄의 조건으로 되돌린다.
+    // Log는 그 수치를 측정 조건 (MeasurementConditions)과 함께 한 줄로 찍으며, Restore는 그 한 줄의 조건으로 되돌린다.
     void ShowSection(void);
     // camera ray는 rasterViewport로 그린 raster의 sample 위치를 지난다. rasterDepth는 그 raster가 그린 depth buffer이고 target과 크기가 같다.
     void Render(ComputeContext& context, Mode mode, const Heatmap& heatmap, const Math::Camera& camera, const D3D12_VIEWPORT& rasterViewport,

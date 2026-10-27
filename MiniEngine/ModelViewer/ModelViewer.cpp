@@ -44,6 +44,7 @@
 #include "Core/Editor/SceneEditor.h"
 #include "Core/Automation/ControlChannel.h"
 #include "Core/Editor/EditorSettings.h"
+#include "Core/Editor/MeasurementConditions.h"
 #include "Core/UI/ImGuiLayer.h"
 
 #include <algorithm>
@@ -359,49 +360,153 @@ void SkyLight::ShowPanel()
     });
 }
 
-bool ReadCondition(const RayQueryValidation::SceneConditions& conditions, const char* key, float& value)
+std::string FormatFloat(float value)
 {
-    const auto text = conditions.find(key);
-    return text != conditions.end() && sscanf_s(text->second.c_str(), "%f", &value) == 1;
+    char text[32];
+    sprintf_s(text, "%.9g", value);
+    return text;
 }
 
-bool ReadCondition(const RayQueryValidation::SceneConditions& conditions, const char* key, float& x, float& y, float& z)
-{
-    const auto text = conditions.find(key);
-    return text != conditions.end() && sscanf_s(text->second.c_str(), "%f,%f,%f", &x, &y, &z) == 3;
-}
+// 측정 조건의 줄에 담는 값. 같은 화면으로 되돌릴 수 있게 다시 읽으면 같은 float가 되는 자릿수로 쓰고, 줄에서 읽을 때는 앞뒤에 다른
+// 글자가 있거나 받을 수 없는 값을 받지 않는다 (MeasurementConditions::Restore).
+using MeasurementConditions::ReadValue;
 
-// 검증의 Log 한 줄에 찍는 camera와 directional light. 같은 화면으로 되돌릴 수 있게 저장된 값을 그대로 쓴다.
-// light의 rotation은 editor.ini처럼 +Z와 +Y로 적는다.
-void DescribeScene(const EditorCamera& camera, const DirectionalLight& light, RayQueryValidation::SceneConditions& conditions)
+void DescribeCameraConditions(const EditorCamera& camera, MeasurementConditions::Values& values)
 {
     const EditorCamera::Pose pose = camera.GetPose();
-    char text[96];
-    sprintf_s(text, "%.9g,%.9g,%.9g", (float)pose.position.GetX(), (float)pose.position.GetY(), (float)pose.position.GetZ());
-    conditions["camera"] = text;
-    sprintf_s(text, "%.9g", pose.heading);
-    conditions["heading"] = text;
-    sprintf_s(text, "%.9g", pose.pitch);
-    conditions["pitch"] = text;
-    const Matrix3& rotation = light.GetProperties().rotation;
-    conditions["light direction"] = FormatVector(rotation.GetZ());
-    conditions["light up"] = FormatVector(rotation.GetY());
+    values["camera"] = FormatVector(pose.position);
+    values["heading"] = FormatFloat(pose.heading);
+    values["pitch"] = FormatFloat(pose.pitch);
 }
 
-bool RestoreScene(EditorCamera& camera, DirectionalLight& light, const RayQueryValidation::SceneConditions& conditions)
+void ReadCameraConditions(EditorCamera& camera, const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading)
 {
-    float x, y, z, heading, pitch;
-    float direction[3], up[3];
-    DirectionalLight::Properties properties = light.GetProperties();
-    if (!ReadCondition(conditions, "camera", x, y, z) || !ReadCondition(conditions, "heading", heading) || !ReadCondition(conditions, "pitch", pitch) ||
-        !ReadCondition(conditions, "light direction", direction[0], direction[1], direction[2]) ||
-        !ReadCondition(conditions, "light up", up[0], up[1], up[2]) ||
-        !MakeRotation(Vector3(direction[0], direction[1], direction[2]), Vector3(up[0], up[1], up[2]), properties.rotation))
-        return false;
+    EditorCamera::Pose pose = camera.GetPose();
+    ReadValue(values, "camera", reading, [&pose](const std::string& text) { return ReadVector(text, pose.position); });
+    ReadValue(values, "heading", reading, [&pose](const std::string& text) { return ReadNumbers(text, &pose.heading, 1); });
+    ReadValue(values, "pitch", reading, [&pose](const std::string& text) { return ReadNumbers(text, &pose.pitch, 1); });
+    reading.applies.push_back([&camera, pose] { camera.SetPose(pose); });
+}
 
-    camera.SetPose({ Vector3(x, y, z), heading, pitch });
-    light.SetProperties(properties);
-    return true;
+// scene의 해상도는 camera ray가 지나는 pixel 격자를 정하지만, UI가 보이면 dock 배치가 정하므로 되돌리지 않고 다르면 알린다.
+std::string FormatSceneSize(uint32_t width, uint32_t height)
+{
+    return std::to_string(width) + "x" + std::to_string(height);
+}
+
+void DescribeSceneSize(MeasurementConditions::Values& values)
+{
+    values["size"] = FormatSceneSize(g_SceneColorBuffer.GetWidth(), g_SceneColorBuffer.GetHeight());
+}
+
+void ReadSceneSize(const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading)
+{
+    uint32_t width = 0, height = 0;
+    const bool read = ReadValue(values, "size", reading, [&width, &height](const std::string& text)
+    {
+        const size_t separator = text.find('x');
+        return separator != std::string::npos && MeasurementConditions::ReadUInt(text.substr(0, separator), width) &&
+            MeasurementConditions::ReadUInt(text.substr(separator + 1), height);
+    });
+    if (read && (width != g_SceneColorBuffer.GetWidth() || height != g_SceneColorBuffer.GetHeight()))
+    {
+        reading.notes.push_back("the resolution is " + FormatSceneSize(width, height) + " in the line but " +
+            FormatSceneSize(g_SceneColorBuffer.GetWidth(), g_SceneColorBuffer.GetHeight()) + " now. Restore does not change it.");
+    }
+}
+
+void DescribeTaa(MeasurementConditions::Values& values)
+{
+    values["taa"] = TemporalEffects::EnableTAA ? "on" : "off";
+}
+
+void ReadTaa(const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading)
+{
+    bool taa = false;
+    if (!ReadValue(values, "taa", reading, [&taa](const std::string& text) { taa = text == "on"; return text == "on" || text == "off"; }))
+        return;
+    if (taa)
+        reading.notes.push_back("TAA was on in the line, so its jitter cannot be reproduced.");
+    reading.applies.push_back([taa] { TemporalEffects::EnableTAA = taa; });
+}
+
+// light의 rotation은 editor.ini처럼 +Z와 +Y로 적어, 다시 읽으면 bit 단위로 같은 rotation이 된다. position은 조명에 영향이 없어 적지 않는다.
+void DescribeLightConditions(const DirectionalLight& light, MeasurementConditions::Values& values)
+{
+    const DirectionalLight::Properties& properties = light.GetProperties();
+    values["light direction"] = FormatVector(properties.rotation.GetZ());
+    values["light up"] = FormatVector(properties.rotation.GetY());
+    values["light color"] = FormatVector(properties.color);
+    values["light intensity"] = FormatFloat(properties.intensity);
+}
+
+void ReadLightConditions(DirectionalLight& light, const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading)
+{
+    DirectionalLight::Properties properties = light.GetProperties();
+    Vector3 direction, up;
+    const bool hasDirection = ReadValue(values, "light direction", reading, [&direction](const std::string& text) { return ReadVector(text, direction); });
+    const bool hasUp = ReadValue(values, "light up", reading, [&up](const std::string& text) { return ReadVector(text, up); });
+    if (hasDirection && hasUp && !MakeRotation(direction, up, properties.rotation))
+    {
+        reading.unread.push_back("light direction");
+        reading.unread.push_back("light up");
+    }
+    ReadValue(values, "light color", reading, [&properties](const std::string& text) { return ReadVector(text, properties.color) && IsColor(properties.color); });
+    ReadValue(values, "light intensity", reading, [&properties](const std::string& text)
+    {
+        return ReadNumbers(text, &properties.intensity, 1) && properties.intensity >= 0.0f;
+    });
+    reading.applies.push_back([&light, properties] { light.SetProperties(properties); });
+}
+
+void DescribeSkyLightConditions(const SkyLight& sky, MeasurementConditions::Values& values)
+{
+    const SkyLight::Properties& properties = sky.GetProperties();
+    values["sky color"] = FormatVector(properties.color);
+    values["sky intensity"] = FormatFloat(properties.intensity);
+}
+
+// intensity는 Sky Light의 settings처럼 inf도 받는다 (LoadSkyLightSettings). /fp:fast에서는 NaN과의 비교가 참일 수 있어 NaN을 따로 본다.
+void ReadSkyLightConditions(SkyLight& sky, const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading)
+{
+    SkyLight::Properties properties = sky.GetProperties();
+    ReadValue(values, "sky color", reading, [&properties](const std::string& text) { return ReadVector(text, properties.color) && IsColor(properties.color); });
+    ReadValue(values, "sky intensity", reading, [&properties](const std::string& text)
+    {
+        return MeasurementConditions::ReadFloat(text, properties.intensity) && !std::isnan(properties.intensity) && properties.intensity >= 0.0f;
+    });
+    reading.applies.push_back([&sky, properties] { sky.SetProperties(properties); });
+}
+
+// raster와 path tracer가 그리는 조건을 Log와 capture의 줄에 담고 Restore로 되돌리게 한다. path tracer의 설정은 PathTracerPanel이 더한다.
+// OrbitCamera는 pose를 정할 수 없으므로 editorCamera가 없으면 Restore를 쓸 수 없다.
+void RegisterMeasurementConditions(EditorCamera* editorCamera, DirectionalLight& light, SkyLight& sky)
+{
+    if (editorCamera != nullptr)
+    {
+        MeasurementConditions::Register("camera", {
+            [editorCamera](MeasurementConditions::Values& values) { DescribeCameraConditions(*editorCamera, values); },
+            [editorCamera](const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading) { ReadCameraConditions(*editorCamera, values, reading); },
+            { "camera" } });
+    }
+    else
+        MeasurementConditions::SetUnavailableReason("The camera cannot be restored, as -model uses the orbit camera.");
+    MeasurementConditions::Register("size", { DescribeSceneSize, ReadSceneSize, {} });
+    MeasurementConditions::Register("taa", { DescribeTaa, ReadTaa, { "settings.Engine Tuning" } });
+    MeasurementConditions::Register("light", {
+        [&light](MeasurementConditions::Values& values) { DescribeLightConditions(light, values); },
+        [&light](const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading) { ReadLightConditions(light, values, reading); },
+        { "light" } });
+    MeasurementConditions::Register("sky", {
+        [&sky](MeasurementConditions::Values& values) { DescribeSkyLightConditions(sky, values); },
+        [&sky](const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading) { ReadSkyLightConditions(sky, values, reading); },
+        { "sky" } });
+}
+
+void UnregisterMeasurementConditions(void)
+{
+    for (const char* group : { "camera", "size", "taa", "light", "sky" })
+        MeasurementConditions::Unregister(group);
 }
 
 ControlChannel::Fields DescribeVector(Vector3 vector)
@@ -857,11 +962,6 @@ void ModelViewer::Startup( void )
     {
         editorCamera = new EditorCamera(m_Camera, Vector3(kYUnitVector));
         m_CameraController.reset(editorCamera);
-        // OrbitCamera는 pose를 정할 수 없으므로 검증의 Restore는 EditorCamera를 쓸 때만 된다.
-        RayQueryValidation::SetSceneConditions(
-            [this, editorCamera](RayQueryValidation::SceneConditions& conditions) { DescribeScene(*editorCamera, m_Light, conditions); },
-            [this, editorCamera](const RayQueryValidation::SceneConditions& conditions) { return RestoreScene(*editorCamera, m_Light, conditions); },
-            { "camera", "light" });
     }
     else
         m_CameraController.reset(new OrbitCamera(m_Camera, m_ModelInst.GetBoundingSphere(), Vector3(kYUnitVector)));
@@ -874,10 +974,12 @@ void ModelViewer::Startup( void )
     SceneEditor::RegisterCommands(m_Camera);
     RegisterLight(m_Light);
     RegisterSkyLight(m_SkyLight);
+    RegisterMeasurementConditions(editorCamera, m_Light, m_SkyLight);
 }
 
 void ModelViewer::Cleanup( void )
 {
+    UnregisterMeasurementConditions();
     EditorSettings::Unregister(kSkyLightSettingsSection);
     EditorSettings::Unregister(kLightSettingsSection);
     SceneEditor::RemoveObject(m_Light);

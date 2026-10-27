@@ -1016,11 +1016,21 @@ def part_of_state(state, path):
     return part
 
 
+def merge_state(state, part):
+    """part 를 state 에 합친다. settings.Engine Tuning 과 settings.Path Tracer 처럼 바깥 key 가 같은 object 는 그 안에서 합친다."""
+    for key, value in part.items():
+        if isinstance(value, dict) and isinstance(state.get(key), dict):
+            merge_state(state[key], value)
+        else:
+            state[key] = value
+    return state
+
+
 def read_state(session, paths):
-    """paths 가 가리키는 부분을 한 state 로 합친다. 바깥 key 가 겹치지 않는 path 를 준다."""
+    """paths 가 가리키는 부분을 한 state 로 합친다."""
     state = {}
     for path in paths:
-        state.update(session.ask_ok(f'state {path}')['state'])
+        merge_state(state, session.ask_ok(f'state {path}')['state'])
     return state
 
 
@@ -1631,7 +1641,9 @@ def check_rest_of_ui_commands(session, check):
     camera = start['camera']
     session.ask_ok('pose ' + ' '.join(repr(float(camera[key]) + 10) for key in ['x', 'y', 'z']) + f' {camera["heading"]} {camera["pitch"]}')
     session.ask_ok('light set elevation=40')
-    change('restore', f'restore {line}', 'settings.Engine Tuning', 'camera', 'light')
+    change('restore', f'restore {line}', 'camera', 'light', 'sky', 'settings.Engine Tuning', 'settings.Path Tracer')
+    # restore 는 줄의 pt samples 를 Target Samples 로 둔다.
+    session.ask_ok(f'settings set Path Tracer: Target Samples={start["settings"]["Path Tracer"]["Target Samples"]}')
 
     check_changes(check, 'window, settings set Editor Camera, Ray Tracing View and Path Tracer, pt reset and restore change the state '
                          'and reply with the changed part', changes)

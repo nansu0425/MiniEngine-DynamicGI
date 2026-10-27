@@ -85,24 +85,14 @@ namespace
         float jitterX;
         float jitterY;
         bool taa;
-        // camera와 directional light처럼 app이 정한 조건
-        RayQueryValidation::SceneConditions scene;
+        // camera, light, 해상도처럼 그 frame을 그린 조건
+        MeasurementConditions::Values conditions;
     };
 
     struct Capture
     {
         ValidatedFrame frame;
         Stats stats;
-    };
-
-    // Restore한 Log 한 줄의 조건 중 Restore가 되돌리지 못하는 것. 지금 상태와 견줘 다른 점을 보여 준다.
-    struct RestoredLine
-    {
-        std::string mode;
-        uint32_t width;
-        uint32_t height;
-        bool taa;
-        bool sceneRestored;
     };
 
     enum RootParameter { kConstants, kScene, kRasterDepth = kScene + RaytracingScene::kNumRootParameters, kOutputs, kNumRootParameters };
@@ -121,14 +111,9 @@ namespace
     bool s_HasCapture = false;
     Capture s_Capture;
 
-    std::function<void(RayQueryValidation::SceneConditions&)> s_DescribeScene;
-    std::function<bool(const RayQueryValidation::SceneConditions&)> s_RestoreScene;
-    std::vector<std::string> s_SceneStatePaths;
     std::function<void(const ControlChannel::Reply&)> s_Fit;
-    // Restore할 Log 한 줄. Capture하면 그 Capture의 줄로 채운다.
-    char s_RestoreLine[4096] = {};
-    bool s_HasRestored = false;
-    RestoredLine s_Restored;
+    // Capture하면 그 Capture의 줄로 채운다.
+    MeasurementConditions::RestoreField s_RestoreField;
 
     __declspec(align(16)) struct Constants
     {
@@ -317,12 +302,9 @@ namespace
         char text[256];
 
         add("mode", mode.label);
-        sprintf_s(text, "%ux%u", frame.width, frame.height);
-        add("size", text);
-        add("taa", frame.taa ? "on" : "off");
         sprintf_s(text, "%.9g,%.9g", frame.jitterX, frame.jitterY);
         add("jitter", text);
-        for (const auto& condition : frame.scene)
+        for (const auto& condition : frame.conditions)
             add(condition.first, condition.second);
 
         add("pixels", std::to_string(stats.pixelCount));
@@ -344,88 +326,24 @@ namespace
         return kLogPrefix + conditions;
     }
 
-    // Restore가 되돌리는 조건만 Log 줄의 형식으로 쓴다.
-    std::string DescribeRestorableConditions(void)
-    {
-        RayQueryValidation::SceneConditions scene;
-        if (s_DescribeScene)
-            s_DescribeScene(scene);
-
-        std::string conditions;
-        MeasurementConditions::AppendValue(conditions, "taa", TemporalEffects::EnableTAA ? "on" : "off");
-        for (const auto& condition : scene)
-            MeasurementConditions::AppendValue(conditions, condition.first, condition.second);
-        return conditions;
-    }
-
-    // TAA는 직접 되돌리고 camera와 directional light는 app에 맡긴다. 해상도와 mode는 사용자가 바꾸도록 차이만 기록한다.
-    void Restore(const std::string& line)
-    {
-        const RayQueryValidation::SceneConditions values = MeasurementConditions::Parse(line);
-        const auto value = [&values](const char* key)
-        {
-            const auto found = values.find(key);
-            return found != values.end() ? found->second : std::string();
-        };
-
-        s_Restored = {};
-        s_Restored.mode = value("mode");
-        sscanf_s(value("size").c_str(), "%ux%u", &s_Restored.width, &s_Restored.height);
-        s_Restored.taa = value("taa") == "on";
-        if (!value("taa").empty())
-            TemporalEffects::EnableTAA = s_Restored.taa;
-        s_Restored.sceneRestored = s_RestoreScene(values);
-        s_HasRestored = true;
-    }
-
-    // Restore가 되돌리지 못한 조건 중 지금과 다른 것을 알려 준다.
-    void ShowRestoredDifferences(void)
-    {
-        const ImVec4 kWarningColor(1.0f, 0.75f, 0.2f, 1.0f);
-        if (!s_Restored.sceneRestored)
-            ImGui::TextColored(kWarningColor, "Warning: the camera and light are not restored. The line lacks them.");
-        if (s_Restored.taa)
-            ImGui::TextColored(kWarningColor, "Warning: TAA was on in the line, so its jitter cannot be reproduced.");
-
-        if (!WasLastFrameValidated() || s_Restored.mode != kModes[s_LastFrame.mode].label)
-        {
-            ImGui::TextColored(kWarningColor, "Warning: the line was measured with %s. Pick it in the View section.", s_Restored.mode.c_str());
-            return;
-        }
-        if (s_Restored.width != s_LastFrame.width || s_Restored.height != s_LastFrame.height)
-        {
-            ImGui::TextColored(kWarningColor, "Warning: the resolution is %u x %u in the line but %u x %u now.",
-                s_Restored.width, s_Restored.height, s_LastFrame.width, s_LastFrame.height);
-        }
-    }
-
+    // Restore는 mode를 바꾸지 않으므로, 줄을 잰 mode가 지금 검증하는 mode와 다르면 알린다.
     void ShowRestore(void)
     {
         ImGui::SeparatorText("Restore");
-        ImGui::SetNextItemWidth(-FLT_MIN);
-        if (ImGui::InputText("##Line", s_RestoreLine, sizeof(s_RestoreLine)))
-            s_HasRestored = false;
-        ImGui::SetItemTooltip("A line printed by Log. Capture fills in its own line.");
-
-        const bool canRestore = s_RestoreScene && s_RestoreLine[0] != '\0';
-        ImGui::BeginDisabled(!canRestore);
-        if (ImGui::Button("Restore"))
-            Restore(s_RestoreLine);
-        ImGui::EndDisabled();
-        ImGui::SetItemTooltip(s_RestoreScene ?
-            "Sets the camera, light and TAA as in the line. The resolution and the TAA jitter are not restored." :
-            "Needs the editor camera.");
-
-        if (s_HasRestored)
-            ShowRestoredDifferences();
+        s_RestoreField.Show();
+        if (!s_RestoreField.HasResult())
+            return;
+        const MeasurementConditions::Values values = MeasurementConditions::Parse(s_RestoreField.GetLine());
+        const auto mode = values.find("mode");
+        if (mode != values.end() && (!WasLastFrameValidated() || mode->second != kModes[s_LastFrame.mode].label))
+            ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.2f, 1.0f), "Warning: the line was measured with %s. Pick it in the View section.", mode->second.c_str());
     }
 
     // Restore 칸을 그 Capture의 줄로 채운다.
     void CaptureForRestore(void)
     {
         CaptureLastFrame();
-        strncpy_s(s_RestoreLine, DescribeCapture(s_Capture).c_str(), _TRUNCATE);
-        s_HasRestored = false;
+        s_RestoreField.SetLine(DescribeCapture(s_Capture));
     }
 
     ControlChannel::Fields DescribeCaptureValues(void)
@@ -446,7 +364,7 @@ namespace
         return fields;
     }
 
-    // panel의 Capture, Log, Restore와 같은 일을 harness가 명령으로 한다.
+    // panel의 Capture, Log와 같은 일을 harness가 명령으로 한다. Restore는 engine의 restore 명령이 한다.
     void RegisterCommands(void)
     {
         ControlChannel::RegisterState("validation", DescribeValidation);
@@ -476,56 +394,12 @@ namespace
             reply.Ok(ControlChannel::Fields().Text("line", line).Object("values", DescribeCaptureValues())
                 .Object("state", ControlChannel::GetState("validation")));
         });
-
-        ControlChannel::Register("describe", "describe: the camera, directional light and TAA as a line that restore takes", [](const std::string&, const ControlChannel::Reply& reply)
-        {
-            if (!s_DescribeScene)
-            {
-                reply.Error("describe needs the editor camera");
-                return;
-            }
-            reply.Ok(ControlChannel::Fields().Text("line", DescribeRestorableConditions()));
-        });
-
-        ControlChannel::Register("restore", "restore <line>: like Restore with a line printed by Log, validation capture or describe", [](const std::string& arguments, const ControlChannel::Reply& reply)
-        {
-            if (!s_RestoreScene)
-            {
-                reply.Error("restore needs the editor camera");
-                return;
-            }
-            if (arguments.empty())
-            {
-                reply.Error("usage: restore <line>");
-                return;
-            }
-
-            Restore(arguments);
-            if (!s_Restored.sceneRestored)
-            {
-                reply.Error("the line lacks the camera or light. Only TAA was restored.");
-                return;
-            }
-            // TAA는 Engine Tuning에 있다.
-            ControlChannel::Fields state = ControlChannel::GetState("settings.Engine Tuning");
-            for (const std::string& path : s_SceneStatePaths)
-                state.Append(ControlChannel::GetState(path));
-            reply.Ok(ControlChannel::Fields().Text("line", DescribeRestorableConditions()).Object("state", state));
-        });
     }
 }
 
 void RayQueryValidation::SetFitCommand(const std::function<void(const ControlChannel::Reply&)>& fit)
 {
     s_Fit = fit;
-}
-
-void RayQueryValidation::SetSceneConditions(const std::function<void(SceneConditions&)>& describe, const std::function<bool(const SceneConditions&)>& restore,
-    const std::vector<std::string>& statePaths)
-{
-    s_DescribeScene = describe;
-    s_RestoreScene = restore;
-    s_SceneStatePaths = statePaths;
 }
 
 const char* RayQueryValidation::GetModeLabel(Mode mode)
@@ -618,7 +492,7 @@ void RayQueryValidation::ShowSection(void)
     if (ImGui::Button("Log"))
         Utility::Print((DescribeCapture(s_Capture) + "\n").c_str());
     ImGui::EndDisabled();
-    ImGui::SetItemTooltip("Prints the capture with its camera, light, TAA and resolution as one line to the Output window.");
+    ImGui::SetItemTooltip("Prints the capture with the conditions it was measured in as one line to the Output window.");
 
     if (s_HasCapture)
         ShowCapture(s_Capture);
@@ -673,7 +547,6 @@ void RayQueryValidation::Render(ComputeContext& context, Mode mode, const Heatma
     s_LastFrame = { GetFrameCount(), mode, target.GetWidth(), target.GetHeight(),
         rasterViewport.TopLeftX, rasterViewport.TopLeftY, TemporalEffects::EnableTAA };
     // Capture는 다음 frame에 읽으므로 그 사이에 camera가 움직여도 이 frame의 조건이 남도록 지금 받아 둔다.
-    if (s_DescribeScene)
-        s_DescribeScene(s_LastFrame.scene);
+    s_LastFrame.conditions = MeasurementConditions::Describe();
     s_HasValidatedFrame = true;
 }

@@ -3,14 +3,17 @@
 #include "Core/pch.h"
 #include "Core/Automation/ControlChannel.h"
 #include "Core/Editor/EditorSettings.h"
+#include "Core/Editor/MeasurementConditions.h"
 #include "Core/UI/ImGuiLayer.h"
 
 #include <imgui.h>
 #include <algorithm>
+#include <cmath>
 
 namespace
 {
     const char* kSettingsSection = "Path Tracer";
+    const char* kLogPrefix = "[Path Tracer] ";
 
     constexpr uint32_t kMaxSamplesPerFrame = 256;
     // 누적 buffer가 sample 수를 float로 세므로 1씩 더해도 정확한 2^24보다 작게 둔다.
@@ -33,6 +36,9 @@ namespace
         ControlChannel::Reply reply;
     };
     std::vector<SampleWait> s_SampleWaits;
+
+    // Log하면 그 줄로 채운다.
+    MeasurementConditions::RestoreField s_RestoreField;
 
     void ClampSettings(void)
     {
@@ -173,6 +179,90 @@ namespace
         ClampSettings();
     }
 
+    // 측정 조건의 줄에 담는 path tracer의 설정과 sample 수. 설정은 PathTracer.cpp의 HaveSameImage가 견주는 것, 곧 image를 정하는 것만
+    // 담는다. 값은 editor.ini와 같은 형식으로 쓴다.
+    void DescribeConditions(MeasurementConditions::Values& values)
+    {
+        values["pt material"] = kMaterialNames[(int)s_Settings.material];
+        values["pt seed"] = std::to_string(s_Settings.seed);
+        values["pt max bounces"] = std::to_string(s_Settings.maxBounces);
+        values["pt russian roulette"] = FormatFlag(s_Settings.russianRoulette);
+        values["pt geometric normals"] = FormatFlag(s_Settings.geometricNormals);
+        values["pt furnace"] = FormatFlag(s_Settings.furnace);
+        values["pt furnace albedo"] = FormatFloat(s_Settings.furnaceAlbedo);
+        values["pt furnace emission"] = FormatFloat(s_Settings.furnaceEmission);
+        values["pt samples"] = std::to_string(PathTracer::GetProgress().samples);
+    }
+
+    bool ReadConditionFlag(const std::string& text, bool& value)
+    {
+        value = text == "1";
+        return text == "0" || text == "1";
+    }
+
+    // 줄의 image를 다시 만들도록 pt samples를 Target Samples로 두고 처음부터 다시 쌓는다. 0이면 path tracer를 쌓지 않은 때의 줄이라
+    // Target Samples를 그대로 둔다. ClampSettings가 바꿀 값은 받지 않는다. /fp:fast에서는 NaN과의 비교가 참일 수 있어 유한한지 따로 본다.
+    void ReadConditions(const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading)
+    {
+        using MeasurementConditions::ReadFloat;
+        using MeasurementConditions::ReadUInt;
+        using MeasurementConditions::ReadValue;
+
+        PathTracer::Settings settings = s_Settings;
+        uint32_t samples = 0;
+        ReadValue(values, "pt material", reading, [&settings](const std::string& text)
+        {
+            const auto name = std::find(std::begin(kMaterialNames), std::end(kMaterialNames), text);
+            settings.material = (PathTracer::Material)(name - std::begin(kMaterialNames));
+            return name != std::end(kMaterialNames);
+        });
+        ReadValue(values, "pt seed", reading, [&settings](const std::string& text) { return ReadUInt(text, settings.seed); });
+        ReadValue(values, "pt max bounces", reading, [&settings](const std::string& text)
+        {
+            return ReadUInt(text, settings.maxBounces) && settings.maxBounces <= kMaxBounces;
+        });
+        ReadValue(values, "pt russian roulette", reading, [&settings](const std::string& text) { return ReadConditionFlag(text, settings.russianRoulette); });
+        ReadValue(values, "pt geometric normals", reading, [&settings](const std::string& text) { return ReadConditionFlag(text, settings.geometricNormals); });
+        ReadValue(values, "pt furnace", reading, [&settings](const std::string& text) { return ReadConditionFlag(text, settings.furnace); });
+        ReadValue(values, "pt furnace albedo", reading, [&settings](const std::string& text)
+        {
+            return ReadFloat(text, settings.furnaceAlbedo) && std::isfinite(settings.furnaceAlbedo) && settings.furnaceAlbedo >= 0.0f &&
+                settings.furnaceAlbedo <= 1.0f;
+        });
+        ReadValue(values, "pt furnace emission", reading, [&settings](const std::string& text)
+        {
+            return ReadFloat(text, settings.furnaceEmission) && std::isfinite(settings.furnaceEmission) && settings.furnaceEmission >= 0.0f;
+        });
+        ReadValue(values, "pt samples", reading, [&samples](const std::string& text) { return ReadUInt(text, samples) && samples <= kMaxTargetSamples; });
+        reading.applies.push_back([settings, samples]
+        {
+            s_Settings = settings;
+            if (samples > 0)
+                s_Settings.targetSamples = samples;
+            PathTracer::Reset();
+        });
+    }
+
+    void ShowConditions(void)
+    {
+        ImGui::SeparatorText("Conditions");
+        const std::string& unavailable = MeasurementConditions::GetUnavailableReason();
+        ImGui::BeginDisabled(!unavailable.empty());
+        if (ImGui::Button("Log"))
+        {
+            const std::string line = kLogPrefix + MeasurementConditions::Format(MeasurementConditions::Describe());
+            Utility::Print((line + "\n").c_str());
+            ImGui::SetClipboardText(line.c_str());
+            s_RestoreField.SetLine(line);
+        }
+        ImGui::EndDisabled();
+        ImGui::SetItemTooltip("%s", unavailable.empty() ?
+            "Prints the camera, resolution, lights, settings above and samples as one line to the Output window, copies it and fills in "
+            "the line below. Restoring it sets the Target Samples to those samples and starts over, so the image comes out the same." :
+            unavailable.c_str());
+        s_RestoreField.Show();
+    }
+
     ControlChannel::Fields DescribeProgress(void)
     {
         const PathTracer::Progress progress = PathTracer::GetProgress();
@@ -254,6 +344,7 @@ void PathTracerPanel::Initialize(void)
 {
     PathTracer::Initialize();
     EditorSettings::Register(kSettingsSection, SaveSettings, LoadSettings);
+    MeasurementConditions::Register("pt", { DescribeConditions, ReadConditions, { std::string("settings.") + kSettingsSection } });
     RegisterCommands();
     ControlChannel::RegisterState("pt", DescribeProgress);
 }
@@ -261,6 +352,7 @@ void PathTracerPanel::Initialize(void)
 void PathTracerPanel::Shutdown(void)
 {
     s_SampleWaits.clear();
+    MeasurementConditions::Unregister("pt");
     EditorSettings::Unregister(kSettingsSection);
     PathTracer::Shutdown();
 }
@@ -272,6 +364,7 @@ void PathTracerPanel::Update(void)
     {
         ShowSettings();
         ShowProgress();
+        ShowConditions();
     });
 }
 

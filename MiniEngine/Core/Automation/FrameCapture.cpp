@@ -1,6 +1,7 @@
 #include "Core/pch.h"
 #include "Core/Automation/FrameCapture.h"
 #include "Core/Display/Display.h"
+#include "Core/Editor/MeasurementConditions.h"
 #include "Core/Graphics/Command/CommandContext.h"
 #include "Core/Graphics/Resource/PixelBuffer.h"
 #include "Core/Graphics/Resource/ReadbackBuffer.h"
@@ -69,6 +70,14 @@ namespace
         file << "{" << ControlChannel::GetState().ToMembers() << "}";
         return file.good();
     }
+
+    // 같은 image를 다시 만들 수 있도록, 그 image를 그린 frame의 조건을 restore가 받는 줄로 옆에 남긴다.
+    bool SaveConditions(const std::string& path, const std::string& line)
+    {
+        std::ofstream file(Utility::ToWide(path), std::ios::binary);
+        file << line << '\n';
+        return file.good();
+    }
 }
 
 bool FrameCapture::FindTarget(const std::string& name, Target& target)
@@ -110,8 +119,9 @@ void FrameCapture::Capture(Target target, CommandContext& context, PixelBuffer& 
     if (pending == s_PendingCaptures.end())
         return;
 
-    const std::string path = pending->second.pathWithoutExtension + kTargets[target].extension;
-    const std::string statePath = pending->second.pathWithoutExtension + ".state.json";
+    const std::string pathWithoutExtension = pending->second.pathWithoutExtension;
+    const std::string path = pathWithoutExtension + kTargets[target].extension;
+    const std::string statePath = pathWithoutExtension + ".state.json";
     const ControlChannel::Reply reply = pending->second.reply;
     s_PendingCaptures.erase(pending);
 
@@ -147,10 +157,22 @@ void FrameCapture::Capture(Target target, CommandContext& context, PixelBuffer& 
         reply.Error("cannot write " + statePath);
         return;
     }
-    reply.Ok(ControlChannel::Fields()
-        .Text("path", path)
+    ControlChannel::Fields fields;
+    fields.Text("path", path)
         .Integer("width", buffer.GetWidth())
         .Integer("height", buffer.GetHeight())
         .Integer("frame", Graphics::GetFrameCount())
-        .Text("state", statePath));
+        .Text("state", statePath);
+    if (MeasurementConditions::GetUnavailableReason().empty())
+    {
+        const std::string conditionsPath = pathWithoutExtension + ".conditions.txt";
+        const std::string line = MeasurementConditions::Format(MeasurementConditions::Describe());
+        if (!SaveConditions(conditionsPath, line))
+        {
+            reply.Error("cannot write " + conditionsPath);
+            return;
+        }
+        fields.Text("conditions", conditionsPath).Text("line", line);
+    }
+    reply.Ok(fields);
 }

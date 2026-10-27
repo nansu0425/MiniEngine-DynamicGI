@@ -4,6 +4,7 @@
 #include "Core/Automation/FrameCapture.h"
 #include "Core/Display/Display.h"
 #include "Core/Editor/EditorSettings.h"
+#include "Core/Editor/MeasurementConditions.h"
 #include "Core/Graphics/GraphicsCore.h"
 #include "Core/Graphics/Resource/BufferManager.h"
 #include "Core/Profiling/EngineProfiling.h"
@@ -315,6 +316,53 @@ namespace
         reply.Ok(Fields().Object("values", DescribeSection(values)));
     }
 
+    void DescribeConditions(const std::string&, const Reply& reply)
+    {
+        const std::string& unavailable = MeasurementConditions::GetUnavailableReason();
+        if (!unavailable.empty())
+        {
+            reply.Error(unavailable);
+            return;
+        }
+        reply.Ok(Fields().Text("line", MeasurementConditions::Format(MeasurementConditions::Describe())));
+    }
+
+    void RestoreConditions(const std::string& arguments, const Reply& reply)
+    {
+        const std::string& unavailable = MeasurementConditions::GetUnavailableReason();
+        if (!unavailable.empty())
+        {
+            reply.Error(unavailable);
+            return;
+        }
+        if (arguments.empty())
+        {
+            reply.Error("usage: restore <line>");
+            return;
+        }
+
+        const MeasurementConditions::Result result = MeasurementConditions::Restore(MeasurementConditions::Parse(arguments));
+        if (!result.unread.empty())
+        {
+            reply.Error("the line lacks or cannot set " + JoinNames(result.unread) + ", so nothing was restored.",
+                Fields().Text("unread", JoinNames(result.unread)));
+            return;
+        }
+        Fields state;
+        for (const std::string& path : MeasurementConditions::GetStatePaths())
+            state.Merge(GetState(path));
+        Fields fields;
+        fields.Text("line", MeasurementConditions::Format(MeasurementConditions::Describe()));
+        if (!result.notes.empty())
+        {
+            std::string notes;
+            for (const std::string& note : result.notes)
+                notes += (notes.empty() ? "" : " ") + note;
+            fields.Text("note", notes);
+        }
+        reply.Ok(fields.Object("state", state));
+    }
+
     void HandleSettings(const std::string& arguments, const Reply& reply)
     {
         if (StartsWith(arguments, "set "))
@@ -558,13 +606,21 @@ namespace ControlChannel
         Register("quit", "quit: exits as if the window were closed, saving the editor state", Quit);
         Register("settings", "settings get <section> | settings set <section>: <key>=<value>; <key>=<value>  (sections and values as in editor.ini). "
             "set changes nothing and fails if a value does not read back as given", HandleSettings);
+        Register("describe", "describe: the conditions the scene and the path tracer are drawn in now, as a line that restore takes. "
+            "It has the camera, resolution, TAA, directional light, Sky Light, path tracer settings and the samples the path tracer has added", DescribeConditions);
+        Register("restore", "restore <line>: sets every condition in a line printed by Log, left beside a capture or given by describe, as Restore does. "
+            "Fails and sets nothing if the line lacks a condition or one cannot be set, and unread names them. "
+            "The resolution is only compared and note says how it differs. pt samples becomes the Target Samples and the path tracer starts over",
+            RestoreConditions);
         Register("ui", "ui show|hide: same as F1. Hidden, the scene fills the client", SetUIVisible);
         Register("panel", "panel <name> open|close: same as the View menu", SetPanelOpen);
         Register("window", "window client <W>x<H>", ResizeWindow);
         Register("capture", "capture scene|overlay|display|pt <path without extension>: scene is the HDR before post effects as float32 .dds, "
             "overlay is the debug view layer as .png with premultiplied alpha, display is the presented image with UI as .png, "
             "pt is the path tracer's accumulation as float32 .dds with the mean in rgb and the samples it added in a. "
-            "pt replies on the next frame even while Show is off, and fails if the path tracer has not been shown", CaptureFrame);
+            "pt replies on the next frame even while Show is off, and fails if the path tracer has not been shown. "
+            "Beside the image it writes the state of that frame as <path>.state.json and, unless describe fails, "
+            "the line of its conditions as <path>.conditions.txt, which line in the reply also has", CaptureFrame);
         Register("profile", "profile <scope> frames=<n>: the GPU time in ms of the Profiler scope named <scope> (as in its Scope column) "
             "over the next n frames, as mean, min and max. Fails if the scope does not run in one of those frames. "
             "Release compiles the timers out", MeasureGpuTime);
