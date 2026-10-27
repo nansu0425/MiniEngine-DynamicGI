@@ -108,7 +108,8 @@ private:
 
 // ray가 아무 면도 만나지 않을 때 받는 빛. 무한히 먼 sky가 모든 방향에서 같은 radiance를 낸다.
 // ray tracing으로 간접광을 구하는 곳 (path tracer, 앞으로의 DDGI)이 miss에서 이 radiance를 쓴다. raster는 이 빛으로 surface를 비추지
-// 않는다. raster에는 sky의 visibility가 없어서 surface에 더하면 sky가 가려진 실내까지 밝아지고, 그 빛은 DDGI가 구한다.
+// 않고 camera에서 바로 보이는 배경으로만 그린다. raster에는 sky의 visibility가 없어서 surface에 더하면 sky가 가려진 실내까지 밝아지고,
+// 그 빛은 DDGI가 구한다.
 class SkyLight
 {
 public:
@@ -351,7 +352,7 @@ void SkyLight::ShowPanel()
             m_Properties.intensity = std::max(0.0f, m_Properties.intensity);
         ImGui::SetItemTooltip("Radiance of the sky in every direction, in cd/m2. An upward surface open to the whole sky receives "
             "pi times this in lux.");
-        ImGui::TextDisabled("Rays that hit nothing see this light. The raster does not light surfaces with it.");
+        ImGui::TextDisabled("Rays that hit nothing see this light. The raster does not light surfaces with it and draws it only as the background.");
     });
 }
 
@@ -1026,6 +1027,8 @@ void ModelViewer::RenderScene( void )
 
                 sorter.RenderMeshes(MeshSorter::kOpaque, gfxContext, globals);
             }
+
+            Renderer::DrawSkyBackground(gfxContext, viewport, scissor, m_SkyLight.GetRadiance());
 
             sorter.RenderMeshes(MeshSorter::kTransparent, gfxContext, globals);
         }

@@ -1,9 +1,10 @@
-"""raster 가 그리는 빛이 directional light 와 emission 뿐이고, raster 가 sky 를 그리지 않는지 확인한다.
+"""raster 가 surface 에 그리는 빛이 directional light 와 emission 뿐인지 확인한다.
 
-  python scripts/check-raster-lighting.py check   # [1] ~ [5], [7], [8], [10], [13], [14] 를 판정한다
+  python scripts/check-raster-lighting.py check   # [1] ~ [4], [7], [8], [10], [13], [14] 를 판정한다
 
 번호는 작업 C 의 완료 기준의 번호다. [6] 과 [9] 는 Environment 를 빼면서 없앴고, [11] 의 build 와 [12] 의 viewer.py selftest 는 이
-script 밖에서 본다.
+script 밖에서 본다. raster 가 sky 를 그리지 않는다는 [5] 는 작업 9 에서 raster 가 Sky Light 를 배경으로 그리게 되어 없앴다. 배경은
+check-sky-light.py 가 본다.
 
 app 을 Debug 로 세 번 띄우고 끝내며, 이미 띄운 harness instance 는 먼저 끝낸다. 하나라도 실패하면 exit 1 이다. 실행마다 끝낼 때 실행
 중의 D3D12 CORRUPTION, ERROR, WARNING 이 0 이고 종료 때 LIVE_DEVICE 하나만 남는지도 본다.
@@ -30,28 +31,23 @@ quad 의 pixel 은 Ray Tracing View 의 Front Face capture 에서 앞면인 pixe
 
 Sponza 에는 emissive 와 occlusion texture 가 없어서 그 둘은 test scene 으로 본다.
 
-  [5] SKY_POSE 에서 Ray Tracing View 의 Front Face capture 가 아무 면도 만나지 않은 pixel 의 가장자리 EDGE_PIXELS 를 깎은 것 (sky
-      pixel) 이 scene capture 에서 모두 (0, 0, 0) 이다. raster 는 작업 9 전까지 sky 를 그리지 않는다. sky pixel 이 화면의
-      MIN_SKY_FRACTION 보다 적으면 실패한다.
   [7] profile Generate SSAO 가 실패한다. SSAO pass 가 돌지 않는다.
   [8] Engine Tuning 에 Viewer/Lighting/Environment 와 Viewer/Lighting/Gloss Reduction 이 없다.
   [13] harness baseline 의 시점에서 camera 를 멈춘 채 motion blur 를 켜고 찍은 capture 가 끄고 찍은 capture 와 같다. motion blur 는
        g_LinearDepth 로 camera 의 velocity 를 구하므로 (ModelViewer::RenderScene), SSAO 를 빼도 linear depth 가 이번 frame 의 depth
-       로 채워지는지 본다. 끄고 찍은 capture 에서 0 이 아닌 pixel 이 MIN_LIT_FRACTION 보다 적으면 실패한다.
+       로 채워지는지 본다. 끄고 찍은 capture 에서 Front Face capture 가 앞면을 본 pixel 중 0 이 아닌 것이 화면의
+       MIN_LIT_FRACTION 보다 적으면 실패한다. 배경의 sky 는 늘 0 이 아니므로 세지 않는다.
 
 source:
 
   [10] ModelViewer 의 source 와 Model/Renderer 에 FORBIDDEN_NAMES 가 없다. raster 가 irradiance cube, SSAO, Gloss Reduction,
        Environment 의 cubemap, skybox 를 쓰지 않는다.
   [14] FETCH_SCRIPT 가 CUBEMAP_FOLDER 를 받지 않는다.
-
-Sponza 의 SKY_POSE capture 는 발표에 쓰도록 KEPT_DIR 에 DDS 와 보기용 PNG 로 남긴다.
 """
 
 import argparse
 import json
 import math
-import shutil
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -64,11 +60,10 @@ from checks import Checks, stop_and_check
 from gltfwriter import GLTF_FLOAT, GLTF_UNSIGNED_SHORT, BufferBuilder, flatten
 from imagefiles import ImageFileError, read_dds_rgba32f
 from imagemasks import column_groups, eroded
-from viewer import (ENGINE_DIR, HARNESS_DIR, PREVIEW_EXPOSURE, REPO_ROOT, SETTLE_FRAMES, VIEWER_DIR, HarnessError, Session, capture,
-                    describe_difference, make_view, start_instance, stop_instance)
+from viewer import (ENGINE_DIR, HARNESS_DIR, REPO_ROOT, SETTLE_FRAMES, VIEWER_DIR, HarnessError, Session, capture, describe_difference,
+                    start_instance, stop_instance)
 
 SCENE_DIR = HARNESS_DIR / 'raster-lighting'
-KEPT_DIR = HARNESS_DIR / 'kept' / 'raster-lighting'
 TEST_SCENES = {'plain': 'RasterLighting', 'occluded': 'RasterLightingOccluded'}
 
 # light 와 normal 의 cos 는 +z 를 향한 dark 와 emissive 에서 -0.2 / |(0, 1, -0.2)| 이고, lit 에서 (sin 45° - 0.2 cos 45°) / |(0, 1, -0.2)| 다.
@@ -92,9 +87,6 @@ QUADS = [
                     rotation=(-math.sin(math.pi / 8), 0.0, 0.0, math.cos(math.pi / 8))),
 ]
 
-# 기본 시점의 위치를 courtyard 가운데로 옮기고 위를 본다. 가장자리를 깎은 sky pixel 이 화면의 약 24% 다.
-SKY_POSE = '0 300 0 1.5708 1.2'
-MIN_SKY_FRACTION = 0.1
 # harness baseline 의 시점에서 해가 닿는 pixel 은 약 7% 다.
 MIN_LIT_FRACTION = 0.01
 MOTION_BLUR_SETTING = 'Graphics/Motion Blur/Enable'
@@ -201,30 +193,6 @@ def judge_test_scenes(runs, check):
         check('[4] an occlusion texture of 0 on every material changes no pixel', same, describe_difference(plain.rgb, occluded.rgb))
 
 
-def keep(path):
-    KEPT_DIR.mkdir(parents=True, exist_ok=True)
-    kept = KEPT_DIR / path.name
-    shutil.copy2(path, kept)
-    make_view(kept, 'scene', kept.with_suffix('.png'), None, 1 << 16, PREVIEW_EXPOSURE)
-
-
-def check_sky(session, check):
-    scene_path = capture(session, 'scene', 'sponza-sky-pose')
-    rgb = read_dds_rgba32f(scene_path)[..., :3]
-    keep(scene_path)
-    session.ask_ok('settings set Ray Tracing View: View=Debug: Front Face')
-    session.ask_ok(f'frames {SETTLE_FRAMES}')
-    front_face = np.asarray(Image.open(capture(session, 'overlay', 'sponza-sky-pose-front-face')).convert('RGB'))
-    session.ask_ok('settings set Ray Tracing View: View=Off')
-
-    sky = eroded(np.all(front_face == 0, axis=2), EDGE_PIXELS)
-    drawn = sky & np.any(rgb != 0.0, axis=2)
-    fraction = float(sky.mean())
-    check('[5] the raster draws no sky', not drawn.any() and fraction >= MIN_SKY_FRACTION,
-          f'{int(sky.sum())} sky pixels ({fraction:.1%} of the scene, at least {MIN_SKY_FRACTION:.0%} needed), '
-          f'{int(drawn.sum())} of them are not (0, 0, 0)')
-
-
 def check_settings(session, check):
     measured = session.ask(f'profile {SSAO_SCOPE} frames={PROFILE_FRAMES}')
     check(f'[7] profile {SSAO_SCOPE} fails because SSAO does not run', not measured['ok'], measured.get('error', measured))
@@ -240,11 +208,20 @@ def motion_blur_capture(session, enabled, name):
     return read_dds_rgba32f(capture(session, 'scene', name))[..., :3]
 
 
+def front_face_mask(session, name):
+    session.ask_ok('settings set Ray Tracing View: View=Debug: Front Face')
+    session.ask_ok(f'frames {SETTLE_FRAMES}')
+    front_face = np.asarray(Image.open(capture(session, 'overlay', name)).convert('RGB'))
+    session.ask_ok('settings set Ray Tracing View: View=Off')
+    return np.all(front_face == FRONT_FACE_COLOR, axis=2)
+
+
 def check_motion_blur(session, check):
     still = motion_blur_capture(session, False, 'sponza-motion-blur-off')
     blurred = motion_blur_capture(session, True, 'sponza-motion-blur-on')
     session.ask_ok(f'settings set Engine Tuning: {MOTION_BLUR_SETTING}=off')
-    lit = float(np.any(still != 0.0, axis=2).mean())
+    surface = front_face_mask(session, 'sponza-front-face')
+    lit = float((surface & np.any(still != 0.0, axis=2)).mean())
     same = np.array_equal(still.view(np.uint32), blurred.view(np.uint32))
     check('[13] motion blur with the camera still changes no pixel', same and lit >= MIN_LIT_FRACTION,
           f'{describe_difference(still, blurred)}; {lit:.1%} of the pixels are lit, at least {MIN_LIT_FRACTION:.0%} needed')
@@ -257,9 +234,6 @@ def run_sponza(build_first, check):
         try:
             session.ask_ok('ui hide')
             check_motion_blur(session, check)
-            session.ask_ok(f'pose {SKY_POSE}')
-            session.ask_ok(f'frames {SETTLE_FRAMES}')
-            check_sky(session, check)
             check_settings(session, check)
         finally:
             session.close()
@@ -297,7 +271,6 @@ def command_check(args):
     judge_test_scenes(runs, check)
     run_sponza(build_first, check)
     check_sources(check)
-    print(f'kept captures: {KEPT_DIR}')
     print(f'{len(check.failures)} failed' if check.failures else 'all passed')
     return 1 if check.failures else 0
 
@@ -305,7 +278,7 @@ def command_check(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     commands = parser.add_subparsers(dest='command', required=True)
-    check_parser = commands.add_parser('check', help='judge [1] ~ [5], [7], [8], [10], [13], [14] with the Debug app')
+    check_parser = commands.add_parser('check', help='judge [1] ~ [4], [7], [8], [10], [13], [14] with the Debug app')
     check_parser.add_argument('--no-build', action='store_true', help='run the Debug app as it is built')
     check_parser.set_defaults(handler=command_check)
     args = parser.parse_args()

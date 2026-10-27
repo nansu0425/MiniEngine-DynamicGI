@@ -63,6 +63,9 @@ namespace Renderer
 
     uint8_t GetPSO(uint16_t psoFlags);
     void UpdateGlobalDescriptors(void);
+    // 불투명한 면을 다 그린 뒤, 아무 면도 그리지 않은 scene color의 pixel에 camera에서 바로 보이는 sky light의 radiance (cd/m²)를 쓴다.
+    // raster는 sky light로 surface를 비추지 않으므로 이것이 raster가 sky light를 쓰는 전부다.
+    void DrawSkyBackground(GraphicsContext& gfxContext, const D3D12_VIEWPORT& viewport, const D3D12_RECT& scissor, const Math::Vector3& skyRadiance);
 
     class MeshSorter
     {

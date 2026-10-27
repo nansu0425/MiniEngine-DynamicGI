@@ -39,6 +39,8 @@
 #include "Output/Model/CompiledShaders/CutoutDepthVS.h"
 #include "Output/Model/CompiledShaders/CutoutDepthSkinVS.h"
 #include "Output/Model/CompiledShaders/CutoutDepthPS.h"
+#include "Output/Model/CompiledShaders/SkyBackgroundVS.h"
+#include "Output/Model/CompiledShaders/SkyBackgroundPS.h"
 
 #pragma warning(disable:4319) // '~': zero extending 'uint32_t' to 'uint64_t' of greater size
 
@@ -61,6 +63,7 @@ namespace Renderer
 
     RootSignature m_RootSig;
     GraphicsPSO m_DefaultPSO(L"Renderer: Default PSO"); // Not finalized.  Used as a template.
+    GraphicsPSO m_SkyBackgroundPSO(L"Renderer: Sky Background PSO");
 
     DescriptorHandle m_CommonTextures;
 }
@@ -203,6 +206,12 @@ void Renderer::Initialize(void)
     m_DefaultPSO.SetRenderTargetFormats(1, &ColorFormat, DepthFormat);
     m_DefaultPSO.SetVertexShader(g_pDefaultVS, sizeof(g_pDefaultVS));
     m_DefaultPSO.SetPixelShader(g_pDefaultPS, sizeof(g_pDefaultPS));
+
+    m_SkyBackgroundPSO = m_DefaultPSO;
+    m_SkyBackgroundPSO.SetDepthStencilState(DepthStateReadOnly);
+    m_SkyBackgroundPSO.SetVertexShader(g_pSkyBackgroundVS, sizeof(g_pSkyBackgroundVS));
+    m_SkyBackgroundPSO.SetPixelShader(g_pSkyBackgroundPS, sizeof(g_pSkyBackgroundPS));
+    m_SkyBackgroundPSO.Finalize();
 
     TextureManager::Initialize(L"");
 
@@ -398,6 +407,27 @@ uint8_t Renderer::GetPSO(uint16_t psoFlags)
     ASSERT(sm_PSOs.size() <= 256, "Ran out of room for unique PSOs");
 
     return (uint8_t)sm_PSOs.size() - 2;
+}
+
+void Renderer::DrawSkyBackground(GraphicsContext& gfxContext, const D3D12_VIEWPORT& viewport, const D3D12_RECT& scissor, const Vector3& skyRadiance)
+{
+    ScopedTimer _prof(L"Sky Background", gfxContext);
+
+    __declspec(align(16)) struct
+    {
+        Vector3 SkyRadiance;
+    } constants = { skyRadiance };
+
+    gfxContext.SetRootSignature(m_RootSig);
+    gfxContext.SetPipelineState(m_SkyBackgroundPSO);
+
+    gfxContext.TransitionResource(g_SceneDepthBuffer, D3D12_RESOURCE_STATE_DEPTH_READ);
+    gfxContext.TransitionResource(g_SceneColorBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
+    gfxContext.SetRenderTarget(g_SceneColorBuffer.GetRTV(), g_SceneDepthBuffer.GetDSV_DepthReadOnly());
+    gfxContext.SetViewportAndScissor(viewport, scissor);
+
+    gfxContext.SetDynamicConstantBufferView(kMaterialConstants, sizeof(constants), &constants);
+    gfxContext.Draw(3);
 }
 
 void MeshSorter::AddMesh( const Mesh& mesh, float distance,

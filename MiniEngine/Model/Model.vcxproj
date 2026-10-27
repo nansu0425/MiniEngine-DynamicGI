@@ -190,6 +190,12 @@
     <FxCompile Include="Renderer\DepthOnlyVS.hlsl">
       <ShaderType>Vertex</ShaderType>
     </FxCompile>
+    <FxCompile Include="Renderer\SkyBackgroundPS.hlsl">
+      <ShaderType>Pixel</ShaderType>
+    </FxCompile>
+    <FxCompile Include="Renderer\SkyBackgroundVS.hlsl">
+      <ShaderType>Vertex</ShaderType>
+    </FxCompile>
     <FxCompile Include="Sponza\DepthViewerPS.hlsl">
       <ShaderType>Pixel</ShaderType>
     </FxCompile>
