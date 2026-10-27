@@ -424,6 +424,7 @@
     <None Include="Shaders\PixelPacking_RGBE.hlsli" />
     <None Include="Shaders\PixelPacking_RGBM.hlsli" />
     <None Include="Shaders\Random.hlsli" />
+    <None Include="Shaders\LambertBrdf.hlsli" />
     <None Include="Effects\PostEffects\PostEffectsRS.hlsli" />
     <None Include="Display\PresentRS.hlsli" />
     <None Include="Shaders\ShaderUtility.hlsli" />

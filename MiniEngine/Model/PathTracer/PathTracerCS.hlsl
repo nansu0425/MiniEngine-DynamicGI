@@ -1,7 +1,7 @@
 #include "Model/Raytracing/CameraRays.hlsli"
 #include "Model/Raytracing/HitSurface.hlsli"
 #include "Model/Raytracing/SurfaceRay.hlsli"
-#include "Model/PathTracer/LambertBrdf.hlsli"
+#include "Core/Shaders/LambertBrdf.hlsli"
 #include "Core/Shaders/Random.hlsli"
 
 // PathTracer.cpp의 Constants와 같은 layout이다. 뜻은 PathTracer::Settings의 같은 이름의 값을 따른다.
