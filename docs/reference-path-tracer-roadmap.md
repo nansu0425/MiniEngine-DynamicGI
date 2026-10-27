@@ -38,10 +38,10 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 7. Directional Light (끝남: f57e319, c24314b, 648aea9, 7d8148f, c8610b9, 665bea1)
 8. glTF BRDF (끝남: 5ac463b, d9a4e3f, 77271b2)
 9. Sky Light (끝남: 63404ca, a99f3fe, 319d723, f5b807e)
-10. Log 와 Restore: 측정 조건을 Log 한 줄로 남기고, app 을 다시 실행해도 그 줄로 되돌린다. 지금의 Log 는 camera 와 directional light 만 남기므로 작업 9 의 Sky Light 를 더한다.
+10. Log 와 Restore (끝남: 773ada1, 39d9b61)
 11. Indirect Irradiance: DDGI 와 비교할 양을 누적하는 출력을 더한다.
 12. 수렴과 측정: 고정 시점에서 수렴과 bias 를 재고 ground truth 의 spp 를 정한다.
-13. Cornell box 와 외부 renderer: (a) 장면을 만들어 load 하고, (b) 외부 renderer 로 그린 image 와 비교한다. furnace 가 잡지 못하는 leak, self-hit, visibility, 방향 분포의 오류를 여기서 본다.
+13. Cornell box 와 외부 renderer: (a) 장면을 만들어 load 하고, (b) 외부 renderer 로 그린 image 와 비교한다. furnace 가 잡지 못하는 leak, self-hit, visibility, 방향 분포의 오류를 여기서 본다. `-model` 로 연 장면은 orbit camera 라서 측정 조건의 줄로 Restore 할 수 없으므로 (39d9b61), (a) 가 그 장면에서도 camera 를 되돌리게 한다.
 
 ## 일정
 
@@ -52,7 +52,7 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 | 10/24 | 끝남: 1, A, B, harness 의 D3D12 log 수집 (573dded) 과 그 log 로 찾은 Lighting 수정 (e8a2352), 문서 정리 |
 | 10/25 | 끝남: 2, 3, 4 |
 | 10/26 | 끝남: 5, 6, C, 7 |
-| 10/27 | 끝남: 8, 9. 10 |
+| 10/27 | 끝남: 8, 9, 10 |
 | 10/28 | 11, 12, 13 (a) |
 | 10/29 오전 | 13 (b) |
 | 10/29 | 발표 자료 |
