@@ -936,7 +936,7 @@ void DirectionalLight::ShowDetails()
     if (ImGui::Button("Reset Transform"))
         ResetTransform();
     ImGui::SetItemTooltip("Sets the transform to no rotation at the origin, so the light goes along world -Z. The color and intensity stay.");
-    ImGui::TextDisabled("Rotate the light with the gizmo (E). The Scene Editor panel picks local or world rings.");
+    ImGui::TextDisabled("Rotate the light with the gizmo (E). The toolbar on the scene picks local or world rings.");
 }
 
 // scripts/viewer.py가 이 이름과 형식으로 기본 model 경로를 읽는다.

@@ -24,6 +24,11 @@ namespace ImGuiLayer
     bool BeginSceneGizmo(void);
     void EndSceneGizmo(void);
 
+    // 사이에서 그린 widget은 scene 영역의 오른쪽 위에 붙은 작은 창에 보이고 입력을 받는다.
+    // UI를 숨기면 false를 반환하고, 이때는 End를 부르지 않는다.
+    bool BeginSceneToolbar(void);
+    void EndSceneToolbar(void);
+
     // F1로도 바꾼다. 숨기면 scene이 window 전체를 차지한다.
     void SetVisible(bool visible);
     bool IsVisible(void);

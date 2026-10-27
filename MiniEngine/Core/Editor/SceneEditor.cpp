@@ -17,7 +17,6 @@ namespace
     GizmoMode s_GizmoMode = GizmoMode::Translate;
     // rotate gizmo의 ring이 따르는 축. translate는 늘 world의 축이다.
     ImGuizmo::MODE s_RotateAxes = ImGuizmo::LOCAL;
-    bool s_ShowPanel = false;
     bool s_ShowHierarchy = false;
     bool s_ShowDetails = false;
 
@@ -82,26 +81,25 @@ namespace
         return axes == ImGuizmo::WORLD ? "world" : "local";
     }
 
-    void ShowPanelContent(void)
+    void ShowGizmoToolbar(void)
     {
-        ImGui::Text("Selected: %s", s_Selected != nullptr ? s_Selected->GetName() : "none");
-        ImGui::SetItemTooltip("Click an object in the Scene Hierarchy or its icon in the scene to select it. Click empty space in the scene to deselect.");
-
-        ImGui::SeparatorText("Gizmo");
         if (ImGui::RadioButton("Translate (W)", s_GizmoMode == GizmoMode::Translate))
             s_GizmoMode = GizmoMode::Translate;
+        ImGui::SetItemTooltip("Moves the selected object along the world axes.");
         ImGui::SameLine();
         if (ImGui::RadioButton("Rotate (E)", s_GizmoMode == GizmoMode::Rotate))
             s_GizmoMode = GizmoMode::Rotate;
 
-        ImGui::SeparatorText("Rotate Axes");
+        ImGui::SameLine();
+        ImGui::TextDisabled("|");
+        ImGui::SameLine();
         if (ImGui::RadioButton("Local", s_RotateAxes == ImGuizmo::LOCAL))
             s_RotateAxes = ImGuizmo::LOCAL;
-        ImGui::SetItemTooltip("The rings turn the object about its own axes.");
+        ImGui::SetItemTooltip("The rotate rings turn the object about its own axes.");
         ImGui::SameLine();
         if (ImGui::RadioButton("World", s_RotateAxes == ImGuizmo::WORLD))
             s_RotateAxes = ImGuizmo::WORLD;
-        ImGui::SetItemTooltip("The rings turn the object about the world axes.");
+        ImGui::SetItemTooltip("The rotate rings turn the object about the world axes.");
     }
 
     void ShowHierarchyContent(void)
@@ -250,7 +248,6 @@ void SceneEditor::Update(const Camera& camera)
 {
     ImGuiLayer::ShowPanel("Scene Hierarchy", s_ShowHierarchy, ShowHierarchyContent);
     ImGuiLayer::ShowPanel("Details", s_ShowDetails, ShowDetailsContent);
-    ImGuiLayer::ShowPanel("Scene Editor", s_ShowPanel, ShowPanelContent);
 
     if (!ImGuiLayer::BeginSceneGizmo())
         return;
@@ -274,6 +271,13 @@ void SceneEditor::Update(const Camera& camera)
     }
 
     ImGuiLayer::EndSceneGizmo();
+
+    // gizmo 창보다 나중에 만들어야 icon과 gizmo 위에 보인다.
+    if (ImGuiLayer::BeginSceneToolbar())
+    {
+        ShowGizmoToolbar();
+        ImGuiLayer::EndSceneToolbar();
+    }
 }
 
 void SceneEditor::RegisterCommands(const Camera& camera)
@@ -282,7 +286,7 @@ void SceneEditor::RegisterCommands(const Camera& camera)
     ControlChannel::RegisterState("editor", [projection] { return DescribeEditor(*projection); });
     ControlChannel::Register("editor", "editor select <name>|none | editor mode translate|rotate | editor axes local|world: the selected object, "
         "whose settings the Details panel shows and which the gizmo edits, the gizmo mode and the axes the rotate rings follow, "
-        "as clicking an object in the Scene Hierarchy panel or its icon, pressing W or E and the Scene Editor panel do. "
+        "as clicking an object in the Scene Hierarchy panel or its icon, pressing W or E and the toolbar at the top right of the scene do. "
         "local turns the object about its own axes and world about the world axes. translate always follows the world axes. "
         "state editor has them, and the objects in the order of the Scene Hierarchy panel, each with its world position and, in front of the camera, "
         "its icon's center in client pixels. on_screen is whether that center is in the scene. An object without an icon, "

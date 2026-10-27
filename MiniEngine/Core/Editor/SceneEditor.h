@@ -48,11 +48,11 @@ namespace SceneEditor
     void AddObject(Object& object);
     void RemoveObject(Object& object);
 
-    // camera를 이번 frame에 맞춘 뒤 ImGuiLayer::BeginFrame과 Render 사이에서 부른다. View 메뉴의 Scene Hierarchy, Details,
-    // Scene Editor panel도 그린다.
+    // camera를 이번 frame에 맞춘 뒤 ImGuiLayer::BeginFrame과 Render 사이에서 부른다. View 메뉴의 Scene Hierarchy, Details panel과
+    // scene 위의 gizmo toolbar도 그린다.
     void Update(const Math::Camera& camera);
 
-    // harness가 icon click, Scene Hierarchy panel, W, E key와 Scene Editor panel 대신 명령으로 고른 물체, gizmo mode, rotate의 축을 정하고,
+    // harness가 icon click, Scene Hierarchy panel, W, E key와 gizmo toolbar 대신 명령으로 고른 물체, gizmo mode, rotate의 축을 정하고,
     // state의 editor로 읽는다. camera는 Update에 넘기는 것과 같은 camera이고 app이 끝날 때까지 살아 있어야 한다. icon의 화면 위치를 이것으로 투영한다.
     void RegisterCommands(const Math::Camera& camera);
 

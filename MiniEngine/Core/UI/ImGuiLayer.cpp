@@ -308,6 +308,26 @@ void ImGuiLayer::EndSceneGizmo(void)
     ImGui::End();
 }
 
+bool ImGuiLayer::BeginSceneToolbar(void)
+{
+    if (!s_Visible)
+        return false;
+
+    // 왼쪽 위는 scene overlay가 쓴다.
+    const ImVec2 margin = ImGui::GetStyle().WindowPadding;
+    ImGui::SetNextWindowPos(ImVec2((float)s_SceneViewport.right - margin.x, (float)s_SceneViewport.top + margin.y), ImGuiCond_Always, ImVec2(1.0f, 0.0f));
+    ImGui::SetNextWindowBgAlpha(0.5f);
+    ImGui::Begin("##SceneToolbar", nullptr,
+        ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav);
+    return true;
+}
+
+void ImGuiLayer::EndSceneToolbar(void)
+{
+    ImGui::End();
+}
+
 void ImGuiLayer::SetVisible(bool visible)
 {
     s_Visible = visible;
