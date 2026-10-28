@@ -40,7 +40,7 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 9. Sky Light (끝남: 63404ca, a99f3fe, 319d723, f5b807e)
 10. Log 와 Restore (끝남: 773ada1, 39d9b61)
 11. Indirect Irradiance (끝남: a93d5bb)
-12. 수렴과 측정: 고정 시점에서 수렴과 bias 를 재고 ground truth 의 spp 를 정한다.
+12. 수렴과 측정 (끝남: d1ad157, 60be7ec)
 13. Cornell box 와 외부 renderer: (a) 장면을 만들어 load 하고, (b) 외부 renderer 로 그린 image 와 비교한다. furnace 가 잡지 못하는 leak, self-hit, visibility, 방향 분포의 오류를 여기서 본다. `-model` 로 연 장면은 orbit camera 라서 측정 조건의 줄로 Restore 할 수 없으므로 (39d9b61), (a) 가 그 장면에서도 camera 를 되돌리게 한다.
 
 ## 일정
@@ -53,7 +53,7 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 | 10/25 | 끝남: 2, 3, 4 |
 | 10/26 | 끝남: 5, 6, C, 7 |
 | 10/27 | 끝남: 8, 9, 10 |
-| 10/28 | 끝남: 11. 남은 것: 12, 13 (a) |
+| 10/28 | 끝남: 11, 12. 남은 것: 13 (a) |
 | 10/29 오전 | 13 (b) |
 | 10/29 | 발표 자료 |
 
@@ -104,16 +104,18 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 
 - TANGENT 가 없을 때 MikkTSpace 로 tangent 를 만드는 일 (`Specification.adoc:1759`): TANGENT 없이 normal map 을 쓰는 asset 을 처음 쓸 때. 계획은 7b3ba43 의 이 문서 작업 4 (a) 에 있다.
 - metal 의 multiple scattering (`Specification.adoc:3637` 이 권한다): rough 한 metal 의 energy 손실이 결과를 바꾸는 장면이나 RT Reflection 전. 지금은 single scattering 이라 baseColor 1, roughness 1 인 metal 이 수직에서 0.31 만 반사한다 (작업 8 의 `kept/gltf-brdf/brdf/cells.json`).
-- glTF BRDF 의 coupling table 을 grazing 에서 더 촘촘히 두는 일: E_s 의 보간 오차가 μ ≥ 0.03 에서 3.0e-4, 그 아래에서 7.3e-4 까지이고 energy 가 느는 쪽은 3.4e-4 까지다 (`scripts/gltfbrdf.py`). 작업 12 의 bias 가 grazing 에 몰릴 때
+- glTF BRDF 의 coupling table 을 grazing 에서 더 촘촘히 두는 일: E_s 의 보간 오차가 μ ≥ 0.03 에서 3.0e-4, 그 아래에서 7.3e-4 까지이고 energy 가 느는 쪽은 3.4e-4 까지다 (`scripts/gltfbrdf.py`). 작업 12 의 bias 가 grazing 에 몰릴 때. 작업 12 는 bias 를 Lambert 로만 재서 이 조건을 보지 못했다.
 - 방향에 따라 다른 sky 와 그 importance sampling, MIS: 상수 sky 로는 볼 수 없는 결과가 필요해질 때. 그때 맞는 sky 를 구하거나 만든다.
-- 상수 Sky Light 의 NEE 와 MIS: 작업 12 가 sky 에서 오는 빛 때문에 수렴이 느리다고 잴 때. 상수 sky 의 방향을 cosine 으로 고르면 pdf 가 Lambert 의 BRDF sampling 과 같아서 얻는 것이 적다. Sponza 의 실내에서는 sky 가 courtyard 로만 보이므로, 그 구멍 쪽을 고르는 portal sampling 이 있어야 효과를 볼 것이다 (추측).
+- 상수 Sky Light 의 NEE 와 MIS: 작업 12 가 sky 에서 오는 빛 때문에 수렴이 느리다고 잴 때. 작업 12 는 sky 에서 오는 빛의 몫을 따로 재지 않았다. 상수 sky 의 방향을 cosine 으로 고르면 pdf 가 Lambert 의 BRDF sampling 과 같아서 얻는 것이 적다. Sponza 의 실내에서는 sky 가 courtyard 로만 보이므로, 그 구멍 쪽을 고르는 portal sampling 이 있어야 효과를 볼 것이다 (추측).
 - emissive triangle 의 NEE: 작은 emitter 가 수렴을 막을 때
 - stratified sampler, blue noise: 수렴 시간이 문제가 될 때
-- glTF 의 caustic 이 남기는 흰 점을 줄이는 일: 작업 12 가 아래 시점에서 수렴을 재고, 흰 점이 수렴 목표를 막을 때. 햇빛이 roughness 가 0 에 가까운 texel 에서 반사되어 다른 면을 비추는 path 는 그 texel 의 NEE 로만 드물게 찾으므로, 아주 큰 sample 이 어두운 곳에 흰 점으로 남는다 (아래 값에서 한 추론). 작업 8 을 끝낼 때 복도 시점 (pose `-1479.30859 211.686859 395.723236 -1.53974497 -0.124806166`, light direction `0,0.970682025,-0.24036777`, intensity 4, Max Bounces 64, Russian roulette on, 4096 spp) 에서 잰 값:
+- 정답의 spp (Target Samples 기본값) 를 131072 에서 262144 로 올리는 일: 작업 13 이나 DDGI 비교에서 정답의 noise 가 결과를 바꿀 때. corridor 시점의 Lambert 는 131072 spp 에서 e 가 1% 에 가까스로 들어, 1% 와의 차가 e 의 표준오차와 비슷하다 (`scripts/check-convergence.py check` 의 [C2]).
+- glTF 의 caustic 이 남기는 흰 점을 줄이는 일: 작업 12 의 수렴 측정에서 흰 점이 수렴 목표를 막았으므로, 작업 12, 13 과 따로 원인을 분석하고 줄인다. 햇빛이 roughness 가 0 에 가까운 texel 에서 반사되어 다른 면을 비추는 path 는 그 texel 의 NEE 로만 드물게 찾으므로, 아주 큰 sample 이 어두운 곳에 흰 점으로 남는다 (아래 값에서 한 추론). 작업 8 을 끝낼 때 복도 시점 (pose `-1479.30859 211.686859 395.723236 -1.53974497 -0.124806166`, light direction `0,0.970682025,-0.24036777`, intensity 4, Max Bounces 64, Russian roulette on, 4096 spp) 에서 잰 값:
   - 흰 점 (8 이웃의 최대보다 0.004 넘게 밝고 2 배 이상인 pixel) 은 glTF 344 개, Lambert 27 개다. Seed 를 바꾸면 같은 자리는 42 개이고 평균은 같다.
   - sky 만 켜면 거의 사라지고, Max Bounces 1, 2, 3 (1024 spp) 에서 42, 108, 324 개다.
   - 흰 점 하나를 만든 sample 의 값은 중앙값 27, 최대 8281 이다. Lambert 의 sample 은 약 intensity / π 를 넘지 못한다.
   - 줄이는 방법의 후보는 directional light 의 angular size 와 MIS (범위 밖에서 옮겨야 한다) 와 α 하한을 올리는 일이다. sample 값을 자르는 일은 bias 가 생겨 정답에 맞지 않는다.
+  - 작업 12 의 Indirect Irradiance 에서 Lambert 는 두 시점 모두 131072 spp 에 noise 1% 안에 들었다. glTF 는 16384 spp 까지 쌓아도 1% 에 멀고, start 시점은 8192 spp 보다 16384 spp 의 noise 가 컸다. 두 시점 모두 오차의 대부분이 상위 0.1% 의 pixel 에 있다. 수치는 측정 기록의 작업 12 에 있다.
 - infra 검증 5-4 ~ 5-7 의 mode: PT 에 그 문제로 보이는 결과가 나올 때 (323e185)
 - albedo 1 의 furnace 에서 16384 번 넘게 반사하고도 escape 하지 못한 path 가 어디에 갇혔는지 보는 일 (a5060e3): 작업 13 이나 PT 에서 leak, self-hit 로 보이는 결과가 나올 때. Indirect Irradiance 의 white furnace 에서도 16 spp 중 한 pixel 의 sample 하나가 65536 번 안에 escape 하지 못했다 (a93d5bb 의 check-indirect-irradiance.py [I1]).
 - Material Lambert 의 PT export 가 같은 build 에서도 실행마다 rgb 가 4 ulp 까지 다른 원인: Lambert 의 bit 재현에 의존하는 확인 (check-gltf-brdf.py 의 [S5]) 이 실패할 때. d05ec6f 를 두 번 띄워 같은 조건으로 쌓은 export 에서 pixel 의 0.4 ~ 1.3% 가 달랐고, glTF 는 같았다. check-indirect-irradiance.py 의 [K1] 은 이 차를 허용한다. PathTracerCS.hlsl 의 LAMBERT_MATERIAL 주석이 적은 반올림 차이도 같은 원인일 수 있다 (추측).
