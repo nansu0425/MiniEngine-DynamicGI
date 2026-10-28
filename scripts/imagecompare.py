@@ -1,6 +1,6 @@
 """float image 두 장의 차와, 같은 image 의 두 추정이 같은 기대값을 갖는지를 수치로 낸다.
 
-PT 의 확인 script 와, 나중에 PT 와 다른 기능의 결과를 견주는 script 가 같은 식을 쓰도록 여기에 모은다.
+PT 의 확인 script 와, 나중에 PT 와 다른 기능의 결과를 비교하는 script 가 같은 식을 쓰도록 여기에 모은다.
 
   python scripts/imagecompare.py diff <x.dds> <reference.dds>
   python scripts/imagecompare.py agree <a0.dds> <a1.dds> <b0.dds> <b1.dds>
@@ -37,7 +37,7 @@ SELFTEST_NOISE = (0.1, 0.2)
 SELFTEST_BIAS_TO_NOISE = 0.3
 # SELFTEST_SHAPE 의 독립 Gaussian noise 에서 r 이 흔들리는 폭은 1e-3 보다 작다 (어림). seed 를 고정하므로 결과는 실행마다 같다.
 SELFTEST_TOLERANCE = 3e-3
-# bias 는 r 의 분자와 분모의 차의 제곱근이라 r 보다 흔들린다. bias / noise 로 견준다.
+# bias 는 r 의 분자와 분모의 차의 제곱근이라 r 보다 흔들린다. bias / noise 로 비교한다.
 SELFTEST_BIAS_TOLERANCE = 1e-2
 
 
