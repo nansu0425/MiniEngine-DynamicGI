@@ -39,7 +39,7 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 8. glTF BRDF (끝남: 5ac463b, d9a4e3f, 77271b2)
 9. Sky Light (끝남: 63404ca, a99f3fe, 319d723, f5b807e)
 10. Log 와 Restore (끝남: 773ada1, 39d9b61)
-11. Indirect Irradiance: DDGI 와 비교할 양을 누적하는 출력을 더한다.
+11. Indirect Irradiance (끝남: a93d5bb)
 12. 수렴과 측정: 고정 시점에서 수렴과 bias 를 재고 ground truth 의 spp 를 정한다.
 13. Cornell box 와 외부 renderer: (a) 장면을 만들어 load 하고, (b) 외부 renderer 로 그린 image 와 비교한다. furnace 가 잡지 못하는 leak, self-hit, visibility, 방향 분포의 오류를 여기서 본다. `-model` 로 연 장면은 orbit camera 라서 측정 조건의 줄로 Restore 할 수 없으므로 (39d9b61), (a) 가 그 장면에서도 camera 를 되돌리게 한다.
 
@@ -53,7 +53,7 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 | 10/25 | 끝남: 2, 3, 4 |
 | 10/26 | 끝남: 5, 6, C, 7 |
 | 10/27 | 끝남: 8, 9, 10 |
-| 10/28 | 11, 12, 13 (a) |
+| 10/28 | 끝남: 11. 남은 것: 12, 13 (a) |
 | 10/29 오전 | 13 (b) |
 | 10/29 | 발표 자료 |
 
@@ -115,7 +115,9 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
   - 흰 점 하나를 만든 sample 의 값은 중앙값 27, 최대 8281 이다. Lambert 의 sample 은 약 intensity / π 를 넘지 못한다.
   - 줄이는 방법의 후보는 directional light 의 angular size 와 MIS (범위 밖에서 옮겨야 한다) 와 α 하한을 올리는 일이다. sample 값을 자르는 일은 bias 가 생겨 정답에 맞지 않는다.
 - infra 검증 5-4 ~ 5-7 의 mode: PT 에 그 문제로 보이는 결과가 나올 때 (323e185)
-- albedo 1 의 furnace 에서 16384 번 넘게 반사하고도 escape 하지 못한 path 가 어디에 갇혔는지 보는 일 (a5060e3): 작업 13 이나 PT 에서 leak, self-hit 로 보이는 결과가 나올 때
+- albedo 1 의 furnace 에서 16384 번 넘게 반사하고도 escape 하지 못한 path 가 어디에 갇혔는지 보는 일 (a5060e3): 작업 13 이나 PT 에서 leak, self-hit 로 보이는 결과가 나올 때. Indirect Irradiance 의 white furnace 에서도 16 spp 중 한 pixel 의 sample 하나가 65536 번 안에 escape 하지 못했다 (a93d5bb 의 check-indirect-irradiance.py [I1]).
+- Material Lambert 의 PT export 가 같은 build 에서도 실행마다 rgb 가 4 ulp 까지 다른 원인: Lambert 의 bit 재현에 의존하는 확인 (check-gltf-brdf.py 의 [S5]) 이 실패할 때. d05ec6f 를 두 번 띄워 같은 조건으로 쌓은 export 에서 pixel 의 0.4 ~ 1.3% 가 달랐고, glTF 는 같았다. check-indirect-irradiance.py 의 [K1] 은 이 차를 허용한다. PathTracerCS.hlsl 의 LAMBERT_MATERIAL 주석이 적은 반올림 차이도 같은 원인일 수 있다 (추측).
+- 작업 11 의 check 를 처음 돌릴 때 Indirect Irradiance 의 white furnace (Max Bounces 65536) 를 쌓다가 app 이 exit reason 없이 끝난 원인: 다시 일어날 때. 같은 조건을 손으로 쌓을 때와 check 를 다시 돌릴 때는 재현되지 않았다.
 - PT panel 의 Export button: script 없이 사람이 PT 의 값을 export 할 일이 생길 때. 지금은 harness 의 `capture pt` 로만 export 한다 (2b33c11).
 - Engine Tuning 의 Graphics/SSAO 항목을 없애는 일: ModelViewer 는 SSAO 를 돌리지 않지만 engine 의 SSAO module 이 남아 있어 효과 없는 항목이 보인다. legacy Sponza renderer 를 지울 때 (35e8e58)
 - NaN 이나 Inf 라서 버린 sample 수를 panel 에 보이는 일: 작업 8 부터 PT 에 NaN 이나 Inf 가 생겨 사람이 실행 중에 봐야 할 때. 지금은 export 의 a 로만 센다 (2b33c11).
