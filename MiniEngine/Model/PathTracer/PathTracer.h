@@ -44,8 +44,8 @@ namespace PathTracer
         Material material = Material::kGltf;
         // pixel마다 한 frame에 더하는 sample 수
         uint32_t samplesPerFrame = 1;
-        // 이만큼 쌓으면 trace를 멈추고 평균만 보인다.
-        uint32_t targetSamples = 4096;
+        // 이만큼 쌓으면 trace를 멈추고 평균만 보인다. 기본값은 정답의 spp로, scripts/check-convergence.py의 [C2]가 정한다.
+        uint32_t targetSamples = 131072;
         // seed만 다른 두 누적은 같은 image의 서로 다른 추정이다.
         uint32_t seed = 0;
         // path가 반사하는 횟수의 상한. 0이면 처음 맞은 곳의 emission과 camera에서 바로 보이는 sky만 보고, 1이면 처음 맞은 곳에서 반사한
