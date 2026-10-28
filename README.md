@@ -49,7 +49,10 @@
 이 repo 는 MIT 로 공개한다. 그래서 `references/` 에는 이 repo 에서 자유롭게 참고할 수 있는 자료만 둔다.
 
 - 논문은 알고리즘과 수식을 참고해 구현한다. 본문과 그림은 repo 에 옮기지 않는다.
-- MIT 처럼 허용하는 license 의 코드는 가져다 쓸 수 있다. 가져온 코드에는 원래의 copyright 와 license 문구를 남긴다.
+- MIT 처럼 허용하는 license 의 코드는 가져다 쓸 수 있다. 가져온 코드는 다음처럼 표시한다.
+  - 가져온 함수나 class 의 주석에 출처 project 와 파일 경로, 원래 이름을 적고, license 는 `THIRD_PARTY_NOTICES.md` 에 있다고 적는다. 고친 점이 있으면 이어서 적는다. 예: `// Capsaicin의 src/core/src/geometry/geometry.hlsl에서 offsetPosition을 가져왔다. license는 THIRD_PARTY_NOTICES.md에 있다.` `THIRD_PARTY_NOTICES.md` 로 검색하면 가져온 코드를 모두 찾을 수 있다.
+  - copyright 와 license 문구의 전문은 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 에 출처 project 마다 한 번만 둔다. MIT 는 문구를 copy 에 포함하라고만 하고 위치는 정하지 않는다. 새 project 에서 코드를 가져오면 `THIRD_PARTY_NOTICES.md` 에 새 project 의 항목을 더한다.
+  - 파일 상단에는 license 전문을 붙이지 않는다. 파일 전체가 다른 project 에서 가져온 코드처럼 보이기 때문이다. 파일을 통째로 가져왔을 때만 원래 파일의 header 를 그대로 둔다.
 - license 가 없거나 재배포를 막는 코드는 사용하지 않는다. 코드가 구현한 idea만 참고한다.
 
 ## Rendering 기준
@@ -87,4 +90,4 @@ spec 의 doubleSided 는 camera 에서 그릴 때의 결과만 정하고, shadow
 
 ## License
 
-이 프로젝트의 작업은 MIT License 를 따른다([LICENSE](LICENSE)). upstream MiniEngine 코드는 Microsoft 의 MIT License 를 따른다([MiniEngine/License.txt](MiniEngine/License.txt)). Sponza asset 은 Cryengine Limited License Agreement 를 따르고, 그 license 표시는 받은 뒤 `MiniEngine/ModelViewer/glTF-Sample-Assets/Models/Sponza/LICENSE.md` 에 있다.
+이 프로젝트의 작업은 MIT License 를 따른다([LICENSE](LICENSE)). upstream MiniEngine 코드는 Microsoft 의 MIT License 를 따른다([MiniEngine/License.txt](MiniEngine/License.txt)). 다른 project 에서 가져온 코드의 copyright 와 license 는 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 에 있다. Sponza asset 은 Cryengine Limited License Agreement 를 따르고, 그 license 표시는 받은 뒤 `MiniEngine/ModelViewer/glTF-Sample-Assets/Models/Sponza/LICENSE.md` 에 있다.

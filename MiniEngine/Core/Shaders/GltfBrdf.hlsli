@@ -1,29 +1,5 @@
-/**********************************************************************
-Copyright (c) 2025 Advanced Micro Devices, Inc. All rights reserved.
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-********************************************************************/
-
 // glTF 2.0 metallic-roughness material의 BRDF (references/glTF의 Specification.adoc Appendix B). path tracer와 raster가 같은 함수로
-// 평가한다. scripts/gltfbrdf.py가 같은 BRDF를 float64로 계산하고, scripts/check-gltf-brdf.py가 GPU에서 이 함수를 돌려 그 값과 견준다.
-// Capsaicin (references/manifest.json의 commit)의 src/core/src/materials/material_sampling.hlsl에서 sampleGGXVNDFSphericalCap을 가져왔다.
-// 고친 점: 이름을 SampleVisibleMicrofacetNormal로 바꿨고 2 * PI를 풀어 썼다.
+// 평가한다. scripts/gltfbrdf.py가 같은 BRDF를 float64로 계산하고, scripts/check-gltf-brdf.py가 GPU에서 이 함수를 돌려 그 값과 비교한다.
 
 #ifndef __GLTF_BRDF_HLSLI__
 #define __GLTF_BRDF_HLSLI__
@@ -178,6 +154,8 @@ float3 EvaluateGltfBrdf(GltfBrdfInput input, float3 light)
 
 // Sampling Visible GGX Normals with Spherical Caps - Jonathan Dupuy and Anis Benyoub 2023
 // https://doi.org/10.1111/cgf.14867
+// Capsaicin의 src/core/src/materials/material_sampling.hlsl에서 sampleGGXVNDFSphericalCap을 가져왔다. license는 THIRD_PARTY_NOTICES.md에 있다.
+// 고친 점: 이름을 SampleVisibleMicrofacetNormal로 바꿨고 2 * PI를 풀어 썼다.
 // localView는 normal이 +z인 공간의 view이고 z ≥ 0이다. samples는 [0, 1)의 두 수다.
 float3 SampleVisibleMicrofacetNormal(float roughnessAlpha, float3 localView, float2 samples)
 {

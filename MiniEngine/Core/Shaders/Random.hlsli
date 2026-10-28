@@ -1,32 +1,10 @@
-/**********************************************************************
-Copyright (c) 2025 Advanced Micro Devices, Inc. All rights reserved.
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-********************************************************************/
-
-// Capsaicin (references/manifest.json의 commit)의 src/core/src/components/random_number_generator/random_number_generator.hlsl에서 Random을 가져왔다.
-// 고친 점: CPU가 채운 seed buffer를 읽는 MakeRandom 대신, seed와 pixel과 sample 번호를 PCG hash로 섞어 state 하나를 만드는 MakeRandom을 쓴다.
-// 그래서 같은 seed, pixel, sample 번호는 frame이나 실행이 달라도 같은 수열을 낸다. 쓰지 않는 randInt(max)와 rand3은 가져오지 않았다.
-
 #ifndef __RANDOM_HLSLI__
 #define __RANDOM_HLSLI__
 
+// Capsaicin의 src/core/src/components/random_number_generator/random_number_generator.hlsl에서 Random을 가져왔다.
+// license는 THIRD_PARTY_NOTICES.md에 있다.
+// 고친 점: CPU가 채운 seed buffer를 읽는 MakeRandom 대신, seed와 pixel과 sample 번호를 PCG hash로 섞어 state 하나를 만드는 MakeRandom을 쓴다.
+// 그래서 같은 seed, pixel, sample 번호는 frame이나 실행이 달라도 같은 수열을 낸다. 쓰지 않는 randInt(max)와 rand3은 가져오지 않았다.
 class Random
 {
     uint rngState;
