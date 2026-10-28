@@ -26,8 +26,19 @@ namespace
     bool s_Show = false;
     PathTracer::Settings s_Settings;
 
-    // PathTracer::Material의 순서이고, editor.ini와 settings 명령이 이 이름으로 읽고 쓴다.
+    // PathTracer::Output과 PathTracer::Material의 순서이고, editor.ini, settings 명령, 측정 조건의 줄이 이 이름으로 읽고 쓴다.
+    const char* kOutputNames[] = { "Radiance", "Indirect Irradiance" };
     const char* kMaterialNames[] = { "glTF", "Lambert" };
+
+    template <typename Enum, size_t Count>
+    bool ReadName(const std::string& text, const char* const (&names)[Count], Enum& value)
+    {
+        const auto name = std::find(std::begin(names), std::end(names), text);
+        if (name == std::end(names))
+            return false;
+        value = (Enum)(name - std::begin(names));
+        return true;
+    }
 
     // pt wait samples=<n>이 기다리는 sample 수와 그 응답
     struct SampleWait
@@ -54,6 +65,13 @@ namespace
     {
         ImGui::Checkbox("Show", &s_Show);
         ImGui::SetItemTooltip("Draws the path tracer over the raster scene before post effects. Off, it stops accumulating and keeps what it has.");
+
+        int output = (int)s_Settings.output;
+        if (ImGui::Combo("Output", &output, kOutputNames, IM_ARRAYSIZE(kOutputNames)))
+            s_Settings.output = (PathTracer::Output)output;
+        ImGui::SetItemTooltip("Radiance reaches the camera through each pixel. Indirect Irradiance is what DDGI compares with: the irradiance "
+            "at the surface seen through the pixel center, without its own emission and the directional light it gets directly. It shows "
+            "irradiance / pi, and with Lambert it follows only the paths DDGI computes.");
 
         int material = (int)s_Settings.material;
         if (ImGui::Combo("Material", &material, kMaterialNames, IM_ARRAYSIZE(kMaterialNames)))
@@ -116,6 +134,7 @@ namespace
     void SaveSettings(EditorSettings::Values& values)
     {
         values["Show"] = FormatFlag(s_Show);
+        values["Output"] = kOutputNames[(int)s_Settings.output];
         values["Material"] = kMaterialNames[(int)s_Settings.material];
         values["Samples per Frame"] = std::to_string(s_Settings.samplesPerFrame);
         values["Target Samples"] = std::to_string(s_Settings.targetSamples);
@@ -143,16 +162,12 @@ namespace
             value = read;
     }
 
-    void ReadMaterial(const EditorSettings::Values& values, PathTracer::Material& material)
+    template <typename Enum, size_t Count>
+    void ReadName(const EditorSettings::Values& values, const char* key, const char* const (&names)[Count], Enum& value)
     {
-        const auto text = values.find("Material");
-        if (text == values.end())
-            return;
-        for (int index = 0; index < IM_ARRAYSIZE(kMaterialNames); ++index)
-        {
-            if (text->second == kMaterialNames[index])
-                material = (PathTracer::Material)index;
-        }
+        const auto text = values.find(key);
+        if (text != values.end())
+            ReadName(text->second, names, value);
     }
 
     void ReadFloat(const EditorSettings::Values& values, const char* key, float& value)
@@ -166,7 +181,8 @@ namespace
     void LoadSettings(const EditorSettings::Values& values)
     {
         ReadFlag(values, "Show", s_Show);
-        ReadMaterial(values, s_Settings.material);
+        ReadName(values, "Output", kOutputNames, s_Settings.output);
+        ReadName(values, "Material", kMaterialNames, s_Settings.material);
         ReadUInt(values, "Samples per Frame", s_Settings.samplesPerFrame);
         ReadUInt(values, "Target Samples", s_Settings.targetSamples);
         ReadUInt(values, "Seed", s_Settings.seed);
@@ -183,6 +199,7 @@ namespace
     // 담는다. 값은 editor.ini와 같은 형식으로 쓴다.
     void DescribeConditions(MeasurementConditions::Values& values)
     {
+        values["pt output"] = kOutputNames[(int)s_Settings.output];
         values["pt material"] = kMaterialNames[(int)s_Settings.material];
         values["pt seed"] = std::to_string(s_Settings.seed);
         values["pt max bounces"] = std::to_string(s_Settings.maxBounces);
@@ -210,12 +227,8 @@ namespace
 
         PathTracer::Settings settings = s_Settings;
         uint32_t samples = 0;
-        ReadValue(values, "pt material", reading, [&settings](const std::string& text)
-        {
-            const auto name = std::find(std::begin(kMaterialNames), std::end(kMaterialNames), text);
-            settings.material = (PathTracer::Material)(name - std::begin(kMaterialNames));
-            return name != std::end(kMaterialNames);
-        });
+        ReadValue(values, "pt output", reading, [&settings](const std::string& text) { return ReadName(text, kOutputNames, settings.output); });
+        ReadValue(values, "pt material", reading, [&settings](const std::string& text) { return ReadName(text, kMaterialNames, settings.material); });
         ReadValue(values, "pt seed", reading, [&settings](const std::string& text) { return ReadUInt(text, settings.seed); });
         ReadValue(values, "pt max bounces", reading, [&settings](const std::string& text)
         {

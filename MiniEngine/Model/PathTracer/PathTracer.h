@@ -17,6 +17,18 @@ namespace Math
 // 누적한 평균이 서로 다른 image의 sample을 섞지 않도록, image를 정하는 조건이 쌓을 때와 달라지면 처음부터 다시 쌓는다.
 namespace PathTracer
 {
+    enum class Output
+    {
+        kRadiance,
+        // DDGI가 같은 시점에서 비교할 irradiance (lux). raster는 처음 맞은 점의 emission과, 그 점이 directional light에서 바로 받는 빛을
+        // 직접 구하므로 이 둘을 뺀다. 그 점의 BRDF도 raster가 곱하므로 곱하지 않는다. pixel 중심을 쏘는 것은 TAA를 끈 raster가 그 점에서
+        // shading하기 때문이다.
+        // Material Lambert로 쌓은 값을 DDGI가 계산하는 path로 정의한다. DDGI가 probe ray가 맞은 곳을 albedo가 baseColor x (1 - metallic)인
+        // Lambert로 shading한다고 보았다. 그러면 DDGI와 Material glTF의 차가 DDGI의 정확도 (DDGI - Lambert)와 DDGI가 계산하지 않는 path의
+        // 몫 (Lambert - glTF)으로 나뉜다.
+        kIndirectIrradiance,
+    };
+
     // 반사의 BRDF. Material마다 따로 compile한 shader로 그린다 (PathTracerCS.hlsl의 LAMBERT_MATERIAL).
     enum class Material
     {
@@ -28,6 +40,7 @@ namespace PathTracer
 
     struct Settings
     {
+        Output output = Output::kRadiance;
         Material material = Material::kGltf;
         // pixel마다 한 frame에 더하는 sample 수
         uint32_t samplesPerFrame = 1;

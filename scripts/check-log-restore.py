@@ -47,14 +47,15 @@ KEPT_DIR = HARNESS_DIR / 'kept' / 'log-restore'
 SAMPLES = 16
 WAIT_TIMEOUT = 900
 
-# A 는 작업 8 이 흰 점을 잰 복도의 시점이다. Max Bounces 를 줄이고 Russian roulette 를 꺼, 끈 경우의 path 를 짧게 둔다.
+# A 는 작업 8 이 흰 점을 잰 복도의 시점이다. Max Bounces 를 줄이고 Russian roulette 를 꺼, 끈 경우의 path 를 짧게 둔다. Output 은
+# Indirect Irradiance 로 두어 [G2b] 가 그 image 의 재현도 본다.
 LINE_A = {
     'pose': '-1479.30859 211.686859 395.723236 -1.53974497 -0.124806166',
     'light': 'elevation=40 azimuth=200 color=0.5,0.75,1 intensity=3',
     'sky': 'Color=0.75,0.5,1; Intensity=0.5',
     'taa': 'off',
-    'path tracer': {'Material': 'glTF', 'Seed': 7, 'Max Bounces': 8, 'Russian Roulette': 0, 'Geometric Normals': 1, 'Furnace': 0,
-                    'Furnace Albedo': 0.75, 'Furnace Emission': 0.25},
+    'path tracer': {'Output': 'Indirect Irradiance', 'Material': 'glTF', 'Seed': 7, 'Max Bounces': 8, 'Russian Roulette': 0,
+                    'Geometric Normals': 1, 'Furnace': 0, 'Furnace Albedo': 0.75, 'Furnace Emission': 0.25},
     'samples': SAMPLES,
 }
 # A 와 모든 조건이 다르다.
@@ -63,8 +64,8 @@ LINE_B = {
     'light': 'elevation=20 azimuth=10 color=1,0.5,0.25 intensity=5',
     'sky': 'Color=1,1,0.5; Intensity=2',
     'taa': 'on',
-    'path tracer': {'Material': 'Lambert', 'Seed': 2, 'Max Bounces': 16, 'Russian Roulette': 1, 'Geometric Normals': 0, 'Furnace': 1,
-                    'Furnace Albedo': 0.5, 'Furnace Emission': 0.5},
+    'path tracer': {'Output': 'Radiance', 'Material': 'Lambert', 'Seed': 2, 'Max Bounces': 16, 'Russian Roulette': 1,
+                    'Geometric Normals': 0, 'Furnace': 1, 'Furnace Albedo': 0.5, 'Furnace Emission': 0.5},
     'samples': 4,
 }
 TAA = 'Graphics/AA/TAA/Enable'
@@ -74,8 +75,8 @@ CONDITION_STATE = ['camera', 'light', 'sky', 'settings.Engine Tuning', 'settings
 # light direction 의 값은 그 줄의 light up 과 직교하지 않는다.
 OUT_OF_RANGE = [('camera', '1,2'), ('heading', '1.5abc'), ('pitch', '0.1,0'), ('light direction', '0,0,1'), ('light color', '1.5,0,0'),
                 ('light intensity', '-1'), ('light intensity', 'inf'), ('sky color', '1,1'), ('sky intensity', 'nan'), ('sky intensity', '-1'),
-                ('pt material', 'gltf'), ('pt seed', '-1'), ('pt max bounces', '65537'), ('pt russian roulette', '2'), ('pt furnace', 'on'),
-                ('pt geometric normals', ''), ('pt furnace albedo', '1.5'), ('pt furnace albedo', 'nan'), ('pt furnace emission', 'inf'), ('pt samples', '1048577'),
+                ('pt output', 'radiance'), ('pt material', 'gltf'), ('pt seed', '-1'), ('pt max bounces', '65537'), ('pt russian roulette', '2'),
+                ('pt furnace', 'on'), ('pt geometric normals', ''), ('pt furnace albedo', '1.5'), ('pt furnace albedo', 'nan'), ('pt furnace emission', 'inf'), ('pt samples', '1048577'),
                 ('size', '1920x'), ('taa', 'maybe')]
 
 

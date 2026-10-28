@@ -27,8 +27,9 @@ SKY_COLOR = f'{SKY_LIGHT_SECTION}: Color'
 SKY_RADIANCE = f'{SKY_LIGHT_SECTION}: Intensity'
 
 # 작업 5 ~ 7 의 기준과 측정 기록은 Lambert 로 정했으므로 Material 을 Lambert 로 둔다. glTF BRDF 의 확인은 check-gltf-brdf.py 가 한다.
-BASE = {'Show': 1, 'Material': 'Lambert', 'Samples per Frame': 1, 'Seed': 0, SKY_COLOR: '1,1,1', SKY_RADIANCE: 1, 'Max Bounces': 64,
-        'Russian Roulette': 1, 'Geometric Normals': 0, 'Furnace': 0, 'Furnace Albedo': 1, 'Furnace Emission': 0}
+# 작업 5 ~ 10 의 기준은 Radiance 로 정했으므로 Output 을 Radiance 로 둔다. Indirect Irradiance 의 확인은 check-indirect-irradiance.py 가 한다.
+BASE = {'Show': 1, 'Output': 'Radiance', 'Material': 'Lambert', 'Samples per Frame': 1, 'Seed': 0, SKY_COLOR: '1,1,1', SKY_RADIANCE: 1,
+        'Max Bounces': 64, 'Russian Roulette': 1, 'Geometric Normals': 0, 'Furnace': 0, 'Furnace Albedo': 1, 'Furnace Emission': 0}
 WHITE_FURNACE = BASE | {'Furnace': 1, 'Furnace Albedo': 1, 'Furnace Emission': 0, 'Geometric Normals': 1,
                         'Max Bounces': WHITE_FURNACE_BOUNCES, 'Russian Roulette': 0}
 # 해는 어디서나 emission / (1 - albedo) = Sky Light 의 radiance = 1 이다.
