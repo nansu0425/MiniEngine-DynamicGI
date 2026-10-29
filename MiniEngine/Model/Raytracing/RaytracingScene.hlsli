@@ -132,20 +132,25 @@ HitTriangle GetHitTriangle(uint instanceIndex, uint geometryIndex, uint primitiv
     return hitTriangle;
 }
 
-// ray에는 화면 미분이 없으므로 mip 0을 읽는다.
-float4 SampleMaterialTexture(HitTriangle hitTriangle, uint texture)
+// ray에는 화면 미분이 없어 맞은 곳의 footprint를 모르므로, 따로 정한 query 밖에서는 가장 선명한 mip 0을 읽는다.
+static const float kSharpestTextureLod = 0.0;
+
+// lod는 읽을 mip이다.
+float4 SampleMaterialTexture(HitTriangle hitTriangle, uint texture, float lod)
 {
     const float2 uv = ((hitTriangle.material.flags >> texture) & 1) != 0 ? hitTriangle.uv1 : hitTriangle.uv0;
     return SceneTextures[NonUniformResourceIndex(hitTriangle.geometry.textures + texture)]
-        .SampleLevel(SceneSamplers[NonUniformResourceIndex(hitTriangle.geometry.samplers + texture)], uv, 0.0);
+        .SampleLevel(SceneSamplers[NonUniformResourceIndex(hitTriangle.geometry.samplers + texture)], uv, lod);
 }
 
 // glTF처럼 base color의 alpha가 alpha cutoff 이상인 곳만 ray를 막는다.
 // OPAQUE flag가 없는 BLAS geometry는 alpha test material뿐이므로 traversal 중의 candidate는 모두 이 판정을 받는다.
+// alpha test는 shading을 다른 mip으로 하는 query (SurfaceShading.hlsli의 kProbeHitTextureLod)에서도 mip 0으로 본다. 그래서 probe hit의
+// ray도 다른 ray와 같은 면을 맞는다. G3D의 probe ray가 alpha test를 어느 mip으로 하는지는 확인하지 않았고, mip 0은 이 repo의 전제다.
 bool IsOpaqueAt(uint instanceIndex, uint geometryIndex, uint primitiveIndex, float2 barycentrics)
 {
     const HitTriangle hitTriangle = GetHitTriangle(instanceIndex, geometryIndex, primitiveIndex, barycentrics);
-    const float alpha = hitTriangle.material.baseColorFactor.a * SampleMaterialTexture(hitTriangle, kBaseColorTexture).a;
+    const float alpha = hitTriangle.material.baseColorFactor.a * SampleMaterialTexture(hitTriangle, kBaseColorTexture, kSharpestTextureLod).a;
     return alpha >= f16tof32(hitTriangle.material.flags >> 16);
 }
 

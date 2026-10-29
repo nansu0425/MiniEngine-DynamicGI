@@ -28,7 +28,7 @@ namespace
 
     // PathTracer::Output과 PathTracer::Material의 순서이고, editor.ini, settings 명령, 측정 조건의 줄이 이 이름으로 읽고 쓴다.
     const char* kOutputNames[] = { "Radiance", "Indirect Irradiance" };
-    const char* kMaterialNames[] = { "glTF", "Lambert" };
+    const char* kMaterialNames[] = { "glTF", "Lambert", "DDGI Probe Hit" };
 
     template <typename Enum, size_t Count>
     bool ReadName(const std::string& text, const char* const (&names)[Count], Enum& value)
@@ -71,13 +71,16 @@ namespace
             s_Settings.output = (PathTracer::Output)output;
         ImGui::SetItemTooltip("Radiance reaches the camera through each pixel. Indirect Irradiance is what DDGI compares with: the irradiance "
             "at the surface seen through the pixel center, without its own emission and the directional light it gets directly. It shows "
-            "irradiance / pi, and with Lambert it follows only the paths DDGI computes.");
+            "irradiance / pi. With DDGI Probe Hit it differs from DDGI only in how the irradiance is found, so their difference is the error "
+            "of the DDGI irradiance, and its difference from glTF is the error of the probe hit shading against the answer.");
 
         int material = (int)s_Settings.material;
         if (ImGui::Combo("Material", &material, kMaterialNames, IM_ARRAYSIZE(kMaterialNames)))
             s_Settings.material = (PathTracer::Material)material;
         ImGui::SetItemTooltip("glTF reflects by the glTF metallic-roughness BRDF, the answer to compare with. Lambert reflects diffusely "
-            "with albedo base color x (1 - metallic), so the furnaces have answers to the bit.");
+            "with albedo base color x (1 - metallic), so the furnaces have answers to the bit. DDGI Probe Hit shades the points a path hits, "
+            "but the first one in Indirect Irradiance, as DDGI shades its probe ray hits: textures at a fixed mip, a diffuse albedo with the "
+            "glossy part added, the raster's shadow map and an indirect scale.");
 
         const uint32_t step = 1;
         ImGui::InputScalar("Samples per Frame", ImGuiDataType_U32, &s_Settings.samplesPerFrame, &step);
@@ -383,9 +386,12 @@ void PathTracerPanel::Update(void)
 
 void PathTracerPanel::Render(ComputeContext& context, const Math::Camera& camera, const D3D12_VIEWPORT& rasterViewport,
     const RaytracingScene& scene, const Math::Vector3& lightDirection, const Math::Vector3& lightIlluminance, const Math::Vector3& skyRadiance,
-    ColorBuffer& sceneColor)
+    ShadowBuffer& shadowMap, const Math::Matrix4& shadowMatrix, ColorBuffer& sceneColor)
 {
     if (s_Show)
-        PathTracer::Render(context, s_Settings, camera, rasterViewport, scene, lightDirection, lightIlluminance, skyRadiance, sceneColor);
+    {
+        PathTracer::Render(context, s_Settings, camera, rasterViewport, scene, lightDirection, lightIlluminance, skyRadiance, shadowMap,
+            shadowMatrix, sceneColor);
+    }
     PathTracer::Capture(context);
 }

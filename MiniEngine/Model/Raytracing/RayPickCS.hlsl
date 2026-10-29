@@ -60,7 +60,7 @@ void main(uint index : SV_DispatchThreadID)
     result.alphaTest = IsDecidedByAlphaTest(ray, kCullSingleSidedBackFaces, rayHit, hit);
     if (rayHit)
     {
-        const HitSurface surface = GetHitSurface(hit);
+        const HitSurface surface = GetHitSurface(hit, kSharpestTextureLod);
         result.hit = 1;
         result.distance = hit.t;
         result.depth = hit.t * dot(ray.Direction, CameraForward);

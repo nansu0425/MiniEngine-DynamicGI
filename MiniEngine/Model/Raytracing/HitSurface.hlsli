@@ -38,7 +38,8 @@ float3 ObjectToWorldNormal(RayHit hit, float3 normal)
     return normalize(mul(normal, (float3x3)hit.worldToObject));
 }
 
-HitSurface GetHitSurface(RayHit hit)
+// textureLod는 material texture를 읽는 mip이다. 따로 정한 query 밖에서는 kSharpestTextureLod다.
+HitSurface GetHitSurface(RayHit hit, float textureLod)
 {
     const HitTriangle hitTriangle = GetHitTriangle(hit.instanceIndex, hit.geometryIndex, hit.primitiveIndex, hit.barycentrics);
     const BLASGeometry geometry = hitTriangle.geometry;
@@ -55,11 +56,11 @@ HitSurface GetHitSurface(RayHit hit)
     surface.position = mul(hit.objectToWorld, float4(p0 * weights.x + p1 * weights.y + p2 * weights.z, 1.0));
     surface.uv0 = hitTriangle.uv0;
 
-    surface.baseColor = material.baseColorFactor * SampleMaterialTexture(hitTriangle, kBaseColorTexture);
-    const float2 metallicRoughness = float2(material.metallicFactor, material.roughnessFactor) * SampleMaterialTexture(hitTriangle, kMetallicRoughnessTexture).bg;
+    surface.baseColor = material.baseColorFactor * SampleMaterialTexture(hitTriangle, kBaseColorTexture, textureLod);
+    const float2 metallicRoughness = float2(material.metallicFactor, material.roughnessFactor) * SampleMaterialTexture(hitTriangle, kMetallicRoughnessTexture, textureLod).bg;
     surface.metallic = metallicRoughness.x;
     surface.roughness = metallicRoughness.y;
-    surface.emissive = material.emissiveFactor * SampleMaterialTexture(hitTriangle, kEmissiveTexture).rgb;
+    surface.emissive = material.emissiveFactor * SampleMaterialTexture(hitTriangle, kEmissiveTexture, textureLod).rgb;
 
     float3 normal = ObjectToWorldNormal(hit, InterpolateSignedR10G10B10A2(data, vertexAddresses, geometry.normalOffset, weights).xyz);
     if (geometry.tangentOffset != 0)
@@ -69,7 +70,7 @@ HitSurface GetHitSurface(RayHit hit)
         const float3 worldTangent = normalize(mul((float3x3)hit.objectToWorld, tangent.xyz));
         const float3 worldBitangent = normalize(cross(normal, worldTangent)) * tangent.w;
 
-        float3 textureNormal = SampleMaterialTexture(hitTriangle, kNormalTexture).xyz * 2.0 - 1.0;
+        float3 textureNormal = SampleMaterialTexture(hitTriangle, kNormalTexture, textureLod).xyz * 2.0 - 1.0;
         textureNormal = normalize(textureNormal * float3(material.normalTextureScale, material.normalTextureScale, 1.0));
         normal = normalize(mul(textureNormal, float3x3(worldTangent, worldBitangent, normal)));
     }

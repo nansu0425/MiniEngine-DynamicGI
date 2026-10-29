@@ -239,6 +239,12 @@
     <FxCompile Include="PathTracer\PathTracerLambertIrradianceCS.hlsl">
       <ShaderModel>6.5</ShaderModel>
     </FxCompile>
+    <FxCompile Include="PathTracer\PathTracerProbeHitCS.hlsl">
+      <ShaderModel>6.5</ShaderModel>
+    </FxCompile>
+    <FxCompile Include="PathTracer\PathTracerProbeHitIrradianceCS.hlsl">
+      <ShaderModel>6.5</ShaderModel>
+    </FxCompile>
     <FxCompile Include="PathTracer\BrdfTestCS.hlsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -8,12 +8,16 @@
 #include "Core/Graphics/GraphicsCore.h"
 #include "Core/Graphics/Command/CommandContext.h"
 #include "Core/Graphics/Command/CommandListManager.h"
+#include "Core/Graphics/GraphicsCommon.h"
 #include "Core/Graphics/Resource/ColorBuffer.h"
+#include "Core/Graphics/Resource/ShadowBuffer.h"
 
 #include "Output/Model/CompiledShaders/PathTracerCS.h"
 #include "Output/Model/CompiledShaders/PathTracerLambertCS.h"
 #include "Output/Model/CompiledShaders/PathTracerIrradianceCS.h"
 #include "Output/Model/CompiledShaders/PathTracerLambertIrradianceCS.h"
+#include "Output/Model/CompiledShaders/PathTracerProbeHitCS.h"
+#include "Output/Model/CompiledShaders/PathTracerProbeHitIrradianceCS.h"
 
 #include <algorithm>
 
@@ -22,17 +26,20 @@ using namespace Graphics;
 
 namespace
 {
-    enum RootParameter { kConstants, kScene, kOutputs = kScene + RaytracingScene::kNumRootParameters, kNumRootParameters };
+    enum RootParameter { kConstants, kScene, kOutputs = kScene + RaytracingScene::kNumRootParameters, kShadowMap, kNumRootParameters };
     RootSignature s_RootSignature;
     // [PathTracer::Output][PathTracer::Material] 순서다.
-    ComputePSO s_PSOs[][2] = {
-        { ComputePSO(L"Path Tracer glTF"), ComputePSO(L"Path Tracer Lambert") },
-        { ComputePSO(L"Path Tracer Indirect Irradiance glTF"), ComputePSO(L"Path Tracer Indirect Irradiance Lambert") },
+    ComputePSO s_PSOs[][3] = {
+        { ComputePSO(L"Path Tracer glTF"), ComputePSO(L"Path Tracer Lambert"), ComputePSO(L"Path Tracer DDGI Probe Hit") },
+        { ComputePSO(L"Path Tracer Indirect Irradiance glTF"), ComputePSO(L"Path Tracer Indirect Irradiance Lambert"),
+            ComputePSO(L"Path Tracer Indirect Irradiance DDGI Probe Hit") },
     };
 
     // PathTracerCS.hlsl의 u register 순서다.
     enum UAV { kAccumulationUAV, kSceneColorUAV, kNumUAVs };
     SceneHeapTable s_UAVs;
+    // PathTracerCS.hlsl의 ShadowMap
+    SceneHeapTable s_ShadowMapSRV;
     ColorBuffer s_Accumulation;
 
     // 누적한 image를 정하는 조건
@@ -44,6 +51,8 @@ namespace
         Vector3 lightDirection;
         Vector3 lightIlluminance;
         Vector3 skyRadiance;
+        // Material DDGI Probe Hit가 읽는 shadow map을 그린 shadow camera. model은 바뀌지 않으므로 shadow camera가 shadow map을 정한다.
+        Matrix4 shadowMatrix;
     };
 
     // Settings의 samplesPerFrame과 targetSamples는 쌓는 속도와 양만 정하므로 비교하지 않는다.
@@ -63,7 +72,9 @@ namespace
             XMVector3Equal(a.rays.pixelStepRight, b.rays.pixelStepRight) &&
             XMVector3Equal(a.rays.pixelStepDown, b.rays.pixelStepDown) &&
             XMVector3Equal(a.lightDirection, b.lightDirection) && XMVector3Equal(a.lightIlluminance, b.lightIlluminance) &&
-            XMVector3Equal(a.skyRadiance, b.skyRadiance) && HaveSameImage(a.settings, b.settings);
+            XMVector3Equal(a.skyRadiance, b.skyRadiance) && XMVector4Equal(a.shadowMatrix.GetX(), b.shadowMatrix.GetX()) &&
+            XMVector4Equal(a.shadowMatrix.GetY(), b.shadowMatrix.GetY()) && XMVector4Equal(a.shadowMatrix.GetZ(), b.shadowMatrix.GetZ()) &&
+            XMVector4Equal(a.shadowMatrix.GetW(), b.shadowMatrix.GetW()) && HaveSameImage(a.settings, b.settings);
     }
 
     bool s_ResetRequested = true;
@@ -89,6 +100,8 @@ namespace
         Vector3 LightDirection;
         Vector3 LightIlluminance;
         Vector3 SkyRadiance;
+        // raster의 GlobalConstants처럼 Matrix4를 그대로 담고, HLSL은 mul(ShadowMatrix, position)으로 쓴다.
+        Matrix4 ShadowMatrix;
     };
 
     // SceneHeapTable.h의 규칙대로, 앞 frame의 dispatch가 읽고 있을 수 있는 buffer는 GPU를 기다린 뒤에 다시 만든다.
@@ -105,19 +118,24 @@ namespace
 
 void PathTracer::Initialize(void)
 {
-    s_RootSignature.Reset(kNumRootParameters);
+    s_RootSignature.Reset(kNumRootParameters, 1);
     s_RootSignature[kConstants].InitAsConstantBuffer(0);
     RaytracingScene::InitRootParameters(s_RootSignature, kScene);
     s_RootSignature[kOutputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, kNumUAVs);
+    s_RootSignature[kShadowMap].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 1);
+    // PathTracerCS.hlsl의 ShadowMapSampler는 raster의 Renderer와 같은 shadow map 비교 sampler다.
+    s_RootSignature.InitStaticSampler(0, SamplerShadowDesc);
     s_RootSignature.Finalize(L"Path Tracer");
 
     ComputePSO* radiance = s_PSOs[(int)Output::kRadiance];
     radiance[(int)Material::kGltf].SetComputeShader(g_pPathTracerCS, sizeof(g_pPathTracerCS));
     radiance[(int)Material::kLambert].SetComputeShader(g_pPathTracerLambertCS, sizeof(g_pPathTracerLambertCS));
+    radiance[(int)Material::kProbeHit].SetComputeShader(g_pPathTracerProbeHitCS, sizeof(g_pPathTracerProbeHitCS));
     ComputePSO* irradiance = s_PSOs[(int)Output::kIndirectIrradiance];
     irradiance[(int)Material::kGltf].SetComputeShader(g_pPathTracerIrradianceCS, sizeof(g_pPathTracerIrradianceCS));
     irradiance[(int)Material::kLambert].SetComputeShader(g_pPathTracerLambertIrradianceCS, sizeof(g_pPathTracerLambertIrradianceCS));
-    for (ComputePSO (&materials)[2] : s_PSOs)
+    irradiance[(int)Material::kProbeHit].SetComputeShader(g_pPathTracerProbeHitIrradianceCS, sizeof(g_pPathTracerProbeHitIrradianceCS));
+    for (ComputePSO (&materials)[3] : s_PSOs)
     {
         for (ComputePSO& pso : materials)
         {
@@ -127,6 +145,7 @@ void PathTracer::Initialize(void)
     }
 
     s_UAVs.Create(kNumUAVs);
+    s_ShadowMapSRV.Create(1);
 }
 
 void PathTracer::Shutdown(void)
@@ -145,14 +164,16 @@ PathTracer::Progress PathTracer::GetProgress(void)
 }
 
 void PathTracer::Render(ComputeContext& context, const Settings& settings, const Camera& camera, const D3D12_VIEWPORT& rasterViewport,
-    const RaytracingScene& scene, const Vector3& lightDirection, const Vector3& lightIlluminance, const Vector3& skyRadiance, ColorBuffer& sceneColor)
+    const RaytracingScene& scene, const Vector3& lightDirection, const Vector3& lightIlluminance, const Vector3& skyRadiance,
+    ShadowBuffer& shadowMap, const Matrix4& shadowMatrix, ColorBuffer& sceneColor)
 {
     ScopedTimer _prof(L"Path Tracer", context);
 
     FitAccumulationTo(sceneColor);
 
     // 변경을 알려 주는 곳이 없으므로 쌓던 때의 조건과 견준다. Show를 끈 동안 바뀐 조건도 다시 켤 때 잡힌다.
-    const ImageConditions conditions = { DescribeCameraRays(camera, rasterViewport), settings, lightDirection, lightIlluminance, skyRadiance };
+    const ImageConditions conditions = { DescribeCameraRays(camera, rasterViewport), settings, lightDirection, lightIlluminance, skyRadiance,
+        shadowMatrix };
     if (s_ResetRequested || !HaveSameImage(conditions, s_Accumulated))
     {
         s_Accumulated = conditions;
@@ -176,17 +197,21 @@ void PathTracer::Render(ComputeContext& context, const Settings& settings, const
     constants.LightDirection = lightDirection;
     constants.LightIlluminance = lightIlluminance;
     constants.SkyRadiance = skyRadiance;
+    constants.ShadowMatrix = shadowMatrix;
 
     s_UAVs.PointTo(kAccumulationUAV, s_Accumulation, s_Accumulation.GetUAV());
     s_UAVs.PointTo(kSceneColorUAV, sceneColor, sceneColor.GetUAV());
+    s_ShadowMapSRV.PointTo(0, shadowMap, shadowMap.GetSRV());
 
     context.SetRootSignature(s_RootSignature);
     context.SetPipelineState(s_PSOs[(int)settings.output][(int)settings.material]);
     context.TransitionResource(s_Accumulation, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
     context.TransitionResource(sceneColor, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+    context.TransitionResource(shadowMap, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     context.SetDynamicConstantBufferView(kConstants, sizeof(constants), &constants);
     scene.Bind(context, kScene);
     s_UAVs.Bind(context, kOutputs);
+    s_ShadowMapSRV.Bind(context, kShadowMap);
     context.Dispatch2D(sceneColor.GetWidth(), sceneColor.GetHeight());
 
     if (constants.NumSamples != 0)

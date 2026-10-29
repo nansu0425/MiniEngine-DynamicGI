@@ -98,7 +98,7 @@ bool DescribeLightRay(HitSurface surface, out RayDesc ray)
 float3 LightVisibilityColor(RayHit hit)
 {
     RayDesc ray;
-    if (!DescribeLightRay(GetHitSurface(hit), ray))
+    if (!DescribeLightRay(GetHitSurface(hit, kSharpestTextureLod), ray))
         return 0.0;
     return IsOccluded(ray, DebugViewRayFlags()) ? 0.0 : 1.0;
 }
@@ -109,7 +109,7 @@ float3 LightVisibilityColor(RayHit hit)
 float3 LightCullingDifferenceColor(RayHit hit)
 {
     RayDesc ray;
-    if (!DescribeLightRay(GetHitSurface(hit), ray))
+    if (!DescribeLightRay(GetHitSurface(hit, kSharpestTextureLod), ray))
         return 0.0;
 
     const bool occludedWithCulling = IsOccluded(ray, kCullSingleSidedBackFaces);
@@ -130,7 +130,7 @@ float3 HitColor(RayHit hit)
         return LightVisibilityColor(hit);
     if (View == kLightCullingDifference)
         return LightCullingDifferenceColor(hit);
-    return SurfaceColor(GetHitSurface(hit));
+    return SurfaceColor(GetHitSurface(hit, kSharpestTextureLod));
 }
 
 [numthreads(8, 8, 1)]

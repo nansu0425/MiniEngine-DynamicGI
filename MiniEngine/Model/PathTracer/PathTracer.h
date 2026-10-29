@@ -5,11 +5,13 @@
 class ComputeContext;
 class ColorBuffer;
 class RaytracingScene;
+class ShadowBuffer;
 struct D3D12_VIEWPORT;
 
 namespace Math
 {
     class Camera;
+    class Matrix4;
     class Vector3;
 }
 
@@ -23,19 +25,24 @@ namespace PathTracer
         // DDGI가 같은 시점에서 비교할 irradiance (lux). raster는 처음 맞은 점의 emission과, 그 점이 directional light에서 바로 받는 빛을
         // 직접 구하므로 이 둘을 뺀다. 그 점의 BRDF도 raster가 곱하므로 곱하지 않는다. pixel 중심을 쏘는 것은 TAA를 끈 raster가 그 점에서
         // shading하기 때문이다.
-        // Material Lambert로 쌓은 값을 DDGI가 계산하는 path로 정의한다. DDGI가 probe ray가 맞은 곳을 albedo가 baseColor x (1 - metallic)인
-        // Lambert로 shading한다고 보았다. 그러면 DDGI와 Material glTF의 차가 DDGI의 정확도 (DDGI - Lambert)와 DDGI가 계산하지 않는 path의
-        // 몫 (Lambert - glTF)으로 나뉜다.
+        // Material DDGI Probe Hit로 쌓은 값은 DDGI와 irradiance를 구하는 방식 (probe의 보간과 path tracing)만 다르다. 그래서 DDGI와
+        // Probe Hit 값의 차는 DDGI의 irradiance 근사의 오차이고, Probe Hit 값과 Material glTF 값의 차는 probe hit의 shading이 정답과 다른
+        // 몫이다.
         kIndirectIrradiance,
     };
 
-    // 반사의 BRDF. Material마다 따로 compile한 shader로 그린다 (PathTracerCS.hlsl의 LAMBERT_MATERIAL).
+    // path의 vertex를 shading하는 방식. Material마다 따로 compile한 shader로 그린다 (PathTracerCS.hlsl의 LAMBERT_MATERIAL).
     enum class Material
     {
         // glTF의 metallic-roughness BRDF (Core/Shaders/GltfBrdf.hlsli). 정답은 이것으로 만든다.
         kGltf,
         // albedo가 baseColor x (1 - metallic)인 Lambert. 반사마다의 f cos / pdf가 albedo라서 furnace의 답을 bit로 알 수 있다.
         kLambert,
+        // DDGI가 probe ray가 맞은 점 (probe hit)을 shading하는 방식 (Core/Shaders/SurfaceShading.hlsli). 정해진 mip의 texture,
+        // glossy 반사를 합친 albedo의 Lambert, raster와 같은 shadow map으로 shading한다. Output Radiance에서는 camera ray가 맞은 점부터
+        // 모든 vertex가 probe hit이므로, camera 위치의 probe가 보는 radiance가 된다. Output Indirect Irradiance에서는 처음 맞은 점을
+        // shading하지 않고, 처음 맞은 점 뒤의 vertex가 probe hit다. 정답을 만드는 glTF와 Lambert는 shadow ray와 mip 0을 쓴다.
+        kProbeHit,
     };
 
     struct Settings
@@ -85,9 +92,11 @@ namespace PathTracer
     // camera ray는 rasterViewport로 그린 raster의 pixel 격자를 따른다. sceneColor는 raster가 그린 scene이고, 그 크기로 누적해 그 위에 평균을 쓴다.
     // lightDirection은 surface에서 directional light를 향하는 단위 vector이고, lightIlluminance는 light에 수직인 면의 illuminance (lux)다.
     // skyRadiance는 ray가 아무 면도 만나지 않을 때 받는 sky light의 radiance (cd/m²)이고 모든 방향에서 같다.
+    // shadowMap은 raster가 이번 frame에 그린 directional light의 shadow map이고, shadowMatrix는 world position을 그 uv와 depth로 옮긴다.
+    // Material DDGI Probe Hit만 둘을 읽는다.
     void Render(ComputeContext& context, const Settings& settings, const Math::Camera& camera, const D3D12_VIEWPORT& rasterViewport,
         const RaytracingScene& scene, const Math::Vector3& lightDirection, const Math::Vector3& lightIlluminance, const Math::Vector3& skyRadiance,
-        ColorBuffer& sceneColor);
+        ShadowBuffer& shadowMap, const Math::Matrix4& shadowMatrix, ColorBuffer& sceneColor);
 
     // harness의 capture pt에 지금까지 누적한 buffer로 답한다. Render를 부르지 않는 frame에도 불러서, 누적을 멈춘 동안에도 답하게 한다.
     void Capture(ComputeContext& context);
