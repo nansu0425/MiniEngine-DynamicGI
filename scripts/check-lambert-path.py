@@ -86,8 +86,9 @@ SCENE = BASE
 IMAGE_SETTING_CHANGES = {'Output': 'Indirect Irradiance', 'Shading': 'glTF', 'Seed': 1, 'Max Bounces': 63, 'Russian Roulette': 0, SKY_RADIANCE: 2, 'Geometric Normals': 1,
                          'Furnace': 1, 'Furnace Albedo': 0.5, 'Furnace Emission': 0.5}
 PACE_SETTING_CHANGES = {'Samples per Frame': 2, 'Target Samples': 8192}
-# [8] 에서 끝내기 전에 두는 값. BASE 와도 IMAGE_SETTING_CHANGES 와도 달라서 editor.ini 에서 이 run 이 쓴 값인지 알 수 있다. 두 값뿐인
-# Output 과 Shading 은 IMAGE_SETTING_CHANGES 와 같지만 [9] 가 BASE 로 되돌린 뒤에 바꾸므로 같은 것을 알 수 있다.
+# [8] 에서 끝내기 전에 두는 값. BASE 와도 IMAGE_SETTING_CHANGES 와도 달라서 editor.ini 에서 이 run 이 쓴 값인지 알 수 있다. Output 과
+# Shading 은 IMAGE_SETTING_CHANGES 와 같은 값이지만 [9] 가 BASE 로 되돌린 뒤에 바꾸므로 같은 것을 알 수 있다. Output 은 값이 둘뿐이라
+# BASE 와도 IMAGE_SETTING_CHANGES 와도 다른 값이 없다.
 SAVED_SETTINGS = {'Output': 'Indirect Irradiance', 'Shading': 'glTF', 'Max Bounces': 7, 'Russian Roulette': 0, 'Geometric Normals': 1, 'Furnace': 1,
                   'Furnace Albedo': 0.75, 'Furnace Emission': 0.125, 'Seed': 3}
 
