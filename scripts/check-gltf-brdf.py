@@ -6,8 +6,8 @@ BRDF 를 쓰는지 판정한다.
 번호는 작업 8 의 완료 기준의 번호다. app 을 Debug 로 test scene 에서 한 번, Sponza 에서 한 번 띄우고 끝내며, 이미 띄운 harness instance 는
 먼저 끝낸다. 하나라도 실패하면 exit 1 이다. 실행마다 끝낼 때 실행 중의 D3D12 CORRUPTION, ERROR, WARNING 이 0 이고 종료 때 LIVE_DEVICE
 하나만 남는지도 본다. PT 의 값은 capture pt 의 float export 로 본다. 이 script 밖에서 보는 기준:
-  [R3] raster 의 변경 전후: viewer.py snapshot compare task-8 이 exit 0 이고, CHANGED 인 shot 은 sheet 와 report 로 본다. [R2] 는 이
-       script 가 그 compare 의 shot 으로 판정하므로 compare 를 먼저 돌린다.
+  [R2], [R3] raster 의 변경 전후: 작업 8 을 끝낼 때 (77271b2) Harness/kept/snapshots/task-8 의 snapshot 과 compare 로 한 번
+       판정했다. 그 뒤의 raster 변경은 변경마다 viewer.py snapshot compare 로 본다.
   [R5] raster 의 나머지: check-raster-lighting.py check 와, check-directional-light.py check 의 [P5] 와 [R1]
   [M1] 의 panel: Path Tracer panel 의 Shading 을 사람이나 computer use 로 바꾸고 그 전후의 state 로 본다.
   그대로인 것: pathtracerchecks.BASE 의 Shading 은 Lambert 이고, check-lambert-path.py check, check-path-tracer-export.py check,
@@ -80,10 +80,6 @@ Sponza: harness baseline 의 시점과 light 에서 Shading glTF 로 쌓는다. 
        glTF 이고, settings set 으로 바꾸면 state 가 따르고 pt 의 resets 가 1 늘며, 끝낼 때 editor.ini 에 마지막 값이 남는다.
        check-lambert-path.py 의 [8], [9] 도 Shading 을 넣어 판정한다.
 
-raster 의 변경 전후:
-  [R2] SNAPSHOT_DIR/task-8 (47f6794) 의 baseline shot 네 개의 scene 과 가장 새 compare 의 같은 shot 에서, 값이 0 인지 아닌지 (rgb 가 모두
-       0 이면 0) 가 달라진 pixel 은 before 와 after 가 모두 2^-14 미만이다. 빛이 닿는 곳은 그대로이고 밝기만 바뀐다.
-
 source 와 생성 파일:
   [C1] BRDF_FUNCTIONS 가 BRDF_FILE 에만 정의되어 있고, PathTracerCS, SHADING_FILE, BRDF test shader 가 CALLED_BY 의 함수를 부른다.
        DefaultPS (와 그것을 include 하는 variant 셋) 는 BRDF 를 직접 부르지 않고 SHADING_FILE 을 include 해 RASTER_SHADING 을 부른다.
@@ -93,7 +89,7 @@ source 와 생성 파일:
 
 GPU 의 수치는 Debug 에서 잰다. shader 는 모든 config 에서 같은 optimization 으로 compile 되고 (MiniEngine/PropertySheets/Build.props 의
 FxCompile, Debug 는 debug info 만 더한다) table 은 shader 의 상수라서, Profile 과 Release 에서도 같다고 본다 (추론). raster 의 수치는
-harness baseline 에서만 보고, TAA, motion blur, adaptive exposure 를 켠 화면은 [R3] 의 app-default 로만 본다.
+harness baseline 에서만 보고, TAA, motion blur, adaptive exposure 를 켠 화면은 보지 않는다.
 
 발표 자료는 KEPT_DIR 에 남긴다: brdf/albedo.svg (roughness 별 directional albedo. glTF 의 dielectric 과 metal 은 GPU 의 cell, 비교하는
 fresnel_mix 와 (1 - F)(1 - F) coupling 은 Python 참조), [S1] 의 emission furnace 와 white furnace, [S2] 와 Sponza 의 export 와 보기용 PNG,
@@ -124,7 +120,7 @@ from imagecompare import agreement, rmse
 from imagefiles import ImageFileError, read_dds_rgba32f
 from imagemasks import column_groups, eroded
 from pathtracerchecks import BASE, FURNACE_SAMPLES, SECTION, SKY_RADIANCE, WHITE_FURNACE, from_recorded, path_tracer_state, set_path_tracer
-from viewer import (BASELINE_DIR, HARNESS_DIR, PREVIEW_EXPOSURE, REPO_ROOT, SETTLE_FRAMES, SNAPSHOT_DIR, SNAPSHOT_POSES, VIEWER_DIR, HarnessError,
+from viewer import (BASELINE_DIR, HARNESS_DIR, PREVIEW_EXPOSURE, REPO_ROOT, SETTLE_FRAMES, SNAPSHOT_POSES, VIEWER_DIR, HarnessError,
                     Session, baseline_pose, capture, make_view, start_instance, stop_instance)
 
 SCENE_DIR = HARNESS_DIR / 'gltf-brdf'
@@ -132,7 +128,6 @@ SCENE_NAME = 'GltfBrdf'
 KEPT_DIR = HARNESS_DIR / 'kept' / 'gltf-brdf'
 CELLS_FILE = KEPT_DIR / 'brdf' / 'cells.json'
 BEFORE_DIR = KEPT_DIR / 'before'
-SNAPSHOT_NAME = 'task-8'
 GLTF = {'Shading': 'glTF'}
 
 SEED = 8
@@ -852,29 +847,6 @@ def run_sponza(check):
     check('[M1] editor.ini keeps the Shading set last (Lambert)', saved == 'Lambert', f'Shading={saved}')
 
 
-# --- raster 의 변경 전후: [R2] ------------------------------------------------------------------
-
-def check_lit_pixels(check):
-    folder = SNAPSHOT_DIR / SNAPSHOT_NAME
-    compares = sorted(folder.glob('compare-*'))
-    if not compares:
-        check('[R2] the baseline shots light the same pixels as before', False,
-              f'no compare in {folder}. Run viewer.py snapshot compare {SNAPSHOT_NAME} first')
-        return
-    after_folder = compares[-1]
-    details, passed = [], True
-    for pose in SNAPSHOT_POSES:
-        name = f'baseline-{pose}-scene.dds'
-        before, after = (read_dds_rgba32f(where / name)[..., :3] for where in (folder, after_folder))
-        moved = np.all(before == 0.0, axis=2) != np.all(after == 0.0, axis=2)
-        faint = np.all(before < 2.0 ** -14, axis=2) & np.all(after < 2.0 ** -14, axis=2)
-        lit = int(np.count_nonzero(np.any(after != 0.0, axis=2)))
-        passed = passed and not np.any(moved & ~faint)
-        details.append(f'{pose}: {int(moved.sum())} pixels changed between 0 and not, {int(np.count_nonzero(moved & ~faint))} of them at '
-                       f'2^-14 or more; {lit} lit pixels after')
-    check(f'[R2] the baseline shots light the same pixels as before ({after_folder.name})', passed, '; '.join(details))
-
-
 # --- source: [C1] ------------------------------------------------------------------------------
 
 def git_grep(*arguments):
@@ -958,7 +930,6 @@ def command_check(args):
     check = Checks()
     run_test_scene(not args.no_build, check)
     run_sponza(check)
-    check_lit_pixels(check)
     check_source(check)
     check_tables(check)
     write_albedo_graph()
