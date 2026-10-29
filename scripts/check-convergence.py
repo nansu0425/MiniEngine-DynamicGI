@@ -21,7 +21,7 @@ export 의 rgb 는 E (lux) 의 평균, a 는 더한 sample 수다. X_s(N) 은 Se
 
 Material glTF 는 시간 안에 NOISE_BUDGET 에 이르지 못한다. 작업 12 를 판정할 때 1024 spp 의 e 가 start 26%, corridor 15% 였고, squared
 error 의 88%, 50% 가 상위 0.1% pixel 에 있었다. 로드맵의 뒤로 미룬 일에 적은 흰 점이다. 그래서 판정은 Lambert 로 하고, glTF 는 e(N)
-과 흰 점의 몫만 잰다. Lambert 는 DDGI 가 계산하는 path 의 정답이다 (PathTracer.h 의 Output).
+과 흰 점의 몫만 잰다.
 
   [C1] Lambert 의 시점마다 SLOPE_FIT_FROM 부터 끝 spp 까지 log e 대 log N 을 fit 한 기울기가 -0.5 ± SLOPE_TOLERANCE 이고, 끝 spp 의 1/4
        부터 끝까지의 기울기가 -0.5 ± LAST_SLOPE_TOLERANCE 다. 같은 pixel 의 sample 끼리 상관이 있거나 sample 의 분산이 무한에 가까우면

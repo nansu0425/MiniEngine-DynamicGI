@@ -4,7 +4,7 @@
   python scripts/check-probe-hit-material.py before   # Material 을 더하기 전의 code 로 [E7] 의 기준 export 를 BEFORE_DIR 에 남긴다
   python scripts/check-probe-hit-material.py check    # Debug 로 띄워 아래 기준을 판정한다
 
-번호는 작업 E 의 완료 기준의 번호다. probe hit 의 shading 과 그 출처는 SHADING_FILE 에, Material 의 정의는 PathTracer.h 의 Material 에
+번호는 Material DDGI Probe Hit 를 더한 commit (d84b6c3) 의 완료 기준의 번호다. probe hit 의 shading 과 그 출처는 SHADING_FILE 에, Material 의 정의는 PathTracer.h 의 Material 에
 있다. check 는 app 을 test scene 둘에서 한 번씩, Sponza 에서 두 번 띄우고 끝내며, 이미 띄운 harness instance 는 먼저 끝낸다. 하나라도
 실패하면 exit 1 이다. 실행마다 끝낼 때 실행 중의 D3D12 CORRUPTION, ERROR, WARNING 이 0 이고 종료 때 LIVE_DEVICE 하나만 남는지도 본다
 ([E12]). PT 의 값은 capture pt 의 export 로 본다. export 의 rgb 는 sample 의 평균이고 a 는 더한 sample 수다. 이 script 밖에서 보는 기준:
