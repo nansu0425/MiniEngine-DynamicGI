@@ -59,5 +59,35 @@
         "name": "Majercik2021-ScalingDDGI.pdf",
         "url": "https://jcgt.org/published/0010/02/01/paper-lowres.pdf",
         "sha256": "273397f6b9bdde59bf9bcca49e4185702e0356f99eb7efe396dafe19f4cf22b5"
+    },
+    {
+        "name": "G3D-license.txt",
+        "url": "https://svn.code.sf.net/p/g3d/code/G3D10/license.txt?p=7247",
+        "sha256": "36ef2e470b3523152fb4c6fc519aef73e0a60f94193aa5de8d678cafe0b3af0a"
+    },
+    {
+        "name": "G3D-DefaultRenderer_deferredShade.pix",
+        "url": "https://svn.code.sf.net/p/g3d/code/G3D10/data-files/shader/DefaultRenderer/DefaultRenderer_deferredShade.pix?p=7247",
+        "sha256": "8c7c4921d3b5b421eba5ca7ba832ccd9b599120c997010d8d77da0fb8f457b64"
+    },
+    {
+        "name": "G3D-DefaultRenderer.cpp",
+        "url": "https://svn.code.sf.net/p/g3d/code/G3D10/G3D-app.lib/source/DefaultRenderer.cpp?p=7247",
+        "sha256": "794fe3f7a820a64477ff06af4c70f1d1fdda096586bfab844b6d78ac1a4fbbbe"
+    },
+    {
+        "name": "G3D-DDGIVolumeSpecification.h",
+        "url": "https://svn.code.sf.net/p/g3d/code/G3D10/G3D-app.lib/include/G3D-app/DDGIVolumeSpecification.h?p=7247",
+        "sha256": "3d0f99ebc33cb538f5aaa1273972023706002128fdb1b39b9e6eeb4b1ffd8114"
+    },
+    {
+        "name": "G3D-DefaultRenderer.h",
+        "url": "https://svn.code.sf.net/p/g3d/code/G3D10/G3D-app.lib/include/G3D-app/DefaultRenderer.h?p=7247",
+        "sha256": "294db03a0ea67c08e73cb3a941b5a445d953d5f989a688066c851acbc155aebf"
+    },
+    {
+        "name": "G3D-g3dmath.glsl",
+        "url": "https://svn.code.sf.net/p/g3d/code/G3D10/data-files/shader/g3dmath.glsl?p=7247",
+        "sha256": "4c60cc06dce30dd28cab0b4ab64a6a1b5833b84311f28784dfa5be71618d7357"
     }
 ]
