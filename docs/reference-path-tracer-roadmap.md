@@ -41,7 +41,7 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 10. Log 와 Restore (끝남: 773ada1, 39d9b61)
 11. Indirect Irradiance (끝남: a93d5bb)
 12. 수렴과 측정 (끝남: d1ad157, 60be7ec)
-13. Cornell box 와 외부 renderer: (a) 장면을 만들어 load 하고, (b) 외부 renderer 로 그린 image 와 비교한다. furnace 가 잡지 못하는 leak, self-hit, visibility, 방향 분포의 오류를 여기서 본다. `-model` 로 연 장면은 orbit camera 라서 측정 조건의 줄로 Restore 할 수 없으므로 (39d9b61), (a) 가 그 장면에서도 camera 를 되돌리게 한다.
+13. Cornell box 와 외부 renderer (발표 뒤로 옮김): (a) 장면을 만들어 load 하고, (b) 외부 renderer 로 그린 image 와 비교한다. furnace 가 잡지 못하는 leak, self-hit, visibility, 방향 분포의 오류를 여기서 본다. `-model` 로 연 장면은 orbit camera 라서 측정 조건의 줄로 Restore 할 수 없으므로 (39d9b61), (a) 가 그 장면에서도 camera 를 되돌리게 한다.
 
 ## 일정
 
@@ -53,12 +53,12 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 | 10/25 | 끝남: 2, 3, 4 |
 | 10/26 | 끝남: 5, 6, C, 7 |
 | 10/27 | 끝남: 8, 9, 10 |
-| 10/28 | 끝남: 11, 12. 남은 것: 13 (a) |
-| 10/29 오전 | 13 (b) |
+| 10/28 | 끝남: 11, 12 |
 | 10/29 | 발표 자료 |
+| 발표 뒤 | 13. 기한은 발표 뒤에 정한다. |
 
-- 10/29 는 13 (b) 와 발표 자료의 날이라 밀린 작업을 넘기지 않는다.
-- 작업 13 은 끝나지 않아도 기한이 되면 멈춘다. (b) 가 통과하지 못하면 그때의 결과와 원인 후보를 "진행 중" 으로 발표한다. (b) 가 PT 의 bug 를 찾아도 고치기와 작업 12 의 재측정은 발표 뒤에 한다.
+- 10/29 는 발표 자료의 날이라 밀린 작업을 넘기지 않는다.
+- 작업 13 은 "밀릴 때" 의 1 을 적용해 (a) 와 (b) 를 모두 발표 뒤로 옮겼다.
 
 ### 순서의 이유
 
@@ -80,10 +80,10 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 
 ## 발표
 
-10/29 에는 작업 13 (b) 말고 새로 재지 않는다. 각 작업은 끝날 때 발표에 쓸 image 를 남기고, 수치는 측정 기록에 남긴다.
+10/29 에는 새로 재지 않는다. 각 작업은 끝날 때 발표에 쓸 image 를 남기고, 수치는 측정 기록에 남긴다.
 
 - PT 의 입력을 spec 에 맞춘 것: 1, A, B, 2, 4
-- PT 가 맞다는 근거: furnace (5, 6), BRDF 단위의 test (8), 수렴과 bias (12), 외부 renderer 와의 비교 (13)
+- PT 가 맞다는 근거: furnace (5, 6), BRDF 단위의 test (8), 수렴과 bias (12), 외부 renderer 와 비교하는 계획 (13)
 - raster 에서 IBL 과 Environment 를 빼고 sky 를 상수로 둔 이유, directional light 의 단위와 BRDF 를 고른 이유: C, 7, 8, 9
 - 같은 시점의 raster 와 PT, restart 뒤의 재현: 9, 10
 - DDGI 가 비교할 양과, 그 양으로 DDGI 의 오차를 나누는 Shading DDGI Probe Hit: 11, d84b6c3
