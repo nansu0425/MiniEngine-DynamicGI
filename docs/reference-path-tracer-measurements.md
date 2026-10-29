@@ -36,7 +36,7 @@
 
 `python scripts/check-convergence.py check --record` 가 덧붙인다. 시점과 조건, e 와 기울기의 뜻은 그 script 에 있다. 1 spp 의 GPU time 은 Samples per Frame 16 의 frame 을 16 으로 나눈 값이다. 상위 0.1% 의 몫은 끝 spp 에서 두 Seed 의 차의 제곱합 중 가장 큰 0.1% pixel 이 차지하는 몫이고, glTF 에서는 흰 점의 몫이다. N_gt 까지의 시간은 reset 뒤 N_gt spp 를 쌓을 때까지 sample 을 더한 frame 들의 시간이다.
 
-| 날짜 | 코드 | config | GPU | scene | 시점 | Material | 1 spp GPU time (ms) | e(1024) | 끝 spp | e(끝) | 기울기 | 끝 1/4 의 기울기 | 상위 0.1% 의 몫 | N_gt | e(N_gt) | N_gt 까지 (s) |
+| 날짜 | 코드 | config | GPU | scene | 시점 | Shading | 1 spp GPU time (ms) | e(1024) | 끝 spp | e(끝) | 기울기 | 끝 1/4 의 기울기 | 상위 0.1% 의 몫 | N_gt | e(N_gt) | N_gt 까지 (s) |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | 2026-10-28 | 668b4f0+ | Profile | NVIDIA GeForce RTX 4060 Laptop GPU | 1920x1080 | start | Lambert | 9.581 | 0.0852 | 131072 | 0.00754 | -0.499 | -0.501 | 0.030 | 131072 | 0.00754 | 1264 |
 | 2026-10-28 | 668b4f0+ | Profile | NVIDIA GeForce RTX 4060 Laptop GPU | 1920x1080 | start | glTF | 9.658 | 0.2612 | 16384 | 0.3126 | -0.316 | 0.734 | 0.992 | 131072 | - | - |

@@ -10,7 +10,7 @@ format 이 R11G11B10_FLOAT 라서, PT 의 평균은 이 format 으로 양자화�
 furnace 의 답을 그런 값으로 골라 bit 로 비교한다. 1.0 근처에서 이 비교가 볼 수 있는 오차는 mantissa 가 R, G 는 6 bit, B 는 5 bit 라서
 약 0.4% ~ 1.6% 보다 큰 것이다.
 
-PT 의 Material 은 pathtracerchecks.BASE 의 Lambert 다. Lambert 의 f cos / pdf 는 albedo 이고 PT 는 그 값을 곱하므로
+PT 의 Shading 은 pathtracerchecks.BASE 의 Lambert 다. Lambert 의 f cos / pdf 는 albedo 이고 PT 는 그 값을 곱하므로
 (PathTracerCS.hlsl), albedo 가 1 이나 0.5 이면 throughput 은 fp32 에서 정확하고 아래 furnace 의 답은 bit 단위로 맞아야 한다. furnace 는
 Geometric Normals 를 켜서 normal map 이 잃는 energy 를 빼고, 분산이 0 이라 FURNACE_SAMPLES 로 본다. sky 는 늘 흰 Sky Light 의 Intensity 1 이다.
 
@@ -83,12 +83,12 @@ WAIT_TIMEOUT = 900
 SCENE = BASE
 
 # [9] 에서 바꿔 보는 값. 모두 BASE 와 다르다.
-IMAGE_SETTING_CHANGES = {'Output': 'Indirect Irradiance', 'Material': 'glTF', 'Seed': 1, 'Max Bounces': 63, 'Russian Roulette': 0, SKY_RADIANCE: 2, 'Geometric Normals': 1,
+IMAGE_SETTING_CHANGES = {'Output': 'Indirect Irradiance', 'Shading': 'glTF', 'Seed': 1, 'Max Bounces': 63, 'Russian Roulette': 0, SKY_RADIANCE: 2, 'Geometric Normals': 1,
                          'Furnace': 1, 'Furnace Albedo': 0.5, 'Furnace Emission': 0.5}
 PACE_SETTING_CHANGES = {'Samples per Frame': 2, 'Target Samples': 8192}
 # [8] 에서 끝내기 전에 두는 값. BASE 와도 IMAGE_SETTING_CHANGES 와도 달라서 editor.ini 에서 이 run 이 쓴 값인지 알 수 있다. 두 값뿐인
-# Output 과 Material 은 IMAGE_SETTING_CHANGES 와 같지만 [9] 가 BASE 로 되돌린 뒤에 바꾸므로 같은 것을 알 수 있다.
-SAVED_SETTINGS = {'Output': 'Indirect Irradiance', 'Material': 'glTF', 'Max Bounces': 7, 'Russian Roulette': 0, 'Geometric Normals': 1, 'Furnace': 1,
+# Output 과 Shading 은 IMAGE_SETTING_CHANGES 와 같지만 [9] 가 BASE 로 되돌린 뒤에 바꾸므로 같은 것을 알 수 있다.
+SAVED_SETTINGS = {'Output': 'Indirect Irradiance', 'Shading': 'glTF', 'Max Bounces': 7, 'Russian Roulette': 0, 'Geometric Normals': 1, 'Furnace': 1,
                   'Furnace Albedo': 0.75, 'Furnace Emission': 0.125, 'Seed': 3}
 
 

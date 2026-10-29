@@ -45,7 +45,7 @@ float3 GetOutgoingRadiance(SurfaceShadingInput surface, float3 view, float3 ligh
 // (references/G3D-DefaultRenderer_deferredShade.pix:215의 GLOSSY_TO_MATTE). 이 module에서는 아래 함수와 상수가 그 switch다.
 // G3D의 code는 가져오지 않고 식만 따랐다.
 //
-// DDGI의 probe trace와 path tracer의 Material DDGI Probe Hit가 함께 따르는 계약:
+// DDGI의 probe trace와 path tracer의 Shading DDGI Probe Hit가 함께 따르는 계약:
 // - probe hit의 material texture는 emission과 normal map까지 kProbeHitTextureLod의 mip으로 읽는다.
 // - probe hit가 ray가 온 쪽으로 내는 radiance는 GetProbeHitOutgoingRadiance다. albedo는 GetProbeHitAlbedo다.
 // - lightVisibility는 camera pixel처럼 GetDirectionalLightVisibility로 같은 frame의 shadow map에서 구한다. shadow map의 좌표는

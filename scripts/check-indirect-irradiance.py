@@ -16,7 +16,7 @@
 app 을 직접 띄우고 끝내며, 이미 띄운 harness instance 는 먼저 끝낸다. 하나라도 실패하면 exit 1 이다. 실행마다 끝낼 때 실행 중의 D3D12
 CORRUPTION, ERROR, WARNING 이 0 이고 종료 때 LIVE_DEVICE 하나만 남는지도 본다 ([K4]). PT 의 값은 capture pt 의 export 로 본다. export 의
 rgb 는 E (lux) 의 평균이고 a 는 더한 sample 수다. hit pixel 은 Ray Tracing View 의 Front Face capture 에서 면을 만난 pixel 이다. 따로
-적지 않으면 harness baseline 의 시점, Material Lambert, Geometric Normals on, Russian roulette off, FURNACE_SAMPLES 다.
+적지 않으면 harness baseline 의 시점, Shading Lambert, Geometric Normals on, Russian roulette off, FURNACE_SAMPLES 다.
 
 furnace: Russian roulette 를 끄면 RNG 를 쓰는 양이 albedo, emission, sky 에 따라 달라지지 않으므로, Seed 와 Max Bounces 가 같은 furnace
 들은 같은 path 를 그린다 (check-path-tracer-export.py). 그래서 [I2] 의 예측은 기대값이 아니라 sample 마다 성립한다.
@@ -33,13 +33,13 @@ furnace: Russian roulette 를 끄면 RNG 를 쓰는 양이 albedo, emission, sky
        모으는 일을 반사 하나로 센다는 뜻이다.
   [I5] Geometric Normals 를 끈 white furnace 에서 모든 hit pixel 이 E/π <= 1 + FURNACE_TOLERANCE 다. shading normal 이 energy 를 만들지
        않는 것을 본다. 평균 손실을 찍는다.
-  [I6] glTF 의 반사: EMISSION_FURNACE 를 Material glTF 로 Seed 0, 1 씩 쌓는다. hit pixel 에서 상수 π 를 B 로 준 imagecompare 의 r 이
+  [I6] glTF 의 반사: EMISSION_FURNACE 를 Shading glTF 로 Seed 0, 1 씩 쌓는다. hit pixel 에서 상수 π 를 B 로 준 imagecompare 의 r 이
        두 Seed 를 각각 A0 로 둘 때 모두 AGREEMENT_LIMIT 이하이고, NaN 이나 Inf 로 버린 sample 이 0 이다. Russian roulette off 와 on 을
        본다. glTF 의 반사마다의 weight 는 albedo 둘레에서 흔들리므로 [I2] 처럼 sample 마다 맞지 않는다.
 
 light (furnace off, light 는 harness baseline 의 것, Geometric Normals off):
   [I3] Sky 0, Max Bounces 1 이면 모든 pixel 이 0 이다. x₁ 이 직접 받는 light 를 더하지 않는다는 뜻이다. Max Bounces 2 면 0 이 아닌
-       pixel 이 있다. Material glTF 와 Lambert 모두 본다. Sponza 에는 emission 이 없다.
+       pixel 이 있다. Shading glTF 와 Lambert 모두 본다. Sponza 에는 emission 이 없다.
   [I4] Sky 1 에서 같은 Seed 로 Max Bounces 를 directlightchecks.BOUNCE_STEPS 로 올리면 어떤 pixel 도 sample 수만큼의 ulp 보다 더
        어두워지지 않고 평균은 매번 커진다. check-directional-light.py 의 [P7] 과 같은 판정이다. glTF 와 Lambert 모두 본다.
 
@@ -57,10 +57,10 @@ light (furnace off, light 는 harness baseline 의 것, Geometric Normals off):
 
 그대로인 것:
   [K1] BEFORE_DIR 의 export (Output 을 더하기 전의 code, 조건은 BEFORE_DIR/manifest.json) 와 Output Radiance 로 같은 조건에서 쌓은
-       export 를 비교한다. Material glTF 는 rgba 가 bit 까지 같다. Material Lambert 는 a 가 bit 까지 같고 rgb 가 LAMBERT_RUN_ULPS 안이다.
+       export 를 비교한다. Shading glTF 는 rgba 가 bit 까지 같다. Shading Lambert 는 a 가 bit 까지 같고 rgb 가 LAMBERT_RUN_ULPS 안이다.
        Lambert 는 고치기 전의 code (d05ec6f) 로도 실행마다 rgb 가 4 ulp 까지 달라서 bit 로 비교할 수 없다. 같은 build 를 두 번 띄운
-       export 에서 start 는 7502 pixel, courtyard-up 은 27447 pixel 이 달랐고 glTF 는 같았다. Material 을 runtime 값으로 고를 때
-       Lambert 의 결과가 반올림만큼 달라진 적이 있어서 (PathTracerCS.hlsl 의 LAMBERT_MATERIAL), Output 도 따로 compile 하고 그 결과를
+       export 에서 start 는 7502 pixel, courtyard-up 은 27447 pixel 이 달랐고 glTF 는 같았다. Shading 을 runtime 값으로 고를 때
+       Lambert 의 결과가 반올림만큼 달라진 적이 있어서 (PathTracerCS.hlsl 의 LAMBERT_SHADING), Output 도 따로 compile 하고 그 결과를
        이것으로 확인한다. before 는 Output 이 없는 code 에서 돌리므로 Output 을 정하지 않는다.
 
 keep 은 harness baseline 의 시점에서 KEEP 을 Output Indirect Irradiance 의 glTF 와 Lambert, Output Radiance 의 glTF 로 KEEP_SAMPLES 만큼
@@ -94,7 +94,7 @@ BEFORE_DIR = KEPT_DIR / 'before'
 
 RADIANCE = {'Output': 'Radiance'}
 IRRADIANCE = {'Output': 'Indirect Irradiance'}
-GLTF = {'Material': 'glTF'}
+GLTF = {'Shading': 'glTF'}
 
 FURNACE_TOLERANCE = 1e-4
 # [I1] 에서 escape 하지 못한 sample 이 있어도 되는 pixel 수. 판정할 때 잰 1 개에 여유를 둔다.
@@ -120,13 +120,13 @@ R11G11B10_SMALLEST_NORMAL = 2.0 ** -14
 BEFORE_SETTINGS = {key: value for key, value in BASE.items() if key != 'Output'} | {'Geometric Normals': 0, 'Max Bounces': 64,
                                                                                     'Russian Roulette': 1, 'Seed': 0}
 BEFORE_SAMPLES = 64
-BEFORE_RUNS = [(pose_name, material) for pose_name in ('start', MISS_POSE) for material in ('glTF', 'Lambert')]
+BEFORE_RUNS = [(pose_name, shading) for pose_name in ('start', MISS_POSE) for shading in ('glTF', 'Lambert')]
 # d05ec6f 를 두 번 띄워 BEFORE_RUNS 를 쌓은 Lambert 의 export 는 rgb 가 4 ulp 까지 달랐다. 그 두 배를 둔다.
 LAMBERT_RUN_ULPS = 8
 
 KEEP = SCENE
 KEEP_SAMPLES = 1024
-KEEP_RUNS = {'irradiance-gltf': IRRADIANCE | GLTF, 'irradiance-lambert': IRRADIANCE | {'Material': 'Lambert'}, 'radiance-gltf': RADIANCE | GLTF}
+KEEP_RUNS = {'irradiance-gltf': IRRADIANCE | GLTF, 'irradiance-lambert': IRRADIANCE | {'Shading': 'Lambert'}, 'radiance-gltf': RADIANCE | GLTF}
 
 # 가장 느린 run 은 Max Bounces 65536 의 white furnace 다.
 WAIT_TIMEOUT = 900
@@ -229,20 +229,20 @@ def check_gltf_furnace(session, check, hits):
 
 def check_direct_light_excluded(session, check, start_pose):
     session.ask_ok(f'pose {start_pose}')
-    for material in ('glTF', 'Lambert'):
-        settings = BASE | IRRADIANCE | {'Material': material, SKY_RADIANCE: 0, 'Geometric Normals': 0, 'Russian Roulette': 0}
-        one, _, _ = export(session, f'direct-b1-{material.lower()}', settings | {'Max Bounces': 1}, LIGHT_SAMPLES)
-        two, _, _ = export(session, f'direct-b2-{material.lower()}', settings | {'Max Bounces': 2}, LIGHT_SAMPLES)
+    for shading in ('glTF', 'Lambert'):
+        settings = BASE | IRRADIANCE | {'Shading': shading, SKY_RADIANCE: 0, 'Geometric Normals': 0, 'Russian Roulette': 0}
+        one, _, _ = export(session, f'direct-b1-{shading.lower()}', settings | {'Max Bounces': 1}, LIGHT_SAMPLES)
+        two, _, _ = export(session, f'direct-b2-{shading.lower()}', settings | {'Max Bounces': 2}, LIGHT_SAMPLES)
         lit_one = count(np.any(one[..., :3] != 0.0, axis=2))
         lit_two = count(np.any(two[..., :3] != 0.0, axis=2))
-        check(f'[I3] {material}: with Sky 0, Max Bounces 1 is 0 everywhere and Max Bounces 2 is not', lit_one == 0 and lit_two > 0,
+        check(f'[I3] {shading}: with Sky 0, Max Bounces 1 is 0 everywhere and Max Bounces 2 is not', lit_one == 0 and lit_two > 0,
               f'pixels not 0: {lit_one} with Max Bounces 1, {lit_two} with Max Bounces 2')
 
 
 def check_reflections(session, check, start_pose):
-    for material in ('glTF', 'Lambert'):
-        check_bounces(session, check, start_pose, f'[I4] {material}:',
-                      IRRADIANCE | {'Material': material, SKY_RADIANCE: 1, 'Geometric Normals': 0, 'Target Samples': LIGHT_SAMPLES})
+    for shading in ('glTF', 'Lambert'):
+        check_bounces(session, check, start_pose, f'[I4] {shading}:',
+                      IRRADIANCE | {'Shading': shading, SKY_RADIANCE: 1, 'Geometric Normals': 0, 'Target Samples': LIGHT_SAMPLES})
 
 
 def check_scene_capture(session, check, exported, hits):
@@ -316,7 +316,7 @@ def check_radiance_bits(session, check):
         # 양수 float 는 bit 를 정수로 읽은 차가 ulp 수다.
         ulps = int(np.max(np.abs(now[..., :3].view(np.int32).astype(np.int64) - before[..., :3].view(np.int32).astype(np.int64))))
         counts_same = same_bits(now[..., 3], before[..., 3])
-        allowed = 0 if entry['path tracer']['Material'] == 'glTF' else LAMBERT_RUN_ULPS
+        allowed = 0 if entry['path tracer']['Shading'] == 'glTF' else LAMBERT_RUN_ULPS
         passed = passed and counts_same and ulps <= allowed
         details.append(f'{name}: {pixels} pixels differ by up to {ulps} ulps (allowed {allowed}), a {"same" if counts_same else "differs"}')
     check(f'[K1] Output Radiance accumulates the same bits as before ({manifest["code"]}) for glTF and within {LAMBERT_RUN_ULPS} ulps for Lambert',
@@ -361,12 +361,12 @@ def command_before(args):
             session.ask_ok('ui hide')
             light = session.ask_ok(f'settings get {LIGHT_SECTION}')['values']
             BEFORE_DIR.mkdir(parents=True, exist_ok=True)
-            for pose_name, material in BEFORE_RUNS:
+            for pose_name, shading in BEFORE_RUNS:
                 pose = SNAPSHOT_POSES[pose_name] or baseline_pose()
                 session.ask_ok(f'pose {pose}')
-                settings = BEFORE_SETTINGS | {'Material': material}
-                _, _, path = export(session, f'{pose_name}-{material.lower()}', settings, BEFORE_SAMPLES)
-                name = f'{pose_name}-{material.lower()}.dds'
+                settings = BEFORE_SETTINGS | {'Shading': shading}
+                _, _, path = export(session, f'{pose_name}-{shading.lower()}', settings, BEFORE_SAMPLES)
+                name = f'{pose_name}-{shading.lower()}.dds'
                 shutil.copy2(path, BEFORE_DIR / name)
                 manifest['files'][name] = {'pose': pose, 'directional light': light, 'path tracer': settings, 'samples': BEFORE_SAMPLES}
         finally:

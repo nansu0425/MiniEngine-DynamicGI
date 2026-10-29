@@ -26,9 +26,9 @@ namespace
     bool s_Show = false;
     PathTracer::Settings s_Settings;
 
-    // PathTracer::Output과 PathTracer::Material의 순서이고, editor.ini, settings 명령, 측정 조건의 줄이 이 이름으로 읽고 쓴다.
+    // PathTracer::Output과 PathTracer::Shading의 순서이고, editor.ini, settings 명령, 측정 조건의 줄이 이 이름으로 읽고 쓴다.
     const char* kOutputNames[] = { "Radiance", "Indirect Irradiance" };
-    const char* kMaterialNames[] = { "glTF", "Lambert", "DDGI Probe Hit" };
+    const char* kShadingNames[] = { "glTF", "Lambert", "DDGI Probe Hit" };
 
     template <typename Enum, size_t Count>
     bool ReadName(const std::string& text, const char* const (&names)[Count], Enum& value)
@@ -74,9 +74,9 @@ namespace
             "irradiance / pi. With DDGI Probe Hit it differs from DDGI only in how the irradiance is found, so their difference is the error "
             "of the DDGI irradiance, and its difference from glTF is the error of the probe hit shading against the answer.");
 
-        int material = (int)s_Settings.material;
-        if (ImGui::Combo("Material", &material, kMaterialNames, IM_ARRAYSIZE(kMaterialNames)))
-            s_Settings.material = (PathTracer::Material)material;
+        int shading = (int)s_Settings.shading;
+        if (ImGui::Combo("Shading", &shading, kShadingNames, IM_ARRAYSIZE(kShadingNames)))
+            s_Settings.shading = (PathTracer::Shading)shading;
         ImGui::SetItemTooltip("glTF reflects by the glTF metallic-roughness BRDF, the answer to compare with. Lambert reflects diffusely "
             "with albedo base color x (1 - metallic), so the furnaces have answers to the bit. DDGI Probe Hit shades the points a path hits, "
             "but the first one in Indirect Irradiance, as DDGI shades its probe ray hits: textures at a fixed mip, a diffuse albedo with the "
@@ -138,7 +138,7 @@ namespace
     {
         values["Show"] = FormatFlag(s_Show);
         values["Output"] = kOutputNames[(int)s_Settings.output];
-        values["Material"] = kMaterialNames[(int)s_Settings.material];
+        values["Shading"] = kShadingNames[(int)s_Settings.shading];
         values["Samples per Frame"] = std::to_string(s_Settings.samplesPerFrame);
         values["Target Samples"] = std::to_string(s_Settings.targetSamples);
         values["Seed"] = std::to_string(s_Settings.seed);
@@ -185,7 +185,7 @@ namespace
     {
         ReadFlag(values, "Show", s_Show);
         ReadName(values, "Output", kOutputNames, s_Settings.output);
-        ReadName(values, "Material", kMaterialNames, s_Settings.material);
+        ReadName(values, "Shading", kShadingNames, s_Settings.shading);
         ReadUInt(values, "Samples per Frame", s_Settings.samplesPerFrame);
         ReadUInt(values, "Target Samples", s_Settings.targetSamples);
         ReadUInt(values, "Seed", s_Settings.seed);
@@ -203,7 +203,7 @@ namespace
     void DescribeConditions(MeasurementConditions::Values& values)
     {
         values["pt output"] = kOutputNames[(int)s_Settings.output];
-        values["pt material"] = kMaterialNames[(int)s_Settings.material];
+        values["pt shading"] = kShadingNames[(int)s_Settings.shading];
         values["pt seed"] = std::to_string(s_Settings.seed);
         values["pt max bounces"] = std::to_string(s_Settings.maxBounces);
         values["pt russian roulette"] = FormatFlag(s_Settings.russianRoulette);
@@ -231,7 +231,7 @@ namespace
         PathTracer::Settings settings = s_Settings;
         uint32_t samples = 0;
         ReadValue(values, "pt output", reading, [&settings](const std::string& text) { return ReadName(text, kOutputNames, settings.output); });
-        ReadValue(values, "pt material", reading, [&settings](const std::string& text) { return ReadName(text, kMaterialNames, settings.material); });
+        ReadValue(values, "pt shading", reading, [&settings](const std::string& text) { return ReadName(text, kShadingNames, settings.shading); });
         ReadValue(values, "pt seed", reading, [&settings](const std::string& text) { return ReadUInt(text, settings.seed); });
         ReadValue(values, "pt max bounces", reading, [&settings](const std::string& text)
         {

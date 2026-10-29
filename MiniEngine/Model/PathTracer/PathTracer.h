@@ -25,14 +25,14 @@ namespace PathTracer
         // DDGI가 같은 시점에서 비교할 irradiance (lux). raster는 처음 맞은 점의 emission과, 그 점이 directional light에서 바로 받는 빛을
         // 직접 구하므로 이 둘을 뺀다. 그 점의 BRDF도 raster가 곱하므로 곱하지 않는다. pixel 중심을 쏘는 것은 TAA를 끈 raster가 그 점에서
         // shading하기 때문이다.
-        // Material DDGI Probe Hit로 쌓은 값은 DDGI와 irradiance를 구하는 방식 (probe의 보간과 path tracing)만 다르다. 그래서 DDGI와
-        // Probe Hit 값의 차는 DDGI의 irradiance 근사의 오차이고, Probe Hit 값과 Material glTF 값의 차는 probe hit의 shading이 정답과 다른
+        // Shading DDGI Probe Hit로 쌓은 값은 DDGI와 irradiance를 구하는 방식 (probe의 보간과 path tracing)만 다르다. 그래서 DDGI와
+        // Probe Hit 값의 차는 DDGI의 irradiance 근사의 오차이고, Probe Hit 값과 Shading glTF 값의 차는 probe hit의 shading이 정답과 다른
         // 몫이다.
         kIndirectIrradiance,
     };
 
-    // path의 vertex를 shading하는 방식. Material마다 따로 compile한 shader로 그린다 (PathTracerCS.hlsl의 LAMBERT_MATERIAL).
-    enum class Material
+    // path의 vertex를 shading하는 방식. Shading마다 따로 compile한 shader로 그린다 (PathTracerCS.hlsl의 LAMBERT_SHADING).
+    enum class Shading
     {
         // glTF의 metallic-roughness BRDF (Core/Shaders/GltfBrdf.hlsli). 정답은 이것으로 만든다.
         kGltf,
@@ -48,7 +48,7 @@ namespace PathTracer
     struct Settings
     {
         Output output = Output::kRadiance;
-        Material material = Material::kGltf;
+        Shading shading = Shading::kGltf;
         // pixel마다 한 frame에 더하는 sample 수
         uint32_t samplesPerFrame = 1;
         // 이만큼 쌓으면 trace를 멈추고 평균만 보인다. 기본값은 정답의 spp로, scripts/check-convergence.py의 [C2]가 정한다.
@@ -93,7 +93,7 @@ namespace PathTracer
     // lightDirection은 surface에서 directional light를 향하는 단위 vector이고, lightIlluminance는 light에 수직인 면의 illuminance (lux)다.
     // skyRadiance는 ray가 아무 면도 만나지 않을 때 받는 sky light의 radiance (cd/m²)이고 모든 방향에서 같다.
     // shadowMap은 raster가 이번 frame에 그린 directional light의 shadow map이고, shadowMatrix는 world position을 그 uv와 depth로 옮긴다.
-    // Material DDGI Probe Hit만 둘을 읽는다.
+    // Shading DDGI Probe Hit만 둘을 읽는다.
     void Render(ComputeContext& context, const Settings& settings, const Math::Camera& camera, const D3D12_VIEWPORT& rasterViewport,
         const RaytracingScene& scene, const Math::Vector3& lightDirection, const Math::Vector3& lightIlluminance, const Math::Vector3& skyRadiance,
         ShadowBuffer& shadowMap, const Math::Matrix4& shadowMatrix, ColorBuffer& sceneColor);

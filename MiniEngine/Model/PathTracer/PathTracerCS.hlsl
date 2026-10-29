@@ -5,16 +5,16 @@
 #include "Core/Shaders/LambertBrdf.hlsli"
 #include "Core/Shaders/Random.hlsli"
 
-// 1이면 Material Lambert로 반사하고, LAMBERT_MATERIAL과 PROBE_HIT_MATERIAL이 모두 0이면 glTF로 반사한다. PathTracerLambertCS.hlsl이 1로
-// 정의한다. Material을 constant로 고르는 shader 하나로 두었을 때는 Lambert의 결과가 작업 8 전과 반올림만큼 달라 bit까지 같지 않았다
+// 1이면 Shading Lambert로 반사하고, LAMBERT_SHADING과 PROBE_HIT_SHADING이 모두 0이면 glTF로 반사한다. PathTracerLambertCS.hlsl이 1로
+// 정의한다. Shading을 constant로 고르는 shader 하나로 두었을 때는 Lambert의 결과가 작업 8 전과 반올림만큼 달라 bit까지 같지 않았다
 // (scripts/check-gltf-brdf.py의 [S5]). compiler가 두 BRDF의 code와 함께 Lambert의 연산을 다르게 묶은 것으로 본다 (추측).
-#ifndef LAMBERT_MATERIAL
-#define LAMBERT_MATERIAL 0
+#ifndef LAMBERT_SHADING
+#define LAMBERT_SHADING 0
 #endif
 
-// 1이면 Material DDGI Probe Hit로 shading한다. PathTracerProbeHitCS.hlsl이 1로 정의한다. 따로 compile하는 이유는 LAMBERT_MATERIAL과 같다.
-#ifndef PROBE_HIT_MATERIAL
-#define PROBE_HIT_MATERIAL 0
+// 1이면 Shading DDGI Probe Hit로 shading한다. PathTracerProbeHitCS.hlsl이 1로 정의한다. 따로 compile하는 이유는 LAMBERT_SHADING과 같다.
+#ifndef PROBE_HIT_SHADING
+#define PROBE_HIT_SHADING 0
 #endif
 
 // Output을 constant로 고르지 않고 따로 compile해서, Radiance의 shader가 Output이 생기기 전과 같은 연산으로 compile되게 한다.
@@ -22,7 +22,7 @@
 #define INDIRECT_IRRADIANCE 0
 #endif
 
-#if PROBE_HIT_MATERIAL
+#if PROBE_HIT_SHADING
 #include "Core/Shaders/SurfaceShading.hlsli"
 #endif
 
@@ -47,7 +47,7 @@ cbuffer Constants : register(b0)
     float3 LightIlluminance;
     // ray가 아무 면도 만나지 않을 때 받는 sky light의 radiance (cd/m²). 모든 방향에서 같다.
     float3 SkyRadiance;
-    // raster의 DefaultVS.hlsl처럼 world position을 ShadowMap의 uv와 비교할 depth로 옮긴다. Material DDGI Probe Hit만 쓴다.
+    // raster의 DefaultVS.hlsl처럼 world position을 ShadowMap의 uv와 비교할 depth로 옮긴다. Shading DDGI Probe Hit만 쓴다.
     float4x4 ShadowMatrix;
 };
 
@@ -57,7 +57,7 @@ cbuffer Constants : register(b0)
 RWTexture2D<float4> Accumulation : register(u0);
 RWTexture2D<float3> SceneColor : register(u1);
 
-#if PROBE_HIT_MATERIAL
+#if PROBE_HIT_SHADING
 // raster가 같은 frame에 그린 directional light의 shadow map과, raster와 같은 비교 sampler (PathTracer.cpp의 root signature)
 Texture2D<float> ShadowMap : register(t0);
 SamplerComparisonState ShadowMapSampler : register(s0);
@@ -67,7 +67,7 @@ static const float kPi = 3.14159265358979323846;
 
 // path가 shading을 쓰는 vertex가 material texture를 읽는 mip. Indirect Irradiance에서 처음 맞은 점은 shading을 쓰지 않으므로
 // TraceIndirectIrradiance가 kSharpestTextureLod로 읽는다.
-#if PROBE_HIT_MATERIAL
+#if PROBE_HIT_SHADING
 static const float kShadedVertexTextureLod = kProbeHitTextureLod;
 #else
 static const float kShadedVertexTextureLod = kSharpestTextureLod;
@@ -83,8 +83,8 @@ struct PathVertex
     float3 geometryNormal;
     // 반사 방향을 고르는 normal
     float3 normal;
-#if LAMBERT_MATERIAL || PROBE_HIT_MATERIAL
-    // Lambert의 albedo. Material DDGI Probe Hit에서는 SurfaceShading.hlsli의 GetProbeHitAlbedo다.
+#if LAMBERT_SHADING || PROBE_HIT_SHADING
+    // Lambert의 albedo. Shading DDGI Probe Hit에서는 SurfaceShading.hlsli의 GetProbeHitAlbedo다.
     float3 albedo;
 #else
     // 이 vertex의 directional light와 다음 방향 고르기가 같은 값을 쓴다.
@@ -104,14 +104,14 @@ PathVertex GetPathVertex(RayHit hit, float3 view, float textureLod)
     vertex.position = surface.position;
     vertex.geometryNormal = surface.geometryNormal;
     vertex.normal = GeometricNormals != 0 ? surface.geometryNormal : surface.shadingNormal;
-#if PROBE_HIT_MATERIAL
+#if PROBE_HIT_SHADING
     // furnace는 Lambert처럼 albedo를 Furnace Albedo로 둔다. SurfaceShading.hlsli의 kProbeHitIndirectScale은 furnace에서도 곱하므로
-    // 해는 emission / (1 - albedo x kProbeHitIndirectScale)이다 (scripts/check-probe-hit-material.py의 [E4]).
+    // 해는 emission / (1 - albedo x kProbeHitIndirectScale)이다 (scripts/check-probe-hit-shading.py의 [E4]).
     vertex.albedo = Furnace != 0 ? FurnaceAlbedo : GetProbeHitAlbedo(surface.baseColor.rgb, surface.metallic);
-#elif LAMBERT_MATERIAL
-    // glTF spec과 다르다: Material Lambert는 glTF의 metallic-roughness BRDF 대신 albedo가 baseColor x (1 - metallic)인 Lambert로
+#elif LAMBERT_SHADING
+    // glTF spec과 다르다: Shading Lambert는 glTF의 metallic-roughness BRDF 대신 albedo가 baseColor x (1 - metallic)인 Lambert로
     // 반사해서, dielectric의 specular와 metal의 반사가 없다. 반사마다의 f cos / pdf가 albedo라서 furnace의 답을 bit로 알고, 작업 13의
-    // Cornell box가 같은 BRDF를 쓴다. 정답은 Material glTF로 만든다. DDGI가 probe hit를 shading하는 방식은 Material DDGI Probe Hit가 따른다.
+    // Cornell box가 같은 BRDF를 쓴다. 정답은 Shading glTF로 만든다. DDGI가 probe hit를 shading하는 방식은 Shading DDGI Probe Hit가 따른다.
     vertex.albedo = Furnace != 0 ? FurnaceAlbedo : surface.baseColor.rgb * (1.0 - surface.metallic);
 #else
     // furnace는 baseColor 1, metallic 0인 BRDF에 Furnace Albedo를 곱한다. 이 BRDF는 모든 view 방향에서 빛을 다 반사하므로
@@ -126,7 +126,7 @@ PathVertex GetPathVertex(RayHit hit, float3 view, float textureLod)
     return vertex;
 }
 
-#if PROBE_HIT_MATERIAL
+#if PROBE_HIT_SHADING
 // probe hit가 path를 거슬러 내는 radiance 중, path를 다음 vertex로 이어 추정하는 irradiance의 몫을 뺀 radiance. radiance와 visibility는
 // SurfaceShading.hlsli의 계약대로 camera pixel과 같은 routine으로 구한다. furnace는 답을 식으로 알도록 light를 끈다.
 float3 GetProbeHitRadianceWithoutIrradiance(PathVertex vertex)
@@ -148,7 +148,7 @@ float3 ReflectDirectionalLight(PathVertex vertex)
     RayDesc ray;
     if (!DescribeSurfaceRay(vertex.position, vertex.geometryNormal, LightDirection, ray) || IsOccluded(ray, kCullSingleSidedBackFaces))
         return 0.0;
-#if LAMBERT_MATERIAL
+#if LAMBERT_SHADING
     // Lambert의 f는 albedo / π다. illuminance는 light에 수직인 면의 값이므로 normal과의 cos를 곱한다.
     return vertex.albedo / kPi * LightIlluminance * max(0.0, dot(vertex.normal, LightDirection));
 #else
@@ -171,8 +171,8 @@ float3 TraceRadiance(RayDesc ray, uint reflectionsBeforeRay, inout Random random
             return radiance + throughput * SkyRadiance;
 
         const PathVertex vertex = GetPathVertex(hit, -ray.Direction, kShadedVertexTextureLod);
-#if PROBE_HIT_MATERIAL
-        // 다른 Material처럼 마지막 vertex에서는 emission만 본다.
+#if PROBE_HIT_SHADING
+        // 다른 Shading처럼 마지막 vertex에서는 emission만 본다.
         if (bounces == MaxBounces)
             return radiance + throughput * vertex.emission;
         radiance += throughput * GetProbeHitRadianceWithoutIrradiance(vertex);
@@ -188,7 +188,7 @@ float3 TraceRadiance(RayDesc ray, uint reflectionsBeforeRay, inout Random random
 
         radiance += throughput * ReflectDirectionalLight(vertex);
 
-#if LAMBERT_MATERIAL
+#if LAMBERT_SHADING
         if (!DescribeSurfaceRay(vertex.position, vertex.geometryNormal, SampleLambertDirection(vertex.normal, random.rand2()), ray))
             return radiance;
         // Lambert의 f cos / pdf는 albedo다 (SampleLambertDirection).
@@ -223,7 +223,7 @@ bool TraceIndirectIrradiance(RayDesc cameraRay, inout Random random, out float3 
     // 처음 맞은 점에서 빛을 모으는 일을 반사 하나로 센다. 그래야 Max Bounces 2가 DDGI의 single bounce와 같은 빛이 된다.
     if (MaxBounces == 0)
         return true;
-    // 처음 맞은 점은 raster가 shading하므로 Material과 무관하게 다른 query처럼 mip 0으로 읽고 position과 normal만 쓴다.
+    // 처음 맞은 점은 raster가 shading하므로 Shading과 무관하게 다른 query처럼 mip 0으로 읽고 position과 normal만 쓴다.
     const PathVertex vertex = GetPathVertex(hit, -cameraRay.Direction, kSharpestTextureLod);
     RayDesc ray;
     // cosine으로 고른 방향의 pdf가 cos / π라서 irradiance의 추정은 π L이다.

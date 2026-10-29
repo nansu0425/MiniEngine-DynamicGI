@@ -54,7 +54,7 @@ LINE_A = {
     'light': 'elevation=40 azimuth=200 color=0.5,0.75,1 intensity=3',
     'sky': 'Color=0.75,0.5,1; Intensity=0.5',
     'taa': 'off',
-    'path tracer': {'Output': 'Indirect Irradiance', 'Material': 'glTF', 'Seed': 7, 'Max Bounces': 8, 'Russian Roulette': 0,
+    'path tracer': {'Output': 'Indirect Irradiance', 'Shading': 'glTF', 'Seed': 7, 'Max Bounces': 8, 'Russian Roulette': 0,
                     'Geometric Normals': 1, 'Furnace': 0, 'Furnace Albedo': 0.75, 'Furnace Emission': 0.25},
     'samples': SAMPLES,
 }
@@ -64,7 +64,7 @@ LINE_B = {
     'light': 'elevation=20 azimuth=10 color=1,0.5,0.25 intensity=5',
     'sky': 'Color=1,1,0.5; Intensity=2',
     'taa': 'on',
-    'path tracer': {'Output': 'Radiance', 'Material': 'Lambert', 'Seed': 2, 'Max Bounces': 16, 'Russian Roulette': 1,
+    'path tracer': {'Output': 'Radiance', 'Shading': 'Lambert', 'Seed': 2, 'Max Bounces': 16, 'Russian Roulette': 1,
                     'Geometric Normals': 0, 'Furnace': 1, 'Furnace Albedo': 0.5, 'Furnace Emission': 0.5},
     'samples': 4,
 }
@@ -75,7 +75,7 @@ CONDITION_STATE = ['camera', 'light', 'sky', 'settings.Engine Tuning', 'settings
 # light direction 의 값은 그 줄의 light up 과 직교하지 않는다.
 OUT_OF_RANGE = [('camera', '1,2'), ('heading', '1.5abc'), ('pitch', '0.1,0'), ('light direction', '0,0,1'), ('light color', '1.5,0,0'),
                 ('light intensity', '-1'), ('light intensity', 'inf'), ('sky color', '1,1'), ('sky intensity', 'nan'), ('sky intensity', '-1'),
-                ('pt output', 'radiance'), ('pt material', 'gltf'), ('pt seed', '-1'), ('pt max bounces', '65537'), ('pt russian roulette', '2'),
+                ('pt output', 'radiance'), ('pt shading', 'gltf'), ('pt seed', '-1'), ('pt max bounces', '65537'), ('pt russian roulette', '2'),
                 ('pt furnace', 'on'), ('pt geometric normals', ''), ('pt furnace albedo', '1.5'), ('pt furnace albedo', 'nan'), ('pt furnace emission', 'inf'), ('pt samples', '1048577'),
                 ('size', '1920x'), ('taa', 'maybe')]
 

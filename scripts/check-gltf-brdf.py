@@ -9,8 +9,8 @@ BRDF 를 쓰는지 판정한다.
   [R3] raster 의 변경 전후: viewer.py snapshot compare task-8 이 exit 0 이고, CHANGED 인 shot 은 sheet 와 report 로 본다. [R2] 는 이
        script 가 그 compare 의 shot 으로 판정하므로 compare 를 먼저 돌린다.
   [R5] raster 의 나머지: check-raster-lighting.py check 와, check-directional-light.py check 의 [P5] 와 [R1]
-  [M1] 의 panel: Path Tracer panel 의 Material 을 사람이나 computer use 로 바꾸고 그 전후의 state 로 본다.
-  그대로인 것: pathtracerchecks.BASE 의 Material 은 Lambert 이고, check-lambert-path.py check, check-path-tracer-export.py check,
+  [M1] 의 panel: Path Tracer panel 의 Shading 을 사람이나 computer use 로 바꾸고 그 전후의 state 로 본다.
+  그대로인 것: pathtracerchecks.BASE 의 Shading 은 Lambert 이고, check-lambert-path.py check, check-path-tracer-export.py check,
        check-directional-light.py check 가 통과한다. 그래서 작업 5, 6 의 측정 기록이 Lambert 조건으로 유효하다.
   Debug, Profile, Release build, viewer.py selftest, 문서
 
@@ -43,7 +43,7 @@ cell 이고, 하한이 걸리지 않는 작은 roughness 는 node 사이의 값�
 
 test scene: +z 를 보는 flat quad 를 roughness QUAD_ROUGHNESS x metallic QUAD_METALLIC 의 격자로 두고 baseColor 는 QUAD_COLORS 에서
 돌려 쓴다 (texture 없는 material factor). light 는 direction LIGHT_DIRECTION, intensity float 의 π 다. quad 의 pixel 은 Front Face view 의
-앞면을 가장자리 EDGE_PIXELS 깎고 column 과 row 로 나눈 것이다. PT 는 Material glTF, Max Bounces 1, Sky Light 0, Russian roulette off,
+앞면을 가장자리 EDGE_PIXELS 깎고 column 과 row 로 나눈 것이다. PT 는 Shading glTF, Max Bounces 1, Sky Light 0, Russian roulette off,
 16 spp 다. sky 와 emission 이 0 이라 path 의 값은 처음 맞은 곳의 직접광뿐이다.
   [S3] NEE 의 절대값: Geometric Normals on 의 PT export 가 quad 마다 3 x 3 pick 점에서 참조의 f(v, l) E max(0, n_g·l) 와 channel 마다
        상대 S3_TOLERANCE 안이다. v 는 pick 의 위치에서 state camera 의 위치로 가는 방향, n_g 는 pick 의 normal 이다.
@@ -51,7 +51,7 @@ test scene: +z 를 보는 flat quad 를 roughness QUAD_ROUGHNESS x metallic QUAD
        export v 가 깎은 앞면 pixel 모두에서 |q - v| ≤ 2^-m max(v, 2^-14) + 1e-3 v 다 (m 은 R11G11B10 의 mantissa bit 수
        R11G11B10_MANTISSA). shadow map 이 원인인 차이는 shadow map 을 고치지 않고 근거를 보고한다.
 
-Sponza: harness baseline 의 시점과 light 에서 Material glTF 로 쌓는다. glTF 의 furnace 는 baseColor 1, metallic 0, material 의 roughness
+Sponza: harness baseline 의 시점과 light 에서 Shading glTF 로 쌓는다. glTF 의 furnace 는 baseColor 1, metallic 0, material 의 roughness
 인 BRDF 에 Furnace Albedo 를 곱하므로 모든 view 방향에서 directional albedo 가 Furnace Albedo 다 (PathTracerCS.hlsl).
   [S1] 여러 번 반사하는 emission furnace (EMISSION_FURNACE_GLTF: Albedo 0.875, Emission 0.125, Sky 1, Geometric Normals on, Max Bounces
        256, FURNACE_SAMPLES spp): 해는 어디서나 Emission / (1 - Albedo) = 1 이다. Russian roulette off 와 on 각각에서 Seed 0, 1 의 export
@@ -68,17 +68,17 @@ Sponza: harness baseline 의 시점과 light 에서 Material glTF 로 쌓는다.
        Seed 의 camera ray 로 Max Bounces 0, Emission 0 을 쌓아 정확히 0 인 pixel 과 1 인 pixel 이다.
   [S4] 유한성과 visibility: viewer.SNAPSHOT_POSES 의 네 시점과 directlightchecks.SPONZA_LIGHTS 의 두 방향에서 SPONZA_SCENE (Geometric
        Normals off, Max Bounces 64, Russian roulette on, 256 spp) 을 쌓아 invalid sample 이 0 이다. 그리고 check-directional-light.py 의
-       [P6], [P7] 을 Material glTF 로 통과한다. [P6] 의 보이는데 어두움은 glTF 의 f 가 0 이 아닌 pixel (Metallic 이 1 이고 Base Color 가
+       [P6], [P7] 을 Shading glTF 로 통과한다. [P6] 의 보이는데 어두움은 glTF 의 f 가 0 이 아닌 pixel (Metallic 이 1 이고 Base Color 가
        0 인 곳 밖) 에서 세고 임계값은 그대로다.
   [S5] Lambert 의 bit 재현: BEFORE_DIR/start-pt.dds (47f6794, 조건은 BEFORE_DIR/manifest.json: baseline 시점, light 기본 방향, intensity
-       4, Sky 1, Max Bounces 64, Russian roulette on, Seed 0, Geometric Normals off, 64 spp) 와 Material Lambert 로 같은 조건에서 쌓은
+       4, Sky 1, Max Bounces 64, Russian roulette on, Seed 0, Geometric Normals off, 64 spp) 와 Shading Lambert 로 같은 조건에서 쌓은
        export 의 rgba 가 bit 까지 같다.
   [R4] 기본 화면의 밝기: scripts/harness-baseline/editor.ini 의 Exposure 주석의 규칙대로, baseline 시점에서 Exposure 2^EXPOSURE_STOPS 의
        display 와 adaptive exposure 를 ADAPTATION_FRAMES 만큼 수렴시킨 display 의 평균 밝기를 견줘 stop 으로 가장 가까운 Exposure 가 1
        이다. 수렴은 마지막 두 밝기의 비가 ADAPTATION_SETTLED 안인 것으로 본다.
-  [M1] Material 설정: 기본은 glTF 다. Material key 가 없는 editor.ini (harness baseline) 로 띄우면 state 와 settings get Path Tracer 가
+  [M1] Shading 설정: 기본은 glTF 다. Shading key 가 없는 editor.ini (harness baseline) 로 띄우면 state 와 settings get Path Tracer 가
        glTF 이고, settings set 으로 바꾸면 state 가 따르고 pt 의 resets 가 1 늘며, 끝낼 때 editor.ini 에 마지막 값이 남는다.
-       check-lambert-path.py 의 [8], [9] 도 Material 을 넣어 판정한다.
+       check-lambert-path.py 의 [8], [9] 도 Shading 을 넣어 판정한다.
 
 raster 의 변경 전후:
   [R2] SNAPSHOT_DIR/task-8 (47f6794) 의 baseline shot 네 개의 scene 과 가장 새 compare 의 같은 shot 에서, 값이 0 인지 아닌지 (rgb 가 모두
@@ -133,7 +133,7 @@ KEPT_DIR = HARNESS_DIR / 'kept' / 'gltf-brdf'
 CELLS_FILE = KEPT_DIR / 'brdf' / 'cells.json'
 BEFORE_DIR = KEPT_DIR / 'before'
 SNAPSHOT_NAME = 'task-8'
-GLTF = {'Material': 'glTF'}
+GLTF = {'Shading': 'glTF'}
 
 SEED = 8
 PAIRS = 1 << 16
@@ -671,26 +671,26 @@ def run_test_scene(build_first, check):
 
 # --- Sponza: [S1], [S2], [S4], [S5], [R4], [M1] ----------------------------------------------
 
-def check_default_material(session, check):
-    shown = session.ask_ok(f'state settings.{SECTION}')['state']['settings'][SECTION].get('Material')
-    got = session.ask_ok(f'settings get {SECTION}')['values'].get('Material')
+def check_default_shading(session, check):
+    shown = session.ask_ok(f'state settings.{SECTION}')['state']['settings'][SECTION].get('Shading')
+    got = session.ask_ok(f'settings get {SECTION}')['values'].get('Shading')
     baseline = (BASELINE_DIR / 'editor.ini').read_text(encoding='utf-8')
-    check('[M1] Material is glTF in state and settings get when editor.ini has no Material key',
-          shown == 'glTF' and got == 'glTF' and 'Material' not in baseline, f'state {shown}, settings get {got}')
+    check('[M1] Shading is glTF in state and settings get when editor.ini has no Shading key',
+          shown == 'glTF' and got == 'glTF' and 'Shading' not in baseline, f'state {shown}, settings get {got}')
 
 
-def check_material_resets(session, check):
+def check_shading_resets(session, check):
     set_path_tracer(session, GLTF | {'Target Samples': 1 << 20})
     session.ask_ok('pt reset')
     counts = []
-    for material in ['Lambert', 'glTF']:
+    for shading in ['Lambert', 'glTF']:
         session.ask_ok('pt wait samples=2', timeout=WAIT_TIMEOUT)
         before = path_tracer_state(session)['resets']
-        replied = set_path_tracer(session, {'Material': material})['state']['settings'][SECTION]['Material']
+        replied = set_path_tracer(session, {'Shading': shading})['state']['settings'][SECTION]['Shading']
         session.ask_ok('frames 2')
-        counts.append((material, replied, path_tracer_state(session)['resets'] - before))
-    check('[M1] settings set changes Material, state shows it and the path tracer starts over once each time',
-          all(replied == material and count == 1 for material, replied, count in counts), str(counts))
+        counts.append((shading, replied, path_tracer_state(session)['resets'] - before))
+    check('[M1] settings set changes Shading, state shows it and the path tracer starts over once each time',
+          all(replied == shading and count == 1 for shading, replied, count in counts), str(counts))
     set_path_tracer(session, {'Show': 0})
 
 
@@ -797,7 +797,7 @@ def check_sponza_finite(session, check, default_light):
             rgba, invalid = export(session, SPONZA_SCENE, f'sponza-{pose_name}-{light_name}', keep_it=light_name == 'default')
             counts[f'{pose_name} {light_name}'] = (invalid, bool(np.all(np.isfinite(rgba))))
     set_light(session, default_light)
-    check(f'[S4] no sample is NaN or Inf in Sponza with Material glTF, {SPONZA_SCENE["Target Samples"]} spp at the snapshot poses and lights',
+    check(f'[S4] no sample is NaN or Inf in Sponza with Shading glTF, {SPONZA_SCENE["Target Samples"]} spp at the snapshot poses and lights',
           all(invalid == 0 and finite for invalid, finite in counts.values()),
           '; '.join(f'{name}: {invalid} invalid, finite {finite}' for name, (invalid, finite) in counts.items()))
 
@@ -812,10 +812,10 @@ def check_lambert_bits(session, check):
     entry = manifest['files']['start-pt.dds']
     session.ask_ok(f'pose {entry["pose"]}')
     set_light(session, entry['directional light'])
-    now, _ = export(session, from_recorded(entry['path tracer']) | {'Material': 'Lambert'}, 'lambert-start-pt')
+    now, _ = export(session, from_recorded(entry['path tracer']) | {'Shading': 'Lambert'}, 'lambert-start-pt')
     before = read_dds_rgba32f(BEFORE_DIR / 'start-pt.dds')
     differing = np.any(now.view(np.uint32) != before.view(np.uint32), axis=2)
-    check(f'[S5] Material Lambert accumulates the same rgba bits as before ({manifest["code"]})', not differing.any(),
+    check(f'[S5] Shading Lambert accumulates the same rgba bits as before ({manifest["code"]})', not differing.any(),
           f'{int(differing.sum())} pixels differ')
 
 
@@ -828,7 +828,7 @@ def run_sponza(check):
             camera = session.ask_ok('state camera')['state']['camera']
             start_pose = ' '.join(str(camera[key]) for key in ['x', 'y', 'z', 'heading', 'pitch'])
             default_light = session.ask_ok(f'settings get {LIGHT_SECTION}')['values']
-            check_default_material(session, check)
+            check_default_shading(session, check)
             check_exposure(session, check, start_pose)
             check_emission_furnace(session, check)
             check_one_reflection_furnace(session, check, start_pose)
@@ -836,7 +836,7 @@ def run_sponza(check):
             check_sponza_direct(session, check, start_pose, default_light, '[S4] [P6] glTF', GLTF, gltf_reflects_nothing,
                                 lambda path: keep(path, 'pt'))
             check_bounces(session, check, start_pose, '[S4] [P7] glTF', GLTF)
-            check_material_resets(session, check)
+            check_shading_resets(session, check)
             check_lambert_bits(session, check)
         finally:
             session.close()
@@ -848,8 +848,8 @@ def run_sponza(check):
     ini = configparser.ConfigParser(delimiters=('=',), comment_prefixes=(';',), interpolation=None)
     ini.optionxform = str
     ini.read(Path(instance['run_dir']) / 'editor.ini', encoding='utf-8')
-    saved = ini[SECTION].get('Material') if ini.has_section(SECTION) else None
-    check('[M1] editor.ini keeps the Material set last (Lambert)', saved == 'Lambert', f'Material={saved}')
+    saved = ini[SECTION].get('Shading') if ini.has_section(SECTION) else None
+    check('[M1] editor.ini keeps the Shading set last (Lambert)', saved == 'Lambert', f'Shading={saved}')
 
 
 # --- raster 의 변경 전후: [R2] ------------------------------------------------------------------

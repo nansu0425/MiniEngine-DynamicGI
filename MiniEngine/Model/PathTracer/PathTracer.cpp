@@ -28,7 +28,7 @@ namespace
 {
     enum RootParameter { kConstants, kScene, kOutputs = kScene + RaytracingScene::kNumRootParameters, kShadowMap, kNumRootParameters };
     RootSignature s_RootSignature;
-    // [PathTracer::Output][PathTracer::Material] 순서다.
+    // [PathTracer::Output][PathTracer::Shading] 순서다.
     ComputePSO s_PSOs[][3] = {
         { ComputePSO(L"Path Tracer glTF"), ComputePSO(L"Path Tracer Lambert"), ComputePSO(L"Path Tracer DDGI Probe Hit") },
         { ComputePSO(L"Path Tracer Indirect Irradiance glTF"), ComputePSO(L"Path Tracer Indirect Irradiance Lambert"),
@@ -51,14 +51,14 @@ namespace
         Vector3 lightDirection;
         Vector3 lightIlluminance;
         Vector3 skyRadiance;
-        // Material DDGI Probe Hit가 읽는 shadow map을 그린 shadow camera. model은 바뀌지 않으므로 shadow camera가 shadow map을 정한다.
+        // Shading DDGI Probe Hit가 읽는 shadow map을 그린 shadow camera. model은 바뀌지 않으므로 shadow camera가 shadow map을 정한다.
         Matrix4 shadowMatrix;
     };
 
     // Settings의 samplesPerFrame과 targetSamples는 쌓는 속도와 양만 정하므로 비교하지 않는다.
     bool HaveSameImage(const PathTracer::Settings& a, const PathTracer::Settings& b)
     {
-        return a.output == b.output && a.material == b.material && a.seed == b.seed && a.maxBounces == b.maxBounces &&
+        return a.output == b.output && a.shading == b.shading && a.seed == b.seed && a.maxBounces == b.maxBounces &&
             a.russianRoulette == b.russianRoulette && a.geometricNormals == b.geometricNormals && a.furnace == b.furnace &&
             a.furnaceAlbedo == b.furnaceAlbedo && a.furnaceEmission == b.furnaceEmission;
     }
@@ -128,16 +128,16 @@ void PathTracer::Initialize(void)
     s_RootSignature.Finalize(L"Path Tracer");
 
     ComputePSO* radiance = s_PSOs[(int)Output::kRadiance];
-    radiance[(int)Material::kGltf].SetComputeShader(g_pPathTracerCS, sizeof(g_pPathTracerCS));
-    radiance[(int)Material::kLambert].SetComputeShader(g_pPathTracerLambertCS, sizeof(g_pPathTracerLambertCS));
-    radiance[(int)Material::kProbeHit].SetComputeShader(g_pPathTracerProbeHitCS, sizeof(g_pPathTracerProbeHitCS));
+    radiance[(int)Shading::kGltf].SetComputeShader(g_pPathTracerCS, sizeof(g_pPathTracerCS));
+    radiance[(int)Shading::kLambert].SetComputeShader(g_pPathTracerLambertCS, sizeof(g_pPathTracerLambertCS));
+    radiance[(int)Shading::kProbeHit].SetComputeShader(g_pPathTracerProbeHitCS, sizeof(g_pPathTracerProbeHitCS));
     ComputePSO* irradiance = s_PSOs[(int)Output::kIndirectIrradiance];
-    irradiance[(int)Material::kGltf].SetComputeShader(g_pPathTracerIrradianceCS, sizeof(g_pPathTracerIrradianceCS));
-    irradiance[(int)Material::kLambert].SetComputeShader(g_pPathTracerLambertIrradianceCS, sizeof(g_pPathTracerLambertIrradianceCS));
-    irradiance[(int)Material::kProbeHit].SetComputeShader(g_pPathTracerProbeHitIrradianceCS, sizeof(g_pPathTracerProbeHitIrradianceCS));
-    for (ComputePSO (&materials)[3] : s_PSOs)
+    irradiance[(int)Shading::kGltf].SetComputeShader(g_pPathTracerIrradianceCS, sizeof(g_pPathTracerIrradianceCS));
+    irradiance[(int)Shading::kLambert].SetComputeShader(g_pPathTracerLambertIrradianceCS, sizeof(g_pPathTracerLambertIrradianceCS));
+    irradiance[(int)Shading::kProbeHit].SetComputeShader(g_pPathTracerProbeHitIrradianceCS, sizeof(g_pPathTracerProbeHitIrradianceCS));
+    for (ComputePSO (&shadings)[3] : s_PSOs)
     {
-        for (ComputePSO& pso : materials)
+        for (ComputePSO& pso : shadings)
         {
             pso.SetRootSignature(s_RootSignature);
             pso.Finalize();
@@ -204,7 +204,7 @@ void PathTracer::Render(ComputeContext& context, const Settings& settings, const
     s_ShadowMapSRV.PointTo(0, shadowMap, shadowMap.GetSRV());
 
     context.SetRootSignature(s_RootSignature);
-    context.SetPipelineState(s_PSOs[(int)settings.output][(int)settings.material]);
+    context.SetPipelineState(s_PSOs[(int)settings.output][(int)settings.shading]);
     context.TransitionResource(s_Accumulation, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
     context.TransitionResource(sceneColor, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
     context.TransitionResource(shadowMap, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);

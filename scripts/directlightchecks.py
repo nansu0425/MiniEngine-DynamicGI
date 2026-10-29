@@ -1,6 +1,6 @@
 """Sponza 에서 PT 의 directional light 직접광이 Light Visibility 를 따르고 반사가 더하는 빛과 어긋나지 않는지 보는 판정 ([P6], [P7]).
 
-check-directional-light.py 가 Material Lambert 로, check-gltf-brdf.py 가 Material glTF 로 같은 판정을 하도록 여기에 모은다. 기준의
+check-directional-light.py 가 Shading Lambert 로, check-gltf-brdf.py 가 Shading glTF 로 같은 판정을 하도록 여기에 모은다. 기준의
 뜻과 임계값의 근거는 check-directional-light.py 의 docstring 에 있다.
 """
 
@@ -72,7 +72,7 @@ def largest_cluster(mask):
 
 def check_sponza_direct(session, check, start_pose, default_light, label, settings, reflects_nothing, keep):
     """[P6]. settings 는 DIRECT 에 더할 PT 설정이고, reflects_nothing(base_color, metallic) 은 Base Color 와 Metallic view 의 rgb 에서
-    그 Material 의 f 가 0 이라 보이는데 어두워도 되는 pixel 의 mask 다. keep 은 쌓은 export 의 경로를 받는다."""
+    그 Shading 의 f 가 0 이라 보이는데 어두워도 되는 pixel 의 mask 다. keep 은 쌓은 export 의 경로를 받는다."""
     for name, request in SPONZA_LIGHTS.items():
         session.ask_ok(f'pose {start_pose}')
         set_light(session, default_light)

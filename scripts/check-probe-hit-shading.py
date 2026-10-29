@@ -1,10 +1,10 @@
-"""PathTracer 의 Material DDGI Probe Hit 가 DDGI 논문의 probe ray hit shading 을 따르는지와, 기존 Material 과 raster 가 그대로인지
+"""PathTracer 의 Shading DDGI Probe Hit 가 DDGI 논문의 probe ray hit shading 을 따르는지와, 기존 Shading 과 raster 가 그대로인지
 판정한다.
 
-  python scripts/check-probe-hit-material.py before   # Material 을 더하기 전의 code 로 [E7] 의 기준 export 를 BEFORE_DIR 에 남긴다
-  python scripts/check-probe-hit-material.py check    # Debug 로 띄워 아래 기준을 판정한다
+  python scripts/check-probe-hit-shading.py before   # Shading DDGI Probe Hit 를 더하기 전의 code 로 [E7] 의 기준 export 를 BEFORE_DIR 에 남긴다
+  python scripts/check-probe-hit-shading.py check    # Debug 로 띄워 아래 기준을 판정한다
 
-번호는 Material DDGI Probe Hit 를 더한 commit (d84b6c3) 의 완료 기준의 번호다. probe hit 의 shading 과 그 출처는 SHADING_FILE 에, Material 의 정의는 PathTracer.h 의 Material 에
+번호는 Shading DDGI Probe Hit 를 더한 commit (d84b6c3) 의 완료 기준의 번호다. probe hit 의 shading 과 그 출처는 SHADING_FILE 에, Shading 의 정의는 PathTracer.h 의 Shading 에
 있다. check 는 app 을 test scene 둘에서 한 번씩, Sponza 에서 두 번 띄우고 끝내며, 이미 띄운 harness instance 는 먼저 끝낸다. 하나라도
 실패하면 exit 1 이다. 실행마다 끝낼 때 실행 중의 D3D12 CORRUPTION, ERROR, WARNING 이 0 이고 종료 때 LIVE_DEVICE 하나만 남는지도 본다
 ([E12]). PT 의 값은 capture pt 의 export 로 본다. export 의 rgb 는 sample 의 평균이고 a 는 더한 sample 수다. 이 script 밖에서 보는 기준:
@@ -13,7 +13,7 @@
   [E9] 기존 확인: check-lambert-path.py, check-path-tracer-export.py, check-indirect-irradiance.py, check-log-restore.py, check-gltf-brdf.py
        의 check 와, HitSurface 를 바꿨으므로 check-normal-map-convention.py 의 make, run, judge 절차
   [E12] 의 build: Debug 와 Profile build 가 성공하고 build log 에 warning 이 없다.
-  [E13] 정의: PathTracer.h 의 Output 과 Material, PathTracerCS.hlsl 의 LAMBERT_MATERIAL, panel tooltip 의 글은 사람이 읽는다.
+  [E13] 정의: PathTracer.h 의 Output 과 Shading, PathTracerCS.hlsl 의 LAMBERT_SHADING, panel tooltip 의 글은 사람이 읽는다.
 
 test scene (SCENE_DIR): -model 의 OrbitCamera 는 model 중심의 +z 쪽에서 -z 를 본다. light 는 direction LIGHT_DIRECTION, 흰색, intensity
 float 의 π 라서 E⊥ / π 가 1 이다. PT 는 Output Radiance, Max Bounces 1, Sky Light 0, Russian roulette off, TEST_SAMPLES spp 다. 처음
@@ -22,9 +22,9 @@ EDGE_PIXELS 깎고 column 으로 나눈 것이다. 비는 export / (E⊥ max(0, 
 direction 이다.
   [E1] ALBEDO_SCENE 의 왼쪽 두 quad 는 texture 없는 baseColor factor BASE_COLOR 이고 metallic 이 0 과 1 이다. Geometric Normals 를 켠다.
        vertex normal 은 R10G10B10A2 로 담겨 성분마다 1/1023 까지 달라서 (로드맵의 뒤로 미룬 일) n·l 이 1e-3 넘게 어긋날 수 있기
-       때문이다. Material DDGI Probe Hit 의 비가 channel 마다 ρ' = (1 - metallic) (0.96 baseColor + 0.04) + metallic baseColor 와 상대
+       때문이다. Shading DDGI Probe Hit 의 비가 channel 마다 ρ' = (1 - metallic) (0.96 baseColor + 0.04) + metallic baseColor 와 상대
        오차의 중앙값이 ALBEDO_TOLERANCE 이하이고, pixel 의 ALBEDO_FRACTION 이상이 모든 channel 에서 ALBEDO_TOLERANCE 안이다. 벗어난 pixel
-       의 수와 위치를 찍는다. Material Lambert 의 비는 baseColor (1 - metallic) 와 같은 기준으로 맞고, ρ' 와는 상대 오차의 중앙값이
+       의 수와 위치를 찍는다. Shading Lambert 의 비는 baseColor (1 - metallic) 와 같은 기준으로 맞고, ρ' 와는 상대 오차의 중앙값이
        ALBEDO_TOLERANCE 보다 큰 channel 이 있다. 두 식이 다르다는 것을 본다.
   [E2] 오른쪽 quad 는 CHECKER_SIZE 의 두 색 checker texture (CHECKER_COLORS, CHECKER_CELL texel 칸) 가 base color 이고 metallic 이 0 이다.
        조건은 [E1] 과 같다. Probe Hit 의 비는 channel 마다 변동 계수가 MIP_FLAT 이하이고, 평균이 app 이 만든 DDS 의 mip (SHADING_FILE 의
@@ -51,18 +51,18 @@ Sponza (harness baseline 의 시점과 light):
        Probe Hit 와 Lambert 를 쌓은 export 가 a 는 bit 까지, rgb 는 LAMBERT_RUN_ULPS 안에서 같다 (check-indirect-irradiance.py 의 [K1]
        의 허용 범위). Sponza 에는 emission 이 없으므로 path 의 값은 첫 점에서 고른 방향의 sky 뿐이다. 첫 점의 normal map 을 다른 mip 으로
        읽으면 고르는 방향이 달라지고, 첫 점의 shading 을 더하면 값이 커지므로 둘 다 이 판정에 걸린다 (추론).
-  [E7] BEFORE_DIR 의 export (Material 을 더하기 전의 code, 조건은 BEFORE_DIR/manifest.json: BEFORE_POSES 의 시점, harness baseline 의
-       light, 두 Output, Material glTF 와 Lambert, BEFORE_SETTINGS, BEFORE_SAMPLES spp) 와 같은 조건에서 쌓은 export 를 비교한다. glTF 는
+  [E7] BEFORE_DIR 의 export (Shading DDGI Probe Hit 를 더하기 전의 code, 조건은 BEFORE_DIR/manifest.json: BEFORE_POSES 의 시점, harness
+       baseline 의 light, 두 Output, Shading glTF 와 Lambert, BEFORE_SETTINGS, BEFORE_SAMPLES spp) 와 같은 조건에서 쌓은 export 를 비교한다. glTF 는
        rgba 가 bit 까지 같다. Lambert 는 a 가 bit 까지 같고 rgb 가 LAMBERT_RUN_ULPS 안이다. Lambert 는 같은 build 에서도 실행마다 rgb 가
        4 ulp 까지 다르다 (check-indirect-irradiance.py 의 [K1]).
-  [E10] RESTORE_LINE 의 조건 (Material DDGI Probe Hit) 으로 쌓아 capture pt 로 export 한다. app 을 다시 띄워 그 export 의 줄을 restore
+  [E10] RESTORE_LINE 의 조건 (Shading DDGI Probe Hit) 으로 쌓아 capture pt 로 export 한다. app 을 다시 띄워 그 export 의 줄을 restore
        하면 줄 (pt samples 밖) 과 state 의 camera, light, sky, settings.Path Tracer (Show 밖) 가 같고, Show 만 켜 같은 sample 수까지
        쌓은 export 의 rgba 가 bit 까지 같다.
-  [E11] Probe Hit 로 쌓다가 light 방향을 바꾸면, 또 Material 을 바꾸면 그때마다 pt 의 resets 가 1 늘고 samples 를 처음부터 센다.
+  [E11] Probe Hit 로 쌓다가 light 방향을 바꾸면, 또 Shading 을 바꾸면 그때마다 pt 의 resets 가 1 늘고 samples 를 처음부터 센다.
 
 source:
   [E6] PROBE_HIT_FUNCTIONS 가 SHADING_FILE 에만 정의되어 있고 PATH_TRACER_SHADER 가 모두 부른다. PATH_TRACER_SHADER 에서
-       PROBE_HIT_MATERIAL 로 고르는 구역에는 kPi 와 dot( 가 없고, 파일 전체에 FORBIDDEN_PATH_TRACER_TEXT 가 없다. 식과 상수를 PT 에
+       PROBE_HIT_SHADING 으로 고르는 구역에는 kPi 와 dot( 가 없고, 파일 전체에 FORBIDDEN_PATH_TRACER_TEXT 가 없다. 식과 상수를 PT 에
        따로 두지 않았다는 뜻이다. SHADING_FILE 에 FORBIDDEN_SHADING_PATTERN 이 없다. compute shader 도 부를 수 있다는 뜻이다.
 
 raster:
@@ -95,9 +95,9 @@ from pathtracerchecks import BASE, FURNACE_SAMPLES, SECTION, SKY_LIGHT_SECTION, 
 from viewer import (HARNESS_DIR, REPO_ROOT, SETTLE_FRAMES, SNAPSHOT_DIR, SNAPSHOT_POSES, VIEWER_DIR, HarnessError, Session, baseline_pose,
                     capture, start_instance, stop_instance)
 
-KEPT_DIR = HARNESS_DIR / 'kept' / 'probe-hit-material'
+KEPT_DIR = HARNESS_DIR / 'kept' / 'probe-hit-shading'
 BEFORE_DIR = KEPT_DIR / 'before'
-SCENE_DIR = HARNESS_DIR / 'probe-hit-material'
+SCENE_DIR = HARNESS_DIR / 'probe-hit-shading'
 ALBEDO_SCENE = 'ProbeHitAlbedo'
 SHADOW_SCENE = 'ProbeHitShadow'
 SNAPSHOT_NAME = 'task-e'
@@ -108,9 +108,9 @@ PROBE_HIT_FUNCTIONS = ['GetProbeHitAlbedo', 'GetProbeHitOutgoingRadiance', 'GetP
 FORBIDDEN_PATH_TRACER_TEXT = ['0.04', '0.96', '0.95', '1.05', 'SampleCmp']
 FORBIDDEN_SHADING_PATTERN = r'ddx|ddy|discard|clip\(|SV_'
 
-PROBE_HIT = {'Material': 'DDGI Probe Hit'}
-LAMBERT = {'Material': 'Lambert'}
-GLTF = {'Material': 'glTF'}
+PROBE_HIT = {'Shading': 'DDGI Probe Hit'}
+LAMBERT = {'Shading': 'Lambert'}
+GLTF = {'Shading': 'glTF'}
 RADIANCE = {'Output': 'Radiance'}
 IRRADIANCE = {'Output': 'Indirect Irradiance'}
 OUTPUTS = ['Radiance', 'Indirect Irradiance']
@@ -164,7 +164,7 @@ LAMBERT_RUN_ULPS = 8
 BEFORE_POSES = ['start', 'courtyard-up']
 BEFORE_SAMPLES = 64
 BEFORE_SETTINGS = BASE | {'Seed': 0, 'Max Bounces': 64, 'Russian Roulette': 1, 'Geometric Normals': 0, 'Target Samples': BEFORE_SAMPLES}
-BEFORE_RUNS = [(pose, output, material) for pose in BEFORE_POSES for output in OUTPUTS for material in ('glTF', 'Lambert')]
+BEFORE_RUNS = [(pose, output, shading) for pose in BEFORE_POSES for output in OUTPUTS for shading in ('glTF', 'Lambert')]
 
 RESET_SAMPLES = 32
 RESET_LIGHT = 'elevation=35 azimuth=150'
@@ -221,7 +221,7 @@ def write_gltf(name, quads, materials, images=()):
             'attributes': attributes, 'indices': builder.add(indices, GLTF_UNSIGNED_SHORT, 'SCALAR', 6), 'material': material}]})
         nodes.append({'name': f'quad {index}', 'mesh': index, 'translation': list(translation)})
     gltf = {
-        'asset': {'version': '2.0', 'generator': 'scripts/check-probe-hit-material.py'},
+        'asset': {'version': '2.0', 'generator': 'scripts/check-probe-hit-shading.py'},
         'scene': 0,
         'scenes': [{'nodes': list(range(len(nodes)))}],
         'nodes': nodes,
@@ -332,14 +332,14 @@ def check_albedo_scene(session, check):
         return
     scale = INTENSITY * max(0.0, float(light[2])) / math.pi
     ratios, invalid = {}, 0
-    for material in (PROBE_HIT, LAMBERT):
-        rgba, bad = export(session, TEST_DIRECT | material | {'Geometric Normals': 1}, f'albedo-{material["Material"].lower().replace(" ", "-")}')
-        ratios[material['Material']] = [rgba[mask][:, :3] / scale for mask in masks]
+    for shading in (PROBE_HIT, LAMBERT):
+        rgba, bad = export(session, TEST_DIRECT | shading | {'Geometric Normals': 1}, f'albedo-{shading["Shading"].lower().replace(" ", "-")}')
+        ratios[shading['Shading']] = [rgba[mask][:, :3] / scale for mask in masks]
         invalid += bad
 
     for index, metallic in enumerate(ALBEDO_METALLIC):
         expected = probe_hit_albedo(BASE_COLOR, metallic)
-        median, fraction, off = judge_albedo(ratios[PROBE_HIT['Material']][index], expected)
+        median, fraction, off = judge_albedo(ratios[PROBE_HIT['Shading']][index], expected)
         ys, xs = np.nonzero(masks[index])
         off_mask = np.zeros_like(masks[index])
         off_mask[ys[off], xs[off]] = True
@@ -347,10 +347,10 @@ def check_albedo_scene(session, check):
               f'<= {ALBEDO_TOLERANCE:g} per channel and {ALBEDO_FRACTION:.0%} of the pixels within it',
               bool(np.all(median <= ALBEDO_TOLERANCE)) and fraction >= ALBEDO_FRACTION and invalid == 0,
               f'median {np.array2string(median, precision=2)}, {fraction:.4%} of {len(off)} pixels within; '
-              f'mean ratio {np.round(ratios[PROBE_HIT["Material"]][index].mean(axis=0), 6).tolist()}; off pixels {describe_pixels(off_mask)}; '
+              f'mean ratio {np.round(ratios[PROBE_HIT["Shading"]][index].mean(axis=0), 6).tolist()}; off pixels {describe_pixels(off_mask)}; '
               f'{invalid} invalid samples')
 
-        lambert = ratios[LAMBERT['Material']][index]
+        lambert = ratios[LAMBERT['Shading']][index]
         lambert_expected = np.array(BASE_COLOR) * (1.0 - metallic)
         lambert_median, lambert_fraction, _ = judge_albedo(lambert, lambert_expected)
         against_probe = np.median(relative_error(lambert, expected), axis=0)
@@ -362,7 +362,7 @@ def check_albedo_scene(session, check):
 
     lod = int(shading_constant('kProbeHitTextureLod'))
     expected, texel = mip_texel_albedo(lod)
-    probe, lambert = ratios[PROBE_HIT['Material']][2], ratios[LAMBERT['Material']][2]
+    probe, lambert = ratios[PROBE_HIT['Shading']][2], ratios[LAMBERT['Shading']][2]
     variation = probe.std(axis=0) / probe.mean(axis=0)
     deviation = np.abs(probe.mean(axis=0) / expected - 1.0)
     check(f'[E2] the Probe Hit ratio on the checker varies by {MIP_FLAT:.0%} or less per channel and its mean is the rho\' of the mip {lod} '
@@ -479,18 +479,18 @@ def check_first_point(session, check, default_light):
         session.ask_ok(f'pose {SNAPSHOT_POSES[pose_name] or baseline_pose()}')
         set_light(session, default_light)
         images = {}
-        for material in (PROBE_HIT, LAMBERT):
-            rgba, _, _ = accumulate_export(session, FIRST_POINT | material, f'first-point-{pose_name}-{material["Material"].lower().replace(" ", "-")}')
-            images[material['Material']] = rgba
-        pixels, ulps, counts_same = compare_lambert_bits(images[PROBE_HIT['Material']], images[LAMBERT['Material']])
-        lit = int(np.count_nonzero(np.any(images[LAMBERT['Material']][..., :3] != 0.0, axis=2)))
+        for shading in (PROBE_HIT, LAMBERT):
+            rgba, _, _ = accumulate_export(session, FIRST_POINT | shading, f'first-point-{pose_name}-{shading["Shading"].lower().replace(" ", "-")}')
+            images[shading['Shading']] = rgba
+        pixels, ulps, counts_same = compare_lambert_bits(images[PROBE_HIT['Shading']], images[LAMBERT['Shading']])
+        lit = int(np.count_nonzero(np.any(images[LAMBERT['Shading']][..., :3] != 0.0, axis=2)))
         passed = passed and counts_same and ulps <= LAMBERT_RUN_ULPS and lit > 0
         details.append(f'{pose_name}: {pixels} pixels differ by up to {ulps} ulps, a {"same" if counts_same else "differs"}, {lit} pixels not 0')
     check(f'[E5] Indirect Irradiance with Max Bounces 1: Probe Hit accumulates the bits of Lambert, rgb within {LAMBERT_RUN_ULPS} ulps',
           passed, '; '.join(details))
 
 
-def check_existing_materials(session, check):
+def check_existing_shadings(session, check):
     manifest = json.loads((BEFORE_DIR / 'manifest.json').read_text(encoding='utf-8'))
     passed, details = True, []
     for name, entry in manifest['files'].items():
@@ -499,7 +499,7 @@ def check_existing_materials(session, check):
         now, _, _ = accumulate_export(session, entry['path tracer'], f'existing-{Path(name).stem}')
         before = read_dds_rgba32f(BEFORE_DIR / name)
         pixels, ulps, counts_same = compare_lambert_bits(now, before)
-        allowed = 0 if entry['path tracer']['Material'] == 'glTF' else LAMBERT_RUN_ULPS
+        allowed = 0 if entry['path tracer']['Shading'] == 'glTF' else LAMBERT_RUN_ULPS
         passed = passed and counts_same and ulps <= allowed
         details.append(f'{name}: {pixels} pixels differ by up to {ulps} ulps (allowed {allowed}), a {"same" if counts_same else "differs"}')
     check(f'[E7] glTF accumulates the same bits as before ({manifest["code"]}) and Lambert within {LAMBERT_RUN_ULPS} ulps, for both Outputs',
@@ -511,7 +511,7 @@ def check_resets(session, check, start_pose, default_light):
     set_light(session, default_light)
     set_path_tracer(session, BASE | PROBE_HIT | {'Target Samples': 4096})
     session.ask_ok('pt reset')
-    changes = [(f'light set {RESET_LIGHT}', 'the light direction'), (GLTF, 'Material to glTF'), (PROBE_HIT, 'Material back to DDGI Probe Hit')]
+    changes = [(f'light set {RESET_LIGHT}', 'the light direction'), (GLTF, 'Shading to glTF'), (PROBE_HIT, 'Shading back to DDGI Probe Hit')]
     for change, label in changes:
         session.ask_ok(f'pt wait samples={RESET_SAMPLES}', timeout=900)
         before = path_tracer_state(session)
@@ -581,7 +581,7 @@ def run_sponza(check, build_first):
             session.ask_ok('ui hide')
             default_light = session.ask_ok(f'settings get {LIGHT_SECTION}')['values']
             start_pose = baseline_pose()
-            check_existing_materials(session, check)
+            check_existing_shadings(session, check)
             session.ask_ok(f'pose {start_pose}')
             set_light(session, default_light)
             check_furnace(session, check, start_pose)
@@ -618,7 +618,7 @@ def git_grep(*arguments):
 
 
 def probe_hit_sections(text):
-    """PROBE_HIT_MATERIAL 이 참일 때만 compile 되는 줄. #if PROBE_HIT_MATERIAL 부터 그 짝의 #else 나 #endif 까지다."""
+    """PROBE_HIT_SHADING 이 참일 때만 compile 되는 줄. #if PROBE_HIT_SHADING 부터 그 짝의 #else 나 #endif 까지다."""
     lines, depth, inside = [], 0, False
     for line in text.splitlines():
         directive = line.strip()
@@ -631,7 +631,7 @@ def probe_hit_sections(text):
                 inside = False
                 continue
             lines.append(line)
-        elif re.match(r'#if\s+PROBE_HIT_MATERIAL\b', directive):
+        elif re.match(r'#if\s+PROBE_HIT_SHADING\b', directive):
             inside, depth = True, 0
     return lines
 
@@ -648,7 +648,7 @@ def check_source(check):
     left = [text for text in FORBIDDEN_PATH_TRACER_TEXT if text in path_tracer]
     check('[E6] the probe hit shading is defined only in SurfaceShading.hlsli, the path tracer calls it and has no formula or constant of its own',
           all(files == [SHADING_FILE] for files in defined_in.values()) and called == PROBE_HIT_FUNCTIONS and sections and not formulas and not left,
-          f'defined in {defined_in}; PathTracerCS calls {called}; {len(sections)} lines under PROBE_HIT_MATERIAL, formulas there {formulas}; '
+          f'defined in {defined_in}; PathTracerCS calls {called}; {len(sections)} lines under PROBE_HIT_SHADING, formulas there {formulas}; '
           f'{FORBIDDEN_PATH_TRACER_TEXT} found {left}')
     shading = (REPO_ROOT / SHADING_FILE).read_text(encoding='utf-8')
     found = [f'{number}: {line.strip()}' for number, line in enumerate(shading.splitlines(), 1) if re.search(FORBIDDEN_SHADING_PATTERN, line)]
@@ -701,12 +701,12 @@ def command_before(args):
             session.ask_ok('ui hide')
             light = session.ask_ok(f'settings get {LIGHT_SECTION}')['values']
             BEFORE_DIR.mkdir(parents=True, exist_ok=True)
-            for pose_name, output, material in BEFORE_RUNS:
+            for pose_name, output, shading in BEFORE_RUNS:
                 pose = SNAPSHOT_POSES[pose_name] or baseline_pose()
                 session.ask_ok(f'pose {pose}')
                 set_light(session, light)
-                settings = BEFORE_SETTINGS | {'Output': output, 'Material': material}
-                name = f'{pose_name}-{output.lower().replace(" ", "-")}-{material.lower()}.dds'
+                settings = BEFORE_SETTINGS | {'Output': output, 'Shading': shading}
+                name = f'{pose_name}-{output.lower().replace(" ", "-")}-{shading.lower()}.dds'
                 _, _, path = accumulate_export(session, settings, Path(name).stem)
                 shutil.copy2(path, BEFORE_DIR / name)
                 manifest['files'][name] = {'pose': pose, 'directional light': light, 'path tracer': settings}
@@ -726,7 +726,7 @@ def command_before(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     commands = parser.add_subparsers(dest='command', required=True)
-    for name, handler, help in [('before', command_before, 'keep the exports of [E7] with the code before the Material, in Debug'),
+    for name, handler, help in [('before', command_before, 'keep the exports of [E7] with the code before Shading DDGI Probe Hit, in Debug'),
                                 ('check', command_check, 'judge the criteria and the D3D12 messages in Debug')]:
         command = commands.add_parser(name, help=help)
         command.add_argument('--no-build', action='store_true', help='use the exe as it is')

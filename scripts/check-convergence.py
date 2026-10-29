@@ -19,7 +19,7 @@ export 의 rgb 는 E (lux) 의 평균, a 는 더한 sample 수다. X_s(N) 은 Se
 로 보고 허용 오차를 그 1/5 로 정했으므로 같은 값을 쓴다. d, b 와 그 상한, floor 는 imagecompare.py 의 bias 다. floor 가 예산보다 크면
 그 spp 로는 차가 예산 아래인지 알 수 없으므로 FAIL 이다.
 
-Material glTF 는 시간 안에 NOISE_BUDGET 에 이르지 못한다. 작업 12 를 판정할 때 1024 spp 의 e 가 start 26%, corridor 15% 였고, squared
+Shading glTF 는 시간 안에 NOISE_BUDGET 에 이르지 못한다. 작업 12 를 판정할 때 1024 spp 의 e 가 start 26%, corridor 15% 였고, squared
 error 의 88%, 50% 가 상위 0.1% pixel 에 있었다. 로드맵의 뒤로 미룬 일에 적은 흰 점이다. 그래서 판정은 Lambert 로 하고, glTF 는 e(N)
 과 흰 점의 몫만 잰다.
 
@@ -79,8 +79,8 @@ POSE_NAMES = ['start', 'corridor']
 # 한 frame 에 여럿을 쌓는다.
 MEASUREMENT = BASE | {'Output': 'Indirect Irradiance', 'Geometric Normals': 0, 'Max Bounces': 64, 'Russian Roulette': 1,
                       'Samples per Frame': 16}
-LAMBERT = {'Material': 'Lambert'}
-GLTF = {'Material': 'glTF'}
+LAMBERT = {'Shading': 'Lambert'}
+GLTF = {'Shading': 'glTF'}
 
 NOISE_BUDGET = 0.01
 BIAS_BUDGET = 0.002
@@ -123,8 +123,8 @@ def powers_of_two(last):
 
 
 def slope_runs():
-    return [Run('slope', f'{pose}-{material.lower()}-seed{seed}', pose, MEASUREMENT | {'Material': material, 'Seed': seed}, powers_of_two(samples))
-            for (pose, material), samples in SLOPE_SAMPLES.items() for seed in (0, 1)]
+    return [Run('slope', f'{pose}-{shading.lower()}-seed{seed}', pose, MEASUREMENT | {'Shading': shading, 'Seed': seed}, powers_of_two(samples))
+            for (pose, shading), samples in SLOPE_SAMPLES.items() for seed in (0, 1)]
 
 
 def bounces_runs():
@@ -249,13 +249,13 @@ def top_pixel_share(x0, x1, hits):
     return float(np.sum(squared[:max(1, int(squared.size * TOP_PIXELS))]) / np.sum(squared))
 
 
-def slope_name(pose, material, seed):
-    return f'{pose}-{material.lower()}-seed{seed}'
+def slope_name(pose, shading, seed):
+    return f'{pose}-{shading.lower()}-seed{seed}'
 
 
-def convergence(manifest, pose, material):
+def convergence(manifest, pose, shading):
     """N 마다의 e 와, 끝 spp 에서 흰 점의 몫"""
-    names = [slope_name(pose, material, seed) for seed in (0, 1)]
+    names = [slope_name(pose, shading, seed) for seed in (0, 1)]
     samples = sorted(set.intersection(*(set(map(int, manifest['runs'][name]['exports'])) for name in names)))
     errors, share = {}, None
     for n in samples:
@@ -293,20 +293,20 @@ def default_target_samples():
 def check_convergence(manifest, check):
     rows = {}
     for pose in POSE_NAMES:
-        for material in ('Lambert', 'glTF'):
-            errors, share = convergence(manifest, pose, material)
+        for shading in ('Lambert', 'glTF'):
+            errors, share = convergence(manifest, pose, shading)
             last = max(errors)
             slope, last_slope = fitted_slope(errors, SLOPE_FIT_FROM), fitted_slope(errors, last // 4)
-            gpu_ms = manifest['runs'][slope_name(pose, material, 0)]['gpu_ms_per_frame'] / MEASUREMENT['Samples per Frame']
-            rows[pose, material] = {'errors': errors, 'share': share, 'slope': slope, 'last_slope': last_slope, 'gpu_ms': gpu_ms}
+            gpu_ms = manifest['runs'][slope_name(pose, shading, 0)]['gpu_ms_per_frame'] / MEASUREMENT['Samples per Frame']
+            rows[pose, shading] = {'errors': errors, 'share': share, 'slope': slope, 'last_slope': last_slope, 'gpu_ms': gpu_ms}
             detail = (f'e {", ".join(f"{n}: {e:.4g}" for n, e in errors.items() if n >= SLOPE_FIT_FROM)}; slope {slope:.4f} from '
                       f'{SLOPE_FIT_FROM}, {last_slope:.4f} from {last // 4}; top {TOP_PIXELS:.1%} pixels have {share:.1%} of the squared error')
-            if material == 'Lambert':
-                check(f'[C1] {pose}, {material}: e falls as N^-0.5 within {SLOPE_TOLERANCE} from {SLOPE_FIT_FROM} spp and within '
+            if shading == 'Lambert':
+                check(f'[C1] {pose}, {shading}: e falls as N^-0.5 within {SLOPE_TOLERANCE} from {SLOPE_FIT_FROM} spp and within '
                       f'{LAST_SLOPE_TOLERANCE} over the last quarter',
                       abs(slope + 0.5) <= SLOPE_TOLERANCE and abs(last_slope + 0.5) <= LAST_SLOPE_TOLERANCE, detail)
             else:
-                print(f'MEASURED  {pose}, {material} (not judged): {detail}', flush=True)
+                print(f'MEASURED  {pose}, {shading} (not judged): {detail}', flush=True)
 
     pose, samples = ground_truth(manifest)
     default = default_target_samples()
@@ -385,14 +385,14 @@ def check_counts(manifest, check):
 
 def record(manifest, rows, ground_truth_samples, biases):
     today = date.today().isoformat()
-    for (pose, material), row in rows.items():
-        entry = manifest['runs'][slope_name(pose, material, 0)]
+    for (pose, shading), row in rows.items():
+        entry = manifest['runs'][slope_name(pose, shading, 0)]
         errors = row['errors']
         last = max(errors)
         at_ground_truth = errors.get(ground_truth_samples)
         seconds = entry['exports'].get(str(ground_truth_samples), {}).get('seconds')
         append_record_row(CONVERGENCE_RECORD_SECTION, [
-            today, entry['code'], *entry['machine'], pose, material, f'{row["gpu_ms"]:.3f}', f'{errors[1024]:.4g}', str(last),
+            today, entry['code'], *entry['machine'], pose, shading, f'{row["gpu_ms"]:.3f}', f'{errors[1024]:.4g}', str(last),
             f'{errors[last]:.4g}', f'{row["slope"]:.3f}', f'{row["last_slope"]:.3f}', f'{row["share"]:.3f}', str(ground_truth_samples),
             f'{at_ground_truth:.4g}' if at_ground_truth is not None else '-', f'{seconds:.0f}' if seconds is not None else '-'])
     for criterion, (pose, comparison, samples, result) in biases.items():

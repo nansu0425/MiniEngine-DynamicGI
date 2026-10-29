@@ -17,7 +17,7 @@ LIVE_DEVICE 하나만 남는지도 본다.
       든 key 가 없다.
   [2] SKY_LIGHTS 의 값마다 PT 를 끈 scene capture 의 sky pixel 이 모두 color x intensity 다. 값은 R11G11B10 이 정확히 담는 것으로
       골라 bit 로 비교한다.
-  [3] 같은 값에서 PT 를 켜고 Material glTF 와 Lambert 로 PT_SAMPLES 만큼 쌓으면, export 의 sky pixel 이 모두 color x intensity (fp32)
+  [3] 같은 값에서 PT 를 켜고 Shading glTF 와 Lambert 로 PT_SAMPLES 만큼 쌓으면, export 의 sky pixel 이 모두 color x intensity (fp32)
       와 bit 가 같고, scene capture 가 [2] 의 PT 를 끈 capture 와 sky pixel 에서 bit 가 같다. ROUNDED_SKY_LIGHT 처럼 R11G11B10 이
       정확히 담지 못하는 값에서도 PT 의 UAV 쓰기와 raster 의 render target 쓰기가 같은 값으로 반올림하는지 본다.
   [4] PT 를 쌓는 동안 Color 나 Intensity 를 바꾸면 pt 의 resets 가 1 늘고 samples 를 처음부터 센다. Intensity 의 inf 는 받고
@@ -26,7 +26,7 @@ LIVE_DEVICE 하나만 남는지도 본다.
   [5] state sky 의 color 와 intensity 가 settings 의 Sky Light 와 같은 값이고, Scene Hierarchy panel 의 목록 (state editor 의 objects)
       에 Sky Light 가 있어 Details panel 에서 그 값을 바꿀 수 있다.
 
-keep 은 기본 시점 (harness baseline 의 pose) 과 SKY_POSE 에서 PT 를 끈 display 와 PT 를 Material glTF 로 KEEP_SAMPLES 만큼 쌓은
+keep 은 기본 시점 (harness baseline 의 pose) 과 SKY_POSE 에서 PT 를 끈 display 와 PT 를 Shading glTF 로 KEEP_SAMPLES 만큼 쌓은
 display 를 찍는다. harness baseline 이라 Adaptation 이 꺼져 있고 Exposure 가 같다.
 """
 
@@ -65,7 +65,7 @@ SAVED_SKY_LIGHT = ((0.25, 0.5, 1.0), 0.75)
 # miss 한 sample 은 모두 같은 값이라 sample 수와 상관없이 평균이 그 값이다. 수를 줄여 시간을 아낀다.
 PT_SAMPLES = 4
 PATH_TRACER = {key: value for key, value in BASE.items() if key not in (SKY_COLOR, SKY_RADIANCE)} | {'Target Samples': PT_SAMPLES}
-MATERIALS = ['glTF', 'Lambert']
+SHADINGS = ['glTF', 'Lambert']
 # [4] 에서 바꾸기 전에 쌓아 두는 sample 수. 바꾼 뒤 frames 2 동안 쌓이는 수보다 커야 처음부터 센 것을 알 수 있다.
 SAMPLES_BEFORE_CHANGE = 32
 WAIT_TIMEOUT = 900
@@ -119,9 +119,9 @@ def raster_scene(session, name):
     return read_dds_rgba32f(capture(session, 'scene', name))[..., :3]
 
 
-def accumulate(session, material, name):
-    """material 로 처음부터 PT_SAMPLES 만큼 쌓은 export 의 rgb 와 scene capture 의 rgb"""
-    set_path_tracer(session, PATH_TRACER | {'Material': material})
+def accumulate(session, shading, name):
+    """shading 으로 처음부터 PT_SAMPLES 만큼 쌓은 export 의 rgb 와 scene capture 의 rgb"""
+    set_path_tracer(session, PATH_TRACER | {'Shading': shading})
     session.ask_ok('pt reset')
     session.ask_ok(f'pt wait samples={PT_SAMPLES}', timeout=WAIT_TIMEOUT)
     export = read_dds_rgba32f(capture(session, 'pt', f'{name}-pt'))[..., :3]
@@ -138,12 +138,12 @@ def check_sky_light(session, sky, sky_light, index, exact, check):
     if exact:
         check(f'[2] the raster draws the sky pixels as {describe(sky_light)}', count_not(raster[sky], expected) == 0,
               f'{count_not(raster[sky], expected)} of {int(sky.sum())} sky pixels are not {expected.tolist()}')
-    for material in MATERIALS:
-        export, scene = accumulate(session, material, f'{name}-{material.lower()}')
-        check(f'[3] {material} path tracer exports the sky pixels as {describe(sky_light)}', count_not(export[sky], expected) == 0,
+    for shading in SHADINGS:
+        export, scene = accumulate(session, shading, f'{name}-{shading.lower()}')
+        check(f'[3] {shading} path tracer exports the sky pixels as {describe(sky_light)}', count_not(export[sky], expected) == 0,
               f'{count_not(export[sky], expected)} of {int(sky.sum())} sky pixels are not {expected.tolist()}')
         differing = int(np.count_nonzero(np.any(scene[sky].view(np.uint32) != raster[sky].view(np.uint32), axis=-1)))
-        check(f'[3] {material} path tracer draws the sky pixels of the scene as the raster does with {describe(sky_light)}', differing == 0,
+        check(f'[3] {shading} path tracer draws the sky pixels of the scene as the raster does with {describe(sky_light)}', differing == 0,
               f'{differing} of {int(sky.sum())} sky pixels differ; path tracer {np.unique(scene[sky], axis=0)[:3].tolist()}, '
               f'raster {np.unique(raster[sky], axis=0)[:3].tolist()}')
 
@@ -267,7 +267,7 @@ def command_keep(args):
                 set_path_tracer(session, {'Show': 0})
                 session.ask_ok(f'frames {SETTLE_FRAMES}')
                 kept.append(keep_display(session, f'{pose_name}-raster'))
-                set_path_tracer(session, PATH_TRACER | {'Material': 'glTF', 'Samples per Frame': 16, 'Target Samples': KEEP_SAMPLES})
+                set_path_tracer(session, PATH_TRACER | {'Shading': 'glTF', 'Samples per Frame': 16, 'Target Samples': KEEP_SAMPLES})
                 session.ask_ok('pt reset')
                 session.ask_ok(f'pt wait samples={KEEP_SAMPLES}', timeout=KEEP_TIMEOUT)
                 kept.append(keep_display(session, f'{pose_name}-path-tracer'))

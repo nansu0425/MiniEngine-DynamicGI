@@ -86,7 +86,7 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 - PT 가 맞다는 근거: furnace (5, 6), BRDF 단위의 test (8), 수렴과 bias (12), 외부 renderer 와의 비교 (13)
 - raster 에서 IBL 과 Environment 를 빼고 sky 를 상수로 둔 이유, directional light 의 단위와 BRDF 를 고른 이유: C, 7, 8, 9
 - 같은 시점의 raster 와 PT, restart 뒤의 재현: 9, 10
-- DDGI 가 비교할 양과, 그 양으로 DDGI 의 오차를 나누는 Material DDGI Probe Hit: 11, d84b6c3
+- DDGI 가 비교할 양과, 그 양으로 DDGI 의 오차를 나누는 Shading DDGI Probe Hit: 11, d84b6c3
 - 비용 (GPU time, ground truth 까지의 시간): 5, 12
 
 ## 범위 밖
@@ -121,11 +121,11 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
   - start 시점 (`scripts/check-convergence.py` 의 POSES) 의 흰 점은 369 개 (174 개) 이고, 56% (44%) 에서 천의 금색 부분이 햇빛을 반사했다. start 시점의 Indirect Irradiance 에서 Lambert 의 흰 점은 106 개다.
   - sample 하나가 큰 이유 (식에서 한 추론): 햇빛은 delta light 라서 금색 면에서는 NEE 로만 반사된다. 금색 면이 햇빛을 반사하는 f cos 의 peak 는 F / (4π α² μo) 에 가깝고 (μo = n·v), roughness 0.18 의 α 0.032 에서는 roughness 1 의 약 1000 배다. 바닥의 diffuse vertex 가 금색 면의 반사를 찾으려면, cosine sampling 이 금색 면에서 햇빛이 거울 반사되는 방향 근처를 골라야 한다. 고를 수 있는 방향의 solid angle 은 α² 에 비례한다. 따라서 금색 면이 평균에 더하는 몫은 α 와 거의 무관하지만, sample 의 분산은 1/α² 로 커진다. 배경이 어두운 복도에서는 sample 과 이웃의 비가 특히 크다.
   - 줄이는 방법: sample 값을 자르는 일은 bias 가 생겨 정답에 맞지 않는다. roughness 하한을 올리면 glTF 의 정답이 아니게 되고, 0.3 까지 올려도 흰 점이 42% (64%) 만 줄었다. directional light 의 angular size 와 MIS (범위 밖에서 옮겨야 한다) 도 효과가 적을 것이다 (추론). 태양의 반지름 약 0.27° (0.0047 rad) 는 금색 면의 반사 lobe 폭 (약 2α = 0.065 rad) 보다 훨씬 작아서, 햇빛이 반사되는 방향의 범위를 거의 넓히지 못한다. MIS 는 금색 vertex 에서 방향을 고르는 일만 바꾸고, 바닥 vertex 가 금색 면 쪽을 고를 확률은 바꾸지 않는다. 남은 후보는 빛 쪽에서 path 를 만드는 방법 (light tracing, bidirectional path tracing) 과 path guiding 이다 (추측).
-  - DDGI 비교에 주는 영향: 복도 시점의 Indirect Irradiance 에서 image 평균 (E / π) 은 glTF 0.008751, Lambert 0.007570 이다. 위 대조 실험에서 specular 항을 빼면 glTF 의 평균이 0.007914 가 되어, 두 평균의 차의 71% 가 사라진다. Radiance 에서는 35% 가 사라진다. 따라서 glTF 가 Lambert 보다 밝은 몫의 대부분은 햇빛이 specular 로 반사되어 다른 면을 비추는 path 의 몫이고, 흰 점도 같은 path 에서 나온다. DDGI 의 probe hit shading 이 정답과 다른 몫은 이 차가 아니라 glTF 와 Material DDGI Probe Hit 의 차이고 (PathTracer.h 의 Output), 재지 않았다. image 평균은 Seed 0, 1 과 4096, 16384 spp 사이에서 0.03% 안으로 같지만, pixel 마다의 값은 수렴하지 않았다.
+  - DDGI 비교에 주는 영향: 복도 시점의 Indirect Irradiance 에서 image 평균 (E / π) 은 glTF 0.008751, Lambert 0.007570 이다. 위 대조 실험에서 specular 항을 빼면 glTF 의 평균이 0.007914 가 되어, 두 평균의 차의 71% 가 사라진다. Radiance 에서는 35% 가 사라진다. 따라서 glTF 가 Lambert 보다 밝은 몫의 대부분은 햇빛이 specular 로 반사되어 다른 면을 비추는 path 의 몫이고, 흰 점도 같은 path 에서 나온다. DDGI 의 probe hit shading 이 정답과 다른 몫은 이 차가 아니라 glTF 와 Shading DDGI Probe Hit 의 차이고 (PathTracer.h 의 Output), 재지 않았다. image 평균은 Seed 0, 1 과 4096, 16384 spp 사이에서 0.03% 안으로 같지만, pixel 마다의 값은 수렴하지 않았다.
   - 조사하지 않은 조건: 원인은 Seed 0, 4096 spp, Profile, 1920x1080 과 두 시점의 light 에서만 조사했다. sample 하나로 설명되지 않는 흰 점은 복도에서 89 개 (47 개), start 에서 92 개 (83 개) 이고, 원인을 보지 않았다. start 시점의 Radiance 에서 Lambert 의 흰 점은 재지 않았다.
 - infra 검증 5-4 ~ 5-7 의 mode: PT 에 그 문제로 보이는 결과가 나올 때 (323e185)
 - albedo 1 의 furnace 에서 16384 번 넘게 반사하고도 escape 하지 못한 path 가 어디에 갇혔는지 보는 일 (a5060e3): 작업 13 이나 PT 에서 leak, self-hit 로 보이는 결과가 나올 때. Indirect Irradiance 의 white furnace 에서도 16 spp 중 한 pixel 의 sample 하나가 65536 번 안에 escape 하지 못했다 (a93d5bb 의 check-indirect-irradiance.py [I1]).
-- Material Lambert 의 PT export 가 같은 build 에서도 실행마다 rgb 가 4 ulp 까지 다른 원인: Lambert 의 bit 재현에 의존하는 확인 (check-gltf-brdf.py 의 [S5]) 이 실패할 때. d05ec6f 를 두 번 띄워 같은 조건으로 쌓은 export 에서 pixel 의 0.4 ~ 1.3% 가 달랐고, glTF 는 같았다. check-indirect-irradiance.py 의 [K1] 은 이 차를 허용한다. PathTracerCS.hlsl 의 LAMBERT_MATERIAL 주석이 적은 반올림 차이도 같은 원인일 수 있다 (추측).
+- Shading Lambert 의 PT export 가 같은 build 에서도 실행마다 rgb 가 4 ulp 까지 다른 원인: Lambert 의 bit 재현에 의존하는 확인 (check-gltf-brdf.py 의 [S5]) 이 실패할 때. d05ec6f 를 두 번 띄워 같은 조건으로 쌓은 export 에서 pixel 의 0.4 ~ 1.3% 가 달랐고, glTF 는 같았다. check-indirect-irradiance.py 의 [K1] 은 이 차를 허용한다. PathTracerCS.hlsl 의 LAMBERT_SHADING 주석이 적은 반올림 차이도 같은 원인일 수 있다 (추측).
 - 작업 11 의 check 를 처음 돌릴 때 Indirect Irradiance 의 white furnace (Max Bounces 65536) 를 쌓다가 app 이 exit reason 없이 끝난 원인: 다시 일어날 때. 같은 조건을 손으로 쌓을 때와 check 를 다시 돌릴 때는 재현되지 않았다.
 - PT panel 의 Export button: script 없이 사람이 PT 의 값을 export 할 일이 생길 때. 지금은 harness 의 `capture pt` 로만 export 한다 (2b33c11).
 - Engine Tuning 의 Graphics/SSAO 항목을 없애는 일: ModelViewer 는 SSAO 를 돌리지 않지만 engine 의 SSAO module 이 남아 있어 효과 없는 항목이 보인다. legacy Sponza renderer 를 지울 때 (35e8e58)
