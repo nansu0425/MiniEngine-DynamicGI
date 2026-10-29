@@ -85,8 +85,9 @@ raster 의 변경 전후:
        0 이면 0) 가 달라진 pixel 은 before 와 after 가 모두 2^-14 미만이다. 빛이 닿는 곳은 그대로이고 밝기만 바뀐다.
 
 source 와 생성 파일:
-  [C1] BRDF_FUNCTIONS 가 BRDF_FILE 에만 정의되어 있고, PathTracerCS, DefaultPS (와 그것을 include 하는 variant 셋), BRDF test shader 가
-       CALLED_BY 의 함수를 부른다. Model/Renderer 에 FORBIDDEN_RASTER_NAMES 가 없다. PathTracerCS 는 MakeGltfBrdfInput 을 한 번 불러
+  [C1] BRDF_FUNCTIONS 가 BRDF_FILE 에만 정의되어 있고, PathTracerCS, SHADING_FILE, BRDF test shader 가 CALLED_BY 의 함수를 부른다.
+       DefaultPS (와 그것을 include 하는 variant 셋) 는 BRDF 를 직접 부르지 않고 SHADING_FILE 을 include 해 RASTER_SHADING 을 부른다.
+       Model/Renderer 에 FORBIDDEN_RASTER_NAMES 가 없다. PathTracerCS 는 MakeGltfBrdfInput 을 한 번 불러
        vertex 의 brdf 를 만들고 그것을 직접광과 반사에 넘긴다 (code 를 읽어 본 것을 grep 의 수로 확인한다).
   [C2] scripts/gltfbrdf.py tables 를 다시 돌리면 repo 에 둔 Core/Shaders/GltfBrdfTables.hlsli 와 byte 까지 같다.
 
@@ -199,8 +200,10 @@ CALLED_FUNCTIONS = ['MakeGltfBrdfInput', 'EvaluateGltfBrdf', 'SampleGltfBrdfDire
 PATH_TRACER_SHADER = 'MiniEngine/Model/PathTracer/PathTracerCS.hlsl'
 RASTER_SHADER = 'MiniEngine/Model/Renderer/DefaultPS.hlsl'
 TEST_SHADER = 'MiniEngine/Model/PathTracer/BrdfTestCS.hlsl'
-# raster 는 directional light 만 평가하고 방향을 고르지 않는다.
-CALLED_BY = {PATH_TRACER_SHADER: CALLED_FUNCTIONS, RASTER_SHADER: CALLED_FUNCTIONS[:2], TEST_SHADER: CALLED_FUNCTIONS}
+SHADING_FILE = 'MiniEngine/Core/Shaders/SurfaceShading.hlsli'
+RASTER_SHADING = 'GetOutgoingRadiance'
+# raster 는 directional light 만 평가하고 방향을 고르지 않는다. DefaultPS 는 SHADING_FILE 을 거쳐 BRDF 를 부른다.
+CALLED_BY = {PATH_TRACER_SHADER: CALLED_FUNCTIONS, SHADING_FILE: CALLED_FUNCTIONS[:2], RASTER_SHADER: [], TEST_SHADER: CALLED_FUNCTIONS}
 FORBIDDEN_RASTER_NAMES = ['Diffuse_Burley', 'G_Shlick_Smith_Hable', 'Specular_D_GGX', 'kDielectricSpecular', 'c_diff']
 GRAPH_COSINES = [1.0, 0.5, 0.3, 0.1, 0.03]
 
@@ -885,9 +888,11 @@ def check_source(check):
                    if not re.search(r':\s*return\s', line)]
     defined_in = sorted({line.split(':', 1)[0] for line in definitions})
     callers = {}
-    for path in [PATH_TRACER_SHADER, RASTER_SHADER, TEST_SHADER]:
+    for path in CALLED_BY:
         text = (REPO_ROOT / path).read_text(encoding='utf-8')
         callers[path] = [name for name in CALLED_FUNCTIONS if re.search(rf'\b{name}\s*\(', text)]
+    raster = (REPO_ROOT / RASTER_SHADER).read_text(encoding='utf-8')
+    shades = f'#include "{SHADING_FILE.removeprefix("MiniEngine/")}"' in raster and re.search(rf'\b{RASTER_SHADING}\s*\(', raster) is not None
     include = RASTER_SHADER.removeprefix('MiniEngine/')
     variants = sorted(line.split(':', 1)[0] for line in git_grep('-F', f'#include "{include}"', '--', '*.hlsl'))
     left = git_grep('-E', '|'.join(FORBIDDEN_RASTER_NAMES), '--', 'MiniEngine/Model/Renderer')
@@ -895,9 +900,10 @@ def check_source(check):
     once = (len(re.findall(r'\bMakeGltfBrdfInput\s*\(', path_tracer)), len(re.findall(r'EvaluateGltfBrdf\(vertex\.brdf', path_tracer)),
             len(re.findall(r'SampleGltfBrdfDirection\(vertex\.brdf', path_tracer)))
     check('[C1] the BRDF functions are defined in one .hlsli, the path tracer, the raster and the BRDF test call them, and the old raster '
-          'BRDF is gone', defined_in == [BRDF_FILE] and all(callers[path] == CALLED_BY[path] for path in callers) and len(variants) == 3
-          and not left and once == (1, 1, 1),
-          f'defined in {defined_in}; calls {callers}; files including DefaultPS {variants}; old names left {left}; '
+          'BRDF is gone', defined_in == [BRDF_FILE] and all(callers[path] == CALLED_BY[path] for path in callers) and shades
+          and len(variants) == 3 and not left and once == (1, 1, 1),
+          f'defined in {defined_in}; calls {callers}; DefaultPS calls {RASTER_SHADING} of {SHADING_FILE}: {shades}; '
+          f'files including DefaultPS {variants}; old names left {left}; '
           f'PathTracerCS makes the input {once[0]} time and passes it to the light {once[1]} and the reflection {once[2]} times')
 
 

@@ -12,7 +12,7 @@
 //              Justin Saunders (ATG)
 
 #include "Model/Renderer/Common.hlsli"
-#include "Core/Shaders/GltfBrdf.hlsli"
+#include "Core/Shaders/SurfaceShading.hlsli"
 
 Texture2D<float4> baseColorTexture          : register(t0);
 Texture2D<float3> metallicRoughnessTexture  : register(t1);
@@ -94,14 +94,13 @@ float3 ComputeNormal(VSOutput vsOutput)
 #endif
 }
 
-// 면이 directional light를 가리는지는 README.md의 "camera 밖에서 본 doubleSided"가 정한다.
-// vertex normal은 면을 따라 휘므로 면의 방향은 worldPos의 미분으로 구한다.
-bool SurfaceOccludesLight(float3 worldPos, float3 V)
+// pixel이 놓인 triangle 면의 normal을 view 쪽으로 구한다. vertex normal은 면을 따라 휘므로 면의 방향은 worldPos의 미분으로 구한다.
+float3 GetGeometryNormal(float3 worldPos, float3 view)
 {
     float3 geometryNormal = cross(ddx(worldPos), ddy(worldPos));
-    if (dot(geometryNormal, V) < 0.0)
+    if (dot(geometryNormal, view) < 0.0)
         geometryNormal = -geometryNormal;
-    return dot(geometryNormal, LightDirection) <= 0.0;
+    return geometryNormal;
 }
 
 [RootSignature(Renderer_RootSig)]
@@ -111,24 +110,23 @@ float4 main(VSOutput vsOutput, bool isFrontFace : SV_IsFrontFace) : SV_Target0
     float4 baseColor = baseColorFactor * baseColorTexture.Sample(baseColorSampler, UVSET(BASECOLOR));
     float2 metallicRoughness = metallicRoughnessFactor * 
         metallicRoughnessTexture.Sample(metallicRoughnessSampler, UVSET(METALLICROUGHNESS)).bg;
-    float3 emissive = emissiveFactor * emissiveTexture.Sample(emissiveSampler, UVSET(EMISSIVE));
+
+    SurfaceShadingInput surface;
+    surface.baseColor = baseColor.rgb;
+    surface.metallic = metallicRoughness.x;
+    surface.roughness = metallicRoughness.y;
+    surface.emissive = emissiveFactor * emissiveTexture.Sample(emissiveSampler, UVSET(EMISSIVE));
     // GltfBrdf.hlsli는 단위 normal을 받는다. tangent frame을 보간한 normal map의 normal은 길이가 1이 아닐 수 있다.
-    float3 normal = normalize(ComputeNormal(vsOutput));
+    surface.normal = normalize(ComputeNormal(vsOutput));
     if (!isFrontFace)
-        normal = -normal;
+        surface.normal = -surface.normal;
     const float3 view = normalize(ViewerPos - vsOutput.worldPos);
 
-    // Begin accumulating light starting with emissive
-    float3 colorAccum = emissive;
-
-    float shadow = texShadow.SampleCmpLevelZero( shadowSampler, vsOutput.shadowCoord.xy, vsOutput.shadowCoord.z );
-    if (SurfaceOccludesLight(vsOutput.worldPos, view))
-        shadow = 0.0;
-    // directional light는 path tracer의 직접광과 같은 BRDF로 반사한다. illuminance는 light에 수직인 면의 값이므로 normal과의 cos를 곱한다.
-    const GltfBrdfInput brdf = MakeGltfBrdfInput(baseColor.rgb, metallicRoughness.x, metallicRoughness.y, normal, view);
-    colorAccum += EvaluateGltfBrdf(brdf, LightDirection) * LightIlluminance * (max(0.0, dot(normal, LightDirection)) * shadow);
+    const float lightVisibility = GetDirectionalLightVisibility(texShadow, shadowSampler, vsOutput.shadowCoord,
+        GetGeometryNormal(vsOutput.worldPos, view), LightDirection);
+    const float3 radiance = GetOutgoingRadiance(surface, view, LightDirection, LightIlluminance, lightVisibility);
 
     // TODO: Shade each light using Forward+ tiles
 
-    return float4(colorAccum, baseColor.a);
+    return float4(radiance, baseColor.a);
 }
