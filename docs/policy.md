@@ -13,7 +13,7 @@
 - submodule 은 `submodules` 에 경로를 적은 것만 받는다. `sparse` 는 submodule 에 적용되지 않는다.
 - 받은 repo 안에서 수정한 내용이 있으면 script 는 그 repo 를 건너뛴다.
 - 논문 같은 단일 파일은 `name`, `url`, `sha256` 을 적는다. 받은 파일의 sha256 이 다르면 script 가 실패한다.
-- manifest 에서 뺀 항목은 script 가 지우지 않는다. `references/` 아래의 해당 폴더나 파일을 직접 지운다.
+- script 는 manifest 에서 뺀 항목을 `references/` 에서 지우지 않는다. 뺀 항목의 폴더나 파일은 직접 지운다.
 - `git clean -fdx` 는 `references/` 도 지운다. 지워지면 script 로 다시 받는다.
 
 ### 참고 범위
@@ -23,7 +23,7 @@
 - 논문은 알고리즘과 수식을 참고해 구현한다. 본문과 그림은 repo 에 옮기지 않는다.
 - MIT 처럼 허용하는 license 의 코드는 가져다 쓸 수 있다. 가져온 코드는 다음처럼 표시한다.
   - 가져온 함수나 class 의 주석에 출처 project 와 파일 경로, 원래 이름을 적고, license 는 `THIRD_PARTY_NOTICES.md` 에 있다고 적는다. 고친 점이 있으면 이어서 적는다. 예: `// Capsaicin의 src/core/src/geometry/geometry.hlsl에서 offsetPosition을 가져왔다. license는 THIRD_PARTY_NOTICES.md에 있다.` `THIRD_PARTY_NOTICES.md` 로 검색하면 가져온 코드를 모두 찾을 수 있다.
-  - copyright 와 license 문구의 전문은 [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md) 에 출처 project 마다 한 번만 둔다. MIT 는 문구를 copy 에 포함하라고만 하고 위치는 정하지 않는다. 새 project 에서 코드를 가져오면 `THIRD_PARTY_NOTICES.md` 에 새 project 의 항목을 더한다.
+  - copyright 와 license 문구의 전문은 [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md) 에 출처 project 마다 한 번만 둔다. MIT 는 문구를 copy 에 포함하라고만 하고 위치는 정하지 않는다. 새 project 에서 코드를 가져오면 `THIRD_PARTY_NOTICES.md` 에 새 project 의 항목을 추가한다.
   - 파일 상단에는 license 전문을 붙이지 않는다. 파일 전체가 다른 project 에서 가져온 코드처럼 보이기 때문이다. 파일을 통째로 가져왔을 때만 원래 파일의 header 를 그대로 둔다.
 - license 가 없거나 재배포를 막는 코드는 사용하지 않는다. 코드가 구현한 idea만 참고한다.
 
@@ -44,7 +44,7 @@ spec 의 doubleSided 는 camera 에서 그릴 때의 결과만 정하고, shadow
 - ray 를 쏘는 query 의 시점은 ray 의 출발점이다. 출발점에서 본 single-sided material 의 뒷면은 없는 것으로 친다. camera ray, reflection ray, path tracing 의 path ray 가 모두 그렇다.
 - 두 점 사이의 visibility 는 shading 하는 점에서 상대 점이 보이는지이고, ray 는 shading 하는 점에서 쏜다. single-sided 면이 사이에 있으면 반대 방향으로 쏜 결과와 다를 수 있다.
 - shading 하는 점이 놓인 면이 geometric normal 로 상대 점을 등지면 가려진 것으로 친다. 그 점에서 출발한 ray 는 바로 그 면을 앞에서 지나기 때문이다. normal map 을 적용한 shading normal 이 상대 점을 향해도 같다.
-- closest hit 와 visibility 가 같은 규칙을 따르므로 같은 ray 에서 둘이 보는 면이 같다. path tracing 의 MIS 처럼 두 query 의 결과를 섞는 곳이 이것에 기댄다.
+- closest hit 와 visibility 가 같은 규칙을 따르므로 같은 ray 에서 둘이 보는 면이 같다. path tracing 의 MIS 처럼 두 query 의 결과를 섞는 곳은 두 query 가 같은 면을 본다는 것을 전제한다.
 - raster 의 shadow map 은 light 에서 보므로, shading 하는 점에서 본 결과와 같도록 single-sided material 의 앞면을 cull 한다.
 - 뒷면에 맞았는지를 알려는 query 는 cull 하지 않는다. DDGI probe 가 벽 안에 있는지 보는 ray 와, debug view 가 culling 을 끄고 보는 view 가 그렇다.
 - 모든 ray 를 양면으로 두고 camera 에서만 cull 하는 방식은 고르지 않았다. ray 가 single-sided 의 뒷면에 맞으면 그 면을 shading 해야 하는데, spec 은 그 뒷면이 어떻게 보이는지 정하지 않는다.
