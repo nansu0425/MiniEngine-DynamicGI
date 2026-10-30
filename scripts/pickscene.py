@@ -14,6 +14,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from gltfwriter import GLTF_FLOAT, GLTF_UNSIGNED_SHORT, BufferBuilder, flatten
+from pickanswers import nearest_face, parallelogram
 
 GLTF_NAME = 'PickKnownAnswers.gltf'
 
@@ -125,22 +126,20 @@ def world_transform(bounds, tolerance=1e-5):
     return scale, world_min - scale * low
 
 
-def classify(origin, direction, transform, t_min, t_max):
-    """ray 가 처음 맞는 면의 (t, surface, face) 또는 None. 뒷면은 raster 와 pick 처럼 cull 한다."""
+def world_faces(transform):
+    """test scene 의 면을 transform 으로 옮긴 world 의 평행사변형. surface 와 face 는 그 면의 SURFACES 값이다."""
     import numpy as np
     scale, offset = transform
-    nearest = None
+    faces = []
     for surface in SURFACES:
         for face in surface.faces:
             normal, u, v = face_axes(face)
-            denominator = direction @ normal
-            if denominator >= 0.0:
-                continue
-            center = scale * np.array(face.center) + offset
-            t = ((center - origin) @ normal) / denominator
-            if not t_min <= t <= t_max or (nearest is not None and t >= nearest[0]):
-                continue
-            local = origin + t * direction - center
-            if abs(local @ u) <= scale * face.half_u and abs(local @ v) <= scale * face.half_v:
-                nearest = (t, surface, face)
-    return nearest
+            faces.append(parallelogram(scale * np.array(face.center) + offset, scale * face.half_u * u, scale * face.half_v * v, normal,
+                                       double_sided=False, surface=surface, face=face))
+    return faces
+
+
+def classify(origin, direction, transform, t_min, t_max):
+    """ray 가 처음 맞는 면의 (t, surface, face) 또는 None. 뒷면은 raster 와 pick 처럼 cull 한다."""
+    found = nearest_face(origin, direction, world_faces(transform), t_min, t_max)
+    return None if found is None else (found[0], found[1].surface, found[1].face)

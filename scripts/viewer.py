@@ -21,6 +21,7 @@ from ctypes import wintypes
 from pathlib import Path
 
 from imagefiles import ImageFileError, read_dds_rgba32f
+from pickanswers import camera_ray, grid_cells, is_unambiguous, vector_of
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 ENGINE_DIR = REPO_ROOT / 'MiniEngine'
@@ -1160,11 +1161,6 @@ LIGHT_OBJECT = 'Directional Light'
 LIGHT_SECTION = 'Directional Light'
 
 
-def vector_of(fields):
-    import numpy as np
-    return np.array([float(fields[axis]) for axis in 'xyz'])
-
-
 def numbers_of(text):
     import numpy as np
     return np.array([float(value) for value in text.split(',')])
@@ -1505,18 +1501,6 @@ def raster_depth_of(z, camera):
     return near * far / (near + float(z) * (far - near))
 
 
-def grid_cells(grid):
-    """pick grid 의 응답을 칸마다 (x, y, instance, material, distance, position 의 text) 로 푼다. miss 인 칸의 값은 None 이다."""
-    keys = ['instance', 'material', 'distance', 'position']
-    cells = []
-    for row in range(grid['rows']):
-        fields = grid['row'][str(row)]
-        tokens = {key: fields[key].split() for key in keys}
-        for column, x in enumerate(int(x) for x in grid['x'].split()):
-            cells.append((x, fields['y'], {key: None if tokens[key][column] == '-' else tokens[key][column] for key in keys}))
-    return cells
-
-
 def cell_of(pick):
     """단일 pick 의 응답을 grid_cells 의 칸 값처럼 쓴다."""
     if not pick['hit']:
@@ -1739,23 +1723,6 @@ def check_acceptance(session, check):
         session.ask_ok(f'frames {VALIDATION_VIEW_SETTLE_FRAMES}')
 
 
-def camera_ray(camera, scene, sample):
-    """CameraRays.cpp 와 CameraRays.hlsli 처럼, scene 의 pixel 격자에서 sample (client pixel) 을 지나는 ray 의 origin 과 방향.
-    camera 는 roll 이 없다고 본다."""
-    import numpy as np
-    forward = vector_of(camera['forward'])
-    forward /= np.linalg.norm(forward)
-    right = np.cross(forward, [0.0, 1.0, 0.0])
-    right /= np.linalg.norm(right)
-    up = np.cross(right, forward)
-    half_height = np.tan(float(camera['vertical_fov']) / 2)
-    half_width = half_height * scene['width'] / scene['height']
-    # pixel 격자는 frustum 을 반 pixel 왼쪽 위로 옮긴 것이다.
-    x, y = sample[0] - scene['left'] - 0.5, sample[1] - scene['top'] - 0.5
-    direction = forward + right * half_width * (2 * x / scene['width'] - 1) + up * half_height * (1 - 2 * y / scene['height'])
-    return vector_of(camera), direction / np.linalg.norm(direction)
-
-
 def check_pick_known_answers(args, check):
     """pickscene.py 의 정답을 아는 test scene 을 -model 로 띄워, pick 이 돌려준 것을 해석적으로 구한 정답과 견준다."""
     import numpy as np
@@ -1783,11 +1750,8 @@ def check_pick_known_answers(args, check):
         def kind(found):
             return None if found is None else (found[1].name, found[2].name)
 
-        # pixel 의 가장자리까지 옮긴 sample 에서도 같은 면을 맞는 칸만 판정한다. 그 밖의 칸은 정답이 sample 위치의 오차에 달려 있다.
         def unambiguous(pixel):
-            center = np.array(pixel) + 0.5
-            kinds = {kind(expect(center + offset)[2]) for offset in [(0, 0), (-0.5, 0), (0.5, 0), (0, -0.5), (0, 0.5)]}
-            return len(kinds) == 1
+            return is_unambiguous(lambda sample: kind(expect(sample)[2]), pixel)
 
         grid = grid_cells(session.ask_ok('pick grid 32x18')['grid'])
         wrong, judged, instances = [], {}, {}
