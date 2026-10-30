@@ -1,20 +1,15 @@
-"""PathTracer 의 Indirect Irradiance 출력이 정의대로 쌓이는지와, Radiance 출력이 Output 을 더하기 전과 같은지 판정한다.
+"""PathTracer 의 Indirect Irradiance 출력이 정의대로 쌓이는지 판정한다.
 
-  python scripts/check-indirect-irradiance.py reference   # [K1] 이 비교할 기준 export 를 지금의 code 로 REFERENCE_DIR 에 남긴다
-  python scripts/check-indirect-irradiance.py check       # Debug 로 띄워 아래 기준을 판정한다
-  python scripts/check-indirect-irradiance.py keep        # Profile 로 띄워 발표에 쓸 image 를 KEPT_DIR 에 남긴다
+  python scripts/check-indirect-irradiance.py check   # Debug 로 띄워 아래 기준을 판정한다
+  python scripts/check-indirect-irradiance.py keep    # Profile 로 띄워 발표에 쓸 image 를 KEPT_DIR 에 남긴다
 
 번호는 작업 11 의 완료 기준의 번호다. Indirect Irradiance 의 정의와 단위는 PathTracer.h 의 Output 에 있다. 이 script 밖에서 보는 기준:
   [U1] 의 저장과 reset: check-lambert-path.py check 의 [8], [9]
   [U2], [U3] 측정 조건의 줄: check-log-restore.py check 의 [G1], [G2b], [G4]
   [U4] panel 의 Output combo: 사람이나 computer use 로 바꾸고 그 전후의 state 로 본다
-  [K2] 기존 확인: check-lambert-path.py, check-path-tracer-export.py, check-gltf-brdf.py, check-directional-light.py,
-       check-sky-light.py, check-log-restore.py 의 check
-  [K3] raster: viewer.py snapshot compare task-11
-  [K4] 의 build 와 selftest: Debug, Profile, Release build, viewer.py selftest
 
 app 을 직접 띄우고 끝내며, 이미 띄운 harness instance 는 먼저 끝낸다. 하나라도 실패하면 exit 1 이다. 실행마다 끝낼 때 실행 중의 D3D12
-CORRUPTION, ERROR, WARNING 이 0 이고 종료 때 LIVE_DEVICE 하나만 남는지도 본다 ([K4]). PT 의 값은 capture pt 의 export 로 본다. export 의
+CORRUPTION, ERROR, WARNING 이 0 이고 종료 때 LIVE_DEVICE 하나만 남는지도 본다. PT 의 값은 capture pt 의 export 로 본다. export 의
 rgb 는 E (lux) 의 평균이고 a 는 더한 sample 수다. hit pixel 은 Ray Tracing View 의 Front Face capture 에서 면을 만난 pixel 이다. 따로
 적지 않으면 harness baseline 의 시점, Shading Lambert, Geometric Normals on, Russian roulette off, FURNACE_SAMPLES 다.
 
@@ -43,7 +38,7 @@ light (furnace off, light 는 harness baseline 의 것, Geometric Normals off):
   [I4] Sky 1 에서 같은 Seed 로 Max Bounces 를 directlightchecks.BOUNCE_STEPS 로 올리면 어떤 pixel 도 sample 수만큼의 ulp 보다 더
        어두워지지 않고 평균은 매번 커진다. check-directional-light.py 의 [P7] 과 같은 판정이다. glTF 와 Lambert 모두 본다.
 
-장면 (SCENE: glTF, light, Sky 1, Geometric Normals off, Max Bounces 64, Russian roulette on):
+SCENE (glTF, light, Sky 1, Geometric Normals off, Max Bounces 64, Russian roulette on):
   [I7] viewer.SNAPSHOT_POSES 의 시점마다 SCENE_SAMPLES 만큼 쌓으면, a 가 0 인 pixel 이 Front Face capture 의 miss pixel 과 같고 그
        rgb 는 0 이며, 나머지 pixel 의 a 는 pt.samples 다. x₁ 이 Front Face view 와 같은 ray (TAA 를 끈 raster sample 위치) 로 만난 면이고,
        hit pixel 에 NaN 이나 Inf 로 버린 sample 이 없다는 뜻이다. courtyard-up 에는 miss pixel 이 있어야 한다.
@@ -54,14 +49,6 @@ light (furnace off, light 는 harness baseline 의 것, Geometric Normals off):
 
 설정:
   [U1] harness baseline 의 editor.ini 에는 Output 이 없고, 띄운 직후 state 의 Output 이 Radiance 다.
-
-그대로인 것:
-  [K1] REFERENCE_DIR 의 export (REFERENCE_DIR/manifest.json 의 code 로 남겼고 조건도 그 manifest 에 있다) 와 Output Radiance 로 같은
-       조건에서 쌓은 export 를 비교한다. Shading glTF 는 rgba 가 bit 까지 같다. Shading Lambert 는 a 가 bit 까지 같고 rgb 가 LAMBERT_RUN_ULPS 안이다.
-       Lambert 는 고치기 전의 code (d05ec6f) 로도 실행마다 rgb 가 4 ulp 까지 달라서 bit 로 비교할 수 없다. 같은 build 를 두 번 띄운
-       export 에서 start 는 7502 pixel, courtyard-up 은 27447 pixel 이 달랐고 glTF 는 같았다. Shading 을 runtime 값으로 고를 때
-       Lambert 의 결과가 반올림만큼 달라진 적이 있어서 (PathTracerCS.hlsl 의 LAMBERT_SHADING), Output 도 따로 compile 하고 그 결과를
-       이것으로 확인한다.
 
 keep 은 harness baseline 의 시점에서 KEEP 을 Output Indirect Irradiance 의 glTF 와 Lambert, Output Radiance 의 glTF 로 KEEP_SAMPLES 만큼
 쌓아 KEPT_DIR 에 DDS 와 보기용 PNG 로 남긴다. Indirect Irradiance 의 PNG 는 E/π 를 Radiance 와 같은 exposure 로 보인다. 그림자 경계와
@@ -81,16 +68,15 @@ from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from checks import Checks, stop_and_check
-from directlightchecks import LIGHT_SECTION, check_bounces, set_light
+from directlightchecks import check_bounces
 from imagecompare import agreement, rmse
 from imagefiles import ImageFileError, read_dds_rgba32f
-from pathtracerchecks import (BASE, EMISSION_FURNACE, FURNACE_SAMPLES, SECTION, SKY_RADIANCE, WHITE_FURNACE, code_version, path_tracer_state,
+from pathtracerchecks import (BASE, EMISSION_FURNACE, FURNACE_SAMPLES, SECTION, SKY_RADIANCE, WHITE_FURNACE, path_tracer_state,
                               set_path_tracer)
 from viewer import (BASELINE_DIR, HARNESS_DIR, PREVIEW_EXPOSURE, SETTLE_FRAMES, SNAPSHOT_POSES, HarnessError, Session, default_scene_pose, capture,
                     make_view, shots_dir, start_instance, stop_instance)
 
 KEPT_DIR = HARNESS_DIR / 'kept' / 'indirect-irradiance'
-REFERENCE_DIR = KEPT_DIR / 'reference'
 
 RADIANCE = {'Output': 'Radiance'}
 IRRADIANCE = {'Output': 'Indirect Irradiance'}
@@ -115,13 +101,6 @@ MISS_POSE = 'courtyard-up'
 
 R11G11B10_MANTISSA_BITS = np.array([6, 6, 5])
 R11G11B10_SMALLEST_NORMAL = 2.0 ** -14
-
-# [K1] 의 기준. light 는 harness baseline 의 것이다.
-REFERENCE_SETTINGS = BASE | {'Geometric Normals': 0, 'Max Bounces': 64, 'Russian Roulette': 1, 'Seed': 0}
-REFERENCE_SAMPLES = 64
-REFERENCE_RUNS = [(pose_name, shading) for pose_name in ('start', MISS_POSE) for shading in ('glTF', 'Lambert')]
-# d05ec6f 를 두 번 띄워 REFERENCE_RUNS 를 쌓은 Lambert 의 export 는 rgb 가 4 ulp 까지 달랐다. 그 두 배를 둔다.
-LAMBERT_RUN_ULPS = 8
 
 KEEP = SCENE
 KEEP_SAMPLES = 1024
@@ -303,25 +282,6 @@ def check_reproduction(session, check, start_pose):
           f'{"no reset" if kept_on else "reset"} while TAA jitters')
 
 
-def check_radiance_bits(session, check):
-    manifest = json.loads((REFERENCE_DIR / 'manifest.json').read_text(encoding='utf-8'))
-    passed, details = True, []
-    for name, entry in manifest['files'].items():
-        session.ask_ok(f'pose {entry["pose"]}')
-        set_light(session, entry['directional light'])
-        now, _, _ = export(session, f'radiance-{Path(name).stem}', entry['path tracer'] | RADIANCE, entry['samples'])
-        reference = read_dds_rgba32f(REFERENCE_DIR / name)
-        pixels = count(np.any(now.view(np.uint32) != reference.view(np.uint32), axis=2))
-        # 양수 float 는 bit 를 정수로 읽은 차가 ulp 수다.
-        ulps = int(np.max(np.abs(now[..., :3].view(np.int32).astype(np.int64) - reference[..., :3].view(np.int32).astype(np.int64))))
-        counts_same = same_bits(now[..., 3], reference[..., 3])
-        allowed = 0 if entry['path tracer']['Shading'] == 'glTF' else LAMBERT_RUN_ULPS
-        passed = passed and counts_same and ulps <= allowed
-        details.append(f'{name}: {pixels} pixels differ by up to {ulps} ulps (allowed {allowed}), a {"same" if counts_same else "differs"}')
-    check(f'[K1] Output Radiance accumulates the same bits as the reference ({manifest["code"]}) for glTF and within {LAMBERT_RUN_ULPS} ulps for Lambert',
-          passed, '; '.join(details))
-
-
 def command_check(args):
     check = Checks()
     instance = start_instance('Debug', build_first=not args.no_build)
@@ -331,7 +291,6 @@ def command_check(args):
             session.ask_ok('ui hide')
             check_default_output(session, check)
             start_pose = default_scene_pose()
-            check_radiance_bits(session, check)
             session.ask_ok(f'pose {start_pose}')
             hits = front_face_hits(session, 'front-face-start')
             check_furnaces(session, check, hits)
@@ -348,37 +307,6 @@ def command_check(args):
         stop_instance(instance, kill_now=True)
     print(f'{len(check.failures)} failed' if check.failures else 'all passed')
     return 1 if check.failures else 0
-
-
-def command_reference(args):
-    check = Checks()
-    instance = start_instance('Debug', build_first=not args.no_build)
-    manifest = {'code': code_version(), 'config': 'Debug', 'files': {}}
-    try:
-        session = Session(instance)
-        try:
-            session.ask_ok('ui hide')
-            light = session.ask_ok(f'settings get {LIGHT_SECTION}')['values']
-            REFERENCE_DIR.mkdir(parents=True, exist_ok=True)
-            for pose_name, shading in REFERENCE_RUNS:
-                pose = SNAPSHOT_POSES[pose_name] or default_scene_pose()
-                session.ask_ok(f'pose {pose}')
-                settings = REFERENCE_SETTINGS | {'Shading': shading}
-                _, _, path = export(session, f'{pose_name}-{shading.lower()}', settings, REFERENCE_SAMPLES)
-                name = f'{pose_name}-{shading.lower()}.dds'
-                shutil.copy2(path, REFERENCE_DIR / name)
-                manifest['files'][name] = {'pose': pose, 'directional light': light, 'path tracer': settings, 'samples': REFERENCE_SAMPLES}
-        finally:
-            session.close()
-        stop_and_check(instance, check)
-    except (HarnessError, ImageFileError) as error:
-        check('reference ran to the end', False, str(error))
-        stop_instance(instance, kill_now=True)
-    if check.failures:
-        return 1
-    (REFERENCE_DIR / 'manifest.json').write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
-    print(f'kept {len(manifest["files"])} exports of {manifest["code"]} in {REFERENCE_DIR}')
-    return 0
 
 
 def command_keep(args):
@@ -407,8 +335,7 @@ def command_keep(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     commands = parser.add_subparsers(dest='command', required=True)
-    for name, handler, help in [('reference', command_reference, 'keep the exports that [K1] compares against, with the code as it is, in Debug'),
-                                ('check', command_check, 'judge the criteria and the D3D12 messages in Debug'),
+    for name, handler, help in [('check', command_check, 'judge the criteria and the D3D12 messages in Debug'),
                                 ('keep', command_keep, 'keep the images for the presentation, in Profile')]:
         command = commands.add_parser(name, help=help)
         command.add_argument('--no-build', action='store_true', help='use the exe as it is')

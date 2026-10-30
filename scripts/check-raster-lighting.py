@@ -2,9 +2,8 @@
 
   python scripts/check-raster-lighting.py check   # [1] ~ [4], [7], [8], [10], [13], [14] 를 판정한다
 
-번호는 작업 C 의 완료 기준의 번호다. [6] 과 [9] 는 Environment 를 빼면서 없앴고, [11] 의 build 와 [12] 의 viewer.py selftest 는 이
-script 밖에서 본다. raster 가 sky 를 그리지 않는다는 [5] 는 작업 9 에서 raster 가 Sky Light 를 배경으로 그리게 되어 없앴다. 배경은
-check-sky-light.py 가 본다.
+번호는 작업 C 의 완료 기준의 번호다. [6] 과 [9] 는 Environment 를 빼면서 없앴다. raster 가 sky 를 그리지 않는다는 [5] 는 작업 9 에서
+raster 가 Sky Light 를 배경으로 그리게 되어 없앴다. 배경은 check-sky-light.py 가 본다.
 
 app 을 Debug 로 세 번 띄우고 끝내며, 이미 띄운 harness instance 는 먼저 끝낸다. 하나라도 실패하면 exit 1 이다. 실행마다 끝낼 때 실행
 중의 D3D12 CORRUPTION, ERROR, WARNING 이 0 이고 종료 때 LIVE_DEVICE 하나만 남는지도 본다.

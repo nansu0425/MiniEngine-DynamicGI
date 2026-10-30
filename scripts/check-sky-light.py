@@ -3,8 +3,7 @@
   python scripts/check-sky-light.py check   # Debug 로 띄워 [1] ~ [5] 와 D3D12 message 를 판정한다
   python scripts/check-sky-light.py keep    # Profile 로 띄워 같은 시점의 raster 와 PT 의 display 를 KEPT_DIR 에 남긴다
 
-번호는 작업 9 의 완료 기준의 번호다. [6] (주석) 은 code 를 읽어 보고, [7] ~ [10] (PT 와 raster 의 회귀, snapshot, build) 은 다른 check
-script 와 viewer.py 로 본다.
+번호는 작업 9 의 완료 기준의 번호다. [6] (주석) 은 code 를 읽어 본다.
 
 app 을 직접 띄우고 끝낸다. 하나라도 실패하면 exit 1 이다. 끝낼 때 실행 중의 D3D12 CORRUPTION, ERROR, WARNING 이 0 이고 종료 때
 LIVE_DEVICE 하나만 남는지도 본다.

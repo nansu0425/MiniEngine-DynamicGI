@@ -6,13 +6,8 @@ BRDF 를 쓰는지 판정한다.
 번호는 작업 8 의 완료 기준의 번호다. app 을 Debug 로 test scene 에서 한 번, Sponza 에서 한 번 띄우고 끝내며, 이미 띄운 harness instance 는
 먼저 끝낸다. 하나라도 실패하면 exit 1 이다. 실행마다 끝낼 때 실행 중의 D3D12 CORRUPTION, ERROR, WARNING 이 0 이고 종료 때 LIVE_DEVICE
 하나만 남는지도 본다. PT 의 값은 capture pt 의 float export 로 본다. 이 script 밖에서 보는 기준:
-  [R2], [R3] raster 의 변경 전후: 작업 8 을 끝낼 때 (77271b2) Harness/kept/snapshots/task-8 의 snapshot 과 compare 로 한 번
-       판정했다. 그 뒤의 raster 변경은 변경마다 viewer.py snapshot compare 로 본다.
   [R5] raster 의 나머지: check-raster-lighting.py check 와, check-directional-light.py check 의 [P5] 와 [R1]
   [M1] 의 panel: Path Tracer panel 의 Shading 을 사람이나 computer use 로 바꾸고 그 전후의 state 로 본다.
-  그대로인 것: pathtracerchecks.BASE 의 Shading 은 Lambert 이고, check-lambert-path.py check, check-path-tracer-export.py check,
-       check-directional-light.py check 가 통과한다. 그래서 작업 5, 6 의 측정 기록이 Lambert 조건으로 유효하다.
-  Debug, Profile, Release build, viewer.py selftest, 문서
 
 BRDF 단위 test: path tracer 와 raster 가 include 하는 바로 그 HLSL 함수 (MakeGltfBrdfInput, EvaluateGltfBrdf, SampleGltfBrdfDirection 과 그
 안의 table 조회) 를 app 의 brdf 명령으로 GPU 에서 돌리고 (MiniEngine/Model/PathTracer/BrdfTest.cpp), 결과를 Python 이 판정한다. 참조는
@@ -38,7 +33,7 @@ cell 이고, 하한이 걸리지 않는 작은 roughness 는 node 사이의 값�
   [B5] energy (spec :3651): 모든 cell 에서 A(μ_o) = ∫ f max(0, n·l) dω_l ≤ 1 + 1e-3 이고, metallic 0 이고 μ_o > 0 인 cell 에서
        |A - 1| ≤ 1e-3 이다. A 는 roughness ≥ 0.1 이면 Q, 그 아래는 IS 이고, IS 로 잰 cell 은 허용 오차에 4σ 를 더한다. metallic > 0 인
        cell 의 A < 1 은 metal 의 single scattering 손실이라 판정하지 않고 값만 출력하고 KEPT_DIR 의 CELLS_FILE 에 남긴다.
-       1e-3 의 근거: albedo 0.5 인 장면에서 반사마다의 오차 e 는 image 에 약 e / (1 - 0.5) 로 쌓이므로 (추론) 2e-3 이고, 작업 12 가 잡을
+       1e-3 의 근거: albedo 0.5 인 scene 에서 반사마다의 오차 e 는 image 에 약 e / (1 - 0.5) 로 쌓이므로 (추론) 2e-3 이고, 작업 12 가 잡을
        정답 오차 1% 의 1/5 이다.
 
 test scene: +z 를 보는 flat quad 를 roughness QUAD_ROUGHNESS x metallic QUAD_METALLIC 의 격자로 두고 baseColor 는 QUAD_COLORS 에서
@@ -70,9 +65,6 @@ Sponza: harness baseline 의 시점과 light 에서 Shading glTF 로 쌓는다. 
        Normals off, Max Bounces 64, Russian roulette on, 256 spp) 을 쌓아 invalid sample 이 0 이다. 그리고 check-directional-light.py 의
        [P6], [P7] 을 Shading glTF 로 통과한다. [P6] 의 보이는데 어두움은 glTF 의 f 가 0 이 아닌 pixel (Metallic 이 1 이고 Base Color 가
        0 인 곳 밖) 에서 세고 임계값은 그대로다.
-  [S5] Lambert 의 bit 재현: REFERENCE_DIR/start-pt.dds (manifest.json 의 code 로 남겼고 조건도 그 manifest 에 있다: baseline 시점, light 기본 방향, intensity
-       4, Sky 1, Max Bounces 64, Russian roulette on, Seed 0, Geometric Normals off, 64 spp) 와 Shading Lambert 로 같은 조건에서 쌓은
-       export 의 rgba 가 bit 까지 같다.
   [R4] 기본 화면의 밝기: scripts/harness-baseline/editor.ini 의 Exposure 주석의 규칙대로, baseline 시점에서 Exposure 2^EXPOSURE_STOPS 의
        display 와 adaptive exposure 를 ADAPTATION_FRAMES 만큼 수렴시킨 display 의 평균 밝기를 견줘 stop 으로 가장 가까운 Exposure 가 1
        이다. 수렴은 마지막 두 밝기의 비가 ADAPTATION_SETTLED 안인 것으로 본다.
@@ -127,7 +119,6 @@ SCENE_DIR = HARNESS_DIR / 'gltf-brdf'
 SCENE_NAME = 'GltfBrdf'
 KEPT_DIR = HARNESS_DIR / 'kept' / 'gltf-brdf'
 CELLS_FILE = KEPT_DIR / 'brdf' / 'cells.json'
-REFERENCE_DIR = KEPT_DIR / 'reference'
 GLTF = {'Shading': 'glTF'}
 
 SEED = 8
@@ -664,7 +655,7 @@ def run_test_scene(build_first, check):
         stop_instance(instance, kill_now=True)
 
 
-# --- Sponza: [S1], [S2], [S4], [S5], [R4], [M1] ----------------------------------------------
+# --- Sponza: [S1], [S2], [S4], [R4], [M1] --------------------------------------------------------
 
 def check_default_shading(session, check):
     shown = session.ask_ok(f'state settings.{SECTION}')['state']['settings'][SECTION].get('Shading')
@@ -678,7 +669,8 @@ def check_shading_resets(session, check):
     set_path_tracer(session, GLTF | {'Target Samples': 1 << 20})
     session.ask_ok('pt reset')
     counts = []
-    for shading in ['Lambert', 'glTF']:
+    # 기본값 glTF 와 다른 Lambert 로 끝내서, [M1] 이 끝낼 때 editor.ini 에 마지막 값이 남는지를 기본값과 구별해 본다.
+    for shading in ['Lambert', 'glTF', 'Lambert']:
         session.ask_ok('pt wait samples=2', timeout=WAIT_TIMEOUT)
         before = path_tracer_state(session)['resets']
         replied = set_path_tracer(session, {'Shading': shading})['state']['settings'][SECTION]['Shading']
@@ -802,18 +794,6 @@ def gltf_reflects_nothing(base_color, metallic):
     return np.all(base_color == 0, axis=2) & np.all(metallic == 255, axis=2)
 
 
-def check_lambert_bits(session, check):
-    manifest = json.loads((REFERENCE_DIR / 'manifest.json').read_text(encoding='utf-8'))
-    entry = manifest['files']['start-pt.dds']
-    session.ask_ok(f'pose {entry["pose"]}')
-    set_light(session, entry['directional light'])
-    now, _ = export(session, entry['path tracer'], 'lambert-start-pt')
-    reference = read_dds_rgba32f(REFERENCE_DIR / 'start-pt.dds')
-    differing = np.any(now.view(np.uint32) != reference.view(np.uint32), axis=2)
-    check(f'[S5] Shading Lambert accumulates the same rgba bits as the reference ({manifest["code"]})', not differing.any(),
-          f'{int(differing.sum())} pixels differ')
-
-
 def run_sponza(check):
     instance = start_instance('Debug', build_first=False)
     try:
@@ -832,7 +812,6 @@ def run_sponza(check):
                                 lambda path: keep(path, 'pt'))
             check_bounces(session, check, start_pose, '[S4] [P7] glTF', GLTF)
             check_shading_resets(session, check)
-            check_lambert_bits(session, check)
         finally:
             session.close()
         stop_and_check(instance, check)

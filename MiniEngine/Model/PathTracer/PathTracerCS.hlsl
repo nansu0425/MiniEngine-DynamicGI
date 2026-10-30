@@ -7,7 +7,7 @@
 
 // 1이면 Shading Lambert로 반사하고, LAMBERT_SHADING과 PROBE_HIT_SHADING이 모두 0이면 glTF로 반사한다. PathTracerLambertCS.hlsl이 1로
 // 정의한다. Shading을 constant로 고르는 shader 하나로 두었을 때는 Lambert의 결과가 작업 8 전과 반올림만큼 달라 bit까지 같지 않았다
-// (scripts/check-gltf-brdf.py의 [S5]). compiler가 두 BRDF의 code와 함께 Lambert의 연산을 다르게 묶은 것으로 본다 (추측).
+// (77271b2의 scripts/check-gltf-brdf.py의 [S5]). compiler가 두 BRDF의 code와 함께 Lambert의 연산을 다르게 묶은 것으로 본다 (추측).
 #ifndef LAMBERT_SHADING
 #define LAMBERT_SHADING 0
 #endif

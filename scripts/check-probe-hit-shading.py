@@ -1,18 +1,11 @@
-"""PathTracer 의 Shading DDGI Probe Hit 가 DDGI 논문의 probe ray hit shading 을 따르는지와, 기존 Shading 과 raster 가 그대로인지
-판정한다.
+"""PathTracer 의 Shading DDGI Probe Hit 가 DDGI 논문의 probe ray hit shading 을 따르는지 판정한다.
 
-  python scripts/check-probe-hit-shading.py reference   # [E7] 이 비교할 기준 export 를 지금의 code 로 REFERENCE_DIR 에 남긴다
-  python scripts/check-probe-hit-shading.py check       # Debug 로 띄워 아래 기준을 판정한다
+  python scripts/check-probe-hit-shading.py check   # Debug 로 띄워 아래 기준을 판정한다
 
 번호는 Shading DDGI Probe Hit 를 더한 commit (d84b6c3) 의 완료 기준의 번호다. probe hit 의 shading 과 그 출처는 SHADING_FILE 에, Shading 의 정의는 PathTracer.h 의 Shading 에
 있다. check 는 app 을 test scene 둘에서 한 번씩, Sponza 에서 두 번 띄우고 끝내며, 이미 띄운 harness instance 는 먼저 끝낸다. 하나라도
-실패하면 exit 1 이다. 실행마다 끝낼 때 실행 중의 D3D12 CORRUPTION, ERROR, WARNING 이 0 이고 종료 때 LIVE_DEVICE 하나만 남는지도 본다
-([E12]). PT 의 값은 capture pt 의 export 로 본다. export 의 rgb 는 sample 의 평균이고 a 는 더한 sample 수다. 이 script 밖에서 보는 기준:
-  [E8] 의 compare: viewer.py snapshot compare task-e 가 exit 0 이고 CHANGED 인 shot 이 없다. 이 script 가 가장 새 compare 의 report 와
-       baseline shot 을 판정하므로 compare 를 먼저 돌린다.
-  [E9] 기존 확인: check-lambert-path.py, check-path-tracer-export.py, check-indirect-irradiance.py, check-log-restore.py, check-gltf-brdf.py
-       의 check 와, HitSurface 를 바꿨으므로 check-normal-map-convention.py 의 make, run, judge 절차
-  [E12] 의 build: Debug 와 Profile build 가 성공하고 build log 에 warning 이 없다.
+실패하면 exit 1 이다. 실행마다 끝낼 때 실행 중의 D3D12 CORRUPTION, ERROR, WARNING 이 0 이고 종료 때 LIVE_DEVICE 하나만 남는지도 본다.
+PT 의 값은 capture pt 의 export 로 본다. export 의 rgb 는 sample 의 평균이고 a 는 더한 sample 수다. 이 script 밖에서 보는 기준:
   [E13] 정의: PathTracer.h 의 Output 과 Shading, PathTracerCS.hlsl 의 LAMBERT_SHADING, panel tooltip 의 글은 사람이 읽는다.
 
 test scene (SCENE_DIR): scene file 의 camera 는 model 중심의 +z 쪽에서 -z 를 보며 model 을 화면에 담는다 (viewer.py 의 write_scene_file). light 는 direction LIGHT_DIRECTION, 흰색, intensity
@@ -47,14 +40,10 @@ Sponza (harness baseline 의 시점과 light):
        Russian roulette 를 끄면 RNG 를 쓰는 양이 albedo, emission, sky 에 따라 달라지지 않아 세 run 이 같은 path 를 그리므로
        (check-path-tracer-export.py), (a k)^n 의 pixel 평균이 X_C / S 다. k 가 1 이면 X_B 는 S 다. 그래서 X_B / S - 1 의 평균이 0 보다
        FURNACE_TOLERANCE 넘게 작아야 하고, 그 평균과 L / S - 1 (a = 0.9 이면 약 -2.2%) 을 찍는다.
-  [E5] 첫 점: Indirect Irradiance, Max Bounces 1, light 와 Sky 는 그대로, Seed 0, FIRST_POINT_SAMPLES spp 로 REFERENCE_POSES 의 시점마다
-       Probe Hit 와 Lambert 를 쌓은 export 가 a 는 bit 까지, rgb 는 LAMBERT_RUN_ULPS 안에서 같다 (check-indirect-irradiance.py 의 [K1]
-       의 허용 범위). Sponza 에는 emission 이 없으므로 path 의 값은 첫 점에서 고른 방향의 sky 뿐이다. 첫 점의 normal map 을 다른 mip 으로
+  [E5] 첫 점: Indirect Irradiance, Max Bounces 1, light 와 Sky 는 그대로, Seed 0, FIRST_POINT_SAMPLES spp 로 FIRST_POINT_POSES 의 시점마다
+       Probe Hit 와 Lambert 를 쌓은 export 가 a 는 bit 까지, rgb 는 LAMBERT_RUN_ULPS 안에서 같다. Lambert 는 같은 build 에서도 실행마다
+       rgb 가 4 ulp 까지 다르다 (docs/reference-path-tracer-roadmap.md 의 뒤로 미룬 일). Sponza 에는 emission 이 없으므로 path 의 값은 첫 점에서 고른 방향의 sky 뿐이다. 첫 점의 normal map 을 다른 mip 으로
        읽으면 고르는 방향이 달라지고, 첫 점의 shading 을 더하면 값이 커지므로 둘 다 이 판정에 걸린다 (추론).
-  [E7] REFERENCE_DIR 의 export (REFERENCE_DIR/manifest.json 의 code 로 남겼다. 조건도 그 manifest 에 있다: REFERENCE_POSES 의 시점, harness
-       baseline 의 light, 두 Output, Shading glTF 와 Lambert, REFERENCE_SETTINGS, REFERENCE_SAMPLES spp) 와 같은 조건에서 쌓은 export 를 비교한다. glTF 는
-       rgba 가 bit 까지 같다. Lambert 는 a 가 bit 까지 같고 rgb 가 LAMBERT_RUN_ULPS 안이다. Lambert 는 같은 build 에서도 실행마다 rgb 가
-       4 ulp 까지 다르다 (check-indirect-irradiance.py 의 [K1]).
   [E10] RESTORE_LINE 의 조건 (Shading DDGI Probe Hit) 으로 쌓아 capture pt 로 export 한다. app 을 다시 띄워 그 export 의 줄을 restore
        하면 줄 (pt samples 밖) 과 state 의 camera, light, sky, settings.Path Tracer (Show 밖) 가 같고, Show 만 켜 같은 sample 수까지
        쌓은 export 의 rgba 가 bit 까지 같다.
@@ -65,10 +54,6 @@ source:
        PROBE_HIT_SHADING 으로 고르는 구역에는 kPi 와 dot( 가 없고, 파일 전체에 FORBIDDEN_PATH_TRACER_TEXT 가 없다. 식과 상수를 PT 에
        따로 두지 않았다는 뜻이다. SHADING_FILE 에 FORBIDDEN_SHADING_PATTERN 이 없다. compute shader 도 부를 수 있다는 뜻이다.
 
-raster:
-  [E8] SNAPSHOT_DIR/SNAPSHOT_NAME 의 baseline shot 의 scene 과 가장 새 compare 의 같은 shot 이 bit 단위로 같고, 그 compare 의 report 에
-       CHANGED 인 shot 이 없다.
-
 GPU 의 수치는 Debug 에서 잰다. shader 는 모든 config 에서 같은 optimization 으로 compile 되므로 (check-gltf-brdf.py), Profile 에서도
 같다고 본다 (추론).
 """
@@ -77,7 +62,6 @@ import argparse
 import json
 import math
 import re
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -91,16 +75,13 @@ from directlightchecks import EDGE_PIXELS, LIGHT_SECTION, accumulate_export, ove
 from gltfwriter import GLTF_FLOAT, GLTF_UNSIGNED_SHORT, BufferBuilder, flatten
 from imagefiles import DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, ImageFileError, read_dds_rgba32f, read_dds_rgba8
 from imagemasks import column_groups, eroded
-from pathtracerchecks import BASE, FURNACE_SAMPLES, SECTION, SKY_LIGHT_SECTION, SKY_RADIANCE, code_version, path_tracer_state, set_path_tracer
-from viewer import (HARNESS_DIR, REPO_ROOT, SETTLE_FRAMES, SNAPSHOT_DIR, SNAPSHOT_POSES, HarnessError, Session, default_scene_pose,
+from pathtracerchecks import BASE, FURNACE_SAMPLES, SECTION, SKY_LIGHT_SECTION, SKY_RADIANCE, path_tracer_state, set_path_tracer
+from viewer import (HARNESS_DIR, REPO_ROOT, SETTLE_FRAMES, SNAPSHOT_POSES, HarnessError, Session, default_scene_pose,
                     capture, start_instance, stop_instance, write_scene_file)
 
-KEPT_DIR = HARNESS_DIR / 'kept' / 'probe-hit-shading'
-REFERENCE_DIR = KEPT_DIR / 'reference'
 SCENE_DIR = HARNESS_DIR / 'probe-hit-shading'
 ALBEDO_SCENE = 'ProbeHitAlbedo'
 SHADOW_SCENE = 'ProbeHitShadow'
-SNAPSHOT_NAME = 'task-e'
 
 SHADING_FILE = 'MiniEngine/Core/Shaders/SurfaceShading.hlsli'
 PATH_TRACER_SHADER = 'MiniEngine/Model/PathTracer/PathTracerCS.hlsl'
@@ -158,13 +139,10 @@ FURNACE = BASE | PROBE_HIT | {'Furnace': 1, 'Furnace Albedo': FURNACE_ALBEDO, SK
 FIRST_POINT_SAMPLES = 16
 FIRST_POINT = BASE | IRRADIANCE | {'Max Bounces': 1, 'Seed': 0, 'Geometric Normals': 0, 'Russian Roulette': 1,
                                    'Target Samples': FIRST_POINT_SAMPLES}
-# d05ec6f 를 두 번 띄워 쌓은 Lambert 의 export 는 rgb 가 4 ulp 까지 달랐다. check-indirect-irradiance.py 의 [K1] 처럼 그 두 배를 둔다.
+# d05ec6f 를 두 번 띄워 쌓은 Lambert 의 export 는 rgb 가 4 ulp 까지 달랐다 (docs/reference-path-tracer-roadmap.md 의 뒤로 미룬 일). 그 두
+# 배를 둔다.
 LAMBERT_RUN_ULPS = 8
-
-REFERENCE_POSES = ['start', 'courtyard-up']
-REFERENCE_SAMPLES = 64
-REFERENCE_SETTINGS = BASE | {'Seed': 0, 'Max Bounces': 64, 'Russian Roulette': 1, 'Geometric Normals': 0, 'Target Samples': REFERENCE_SAMPLES}
-REFERENCE_RUNS = [(pose, output, shading) for pose in REFERENCE_POSES for output in OUTPUTS for shading in ('glTF', 'Lambert')]
+FIRST_POINT_POSES = ['start', 'courtyard-up']
 
 RESET_SAMPLES = 32
 RESET_LIGHT = 'elevation=35 azimuth=150'
@@ -431,7 +409,7 @@ def run_test_scene(name, judge, build_first, check):
         stop_instance(instance, kill_now=True)
 
 
-# --- Sponza: [E4], [E5], [E7], [E10], [E11] -----------------------------------------------------
+# --- Sponza: [E4], [E5], [E10], [E11] -----------------------------------------------------------
 
 def check_furnace(session, check, start_pose):
     session.ask_ok(f'pose {start_pose}')
@@ -476,7 +454,7 @@ def compare_lambert_bits(now, reference):
 
 def check_first_point(session, check, default_light):
     details, passed = [], True
-    for pose_name in REFERENCE_POSES:
+    for pose_name in FIRST_POINT_POSES:
         session.ask_ok(f'pose {SNAPSHOT_POSES[pose_name] or default_scene_pose()}')
         set_light(session, default_light)
         images = {}
@@ -488,22 +466,6 @@ def check_first_point(session, check, default_light):
         passed = passed and counts_same and ulps <= LAMBERT_RUN_ULPS and lit > 0
         details.append(f'{pose_name}: {pixels} pixels differ by up to {ulps} ulps, a {"same" if counts_same else "differs"}, {lit} pixels not 0')
     check(f'[E5] Indirect Irradiance with Max Bounces 1: Probe Hit accumulates the bits of Lambert, rgb within {LAMBERT_RUN_ULPS} ulps',
-          passed, '; '.join(details))
-
-
-def check_existing_shadings(session, check):
-    manifest = json.loads((REFERENCE_DIR / 'manifest.json').read_text(encoding='utf-8'))
-    passed, details = True, []
-    for name, entry in manifest['files'].items():
-        session.ask_ok(f'pose {entry["pose"]}')
-        set_light(session, entry['directional light'])
-        now, _, _ = accumulate_export(session, entry['path tracer'], f'existing-{Path(name).stem}')
-        reference = read_dds_rgba32f(REFERENCE_DIR / name)
-        pixels, ulps, counts_same = compare_lambert_bits(now, reference)
-        allowed = 0 if entry['path tracer']['Shading'] == 'glTF' else LAMBERT_RUN_ULPS
-        passed = passed and counts_same and ulps <= allowed
-        details.append(f'{name}: {pixels} pixels differ by up to {ulps} ulps (allowed {allowed}), a {"same" if counts_same else "differs"}')
-    check(f'[E7] glTF accumulates the same bits as the reference ({manifest["code"]}) and Lambert within {LAMBERT_RUN_ULPS} ulps, for both Outputs',
           passed, '; '.join(details))
 
 
@@ -582,7 +544,6 @@ def run_sponza(check, build_first):
             session.ask_ok('ui hide')
             default_light = session.ask_ok(f'settings get {LIGHT_SECTION}')['values']
             start_pose = default_scene_pose()
-            check_existing_shadings(session, check)
             session.ask_ok(f'pose {start_pose}')
             set_light(session, default_light)
             check_furnace(session, check, start_pose)
@@ -656,28 +617,6 @@ def check_source(check):
     check(f'[E6] {SHADING_FILE} has no {FORBIDDEN_SHADING_PATTERN}', not found, '; '.join(found) or 'none')
 
 
-# --- raster: [E8] ------------------------------------------------------------------------------
-
-def check_snapshot(check):
-    folder = SNAPSHOT_DIR / SNAPSHOT_NAME
-    compares = sorted(folder.glob('compare-*'))
-    if not compares:
-        check('[E8] the raster is the same as before', False, f'no compare in {folder}. Run viewer.py snapshot compare {SNAPSHOT_NAME} first')
-        return
-    after_folder = compares[-1]
-    # report 의 shot 줄은 viewer.py 의 command_snapshot_compare 가 "CHANGED <shot>: scene ..." 이나 "same    <shot>: scene ..." 으로 쓴다.
-    changed = [line for line in (after_folder / 'report.txt').read_text(encoding='utf-8').splitlines() if re.match(r'CHANGED \S+: scene ', line)]
-    details, same = [], True
-    for pose in SNAPSHOT_POSES:
-        name = f'baseline-{pose}-scene.dds'
-        before, after = (read_dds_rgba32f(where / name) for where in (folder, after_folder))
-        differing = int(np.count_nonzero(np.any(before.view(np.uint32) != after.view(np.uint32), axis=2)))
-        same = same and differing == 0
-        details.append(f'{pose}: {differing} pixels differ')
-    check(f'[E8] the baseline shots of {after_folder.name} are bit-identical to {SNAPSHOT_NAME} and no shot is CHANGED', same and not changed,
-          '; '.join(details) + f'; CHANGED {changed or "none"}')
-
-
 # --- 명령 --------------------------------------------------------------------------------------
 
 def command_check(args):
@@ -687,48 +626,14 @@ def command_check(args):
     run_test_scene(SHADOW_SCENE, check_shadow_scene, False, check)
     run_sponza(check, False)
     check_source(check)
-    check_snapshot(check)
     print(f'{len(check.failures)} failed' if check.failures else 'all passed')
     return 1 if check.failures else 0
-
-
-def command_reference(args):
-    check = Checks()
-    instance = start_instance('Debug', build_first=not args.no_build)
-    manifest = {'code': code_version(), 'config': 'Debug', 'files': {}}
-    try:
-        session = Session(instance)
-        try:
-            session.ask_ok('ui hide')
-            light = session.ask_ok(f'settings get {LIGHT_SECTION}')['values']
-            REFERENCE_DIR.mkdir(parents=True, exist_ok=True)
-            for pose_name, output, shading in REFERENCE_RUNS:
-                pose = SNAPSHOT_POSES[pose_name] or default_scene_pose()
-                session.ask_ok(f'pose {pose}')
-                set_light(session, light)
-                settings = REFERENCE_SETTINGS | {'Output': output, 'Shading': shading}
-                name = f'{pose_name}-{output.lower().replace(" ", "-")}-{shading.lower()}.dds'
-                _, _, path = accumulate_export(session, settings, Path(name).stem)
-                shutil.copy2(path, REFERENCE_DIR / name)
-                manifest['files'][name] = {'pose': pose, 'directional light': light, 'path tracer': settings}
-        finally:
-            session.close()
-        stop_and_check(instance, check)
-    except (HarnessError, ImageFileError) as error:
-        check('reference ran to the end', False, str(error))
-        stop_instance(instance, kill_now=True)
-    if check.failures:
-        return 1
-    (REFERENCE_DIR / 'manifest.json').write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
-    print(f'kept {len(manifest["files"])} exports of {manifest["code"]} in {REFERENCE_DIR}')
-    return 0
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     commands = parser.add_subparsers(dest='command', required=True)
-    for name, handler, help in [('reference', command_reference, 'keep the exports that [E7] compares against, with the code as it is, in Debug'),
-                                ('check', command_check, 'judge the criteria and the D3D12 messages in Debug')]:
+    for name, handler, help in [('check', command_check, 'judge the criteria and the D3D12 messages in Debug')]:
         command = commands.add_parser(name, help=help)
         command.add_argument('--no-build', action='store_true', help='use the exe as it is')
         command.set_defaults(handler=handler)

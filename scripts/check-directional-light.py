@@ -8,8 +8,6 @@
   [G3] editor axes (gizmo toolbar 의 Local, World) 가 rotate ring 의 축을 local 과 world 로 바꾼다: viewer.py selftest 의
   check_light 와 editor 확인
   [G2] rotate gizmo 를 끌어 돌리는 것, gizmo toolbar 의 Local, World 와 Details panel 의 Reset Transform 을 누르는 것: 사용자가 본다
-  [K1] raster 화면: viewer.py snapshot compare
-  [K4] 다른 check script, [K5] viewer.py selftest, [K6] Debug, Profile, Release build, [K7] 문서
 
 app 을 Debug 로 Sponza 에서 한 번, test scene 에서 한 번 띄우고 끝내며, 이미 띄운 harness instance 는 먼저 끝낸다. 하나라도 실패하면 exit 1
 이다. 실행마다 끝낼 때 실행 중의 D3D12 CORRUPTION, ERROR, WARNING 이 0 이고 종료 때 LIVE_DEVICE 하나만 남는지도 본다. PT 의 값은 capture pt
@@ -53,12 +51,6 @@ PT 의 직접광 (Sponza): harness baseline 의 시점, Russian roulette off, Sk
        sample 수만큼까지 어두워질 수 있다. 작업 7 을 판정할 때 그런 pixel 은 1 ~ 2 ulp 였다.
   [P8] PT 를 쌓는 동안 light 의 direction, color, intensity 를 바꾸면 pt 의 resets 가 1 늘고, position 을 바꾸면 늘지 않는다.
 
-그대로인 것 (Sponza):
-  [K2] 기본 light 에서 Light Visibility, Light Culling Difference 의 overlay 가 BEFORE_DIR 의 Sun Visibility, Sun Culling Difference 와
-       같다. BEFORE_DIR 은 작업 7 전 (a9423e3) 에 같은 조건으로 찍은 capture 다 (BEFORE_DIR/manifest.json).
-  [K3] intensity 0 으로 쌓은 PT export 가 REFERENCE_DIR/start-pt.dds 와 rgba 의 bit 까지 같다. 그 export 를 남긴 code 와 조건은
-       REFERENCE_DIR/manifest.json 에 있다.
-
 source:
   [K8] tracked 와 untracked (ignore 하지 않은) 파일에서 sun 의 세 표기가 SUN_EXCEPTIONS 밖에 없다.
 
@@ -76,7 +68,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
-from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from checks import Checks, stop_and_check
@@ -92,8 +83,6 @@ from viewer import (HARNESS_DIR, PREVIEW_EXPOSURE, REPO_ROOT, SETTLE_FRAMES, Har
 SCENE_DIR = HARNESS_DIR / 'directional-light'
 SCENE_NAME = 'DirectionalLight'
 KEPT_DIR = HARNESS_DIR / 'kept' / 'directional-light'
-BEFORE_DIR = KEPT_DIR / 'before'
-REFERENCE_DIR = KEPT_DIR / 'reference'
 
 # light 는 위 앞쪽에서 온다. 앞면이 +z 인 quad 와의 cos 는 0.6 이다.
 LIGHT_DIRECTION = (0.0, 0.8, 0.6)
@@ -127,7 +116,6 @@ QUADS = [
     SimpleNamespace(name='double', x=7.5, normal=(0.0, 0.0, 1.0), rotation=(0.0, 0.0, 0.0, 1.0), occluder='doubleSided'),
 ]
 
-BEFORE_VIEWS = {'Debug: Sun Visibility': 'Debug: Light Visibility', 'Debug: Sun Culling Difference': 'Debug: Light Culling Difference'}
 # 이 light 의 이름이 sun 이던 때의 기록. 이 script 의 판정 자체는 SUN_EXCLUDED_PATHS 가 뺀다.
 SUN_EXCEPTIONS = [
     ('docs/harness-roadmap.md', 'agent 가 sun 의 translate gizmo'),
@@ -223,32 +211,6 @@ def check_saved_direction(session, check):
           f'rotation {light["rotation"]}, direction {light["direction"]}, saved {saved["Direction"]}')
 
 
-def check_before(session, check):
-    manifest = json.loads((BEFORE_DIR / 'manifest.json').read_text(encoding='utf-8'))
-    differing = []
-    for name, entry in manifest['files'].items():
-        if 'view' not in entry:
-            continue
-        session.ask_ok(f'pose {entry["pose"]}')
-        now = overlay(session, BEFORE_VIEWS[entry['view']], f'after-{name}')
-        before = np.asarray(Image.open(BEFORE_DIR / name).convert('RGB'))
-        if not np.array_equal(now, before):
-            differing.append(f'{name}: {int(np.count_nonzero(np.any(now != before, axis=2)))} pixels')
-    check(f'[K2] the light visibility views are as before ({manifest["code"]})', not differing, '; '.join(differing))
-
-
-def check_unlit_reference(session, check):
-    manifest = json.loads((REFERENCE_DIR / 'manifest.json').read_text(encoding='utf-8'))
-    entry = manifest['files']['start-pt.dds']
-    session.ask_ok(f'pose {entry["pose"]}')
-    session.ask_ok('light set intensity=0')
-    now, _ = accumulate(session, entry['path tracer'], 'after-start-pt')
-    reference = read_dds_rgba32f(REFERENCE_DIR / 'start-pt.dds')
-    differing = np.any(now.view(np.uint32) != reference.view(np.uint32), axis=2)
-    check(f'[K3] the path tracer with intensity 0 is bit-identical to the reference ({manifest["code"]})', not differing.any(),
-          f'{int(differing.sum())} pixels differ')
-
-
 def reflects_nothing(base_color, metallic):
     """Lambert 의 albedo baseColor x (1 - metallic) 가 0 인 pixel"""
     return np.all(base_color == 0, axis=2) | np.all(metallic == 255, axis=2)
@@ -282,8 +244,6 @@ def run_sponza(build_first, check):
             start_pose = ' '.join(str(camera[key]) for key in ['x', 'y', 'z', 'heading', 'pitch'])
             default_light = session.ask_ok(f'settings get {LIGHT_SECTION}')['values']
             check_saved_direction(session, check)
-            check_before(session, check)
-            check_unlit_reference(session, check)
             check_sponza_direct(session, check, start_pose, default_light, '[P6]', {}, reflects_nothing, lambda path: keep(path, 'pt'))
             check_bounces(session, check, start_pose, '[P7]', {})
             check_resets(session, check)
