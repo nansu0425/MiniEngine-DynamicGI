@@ -51,7 +51,8 @@ namespace
         Vector3 lightDirection;
         Vector3 lightIlluminance;
         Vector3 skyRadiance;
-        // Shading DDGI Probe Hit가 읽는 shadow map을 그린 shadow camera. model은 바뀌지 않으므로 shadow camera가 shadow map을 정한다.
+        // Shading DDGI Probe Hit가 읽는 shadow map을 그린 shadow camera. model이 바뀌면 scene 을 여는 쪽이 Reset하므로 shadow camera가
+        // shadow map을 정한다.
         Matrix4 shadowMatrix;
     };
 

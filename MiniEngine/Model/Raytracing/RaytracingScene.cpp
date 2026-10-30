@@ -69,7 +69,7 @@ void RaytracingScene::Build(CommandContext& context)
     inputs.NumDescs = numInstances;
     inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
 
-    // 앞 frame이 아직 쓰고 있을 수 있는 buffer를 바꾸지 않도록 처음 한 번만 만든다.
+    // 앞 frame이 아직 쓰고 있을 수 있는 buffer를 바꾸지 않도록 Destroy 뒤 처음 한 번만 만든다. Destroy하는 쪽이 GPU를 기다린다.
     if (m_MaxInstances == 0)
         CreateBuffers(inputs);
     ASSERT(numInstances <= m_MaxInstances);

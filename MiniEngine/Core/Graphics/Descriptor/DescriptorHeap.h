@@ -113,6 +113,9 @@ public:
 
     bool HasAvailableSpace( uint32_t Count ) const { return Count <= m_NumFreeDescriptors; }
     DescriptorHandle Alloc( uint32_t Count = 1 );
+    // Alloc한 descriptor는 heap을 Destroy할 때까지 풀지 않는다.
+    uint32_t GetAllocatedCount( void ) const { return m_HeapDesc.NumDescriptors - m_NumFreeDescriptors; }
+    uint32_t GetCapacity( void ) const { return m_HeapDesc.NumDescriptors; }
 
     DescriptorHandle operator[] (uint32_t arrayIdx) const { return m_FirstHandle + arrayIdx * m_DescriptorSize; }
 

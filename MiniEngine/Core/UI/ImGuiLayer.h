@@ -37,6 +37,9 @@ namespace ImGuiLayer
     // 창이 열려 있는지는 editor.ini에 저장되어 다음 실행 때 되돌아온다.
     void ShowPanel(const char* name, bool& open, const std::function<void()>& drawContent);
 
+    // main menu bar의 name 메뉴를 열었을 때 drawItems가 항목을 그린다. UI를 숨기면 그리지 않는다.
+    void ShowMenu(const char* name, const std::function<void()>& drawItems);
+
     // true를 반환하면 window procedure는 그 message를 더 처리하지 않는다.
     bool HandleWindowMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 }

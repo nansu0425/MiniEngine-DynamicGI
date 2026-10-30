@@ -13,6 +13,7 @@
 * pan: drag with the middle mouse button
 * toggle ImGui: F1
 * engine tuning, profiler, scene overlay, ray tracing, scene hierarchy, details: ImGui View menu
+* scene: the Scene menu lists the scene files of the Scenes folder by name and marks the one open. Picking one opens it while running: the model changes, the camera moves to the scene file's starting pose and the path tracer starts over. The lights, settings, camera movement speed and UI stay
 * ray tracing debug view: pick one view in the View section of the Ray Tracing panel. Off shows the raster image
 * ray query validation: pick a Validation view and what its Heatmap paints in the View section, then press Capture in the Validation section to read the last frame's counts and p50, p99, max. Fit to Capture sets a metric heatmap's range from the capture
 * log and restore of the measurement conditions: Log in the Validation section prints the capture, and Log in the Path Tracer panel prints the path tracer's image, with the conditions they were drawn in (scene file, camera, resolution, TAA, directional light, Sky Light, path tracer settings and samples) as one line to the Output window. The path tracer's Log also copies the line. Paste such a line under Restore to set every condition in it, or nothing if the line lacks one or one cannot be set. A line of another scene file is not restored, as the scene cannot change while running, and a line without the scene file is of Scenes/Sponza.ini. The path tracer then starts over and stops at the samples of the line, so it draws the same image, after a restart too. A different resolution or mode is shown as a warning
@@ -43,6 +44,6 @@ Get sample assets from https://github.com/KhronosGroup/glTF-Sample-Models or mak
 * Add to command line "-scene [scene file path relative to the ModelViewer folder]". Without it ModelViewer opens Scenes/Sponza.ini
 * Example:  ModelViewer.exe -scene Scenes/Sponza.ini
 * Scenes/CornellBox.ini opens the Cornell box that scripts/fetch-assets.ps1 fetches and converts to glTF
-* The camera always starts at the scene file's pose, and the scene cannot be changed while running
+* The camera always starts at the scene file's pose. While running, the Scene menu opens another scene file of the Scenes folder (Controls above)
 
 DirectXMesh and DirectXTex are used for compiling content the first time it is loaded.  For example, image files will have mip maps generated, encoded to a block compressed format, and then saved as a DDS for subsequent loading.  This means that first-time loading takes a little longer.

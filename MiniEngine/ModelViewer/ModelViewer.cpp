@@ -32,6 +32,7 @@
 #include "Model/Raytracing/RaytracingPanel.h"
 #include "Model/Raytracing/RayQueryValidation.h"
 #include "Model/Raytracing/RayPick.h"
+#include "Model/PathTracer/PathTracer.h"
 #include "Model/PathTracer/PathTracerPanel.h"
 #include "Model/PathTracer/BrdfTest.h"
 #include "Model/Loader/glTF.h"
@@ -40,6 +41,7 @@
 #include "Model/Loader/ModelLoader.h"
 #include "Core/Camera/ShadowCamera.h"
 #include "Core/Display/Display.h"
+#include "Core/Graphics/GraphicsCore.h"
 #include "Core/Editor/EditorCamera.h"
 #include "Core/Editor/SceneEditor.h"
 #include "Core/Automation/ControlChannel.h"
@@ -49,6 +51,7 @@
 #include "Core/Utility/IniFile.h"
 
 #include <algorithm>
+#include <map>
 #include <sstream>
 
 // Dynamic GI 프로젝트에선 legacy path가 아닌 glTF path를 사용한다.
@@ -174,8 +177,20 @@ public:
 
 private:
 
-    // path의 scene file로 scene 을 연다. scene file을 읽을 수 없으면 error에 이유를 쓰고 false를 돌려준다.
+    struct PreparedScene;
+    // path의 scene file로 scene 을 연다. Scene menu와 scene open 명령이 함께 쓴다. 열 수 없으면 error에 이유를 쓰고 false를 돌려주며
+    // 지금 scene 을 그대로 둔다.
     bool OpenScene(const std::wstring& path, std::string& error);
+    // scene 을 바꾸지 않고 path의 scene file을 열 수 있는지 본다. 그 model을 처음 열면 load해서 m_Models에 남긴다.
+    bool PrepareScene(const std::wstring& path, PreparedScene& scene, std::string& error);
+    // PrepareScene이 준비한 scene 으로 바꾼다. camera는 scene file의 처음 pose로 옮기고 path tracer는 처음부터 다시 쌓는다.
+    void ShowScene(const PreparedScene& scene);
+    void ShowSceneMenu(void);
+    void RegisterSceneCommand(void);
+
+    // 한 번 연 model을 glTF 경로마다 남겨 다시 쓴다. Renderer::LoadModel은 load할 때마다 scene texture descriptor heap에서
+    // descriptor를 할당하고 풀지 않으므로, scene 을 오갈 때마다 load하면 heap이 찬다.
+    std::map<std::wstring, std::shared_ptr<const Model>> m_Models;
 
     Camera m_Camera;
     unique_ptr<EditorCamera> m_CameraController;
@@ -209,6 +224,8 @@ const char kSkyLightSettingsSection[] = "Sky Light";
 
 // scripts/viewer.py가 이 이름과 형식으로 -scene이 없을 때 여는 scene file의 경로를 읽는다.
 const wchar_t kDefaultScene[] = L"Scenes/Sponza.ini";
+// Scene menu가 scene file을 찾는 폴더
+const wchar_t kScenesFolder[] = L"Scenes/";
 
 // 기본값은 맑은 날 한낮의 두 illuminance의 비로 정한다. 하나는 해가 비추는 면이고, 다른 하나는 해만 가려진 그늘이다.
 // 그늘은 하늘의 빛만 받는다고 본다. 실제로는 그늘을 만든 물체가 하늘 일부를 가리고 빛을 반사하기도 하는데, 이 둘은 무시한다.
@@ -954,7 +971,7 @@ void DirectionalLight::ShowDetails()
     ImGui::TextDisabled("Rotate the light with the gizmo (E). The toolbar on the scene picks local or world rings.");
 }
 
-// scene 은 scene file 하나로 연다. 형식은 IniFile이고 key는 아래와 같다. 실행 중에는 scene 을 바꿀 수 없다.
+// scene 은 scene file 하나로 연다. 형식은 IniFile이고 key는 아래와 같다. 실행 중에는 Scene menu와 scene open 명령으로 다른 scene 을 연다.
 //   [Model]  glTF: scene file이 있는 폴더 기준의 glTF 경로
 //            Scale: glTF 좌표에 곱해 world 좌표로 바꾸는 배율. 다음의 Radius와 둘 중 하나만 둔다.
 //            Radius: model의 bounding sphere 반지름이 이 world 길이가 되는 배율 (ModelInstance::Resize)
@@ -1058,17 +1075,123 @@ std::string GetSceneName(const std::wstring& path)
     return name;
 }
 
+struct ModelViewer::PreparedScene
+{
+    std::string name;
+    SceneFile file;
+    std::shared_ptr<const Model> model;
+};
+
+bool ModelViewer::PrepareScene(const std::wstring& path, PreparedScene& scene, std::string& error)
+{
+    if (!ReadSceneFile(path, scene.file, error))
+        return false;
+    auto model = m_Models.find(scene.file.gltfPath);
+    if (model == m_Models.end())
+    {
+        std::shared_ptr<const Model> loaded = Renderer::LoadModel(scene.file.gltfPath, m_ForceRebuild);
+        if (loaded == nullptr)
+        {
+            error = "cannot load its glTF " + Utility::ToUTF8(scene.file.gltfPath);
+            return false;
+        }
+        model = m_Models.emplace(scene.file.gltfPath, loaded).first;
+    }
+    scene.model = model->second;
+    scene.name = GetSceneName(path);
+    return true;
+}
+
+void ModelViewer::ShowScene(const PreparedScene& scene)
+{
+    // 지난 frame의 command가 아직 지금 model instance의 buffer와 TLAS를 읽을 수 있으므로 GPU가 끝내기를 기다린 뒤에 바꾼다.
+    g_CommandManager.IdleGPU();
+    // TLAS의 buffer는 처음 Build한 scene 의 instance 수에 맞춰 만들므로 새 scene 에 맞게 다시 만들게 한다.
+    m_RaytracingScene.Destroy();
+    m_ModelInst = scene.model;
+    ScaleModel(m_ModelInst, scene.file);
+    m_CameraController->SetPose(GetStartPose(scene.file, m_ModelInst, m_Camera.GetNearClip()));
+    m_SceneModel.SetPath(Utility::ToUTF8(scene.file.gltfPath));
+    m_SceneName = scene.name;
+    PathTracer::Reset();
+}
+
 bool ModelViewer::OpenScene(const std::wstring& path, std::string& error)
 {
-    SceneFile scene;
-    if (!ReadSceneFile(path, scene, error))
+    PreparedScene scene;
+    if (!PrepareScene(path, scene, error))
         return false;
-    m_ModelInst = Renderer::LoadModel(scene.gltfPath, m_ForceRebuild);
-    ScaleModel(m_ModelInst, scene);
-    m_CameraController->SetPose(GetStartPose(scene, m_ModelInst, m_Camera.GetNearClip()));
-    m_SceneModel.SetPath(Utility::ToUTF8(scene.gltfPath));
-    m_SceneName = GetSceneName(path);
+    ShowScene(scene);
     return true;
+}
+
+// Scene menu가 보이는 scene file. kScenesFolder의 .ini를 이름순으로 둔다.
+std::vector<std::wstring> ListSceneFiles(void)
+{
+    std::vector<std::wstring> files;
+    WIN32_FIND_DATAW found;
+    const HANDLE find = FindFirstFileW((std::wstring(kScenesFolder) + L"*.ini").c_str(), &found);
+    if (find == INVALID_HANDLE_VALUE)
+        return files;
+    do
+    {
+        if ((found.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0)
+            files.push_back(kScenesFolder + std::wstring(found.cFileName));
+    } while (FindNextFileW(find, &found));
+    FindClose(find);
+    std::sort(files.begin(), files.end());
+    return files;
+}
+
+// 지금 scene 에 표시를 둔다. 항목을 누르면 scene open 명령처럼 그 scene 을 연다.
+void ModelViewer::ShowSceneMenu(void)
+{
+    for (const std::wstring& path : ListSceneFiles())
+    {
+        const std::string name = GetSceneName(path);
+        if (ImGui::MenuItem(Utility::ToUTF8(Utility::RemoveExtension(Utility::RemoveBasePath(path))).c_str(), nullptr, name == m_SceneName))
+        {
+            std::string error;
+            if (!OpenScene(path, error))
+                Utility::Printf("Error: the scene file %s %s\n", name.c_str(), error.c_str());
+        }
+        ImGui::SetItemTooltip("%s", name.c_str());
+    }
+}
+
+void ModelViewer::RegisterSceneCommand(void)
+{
+    ControlChannel::Register("scene", "scene open <scene file>: opens the scene file, relative to the ModelViewer folder as -scene takes it, "
+        "as the Scene menu does. The model changes, the camera moves to the starting pose of the scene file and the path tracer starts over. "
+        "The lights, settings, camera move speed, window and UI stay. Fails and changes nothing if the scene file cannot be opened. "
+        "state scene has the scene file open", [this](const std::string& arguments, const ControlChannel::Reply& reply)
+    {
+        const std::string usage = "usage: scene open <scene file>";
+        if (arguments.compare(0, 5, "open ") != 0 || arguments.size() == 5)
+        {
+            reply.Error(usage);
+            return;
+        }
+        const std::string path = arguments.substr(5);
+        std::string error;
+        if (!OpenScene(Utility::UTF8ToWideString(path), error))
+        {
+            reply.Error("the scene file " + path + " " + error + ". The scene did not change.");
+            return;
+        }
+        ControlChannel::Fields state;
+        for (const char* group : { "scene", "model", "camera" })
+            state.Merge(ControlChannel::GetState(group));
+        reply.Ok(ControlChannel::Fields().Object("state", state));
+    });
+}
+
+// state의 renderer. scene 을 오가도 scene texture descriptor heap의 사용량이 늘지 않는지 harness가 본다 (ModelViewer::m_Models).
+ControlChannel::Fields DescribeRenderer(void)
+{
+    return ControlChannel::Fields().Object("scene_texture_descriptors", ControlChannel::Fields()
+        .Integer("allocated", Renderer::s_TextureHeap.GetAllocatedCount())
+        .Integer("capacity", Renderer::s_TextureHeap.GetCapacity()));
 }
 
 void ModelViewer::Startup( void )
@@ -1115,6 +1238,8 @@ void ModelViewer::Startup( void )
     ControlChannel::RegisterState("camera", [this] { return DescribeCamera(m_Camera, *m_CameraController); });
     ControlChannel::RegisterState("scene", [this] { return DescribeScene(m_SceneName); });
     ControlChannel::RegisterState("model", [this] { return DescribeModel(m_SceneModel.GetPath(), m_ModelInst); });
+    ControlChannel::RegisterState("renderer", DescribeRenderer);
+    RegisterSceneCommand();
 
     SceneEditor::AddObject(m_SceneModel);
     SceneEditor::AddObject(m_Light);
@@ -1138,6 +1263,7 @@ void ModelViewer::Cleanup( void )
     RaytracingView::Shutdown();
     m_RaytracingScene.Destroy();
     m_ModelInst = nullptr;
+    m_Models.clear();
 
 #ifdef LEGACY_RENDERER
     Sponza::Cleanup();
@@ -1154,6 +1280,8 @@ namespace Graphics
 void ModelViewer::Update( float deltaT )
 {
     ScopedTimer _prof(L"Update State");
+
+    ImGuiLayer::ShowMenu("Scene", [this] { ShowSceneMenu(); });
 
     if (GameInput::IsFirstPressed(GameInput::kLShoulder))
         DebugZoom.Decrement();

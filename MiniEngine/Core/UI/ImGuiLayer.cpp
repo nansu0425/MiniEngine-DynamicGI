@@ -365,6 +365,22 @@ void ImGuiLayer::ShowPanel(const char* name, bool& open, const std::function<voi
     ImGui::End();
 }
 
+void ImGuiLayer::ShowMenu(const char* name, const std::function<void()>& drawItems)
+{
+    if (!s_Visible)
+        return;
+
+    if (ImGui::BeginMainMenuBar())
+    {
+        if (ImGui::BeginMenu(name))
+        {
+            drawItems();
+            ImGui::EndMenu();
+        }
+        ImGui::EndMainMenuBar();
+    }
+}
+
 bool ImGuiLayer::HandleWindowMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     // 숨긴 동안에는 ImGui가 keyboard 입력을 받지 않으므로 toggle은 ImGui 밖에서 처리한다.
