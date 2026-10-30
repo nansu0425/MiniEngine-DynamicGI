@@ -174,8 +174,15 @@ public:
 
 private:
 
+    // path의 scene file로 scene 을 연다. scene file을 읽을 수 없으면 error에 이유를 쓰고 false를 돌려준다.
+    bool OpenScene(const std::wstring& path, std::string& error);
+
     Camera m_Camera;
     unique_ptr<EditorCamera> m_CameraController;
+    // -rebuild 1이면 처음 load하는 model의 .mini를 다시 만든다.
+    bool m_ForceRebuild = false;
+    // 연 scene. state와 측정 조건의 줄이 scene 을 가리키는 이름이다.
+    std::string m_SceneName;
 
     D3D12_VIEWPORT m_MainViewport;
     D3D12_RECT m_MainScissor;
@@ -535,8 +542,8 @@ void ReadSceneConditions(const std::string& openScene, const MeasurementConditio
 void RegisterMeasurementConditions(const std::string& scene, EditorCamera& editorCamera, DirectionalLight& light, SkyLight& sky)
 {
     MeasurementConditions::Register("scene", {
-        [scene](MeasurementConditions::Values& values) { values["scene"] = scene; },
-        [scene](const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading) { ReadSceneConditions(scene, values, reading); },
+        [&scene](MeasurementConditions::Values& values) { values["scene"] = scene; },
+        [&scene](const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading) { ReadSceneConditions(scene, values, reading); },
         { "scene" } });
     MeasurementConditions::Register("camera", {
         [&editorCamera](MeasurementConditions::Values& values) { DescribeCameraConditions(editorCamera, values); },
@@ -1043,6 +1050,27 @@ ControlChannel::Fields DescribeScene(const std::string& path)
     return ControlChannel::Fields().Text("path", path);
 }
 
+// state와 측정 조건의 줄이 scene 을 가리키는 이름. '\'로 적은 경로도 '/'로 적은 줄과 같은 scene 이 되게 한다.
+std::string GetSceneName(const std::wstring& path)
+{
+    std::string name = Utility::ToUTF8(path);
+    std::replace(name.begin(), name.end(), '\\', '/');
+    return name;
+}
+
+bool ModelViewer::OpenScene(const std::wstring& path, std::string& error)
+{
+    SceneFile scene;
+    if (!ReadSceneFile(path, scene, error))
+        return false;
+    m_ModelInst = Renderer::LoadModel(scene.gltfPath, m_ForceRebuild);
+    ScaleModel(m_ModelInst, scene);
+    m_CameraController->SetPose(GetStartPose(scene, m_ModelInst, m_Camera.GetNearClip()));
+    m_SceneModel.SetPath(Utility::ToUTF8(scene.gltfPath));
+    m_SceneName = GetSceneName(path);
+    return true;
+}
+
 void ModelViewer::Startup( void )
 {
     MotionBlur::Enable = true;
@@ -1058,41 +1086,34 @@ void ModelViewer::Startup( void )
     PathTracerPanel::Initialize();
     BrdfTest::Initialize();
 
-    bool forceRebuild = false;
     uint32_t rebuildValue;
     if (CommandLineArgs::GetInteger(L"rebuild", rebuildValue))
-        forceRebuild = rebuildValue != 0;
+        m_ForceRebuild = rebuildValue != 0;
 
     std::wstring scenePath = kDefaultScene;
     CommandLineArgs::GetString(L"scene", scenePath);
-    SceneFile scene;
 #ifdef LEGACY_RENDERER
     Sponza::Startup(m_Camera);
-#else
-    std::string error;
-    if (ReadSceneFile(scenePath, scene, error))
-    {
-        m_ModelInst = Renderer::LoadModel(scene.gltfPath, forceRebuild);
-        ScaleModel(m_ModelInst, scene);
-    }
-    else
-        Utility::Printf("Error: the scene file %ws %s\n", scenePath.c_str(), error.c_str());
 #endif
-
     m_Camera.SetZRange(1.0f, 10000.0f);
     m_CameraController.reset(new EditorCamera(m_Camera, Vector3(kYUnitVector)));
-#ifndef LEGACY_RENDERER
+#ifdef LEGACY_RENDERER
     // LEGACY_RENDERER는 scene file을 읽지 않으므로 Sponza::Startup이 정한 camera를 그대로 둔다.
-    m_CameraController->SetPose(GetStartPose(scene, m_ModelInst, m_Camera.GetNearClip()));
+    m_SceneName = GetSceneName(scenePath);
+#else
+    std::string error;
+    if (!OpenScene(scenePath, error))
+    {
+        Utility::Printf("Error: the scene file %ws %s\n", scenePath.c_str(), error.c_str());
+        // 열지 못하면 원점에서 -z를 본다.
+        m_CameraController->SetPose({ Vector3(kZero), 0.0f, 0.0f });
+        m_SceneName = GetSceneName(scenePath);
+    }
 #endif
     EditorCamera& editorCamera = *m_CameraController;
     RegisterPoseCommand(editorCamera);
     ControlChannel::RegisterState("camera", [this] { return DescribeCamera(m_Camera, *m_CameraController); });
-    // state와 측정 조건의 줄이 scene 을 가리키는 이름. '\'로 적은 경로도 '/'로 적은 줄과 같은 scene 이 되게 한다.
-    std::string sceneName = Utility::ToUTF8(scenePath);
-    std::replace(sceneName.begin(), sceneName.end(), '\\', '/');
-    ControlChannel::RegisterState("scene", [sceneName] { return DescribeScene(sceneName); });
-    m_SceneModel.SetPath(Utility::ToUTF8(scene.gltfPath));
+    ControlChannel::RegisterState("scene", [this] { return DescribeScene(m_SceneName); });
     ControlChannel::RegisterState("model", [this] { return DescribeModel(m_SceneModel.GetPath(), m_ModelInst); });
 
     SceneEditor::AddObject(m_SceneModel);
@@ -1101,7 +1122,7 @@ void ModelViewer::Startup( void )
     SceneEditor::RegisterCommands(m_Camera);
     RegisterLight(m_Light);
     RegisterSkyLight(m_SkyLight);
-    RegisterMeasurementConditions(sceneName, editorCamera, m_Light, m_SkyLight);
+    RegisterMeasurementConditions(m_SceneName, editorCamera, m_Light, m_SkyLight);
 }
 
 void ModelViewer::Cleanup( void )
