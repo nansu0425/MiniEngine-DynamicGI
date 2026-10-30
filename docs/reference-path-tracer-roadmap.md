@@ -15,7 +15,7 @@ def659b 의 이 문서에는 미리 조사해 둔 설계 (출력, BRDF, light, s
 
 ## 전제
 
-- 장면은 EditorCamera 로 연 정적 Sponza (KhronosGroup glTF-Sample-Assets 판, 24b0057) 다.
+- scene 은 정적 Sponza (KhronosGroup glTF-Sample-Assets 판, 24b0057) 다. 작업 13 은 Cornell box (Benedikt Bitterli 의 Mitsuba 3 scene) 를 쓴다.
 - GPU 는 RTX 4060 Laptop 이다.
 
 ## 작업
@@ -41,7 +41,7 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 10. Log 와 Restore (끝남: 773ada1, 39d9b61)
 11. Indirect Irradiance (끝남: a93d5bb)
 12. 수렴과 측정 (끝남: d1ad157, 60be7ec)
-13. Cornell box 와 외부 renderer: (a) asset을 scene에 load 하고, (b) 외부 renderer 로 그린 image 와 비교한다. furnace 가 잡지 못하는 오류를 여기서 본다. `-model` 로 연 장면은 orbit camera 라서 측정 조건의 줄로 Restore 할 수 없으므로 (39d9b61), (a) 가 그 장면에서도 camera 를 되돌리게 한다.
+13. Cornell box 와 외부 renderer: (a) asset 을 scene 에 load 하고 (끝남: e01816c, 5fa770f, 42806bf, 7b10dcf, d51340b, bf625bb, ca6ea88, 9c39388, e678d9c), (b) 외부 renderer 로 그린 image 와 비교한다. furnace 가 잡지 못하는 오류를 여기서 본다.
 
 ## 일정
 
@@ -55,7 +55,7 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 | 10/27 | 끝남: 8, 9, 10 |
 | 10/28 | 끝남: 11, 12 |
 | 10/29 | 끝남: 발표 자료 |
-| 10/30 | 13 (a) |
+| 10/30 | 끝남: 13 (a) |
 | 10/31 | 13 (b) |
 | 11/1 | 13 (b) 가 찾은 차이의 원인을 찾는다. 고쳤으면 발표에 쓴 image 와 수치를 다시 잰다. |
 | 11/2 | 발표 자료에 13 의 결과를 반영한다. |
@@ -134,6 +134,5 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 - PT panel 의 Export button: script 없이 사람이 PT 의 값을 export 할 일이 생길 때. 지금은 harness 의 `capture pt` 로만 export 한다 (2b33c11).
 - Engine Tuning 의 Graphics/SSAO 항목을 없애는 일: ModelViewer 는 SSAO 를 돌리지 않지만 engine 의 SSAO module 이 남아 있어 효과 없는 항목이 보인다. legacy Sponza renderer 를 지울 때 (35e8e58)
 - NaN 이나 Inf 라서 버린 sample 수를 panel 에 보이는 일: 작업 8 부터 PT 에 NaN 이나 Inf 가 생겨 사람이 실행 중에 봐야 할 때. 지금은 export 의 a 로만 센다 (2b33c11).
-- normal map 이 없는 material 의 shading normal 을 vertex normal 그대로 두는 일: 작업 13 (a) 의 Cornell box 처럼 normal map 이 없는 장면을 정답으로 쓰기 전. 지금은 그런 material 에도 기본 flat normal texture (8 bit 의 128, 128, 255) 를 적용해 PT 의 shading normal 이 0.3° 쯤 기울고, check-directional-light.py 의 [P4] 가 그 오차를 허용한다 (c8610b9).
 - vertex normal 을 float 로 담는 일: shading normal 의 오차가 측정에 보일 때. 지금은 R10G10B10A2 로 담아 성분마다 1/1023 까지 다르다 (c8610b9).
 - 일반 game engine 처럼 transform 을 편집하는 일 (translate 의 Local 과 World, Inspector 의 수치 입력, snap, undo): 이 로드맵 밖에서 따로 한다. 지금은 rotate 만 Local 과 World 를 고르고, 수치는 harness 의 light set 으로만 넣는다 (665bea1).
