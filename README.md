@@ -34,4 +34,12 @@
 
 ## License
 
-이 프로젝트의 작업은 MIT License 를 따른다([LICENSE](LICENSE)). upstream MiniEngine 코드는 Microsoft 의 MIT License 를 따른다([MiniEngine/License.txt](MiniEngine/License.txt)). 다른 project 에서 가져온 코드의 copyright 와 license 는 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 에 있다. Sponza asset 은 Cryengine Limited License Agreement 를 따르고, 그 license 표시는 받은 뒤 `MiniEngine/ModelViewer/glTF-Sample-Assets/Models/Sponza/LICENSE.md` 에 있다. Cornell box asset 은 CC0 1.0 이고, 그 license 표시는 `scripts/fetch-assets.ps1` 이 받아 푼 zip 의 `cornell-box/LICENSE.txt` 에 있다.
+| 대상 | License | 파일 |
+| --- | --- | --- |
+| 이 프로젝트의 작업 | MIT License | [LICENSE](LICENSE) |
+| upstream MiniEngine 코드 | Microsoft 의 MIT License | [MiniEngine/License.txt](MiniEngine/License.txt) |
+| 다른 project 에서 가져온 코드 | 출처 project 의 license | [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) |
+| Sponza asset | Cryengine Limited License Agreement | `MiniEngine/ModelViewer/glTF-Sample-Assets/Models/Sponza/LICENSE.md` |
+| Cornell box asset | CC0 1.0 | `MiniEngine/ModelViewer/Bitterli/cornell-box/LICENSE.txt` |
+
+asset 의 license 파일은 `scripts/fetch-assets.ps1` 로 asset 을 받은 뒤에 생긴다.
