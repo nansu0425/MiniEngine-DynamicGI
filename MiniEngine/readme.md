@@ -12,11 +12,12 @@
 * movement speed: mouse wheel while holding the right mouse button
 * pan: drag with the middle mouse button
 * toggle ImGui: F1
-* engine tuning, profiler, scene overlay, ray tracing, scene hierarchy, details: ImGui View menu
+* engine tuning, profiler, scene overlay, scene hierarchy, details: ImGui View menu
 * scene: the Scene menu lists the scene files of the Scenes folder by name and marks the one open. Picking one opens it while running: the model changes, the camera moves to the scene file's starting pose and the path tracer starts over. The lights, settings, camera movement speed and UI stay
-* ray tracing debug view: pick one view in the View section of the Ray Tracing panel. Off shows the raster image
-* ray query validation: pick a Validation view and what its Heatmap paints in the View section, then press Capture in the Validation section to read the last frame's counts and p50, p99, max. Fit to Capture sets a metric heatmap's range from the capture
-* log and restore of the measurement conditions: Log in the Validation section prints the capture, and Log in the Path Tracer panel prints the path tracer's image, with the conditions they were drawn in (scene file, camera, resolution, TAA, directional light, Sky Light, path tracer settings and samples) as one line to the Output window. The path tracer's Log also copies the line. Paste such a line under Restore to set every condition in it, or nothing if the line lacks one or one cannot be set. A line of another scene file opens that scene file first, as the Scene menu does, and a line without the scene file is of Scenes/Sponza.ini. The path tracer then starts over and stops at the samples of the line, so it draws the same image, after a restart too. A different resolution or mode is shown as a warning
+* ray tracing debug view: pick one as View under Ray Tracing in Engine Tuning. Off shows the raster image
+* ray query validation: pick a Validation view as View and what its Heatmap paints under Ray Tracing in Engine Tuning, then press Capture under its Validation to read the last frame's counts and p50, p99, max. Fit to Capture sets a metric heatmap's range from the capture
+* path tracer: Show and the other settings are under Path Tracer in Engine Tuning
+* log and restore of the measurement conditions: Log under Ray Tracing/Validation in Engine Tuning prints the capture, and Log under Path Tracer prints the path tracer's image, with the conditions they were drawn in (scene file, camera, resolution, TAA, directional light, Sky Light, path tracer settings and samples) as one line to the Output window. The path tracer's Log also copies the line. Paste such a line under Restore to set every condition in it, or nothing if the line lacks one or one cannot be set. A line of another scene file opens that scene file first, as the Scene menu does, and a line without the scene file is of Scenes/Sponza.ini. The path tracer then starts over and stops at the samples of the line, so it draws the same image, after a restart too. A different resolution or mode is shown as a warning
 * select: click an object in the Scene Hierarchy panel, which lists the model, the directional light and the Sky Light, or click an icon in the scene. Click empty space in the scene to deselect. The Details panel shows the settings of the selected object
 * gizmo mode of the selected object: W translate, E rotate (without holding the right mouse button). The toolbar at the top right of the scene picks them too, and whether the rotate rings follow the object's own axes (Local) or the world axes (World). Translate always follows the world axes
 * directional light: select its icon and rotate it with the rotate gizmo. It is a KHR_lights_punctual directional light, so the light goes along its local -Z, as the arrow shows, and turning it about its local Z (the blue ring with Local axes) leaves the light as it is. Its color and intensity (lux) are in its Details panel, whose Reset Transform sets the transform to no rotation at the origin, so the light goes along world -Z
@@ -24,7 +25,7 @@
 ## Editor state:
 On exit, ModelViewer saves its state in the working directory, or in the folder given by -settings_dir, and restores it on the next start.
 * imgui.ini: panel layout, written by ImGui. Delete it to reset the layout
-* editor.ini: window size and position, open panels, engine tuning values, editor camera movement speed, ray tracing view. Delete it to reset them. The camera's position and direction are not saved, as each scene file sets where the camera starts
+* editor.ini: window size and position, open panels, engine tuning values (with the ray tracing view and the path tracer settings), editor camera movement speed. Delete it to reset them. The camera's position and direction are not saved, as each scene file sets where the camera starts
 
 ## Command line options for automation:
 scripts/viewer.py starts ModelViewer with these options. They change nothing when omitted.

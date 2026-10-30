@@ -12,6 +12,7 @@
 #include "Core/Graphics/Resource/ReadbackBuffer.h"
 #include "Core/Automation/ControlChannel.h"
 #include "Core/Editor/MeasurementConditions.h"
+#include "Core/UI/EngineTuning.h"
 
 #include "Output/Model/CompiledShaders/RayQueryValidationCS.h"
 
@@ -336,7 +337,7 @@ namespace
         const MeasurementConditions::Values values = MeasurementConditions::Parse(s_RestoreField.GetLine());
         const auto mode = values.find("mode");
         if (mode != values.end() && (!WasLastFrameValidated() || mode->second != kModes[s_LastFrame.mode].label))
-            ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.2f, 1.0f), "Warning: the line was measured with %s. Pick it in the View section.", mode->second.c_str());
+            ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.2f, 1.0f), "Warning: the line was measured with %s. Pick it as View above.", mode->second.c_str());
     }
 
     // Restore 칸을 그 Capture의 줄로 채운다.
@@ -354,7 +355,7 @@ namespace
         return values;
     }
 
-    // panel이 보이는 Capture의 수치. validation capture가 응답하는 values와 같다.
+    // Validation section이 보이는 Capture의 수치. validation capture가 응답하는 values와 같다.
     ControlChannel::Fields DescribeValidation(void)
     {
         ControlChannel::Fields fields;
@@ -364,12 +365,12 @@ namespace
         return fields;
     }
 
-    // panel의 Capture, Log와 같은 일을 harness가 명령으로 한다. Restore는 engine의 restore 명령이 한다.
+    // Validation section의 Capture, Log와 같은 일을 harness가 명령으로 한다. Restore는 engine의 restore 명령이 한다.
     void RegisterCommands(void)
     {
         ControlChannel::RegisterState("validation", DescribeValidation);
         ControlChannel::Register("validation", "validation capture | validation fit: capture is like Capture then Log. "
-            "fit is like Fit to Capture: it fits the Heatmap Range of the Ray Tracing View settings to p1 ~ p99 of the heatmap's metric in the last capture of this view. "
+            "fit is like Fit to Capture: it fits the Heatmap Range of Ray Tracing in Engine Tuning to p1 ~ p99 of the heatmap's metric in the last capture of this view. "
             "Both need a Validation view", [](const std::string& arguments, const ControlChannel::Reply& reply)
         {
             if (arguments == "fit" && s_Fit)
@@ -384,7 +385,7 @@ namespace
             }
             if (!WasLastFrameValidated())
             {
-                reply.Error("the last frame was not validated. Pick a Validation view in the Ray Tracing View settings.");
+                reply.Error("the last frame was not validated. Pick a Validation view as Ray Tracing/View in Engine Tuning.");
                 return;
             }
 
@@ -395,6 +396,32 @@ namespace
                 .Object("state", ControlChannel::GetState("validation")));
         });
     }
+
+    void ShowValidationSection(void)
+    {
+        const bool lastFrameValidated = WasLastFrameValidated();
+        ImGui::BeginDisabled(!lastFrameValidated);
+        if (ImGui::Button("Capture"))
+            CaptureForRestore();
+        ImGui::EndDisabled();
+        ImGui::SetItemTooltip(lastFrameValidated ? "Reads the stats of the last frame." : "Pick a Validation view as View above.");
+
+        ImGui::SameLine();
+        ImGui::BeginDisabled(!s_HasCapture);
+        if (ImGui::Button("Log"))
+            Utility::Print((DescribeCapture(s_Capture) + "\n").c_str());
+        ImGui::EndDisabled();
+        ImGui::SetItemTooltip("Prints the capture with the conditions it was measured in as one line to the Output window.");
+
+        if (s_HasCapture)
+            ShowCapture(s_Capture);
+
+        ShowRestore();
+    }
+
+    // Engine Tuning의 Ray Tracing 아래에서, Capture는 View가 고른 Validation view의 바로 앞 frame 집계를 읽어 보여 주고, Log는 그 수치를
+    // 측정 조건 (MeasurementConditions)과 함께 한 줄로 찍으며, Restore는 그 한 줄의 조건으로 되돌린다.
+    TuningSection s_Section("Ray Tracing/Validation", ShowValidationSection);
 }
 
 void RayQueryValidation::SetFitCommand(const std::function<void(const ControlChannel::Reply&)>& fit)
@@ -476,28 +503,6 @@ void RayQueryValidation::Shutdown(void)
 {
     s_Stats.Destroy();
     s_StatsReadback.Destroy();
-}
-
-void RayQueryValidation::ShowSection(void)
-{
-    const bool lastFrameValidated = WasLastFrameValidated();
-    ImGui::BeginDisabled(!lastFrameValidated);
-    if (ImGui::Button("Capture"))
-        CaptureForRestore();
-    ImGui::EndDisabled();
-    ImGui::SetItemTooltip(lastFrameValidated ? "Reads the stats of the last frame." : "Pick a Validation view in the View section.");
-
-    ImGui::SameLine();
-    ImGui::BeginDisabled(!s_HasCapture);
-    if (ImGui::Button("Log"))
-        Utility::Print((DescribeCapture(s_Capture) + "\n").c_str());
-    ImGui::EndDisabled();
-    ImGui::SetItemTooltip("Prints the capture with the conditions it was measured in as one line to the Output window.");
-
-    if (s_HasCapture)
-        ShowCapture(s_Capture);
-
-    ShowRestore();
 }
 
 void RayQueryValidation::Render(ComputeContext& context, Mode mode, const Heatmap& heatmap, const Camera& camera, const D3D12_VIEWPORT& rasterViewport,

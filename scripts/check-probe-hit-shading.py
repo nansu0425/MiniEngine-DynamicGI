@@ -45,7 +45,7 @@ Sponza (harness baseline 의 시점과 light):
        rgb 가 4 ulp 까지 다르다 (docs/reference-path-tracer-roadmap.md 의 뒤로 미룬 일). Sponza 에는 emission 이 없으므로 path 의 값은 첫 점에서 고른 방향의 sky 뿐이다. 첫 점의 normal map 을 다른 mip 으로
        읽으면 고르는 방향이 달라지고, 첫 점의 shading 을 더하면 값이 커지므로 둘 다 이 판정에 걸린다 (추론).
   [E10] RESTORE_LINE 의 조건 (Shading DDGI Probe Hit) 으로 쌓아 capture pt 로 export 한다. app 을 다시 띄워 그 export 의 줄을 restore
-       하면 줄 (pt samples 밖) 과 state 의 camera, light, sky, settings.Path Tracer (Show 밖) 가 같고, Show 만 켜 같은 sample 수까지
+       하면 줄 (pt samples 밖) 과 state 의 camera, light, sky, settings.Engine Tuning (Path Tracer/Show 밖) 이 같고, Show 만 켜 같은 sample 수까지
        쌓은 export 의 rgba 가 bit 까지 같다.
   [E11] Probe Hit 로 쌓다가 light 방향을 바꾸면, 또 Shading 을 바꾸면 그때마다 pt 의 resets 가 1 늘고 samples 를 처음부터 센다.
 
@@ -156,7 +156,7 @@ RESTORE_LINE = {
                                 'Furnace': 0, 'Furnace Albedo': 0.75, 'Furnace Emission': 0.25},
     'samples': 16,
 }
-RESTORED_STATE = ['camera', 'light', 'sky', 'settings.Path Tracer']
+RESTORED_STATE = ['camera', 'light', 'sky', 'settings.Engine Tuning']
 
 
 # --- SHADING_FILE 의 상수 ----------------------------------------------------------------------
@@ -498,7 +498,7 @@ def read_restored_state(session):
         for key in path.split('.'):
             part = part[key]
         state[path] = part
-    state['settings.Path Tracer'] = {key: value for key, value in state['settings.Path Tracer'].items() if key != 'Show'}
+    state['settings.Engine Tuning'] = {key: value for key, value in state['settings.Engine Tuning'].items() if key != 'Path Tracer/Show'}
     return state
 
 

@@ -97,7 +97,7 @@ harness 로 할 수 없는 일을 만나면 그 일이 계획되어 있는지와
 ```
 python scripts/viewer.py start
 python scripts/viewer.py do "ui hide" "state light" "light set elevation=20 azimuth=200" "pick grid 16x9"
-python scripts/viewer.py do "settings set Ray Tracing View: View=Validation: Depth Comparison" "frames 2" "validation capture" "validation fit"
+python scripts/viewer.py do "settings set Engine Tuning: Ray Tracing/View=Validation: Depth Comparison" "frames 2" "validation capture" "validation fit"
 python scripts/viewer.py shot overlay --max-width 640
 python scripts/viewer.py run scripts/harness-scenarios/acceptance.txt
 python scripts/viewer.py stop

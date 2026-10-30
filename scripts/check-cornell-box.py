@@ -304,7 +304,7 @@ def set_line_conditions(session):
     session.ask_ok(f'light set {LINE["light"]}')
     session.ask_ok(f'settings set {SKY_LIGHT_SECTION}: {LINE["sky"]}')
     settings = LINE['path tracer'] | {'Show': 1, 'Samples per Frame': 1, 'Target Samples': LINE['samples']}
-    session.ask_ok('settings set Path Tracer: ' + '; '.join(f'{key}={value}' for key, value in settings.items()))
+    session.ask_ok('settings set Engine Tuning: ' + '; '.join(f'Path Tracer/{key}={value}' for key, value in settings.items()))
     session.ask_ok('pt reset')
     session.ask_ok(f'pt wait samples={LINE["samples"]}', timeout=WAIT_TIMEOUT)
     reply = session.ask_ok(f'capture pt {shots_dir(session.instance) / "line"}')
@@ -409,7 +409,7 @@ def second_run(check, line, image):
             restored = [str(camera[key]) for key in ['x', 'y', 'z']] + [str(camera['heading']), str(camera['pitch'])]
             check('[V4] after a restart, restore of the line gives its camera in state camera as the same text',
                   restored == values['camera'].split(',') + [values['heading'], values['pitch']], ' '.join(restored))
-            session.ask_ok('settings set Path Tracer: Show=1')
+            session.ask_ok('settings set Engine Tuning: Path Tracer/Show=1')
             session.ask_ok(f'pt wait samples={LINE["samples"]}', timeout=WAIT_TIMEOUT)
             again = read_dds_rgba32f(session.ask_ok(f'capture pt {shots_dir(session.instance) / "line-restarted"}')['path'])
             differing = int(np.count_nonzero(np.any(again.view(np.uint32) != image.view(np.uint32), axis=2))) if again.shape == image.shape else None

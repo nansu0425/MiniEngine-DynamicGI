@@ -2,6 +2,7 @@
 #include "Core/Editor/MeasurementConditions.h"
 
 #include <imgui.h>
+#include <algorithm>
 #include <cerrno>
 
 namespace
@@ -116,7 +117,13 @@ std::vector<std::string> MeasurementConditions::GetStatePaths(void)
 {
     std::vector<std::string> paths;
     for (const auto& group : s_Groups)
-        paths.insert(paths.end(), group.second.statePaths.begin(), group.second.statePaths.end());
+    {
+        for (const std::string& path : group.second.statePaths)
+        {
+            if (std::find(paths.begin(), paths.end(), path) == paths.end())
+                paths.push_back(path);
+        }
+    }
     return paths;
 }
 

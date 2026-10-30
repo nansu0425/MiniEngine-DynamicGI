@@ -19,7 +19,7 @@ quad 의 뒤쪽 위에 둔다.
   emissive: dark 와 같고 emissiveFactor 가 EMISSIVE 다. 세 값은 R11G11B10 이 정확히 담는 값이다.
   lit: x 축으로 -45° 돌려 normal 이 (0, sin 45°, cos 45°) 다. light 를 향한다.
 
-quad 의 pixel 은 Ray Tracing View 의 Front Face capture 에서 앞면인 pixel 의 가장자리 EDGE_PIXELS 를 깎고 column 이 이어진 덩어리로
+quad 의 pixel 은 Engine Tuning 의 Ray Tracing/View 가 Debug: Front Face 인 capture 에서 앞면인 pixel 의 가장자리 EDGE_PIXELS 를 깎고 column 이 이어진 덩어리로
 나눠 왼쪽부터 dark, emissive, lit 로 본다. 덩어리가 셋이 아니거나 한 덩어리가 MIN_PIXELS 보다 작으면 [1] ~ [3] 을 판정하지 않고
 실패한다.
 
@@ -151,10 +151,10 @@ def run_test_scene(scene, build_first, check):
             session.ask_ok('light set direction=' + ','.join(f'{value:g}' for value in LIGHT_DIRECTION))
             session.ask_ok(f'frames {SETTLE_FRAMES}')
             rgb = read_dds_rgba32f(capture(session, 'scene', f'{scene}-scene'))[..., :3]
-            session.ask_ok('settings set Ray Tracing View: View=Debug: Front Face')
+            session.ask_ok('settings set Engine Tuning: Ray Tracing/View=Debug: Front Face')
             session.ask_ok(f'frames {SETTLE_FRAMES}')
             front_face = np.asarray(Image.open(capture(session, 'overlay', f'{scene}-front-face')).convert('RGB'))
-            session.ask_ok('settings set Ray Tracing View: View=Off')
+            session.ask_ok('settings set Engine Tuning: Ray Tracing/View=Off')
         finally:
             session.close()
         stop_and_check(instance, check)
@@ -207,10 +207,10 @@ def motion_blur_capture(session, enabled, name):
 
 
 def front_face_mask(session, name):
-    session.ask_ok('settings set Ray Tracing View: View=Debug: Front Face')
+    session.ask_ok('settings set Engine Tuning: Ray Tracing/View=Debug: Front Face')
     session.ask_ok(f'frames {SETTLE_FRAMES}')
     front_face = np.asarray(Image.open(capture(session, 'overlay', name)).convert('RGB'))
-    session.ask_ok('settings set Ray Tracing View: View=Off')
+    session.ask_ok('settings set Engine Tuning: Ray Tracing/View=Off')
     return np.all(front_face == FRONT_FACE_COLOR, axis=2)
 
 

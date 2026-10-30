@@ -7,7 +7,7 @@ BRDF 를 쓰는지 판정한다.
 먼저 끝낸다. 하나라도 실패하면 exit 1 이다. 실행마다 끝낼 때 실행 중의 D3D12 CORRUPTION, ERROR, WARNING 이 0 이고 종료 때 LIVE_DEVICE
 하나만 남는지도 본다. PT 의 값은 capture pt 의 float export 로 본다. 이 script 밖에서 보는 기준:
   [R5] raster 의 나머지: check-raster-lighting.py check 와, check-directional-light.py check 의 [P5] 와 [R1]
-  [M1] 의 panel: Path Tracer panel 의 Shading 을 사람이나 computer use 로 바꾸고 그 전후의 state 로 본다.
+  [M1] 의 panel: Engine Tuning 의 Path Tracer 에서 Shading 을 사람이나 computer use 로 바꾸고 그 전후의 state 로 본다.
 
 BRDF 단위 test: path tracer 와 raster 가 include 하는 바로 그 HLSL 함수 (MakeGltfBrdfInput, EvaluateGltfBrdf, SampleGltfBrdfDirection 과 그
 안의 table 조회) 를 app 의 brdf 명령으로 GPU 에서 돌리고 (MiniEngine/Model/PathTracer/BrdfTest.cpp), 결과를 Python 이 판정한다. 참조는
@@ -68,7 +68,7 @@ Sponza: harness baseline 의 시점과 light 에서 Shading glTF 로 쌓는다. 
   [R4] 기본 화면의 밝기: scripts/harness-baseline/editor.ini 의 Exposure 주석의 규칙대로, baseline 시점에서 Exposure 2^EXPOSURE_STOPS 의
        display 와 adaptive exposure 를 ADAPTATION_FRAMES 만큼 수렴시킨 display 의 평균 밝기를 견줘 stop 으로 가장 가까운 Exposure 가 1
        이다. 수렴은 마지막 두 밝기의 비가 ADAPTATION_SETTLED 안인 것으로 본다.
-  [M1] Shading 설정: 기본은 glTF 다. Shading key 가 없는 editor.ini (harness baseline) 로 띄우면 state 와 settings get Path Tracer 가
+  [M1] Shading 설정: 기본은 glTF 다. Shading key 가 없는 editor.ini (harness baseline) 로 띄우면 state 와 settings get Engine Tuning 의 Path Tracer/Shading 이
        glTF 이고, settings set 으로 바꾸면 state 가 따르고 pt 의 resets 가 1 늘며, 끝낼 때 editor.ini 에 마지막 값이 남는다.
        check-lambert-path.py 의 [8], [9] 도 Shading 을 넣어 판정한다.
 
@@ -111,7 +111,8 @@ from gltfwriter import GLTF_FLOAT, GLTF_UNSIGNED_SHORT, BufferBuilder, flatten
 from imagecompare import agreement, rmse
 from imagefiles import ImageFileError, read_dds_rgba32f
 from imagemasks import column_groups, eroded
-from pathtracerchecks import BASE, FURNACE_SAMPLES, SECTION, SKY_RADIANCE, WHITE_FURNACE, path_tracer_state, set_path_tracer
+from pathtracerchecks import (BASE, FURNACE_SAMPLES, SECTION, SKY_RADIANCE, WHITE_FURNACE, path_tracer_settings, path_tracer_state,
+                              set_path_tracer)
 from viewer import (BASELINE_DIR, HARNESS_DIR, PREVIEW_EXPOSURE, REPO_ROOT, SETTLE_FRAMES, SNAPSHOT_POSES, HarnessError, Session,
                     default_scene_pose, capture, make_view, start_instance, stop_instance, write_scene_file)
 
@@ -658,8 +659,8 @@ def run_test_scene(build_first, check):
 # --- Sponza: [S1], [S2], [S4], [R4], [M1] --------------------------------------------------------
 
 def check_default_shading(session, check):
-    shown = session.ask_ok(f'state settings.{SECTION}')['state']['settings'][SECTION].get('Shading')
-    got = session.ask_ok(f'settings get {SECTION}')['values'].get('Shading')
+    shown = path_tracer_settings(session.ask_ok(f'state settings.{SECTION}')['state']['settings'][SECTION]).get('Shading')
+    got = path_tracer_settings(session.ask_ok(f'settings get {SECTION}')['values']).get('Shading')
     baseline = (BASELINE_DIR / 'editor.ini').read_text(encoding='utf-8')
     check('[M1] Shading is glTF in state and settings get when editor.ini has no Shading key',
           shown == 'glTF' and got == 'glTF' and 'Shading' not in baseline, f'state {shown}, settings get {got}')
@@ -673,7 +674,7 @@ def check_shading_resets(session, check):
     for shading in ['Lambert', 'glTF', 'Lambert']:
         session.ask_ok('pt wait samples=2', timeout=WAIT_TIMEOUT)
         before = path_tracer_state(session)['resets']
-        replied = set_path_tracer(session, {'Shading': shading})['state']['settings'][SECTION]['Shading']
+        replied = set_path_tracer(session, {'Shading': shading})['Shading']
         session.ask_ok('frames 2')
         counts.append((shading, replied, path_tracer_state(session)['resets'] - before))
     check('[M1] settings set changes Shading, state shows it and the path tracer starts over once each time',
@@ -822,7 +823,7 @@ def run_sponza(check):
     ini = configparser.ConfigParser(delimiters=('=',), comment_prefixes=(';',), interpolation=None)
     ini.optionxform = str
     ini.read(Path(instance['run_dir']) / 'editor.ini', encoding='utf-8')
-    saved = ini[SECTION].get('Shading') if ini.has_section(SECTION) else None
+    saved = path_tracer_settings(ini[SECTION]).get('Shading') if ini.has_section(SECTION) else None
     check('[M1] editor.ini keeps the Shading set last (Lambert)', saved == 'Lambert', f'Shading={saved}')
 
 

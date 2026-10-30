@@ -2,7 +2,7 @@
 
   python scripts/check-log-restore.py check   # Debug 로 두 번 띄워 아래 기준을 모두 판정한다
 
-번호는 작업 10 의 목표 번호다. G3 의 사람 쪽 (PT panel 의 Log 와 Restore 칸) 은 computer use 로 본다.
+번호는 작업 10 의 목표 번호다. G3 의 사람 쪽 (Engine Tuning 의 Path Tracer 에 있는 Log 와 Restore 칸) 은 computer use 로 본다.
 
 app 을 직접 띄우고 끝내며, 이미 띄운 harness instance 는 먼저 끝낸다. 하나라도 실패하면 exit 1 이다. 실행마다 끝낼 때 실행 중의
 D3D12 CORRUPTION, ERROR, WARNING 이 0 이고 종료 때 LIVE_DEVICE 하나만 남는지도 본다.
@@ -16,7 +16,7 @@ image 의 줄이다. B 는 Furnace 를 켠 줄이다. Furnace 는 directional li
        같은 scene 의 줄이라 scene 은 [G4] 가 열 수 없는 scene file 의 줄과 scene 이 없는 줄로 본다. 다른 scene 의 줄이 그 scene 을 여는
        것은 check-scene-open.py 의 [O6] 이 본다.
   [G2a] 다시 띄운 app 에 A 를, 그 뒤 B 를 restore 하면 그때마다 줄 (pt samples 밖) 과 state 의 camera, light, sky,
-       settings.Engine Tuning, settings.Path Tracer (Show 밖) 가 줄을 얻을 때와 문자열로 같다. Target Samples 는 줄의 pt samples 다.
+       settings.Engine Tuning (Path Tracer/Show 밖) 이 줄을 얻을 때와 문자열로 같다. Target Samples 는 줄의 pt samples 다.
   [G2b] 다시 띄운 app 에서 export 의 줄을 restore 하고 Show 만 켜 SAMPLES 까지 쌓아 export 한 image 의 rgba 가 첫 실행의 export 와
        bit 단위로 같다.
   [G3] capture pt 의 응답의 line 이 옆에 남긴 .conditions.txt 와 같고, 쌓기를 멈춘 뒤의 describe 와 같다. Validation view 의
@@ -71,7 +71,7 @@ LINE_B = {
     'samples': 4,
 }
 TAA = 'Graphics/AA/TAA/Enable'
-CONDITION_STATE = ['camera', 'light', 'sky', 'settings.Engine Tuning', 'settings.Path Tracer']
+CONDITION_STATE = ['camera', 'light', 'sky', 'settings.Engine Tuning']
 
 # [G4] 에서 key 마다 넣는 받을 수 없는 값. 모든 key 에 'x' 를 넣는 것과 함께, 형식은 맞지만 범위나 조합이 틀린 값을 넣는다.
 # light direction 의 값은 그 줄의 light up 과 직교하지 않는다.
@@ -102,7 +102,7 @@ def read_conditions_state(session):
         for key in path.split('.'):
             part = part[key]
         state[path] = part
-    state['settings.Path Tracer'] = without(state['settings.Path Tracer'], 'Show')
+    state['settings.Engine Tuning'] = without(state['settings.Engine Tuning'], 'Path Tracer/Show')
     return state
 
 
@@ -112,7 +112,7 @@ def set_conditions(session, line):
     session.ask_ok(f'settings set {SKY_LIGHT_SECTION}: {line["sky"]}')
     session.ask_ok(f'settings set Engine Tuning: {TAA}={line["taa"]}')
     settings = line['path tracer'] | {'Show': 1, 'Samples per Frame': 1, 'Target Samples': line['samples']}
-    session.ask_ok('settings set Path Tracer: ' + '; '.join(f'{key}={value}' for key, value in settings.items()))
+    session.ask_ok('settings set Engine Tuning: ' + '; '.join(f'Path Tracer/{key}={value}' for key, value in settings.items()))
     session.ask_ok('pt reset')
     session.ask_ok(f'pt wait samples={line["samples"]}', timeout=WAIT_TIMEOUT)
 
@@ -166,7 +166,7 @@ def first_run(check, no_build):
 def check_restored(session, check, line, state, label):
     restored = session.ask_ok(f'restore {line}')
     now = session.ask_ok('describe')['line']
-    target = session.ask_ok('state settings.Path Tracer')['state']['settings']['Path Tracer']['Target Samples']
+    target = session.ask_ok('state settings.Engine Tuning')['state']['settings']['Engine Tuning']['Path Tracer/Target Samples']
     differing = {key: f'{value} vs {parse(now).get(key)}' for key, value in without(parse(line), 'pt samples').items() if parse(now).get(key) != value}
     check(f'[G2a] restore of {label} gives its conditions again, and pt samples as the Target Samples',
           not differing and parse(now).keys() == parse(line).keys() and target == parse(line)['pt samples'],
@@ -228,8 +228,8 @@ def check_notes(session, check, line_a, restored_b):
 
 
 def check_validation_line(session, check):
-    view = session.ask_ok('state settings.Ray Tracing View')['state']['settings']['Ray Tracing View']['View']
-    session.ask_ok('settings set Ray Tracing View: View=Validation: Depth Comparison')
+    view = session.ask_ok('state settings.Engine Tuning')['state']['settings']['Engine Tuning']['Ray Tracing/View']
+    session.ask_ok('settings set Engine Tuning: Ray Tracing/View=Validation: Depth Comparison')
     session.ask_ok(f'frames {VALIDATION_VIEW_SETTLE_FRAMES}')
     line = session.ask_ok('validation capture')['line']
     described = parse(session.ask_ok('describe')['line'])
@@ -242,7 +242,7 @@ def check_validation_line(session, check):
     now = parse(session.ask_ok('describe')['line'])
     differing = [key for key in described if key != 'pt samples' and now.get(key) != logged.get(key)]
     check('[G3] restore of the validation Log line gives its conditions again', not differing, ', '.join(differing) or 'same')
-    session.ask_ok(f'settings set Ray Tracing View: View={view}')
+    session.ask_ok(f'settings set Engine Tuning: Ray Tracing/View={view}')
     session.ask_ok(f'frames {VALIDATION_VIEW_SETTLE_FRAMES}')
 
 
@@ -255,7 +255,7 @@ def second_run(check, line_a, image_a, state_a, line_b, state_b):
             check_coverage(check, session.ask_ok('describe')['line'], line_a, line_b)
 
             check_restored(session, check, line_a, state_a, 'A')
-            session.ask_ok('settings set Path Tracer: Show=1')
+            session.ask_ok('settings set Engine Tuning: Path Tracer/Show=1')
             session.ask_ok(f'pt wait samples={SAMPLES}', timeout=WAIT_TIMEOUT)
             reply, image = export(session, 'line-a-restarted')
             check_export_line(session, check, reply, 'capture pt after the restart')

@@ -17,13 +17,13 @@ selection = state editor
 ui hide
 
 # 3. Depth Error heatmap 의 Heatmap Range 를 capture 에 맞춘다. 판정: Heatmap Range 가 fit 전과 다르다.
-settings set Ray Tracing View: View=Validation: Depth Comparison
-settings set Ray Tracing View: Heatmap=Depth Error
-unfitted = state settings.Ray Tracing View
+settings set Engine Tuning: Ray Tracing/View=Validation: Depth Comparison
+settings set Engine Tuning: Ray Tracing/Heatmap=Depth Error
+unfitted = state settings.Engine Tuning
 frames 2
 validation capture
 fitted = validation fit
-settings set Ray Tracing View: View=Off
+settings set Engine Tuning: Ray Tracing/View=Off
 
 # 4. atrium 바닥 가까이 서서 바닥의 한 점을 pick 하고 그 점을 본다. 판정: 그 점은 위를 향하고, 화면 가운데의 pick 이 그 점에 닿는다.
 pose 0 200 0 1.6 -0.4

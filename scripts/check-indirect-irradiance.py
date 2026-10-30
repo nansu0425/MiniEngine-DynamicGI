@@ -6,11 +6,11 @@
 번호는 작업 11 의 완료 기준의 번호다. Indirect Irradiance 의 정의와 단위는 PathTracer.h 의 Output 에 있다. 이 script 밖에서 보는 기준:
   [U1] 의 저장과 reset: check-lambert-path.py check 의 [8], [9]
   [U2], [U3] 측정 조건의 줄: check-log-restore.py check 의 [G1], [G2b], [G4]
-  [U4] panel 의 Output combo: 사람이나 computer use 로 바꾸고 그 전후의 state 로 본다
+  [U4] Engine Tuning 의 Path Tracer 에 있는 Output combo: 사람이나 computer use 로 바꾸고 그 전후의 state 로 본다
 
 app 을 직접 띄우고 끝내며, 이미 띄운 harness instance 는 먼저 끝낸다. 하나라도 실패하면 exit 1 이다. 실행마다 끝낼 때 실행 중의 D3D12
 CORRUPTION, ERROR, WARNING 이 0 이고 종료 때 LIVE_DEVICE 하나만 남는지도 본다. PT 의 값은 capture pt 의 export 로 본다. export 의
-rgb 는 E (lux) 의 평균이고 a 는 더한 sample 수다. hit pixel 은 Ray Tracing View 의 Front Face capture 에서 면을 만난 pixel 이다. 따로
+rgb 는 E (lux) 의 평균이고 a 는 더한 sample 수다. hit pixel 은 Engine Tuning 의 Ray Tracing/View 가 Debug: Front Face 인 capture 에서 면을 만난 pixel 이다. 따로
 적지 않으면 harness baseline 의 시점, Shading Lambert, Geometric Normals on, Russian roulette off, FURNACE_SAMPLES 다.
 
 furnace: Russian roulette 를 끄면 RNG 를 쓰는 양이 albedo, emission, sky 에 따라 달라지지 않으므로, Seed 와 Max Bounces 가 같은 furnace
@@ -71,8 +71,8 @@ from checks import Checks, stop_and_check
 from directlightchecks import check_bounces
 from imagecompare import agreement, rmse
 from imagefiles import ImageFileError, read_dds_rgba32f
-from pathtracerchecks import (BASE, EMISSION_FURNACE, FURNACE_SAMPLES, SECTION, SKY_RADIANCE, WHITE_FURNACE, path_tracer_state,
-                              set_path_tracer)
+from pathtracerchecks import (BASE, EMISSION_FURNACE, FURNACE_SAMPLES, SECTION, SKY_RADIANCE, WHITE_FURNACE, path_tracer_settings,
+                              path_tracer_state, set_path_tracer)
 from viewer import (BASELINE_DIR, HARNESS_DIR, PREVIEW_EXPOSURE, SETTLE_FRAMES, SNAPSHOT_POSES, HarnessError, Session, default_scene_pose, capture,
                     make_view, shots_dir, start_instance, stop_instance)
 
@@ -122,10 +122,10 @@ def export(session, name, settings, samples):
 
 def front_face_hits(session, name):
     """Front Face view 는 miss 를 검정으로 그린다."""
-    session.ask_ok('settings set Ray Tracing View: View=Debug: Front Face')
+    session.ask_ok('settings set Engine Tuning: Ray Tracing/View=Debug: Front Face')
     session.ask_ok(f'frames {SETTLE_FRAMES}')
     image = np.asarray(Image.open(capture(session, 'overlay', name)).convert('RGB'))
-    session.ask_ok('settings set Ray Tracing View: View=Off')
+    session.ask_ok('settings set Engine Tuning: Ray Tracing/View=Off')
     return np.any(image != 0, axis=2)
 
 
@@ -145,8 +145,8 @@ def check_default_output(session, check):
     ini = configparser.ConfigParser(delimiters=('=',), comment_prefixes=(';',), interpolation=None)
     ini.optionxform = str
     ini.read(BASELINE_DIR / 'editor.ini', encoding='utf-8')
-    in_baseline = ini.has_section(SECTION) and 'Output' in ini[SECTION]
-    output = session.ask_ok(f'state settings.{SECTION}')['state']['settings'][SECTION].get('Output')
+    in_baseline = ini.has_section(SECTION) and 'Output' in path_tracer_settings(ini[SECTION])
+    output = path_tracer_settings(session.ask_ok(f'state settings.{SECTION}')['state']['settings'][SECTION]).get('Output')
     check('[U1] the harness baseline has no Output and the path tracer starts with Radiance', not in_baseline and output == 'Radiance',
           f'Output in the baseline editor.ini: {in_baseline}; state Output {output}')
 

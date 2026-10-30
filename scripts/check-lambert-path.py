@@ -46,7 +46,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from checks import Checks, stop_and_check
 from imagefiles import ImageFileError, read_dds_rgba32f
 from pathtracerchecks import (BASE, FURNACE_SAMPLES, RECORD, light_by_sky_only, SECTION, WHITE_FURNACE, append_record_row, code_version,
-                              describe_machine, path_tracer_state, set_path_tracer, SKY_RADIANCE)
+                              describe_machine, path_tracer_settings, path_tracer_state, set_path_tracer, SKY_RADIANCE)
 from viewer import HARNESS_DIR, PREVIEW_EXPOSURE, HarnessError, Session, capture, make_view, start_instance, stop_instance
 
 KEPT_DIR = HARNESS_DIR / 'kept' / 'lambert-path'
@@ -145,8 +145,8 @@ def check_resets(session, check):
 
 
 def check_settings_state(session, check):
-    replied = set_path_tracer(session, SAVED_SETTINGS)['state']['settings'][SECTION]
-    read = session.ask_ok(f'state settings.{SECTION}')['state']['settings'][SECTION]
+    replied = set_path_tracer(session, SAVED_SETTINGS)
+    read = path_tracer_settings(session.ask_ok(f'state settings.{SECTION}')['state']['settings'][SECTION])
     expected = {key: str(value) for key, value in SAVED_SETTINGS.items()}
     shown = {key: read.get(key) for key in expected}
     check('[8] settings set changes the path tracer settings in state', shown == expected and replied == read, shown)
@@ -166,7 +166,7 @@ def read_ini_section(path, section):
 
 def check_stopped(instance, check):
     stop_and_check(instance, check)
-    saved = read_ini_section(Path(instance['run_dir']) / 'editor.ini', SECTION)
+    saved = path_tracer_settings(read_ini_section(Path(instance['run_dir']) / 'editor.ini', SECTION))
     expected = {key: str(value) for key, value in SAVED_SETTINGS.items()}
     check('[8] editor.ini keeps the path tracer settings', {key: saved.get(key) for key in expected} == expected, saved)
 

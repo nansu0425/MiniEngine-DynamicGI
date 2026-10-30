@@ -12,7 +12,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from viewer import REPO_ROOT, HarnessError
 
 RECORD = REPO_ROOT / 'docs' / 'reference-path-tracer-measurements.md'
-SECTION = 'Path Tracer'
+# PT 의 설정은 Engine Tuning 의 Path Tracer 에 있다. settings 의 key 는 PT 의 설정 이름 앞에 KEY_PREFIX 를 붙인 것이다.
+SECTION = 'Engine Tuning'
+KEY_PREFIX = 'Path Tracer/'
 
 # furnace 는 Geometric Normals 를 켜면 분산이 0 이라 적은 sample 로 답을 본다.
 FURNACE_SAMPLES = 16
@@ -37,17 +39,22 @@ EMISSION_FURNACE = BASE | {'Furnace': 1, 'Furnace Albedo': 0.5, 'Furnace Emissio
                            'Russian Roulette': 0}
 
 
+def path_tracer_settings(values):
+    """Engine Tuning 의 값 중 PT 의 설정을 KEY_PREFIX 를 뗀 이름으로 돌려준다."""
+    return {key[len(KEY_PREFIX):]: value for key, value in values.items() if key.startswith(KEY_PREFIX)}
+
+
 def set_path_tracer(session, settings):
-    """settings 의 '<section>: <key>' 는 그 section 에, 나머지는 PT 의 설정에 넣고 PT 의 설정을 넣은 응답을 돌려준다."""
+    """settings 의 '<section>: <key>' 는 그 section 에, 나머지는 PT 의 설정에 넣고, PT 의 설정을 넣었으면 넣은 뒤의 PT 의 설정을 돌려준다."""
     sections = {}
     for key, value in settings.items():
         section, separator, name = key.partition(': ')
         if not separator:
-            section, name = SECTION, key
+            section, name = SECTION, KEY_PREFIX + key
         sections.setdefault(section, {})[name] = value
     replies = {section: session.ask_ok(f'settings set {section}: ' + '; '.join(f'{key}={value}' for key, value in values.items()))
                for section, values in sections.items()}
-    return replies.get(SECTION)
+    return path_tracer_settings(replies[SECTION]['state']['settings'][SECTION]) if SECTION in replies else None
 
 
 def light_by_sky_only(session):

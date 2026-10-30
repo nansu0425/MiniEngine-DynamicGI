@@ -25,7 +25,7 @@ namespace ControlChannel
         Fields& Object(const std::string& key, const Fields& value);
         // other의 member를 뒤에 붙인다. 여러 group의 state를 한 응답에 담을 때 쓰고, key가 겹치지 않게 부른다.
         Fields& Append(const Fields& other);
-        // Append와 같지만, 두 쪽에 같은 key의 object가 있으면 그 안에서 합친다. settings.Engine Tuning과 settings.Path Tracer처럼
+        // Append와 같지만, 두 쪽에 같은 key의 object가 있으면 그 안에서 합친다. settings.Engine Tuning과 settings.Editor Camera처럼
         // 바깥 key가 같은 state path들을 한 응답에 담을 때 쓴다.
         Fields& Merge(const Fields& other);
 

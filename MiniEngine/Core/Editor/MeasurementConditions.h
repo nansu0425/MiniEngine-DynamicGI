@@ -68,7 +68,7 @@ namespace MeasurementConditions
     // image로 잘못 보게 되기 때문이다. 줄에 있는 다른 key (Log의 수치 등)는 읽지 않는다.
     Result Restore(const Values& values);
 
-    // 등록한 group의 statePaths를 모두 모은 것
+    // 등록한 group의 statePaths를 모두 모은 것. 여러 group이 같은 path를 가지면 한 번만 담는다.
     std::vector<std::string> GetStatePaths(void);
 
     // Restore 칸과 button. 붙여 넣은 줄로 Restore하고, 되돌리지 못한 key와 지금과 다른 점을 경고로 보인다.

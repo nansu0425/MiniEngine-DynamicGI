@@ -29,11 +29,10 @@
 #include "Model/Raytracing/RayQuerySmokeTest.h"
 #include "Model/Raytracing/RaytracingScene.h"
 #include "Model/Raytracing/RaytracingView.h"
-#include "Model/Raytracing/RaytracingPanel.h"
 #include "Model/Raytracing/RayQueryValidation.h"
 #include "Model/Raytracing/RayPick.h"
 #include "Model/PathTracer/PathTracer.h"
-#include "Model/PathTracer/PathTracerPanel.h"
+#include "Model/PathTracer/PathTracerTuning.h"
 #include "Model/PathTracer/BrdfTest.h"
 #include "Model/Loader/glTF.h"
 #include "Model/Renderer/Renderer.h"
@@ -545,7 +544,7 @@ void ReadSkyLightConditions(SkyLight& sky, const MeasurementConditions::Values& 
 }
 
 // raster와 path tracer가 그리는 조건을 Log와 capture의 줄에 담고 Restore로 되돌리게 한다. scene 은 ModelViewer::RegisterSceneConditions가,
-// path tracer의 설정은 PathTracerPanel이 더한다.
+// path tracer의 설정은 PathTracerTuning이 더한다.
 void RegisterMeasurementConditions(EditorCamera& editorCamera, DirectionalLight& light, SkyLight& sky)
 {
     MeasurementConditions::Register("camera", {
@@ -1225,7 +1224,7 @@ void ModelViewer::Startup( void )
     RayQuerySmokeTest::Run();
     RaytracingView::Initialize();
     RayPick::Initialize();
-    PathTracerPanel::Initialize();
+    PathTracerTuning::Initialize();
     BrdfTest::Initialize();
 
     uint32_t rebuildValue;
@@ -1278,7 +1277,7 @@ void ModelViewer::Cleanup( void )
     SceneEditor::RemoveObject(m_SkyLight);
     SceneEditor::RemoveObject(m_Light);
     SceneEditor::RemoveObject(m_SceneModel);
-    PathTracerPanel::Shutdown();
+    PathTracerTuning::Shutdown();
     RayPick::Shutdown();
     RaytracingView::Shutdown();
     m_RaytracingScene.Destroy();
@@ -1313,8 +1312,7 @@ void ModelViewer::Update( float deltaT )
     m_CameraController->Update(deltaT);
 
     SceneEditor::Update(m_Camera);
-    RaytracingPanel::Update();
-    PathTracerPanel::Update();
+    PathTracerTuning::Update();
 
     GraphicsContext& gfxContext = GraphicsContext::Begin(L"Scene Update");
 
@@ -1453,7 +1451,7 @@ void ModelViewer::RenderScene( void )
     // scene color의 마지막 pass 뒤에 덮어써서, PT가 raster와 같은 bloom, exposure, tone mapping을 거쳐 두 화면을 같은 조건으로 견주게 한다.
     // raster는 그대로 그린다. ray tracing view의 validation이 raster의 depth를 읽는다. PT의 Shading DDGI Probe Hit는 이 frame의 shadow
     // pass가 그린 shadow map을 읽는다.
-    PathTracerPanel::Render(gfxContext.GetComputeContext(), m_Camera, m_MainViewport, m_RaytracingScene, m_Light.GetDirection(), m_Light.GetIlluminance(),
+    PathTracerTuning::Render(gfxContext.GetComputeContext(), m_Camera, m_MainViewport, m_RaytracingScene, m_Light.GetDirection(), m_Light.GetIlluminance(),
         m_SkyLight.GetRadiance(), g_ShadowBuffer, m_ShadowCamera.GetShadowMatrix(), g_SceneColorBuffer);
 
     gfxContext.Finish();

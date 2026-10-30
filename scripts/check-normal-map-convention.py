@@ -1,7 +1,7 @@
 """engine 이 glTF 의 tangent 와 normal map 규약대로 shading normal 을 만드는지, 정답을 아는 test scene 으로 확인한다.
 
-make 가 test scene 과 capture 명령 파일을 쓰고, ModelViewer 가 Ray Tracing View 를 capture 하면, judge 가 그 capture 를
-판정한다. Ray Tracing View 와 PathTracer 는 같은 GetHitSurface (MiniEngine/Model/Raytracing/HitSurface.hlsli) 로 shading
+make 가 test scene 과 capture 명령 파일을 쓰고, ModelViewer 가 Engine Tuning 의 Ray Tracing/View 가 고른 debug view 를 capture 하면, judge 가 그 capture 를
+판정한다. 그 debug view 와 PathTracer 는 같은 GetHitSurface (MiniEngine/Model/Raytracing/HitSurface.hlsli) 로 shading
 normal 을 얻으므로, 이 판정은 PT 가 받는 shading normal 의 판정이다.
 
   python scripts/check-normal-map-convention.py make
@@ -197,7 +197,7 @@ def command_make(args):
 
     lines = ['ui hide']
     for name, view in CAPTURES.items():
-        lines += [f'settings set Ray Tracing View: View=Debug: {view}', f'frames {SETTLE_FRAMES}',
+        lines += [f'settings set Engine Tuning: Ray Tracing/View=Debug: {view}', f'frames {SETTLE_FRAMES}',
                   f'capture overlay {capture_path(name).with_suffix("")}']
     (SCENE_DIR / 'capture.txt').write_text('\n'.join(lines) + '\n', encoding='utf-8')
 

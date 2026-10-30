@@ -51,6 +51,12 @@ public:
         child.m_GroupPtr = this;
     }
 
+    void SetSection( const TuningSection& section )
+    {
+        ASSERT(m_Section == nullptr, "A group has only one section");
+        m_Section = &section;
+    }
+
     void ShowChildren( void );
 
     // 변수의 key는 root group부터의 경로다. 그래서 변수가 더해지거나 빠져도 나머지 변수의 값은 그대로 되돌린다.
@@ -62,7 +68,10 @@ public:
     static VariableGroup sm_RootGroup;
 
 private:
+    void ShowContent( void );
+
     std::map<string, EngineVar*> m_Children;
+    const TuningSection* m_Section = nullptr;
 };
 
 VariableGroup VariableGroup::sm_RootGroup;
@@ -81,7 +90,7 @@ void VariableGroup::ShowChildren( void )
         {
             if (ImGui::TreeNode(iter->first.c_str()))
             {
-                subGroup->ShowChildren();
+                subGroup->ShowContent();
                 ImGui::TreePop();
             }
         }
@@ -94,8 +103,32 @@ void VariableGroup::ShowChildren( void )
     }
 }
 
+void VariableGroup::ShowContent( void )
+{
+    if (m_Section != nullptr)
+    {
+        // section의 widget이 group 아래 변수의 widget과 label이 같아도 부딪히지 않게 한다.
+        ImGui::PushID(m_Section);
+        m_Section->Show();
+        ImGui::PopID();
+    }
+    ShowChildren();
+}
+
 void VariableGroup::SaveValues( EditorSettings::Values& values, const string& pathPrefix ) const
 {
+    if (m_Section != nullptr)
+    {
+        TuningSection::Values sectionValues;
+        m_Section->Save(sectionValues);
+        for (const auto& value : sectionValues)
+        {
+            ASSERT(value.first.find('/') == string::npos && m_Children.find(value.first) == m_Children.end(),
+                "A section key is a variable path: %s%s", pathPrefix.c_str(), value.first.c_str());
+            values[pathPrefix + value.first] = value.second;
+        }
+    }
+
     for (const auto& child : m_Children)
     {
         const string path = pathPrefix + child.first;
@@ -109,6 +142,18 @@ void VariableGroup::SaveValues( EditorSettings::Values& values, const string& pa
 
 void VariableGroup::LoadValues( const EditorSettings::Values& values, const string& pathPrefix )
 {
+    if (m_Section != nullptr)
+    {
+        // key는 path 순서로 정렬되어 있으므로 pathPrefix로 시작하는 key는 lower_bound부터 이어진다. 그중 '/'가 더 있는 key는 아래 group의 것이다.
+        TuningSection::Values sectionValues;
+        for (auto value = values.lower_bound(pathPrefix); value != values.end() && value->first.compare(0, pathPrefix.size(), pathPrefix) == 0; ++value)
+        {
+            if (value->first.find('/', pathPrefix.size()) == string::npos)
+                sectionValues[value->first.substr(pathPrefix.size())] = value->second;
+        }
+        m_Section->Load(sectionValues);
+    }
+
     for (const auto& child : m_Children)
     {
         const string path = pathPrefix + child.first;
@@ -430,6 +475,27 @@ void CallbackTrigger::Edit( const char* label )
         Bang();
 }
 
+// EngineVar의 생성자로 등록하지 않는다. Initialize 뒤에 만들면 등록이 바로 AddToVariableGraph까지 가는데, EngineVar의 생성자 안에서는
+// 이것이 아직 TuningSection이 아니다.
+TuningSection::TuningSection( const std::string& path, std::function<void (void)> show,
+    std::function<void (Values&)> save, std::function<void (const Values&)> load )
+    : m_Show(show), m_Save(save), m_Load(load)
+{
+    EngineTuning::RegisterVariable(path, *this);
+}
+
+void TuningSection::Save( Values& values ) const
+{
+    if (m_Save)
+        m_Save(values);
+}
+
+void TuningSection::Load( const Values& values ) const
+{
+    if (m_Load)
+        m_Load(values);
+}
+
 //=====================================================================================================================
 // EngineTuning namespace methods
 
@@ -478,6 +544,11 @@ void EngineTuning::AddToVariableGraph( const string& path, EngineVar& var )
         }
     }
 
+    // section은 path의 group에 붙는다. 그 group은 변수의 group처럼 없으면 만든다.
+    const TuningSection* section = dynamic_cast<const TuningSection*>(&var);
+    if (section != nullptr)
+        separatedPath.push_back(leafName);
+
     VariableGroup* group = &VariableGroup::sm_RootGroup;
 
     for (auto iter = separatedPath.begin(); iter != separatedPath.end(); ++iter )
@@ -498,7 +569,10 @@ void EngineTuning::AddToVariableGraph( const string& path, EngineVar& var )
         }
     }
 
-    group->AddChild(leafName, var);
+    if (section != nullptr)
+        group->SetSection(*section);
+    else
+        group->AddChild(leafName, var);
 }
 
 void EngineTuning::RegisterVariable( const std::string& path, EngineVar& var )

@@ -131,8 +131,9 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 - albedo 1 의 furnace 에서 16384 번 넘게 반사하고도 escape 하지 못한 path 가 어디에 갇혔는지 보는 일 (a5060e3): 작업 13 이나 PT 에서 leak, self-hit 로 보이는 결과가 나올 때. Indirect Irradiance 의 white furnace 에서도 16 spp 중 한 pixel 의 sample 하나가 65536 번 안에 escape 하지 못했다 (a93d5bb 의 check-indirect-irradiance.py [I1]).
 - Shading Lambert 의 PT export 가 같은 build 에서도 실행마다 rgb 가 4 ulp 까지 다른 원인: Lambert 를 bit 단위로 비교해야 하는 확인이 생길 때. d05ec6f 를 두 번 띄워 같은 조건으로 쌓은 export 에서 pixel 의 0.4 ~ 1.3% 가 달랐고, glTF 는 같았다. check-probe-hit-shading.py 의 [E5] 와 viewer.py snapshot 의 PT shot 은 이 차를 허용한다. PathTracerCS.hlsl 의 LAMBERT_SHADING 주석이 적은 반올림 차이도 같은 원인일 수 있다 (추측).
 - 작업 11 의 check 를 처음 돌릴 때 Indirect Irradiance 의 white furnace (Max Bounces 65536) 를 쌓다가 app 이 exit reason 없이 끝난 원인: 다시 일어날 때. 같은 조건을 손으로 쌓을 때와 check 를 다시 돌릴 때는 재현되지 않았다.
-- PT panel 의 Export button: script 없이 사람이 PT 의 값을 export 할 일이 생길 때. 지금은 harness 의 `capture pt` 로만 export 한다 (2b33c11).
+- Engine Tuning 의 Path Tracer 에 둘 Export button: script 없이 사람이 PT 의 값을 export 할 일이 생길 때. 지금은 harness 의 `capture pt` 로만 export 한다 (2b33c11).
 - Engine Tuning 의 Graphics/SSAO 항목을 없애는 일: ModelViewer 는 SSAO 를 돌리지 않지만 engine 의 SSAO module 이 남아 있어 효과 없는 항목이 보인다. legacy Sponza renderer 를 지울 때 (35e8e58)
+- Engine Tuning tree 의 root 를 한 기준으로 나누는 일: PT 와 RT 를 MiniEngine 의 rendering pipeline 에 통합할 때. 지금 root 의 Graphics, Renderer, Application, Timing, Profiling 은 MiniEngine 원본이 서로 다른 기준으로 나눈 것이고, Path Tracer 와 Ray Tracing 은 그 옆에 root 로 두었다.
 - NaN 이나 Inf 라서 버린 sample 수를 panel 에 보이는 일: 작업 8 부터 PT 에 NaN 이나 Inf 가 생겨 사람이 실행 중에 봐야 할 때. 지금은 export 의 a 로만 센다 (2b33c11).
 - vertex normal 을 float 로 담는 일: shading normal 의 오차가 측정에 보일 때. 지금은 R10G10B10A2 로 담아 성분마다 1/1023 까지 다르다 (c8610b9).
 - 일반 game engine 처럼 transform 을 편집하는 일 (translate 의 Local 과 World, Inspector 의 수치 입력, snap, undo): 이 로드맵 밖에서 따로 한다. 지금은 rotate 만 Local 과 World 를 고르고, 수치는 harness 의 light set 으로만 넣는다 (665bea1).

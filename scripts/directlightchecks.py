@@ -31,10 +31,10 @@ DIRECT = BASE | {SKY_RADIANCE: 0, 'Max Bounces': 1, 'Russian Roulette': 0, 'Targ
 
 
 def overlay(session, view, name):
-    session.ask_ok(f'settings set Ray Tracing View: View={view}')
+    session.ask_ok(f'settings set Engine Tuning: Ray Tracing/View={view}')
     session.ask_ok(f'frames {SETTLE_FRAMES}')
     image = np.asarray(Image.open(capture(session, 'overlay', name)).convert('RGB'))
-    session.ask_ok('settings set Ray Tracing View: View=Off')
+    session.ask_ok('settings set Engine Tuning: Ray Tracing/View=Off')
     return image
 
 

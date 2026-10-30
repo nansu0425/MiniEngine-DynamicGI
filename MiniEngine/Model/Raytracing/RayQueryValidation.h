@@ -52,9 +52,6 @@ namespace RayQueryValidation
 
     void Initialize(void);
     void Shutdown(void);
-    // Ray Tracing panel의 Validation section 내용. Capture는 바로 앞 frame의 집계를 읽어 보여 주고,
-    // Log는 그 수치를 측정 조건 (MeasurementConditions)과 함께 한 줄로 찍으며, Restore는 그 한 줄의 조건으로 되돌린다.
-    void ShowSection(void);
     // camera ray는 rasterViewport로 그린 raster의 sample 위치를 지난다. rasterDepth는 그 raster가 그린 depth buffer이고 target과 크기가 같다.
     void Render(ComputeContext& context, Mode mode, const Heatmap& heatmap, const Math::Camera& camera, const D3D12_VIEWPORT& rasterViewport,
         DepthBuffer& rasterDepth, const RaytracingScene& scene, ColorBuffer& target);

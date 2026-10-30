@@ -3,7 +3,6 @@
 #include "Model/Raytracing/RayQueryValidation.h"
 #include "Core/pch.h"
 #include "Core/Automation/ControlChannel.h"
-#include "Core/Editor/EditorSettings.h"
 
 #include <imgui.h>
 
@@ -19,8 +18,6 @@ namespace
 
         bool operator==(const Selection& other) const { return group == other.group && view == other.view; }
     };
-
-    const char* kSettingsSection = "Ray Tracing View";
 
     Selection s_Selection = { kOff, 0 };
     bool s_ShowSingleSidedBackFaces = false;
@@ -79,9 +76,7 @@ namespace
     // 그룹마다 제목 아래에 view를 나열하고, 전체에서 하나만 고르게 한다.
     void ShowViewCombo(void)
     {
-        // section 제목이 이미 View이므로 label 없이 줄 전체를 쓴다.
-        ImGui::SetNextItemWidth(-FLT_MIN);
-        if (!ImGui::BeginCombo("##View", GetSelectionLabel(s_Selection).c_str()))
+        if (!ImGui::BeginCombo("View", GetSelectionLabel(s_Selection).c_str()))
             return;
 
         SelectableView("Off", { kOff, 0 });
@@ -115,14 +110,14 @@ namespace
     {
         if (s_Selection.group != kValidation)
         {
-            reason = "the view is not a Validation view. Pick one as View in the Ray Tracing View settings.";
+            reason = "the view is not a Validation view. Pick one as Ray Tracing/View in Engine Tuning.";
             return false;
         }
         const RayQueryValidation::Mode mode = GetValidationMode();
         if (!RayQueryValidation::IsMetricItem(mode, s_Heatmap.item))
         {
             reason = std::string("the heatmap is the category ") + RayQueryValidation::GetHeatmapItemLabel(mode, s_Heatmap.item) +
-                ", not a metric. Pick a metric as Heatmap in the Ray Tracing View settings.";
+                ", not a metric. Pick a metric as Ray Tracing/Heatmap in Engine Tuning.";
             return false;
         }
         fitted = s_Heatmap;
@@ -144,7 +139,7 @@ namespace
             return;
         }
         s_Heatmap = fitted;
-        reply.Ok(ControlChannel::Fields().Object("state", ControlChannel::GetState(std::string("settings.") + kSettingsSection)));
+        reply.Ok(ControlChannel::Fields().Object("state", ControlChannel::GetState("settings.Engine Tuning")));
     }
 
     // Validation view의 결과 중 overlay에 칠할 category나 metric과, metric을 칠할 범위를 고른다.
@@ -186,7 +181,7 @@ namespace
         ImGui::EndDisabled();
     }
 
-    void SaveSettings(EditorSettings::Values& values)
+    void SaveSettings(TuningSection::Values& values)
     {
         values["View"] = GetSelectionLabel(s_Selection);
         values["Show Single-Sided Back Faces"] = s_ShowSingleSidedBackFaces ? "1" : "0";
@@ -199,7 +194,7 @@ namespace
         values["Heatmap Range"] = range;
     }
 
-    void LoadSettings(const EditorSettings::Values& values)
+    void LoadSettings(const TuningSection::Values& values)
     {
         const auto backFaces = values.find("Show Single-Sided Back Faces");
         if (backFaces != values.end())
@@ -229,6 +224,17 @@ namespace
             s_Heatmap.maxExponent = maxExponent;
         }
     }
+
+    void ShowSettings(void)
+    {
+        ShowViewCombo();
+        ShowBackFacesCheckbox();
+        ShowHeatmapOptions();
+    }
+
+    // ray tracing의 기능인 AS, closest hit, visibility query를 보고 검증하는 view의 설정이다. 그 집계를 읽는 도구는 RayQueryValidation이
+    // 이 아래의 Validation에 둔다. PT, DDGI처럼 ray tracing을 쓰는 rendering 기법은 ray tracing의 기능이 아니므로 그 설정은 여기에 두지 않는다.
+    TuningSection s_Section("Ray Tracing", ShowSettings, SaveSettings, LoadSettings);
 }
 
 void RaytracingView::Initialize(void)
@@ -236,20 +242,11 @@ void RaytracingView::Initialize(void)
     RaytracingDebugView::Initialize();
     RayQueryValidation::Initialize();
     RayQueryValidation::SetFitCommand(FitHeatmapByCommand);
-    EditorSettings::Register(kSettingsSection, SaveSettings, LoadSettings);
 }
 
 void RaytracingView::Shutdown(void)
 {
-    EditorSettings::Unregister(kSettingsSection);
     RayQueryValidation::Shutdown();
-}
-
-void RaytracingView::ShowSection(void)
-{
-    ShowViewCombo();
-    ShowBackFacesCheckbox();
-    ShowHeatmapOptions();
 }
 
 void RaytracingView::Render(ComputeContext& context, const Math::Camera& camera, const D3D12_VIEWPORT& rasterViewport, DepthBuffer& rasterDepth,

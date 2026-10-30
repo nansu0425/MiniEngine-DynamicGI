@@ -882,13 +882,13 @@ def capture_path_tracer(session, folder):
     shots = []
     for shading, output in SNAPSHOT_PT_RUNS:
         settings = SNAPSHOT_PT_SETTINGS | {'Shading': shading, 'Output': output, 'Target Samples': SNAPSHOT_PT_SAMPLES}
-        session.ask_ok('settings set Path Tracer: ' + '; '.join(f'{key}={value}' for key, value in settings.items()))
+        session.ask_ok('settings set Engine Tuning: ' + '; '.join(f'Path Tracer/{key}={value}' for key, value in settings.items()))
         session.ask_ok('pt reset')
         session.ask_ok(f'pt wait samples={SNAPSHOT_PT_SAMPLES}')
         name = path_tracer_shot_name(shading, output)
         session.ask_ok(f'capture pt {folder / name}')
         shots.append(name)
-    session.ask_ok('settings set Path Tracer: Show=0')
+    session.ask_ok('settings set Engine Tuning: Path Tracer/Show=0')
     return shots
 
 
@@ -1151,7 +1151,7 @@ def part_of_state(state, path):
 
 
 def merge_state(state, part):
-    """part 를 state 에 합친다. settings.Engine Tuning 과 settings.Path Tracer 처럼 바깥 key 가 같은 object 는 그 안에서 합친다."""
+    """part 를 state 에 합친다. settings.Engine Tuning 과 settings.Editor Camera 처럼 바깥 key 가 같은 object 는 그 안에서 합친다."""
     for key, value in part.items():
         if isinstance(value, dict) and isinstance(state.get(key), dict):
             merge_state(state[key], value)
@@ -1269,19 +1269,19 @@ def check_state(session, check):
     change('settings set', f'settings set Engine Tuning: {exposure}=2', 'settings.Engine Tuning')
     session.ask_ok(f'settings set Engine Tuning: {exposure}={original_exposure}')
     change('ui show', 'ui show', 'ui')
-    change('panel open', 'panel Engine Tuning open', 'ui')
-    change('panel close', 'panel Engine Tuning close', 'ui')
+    change('panel open', 'panel Profiler open', 'ui')
+    change('panel close', 'panel Profiler close', 'ui')
     change('ui hide', 'ui hide', 'ui')
 
-    original_view = whole['settings']['Ray Tracing View']['View']
-    session.ask_ok('settings set Ray Tracing View: View=Validation: Depth Comparison')
+    original_view = whole['settings']['Engine Tuning']['Ray Tracing/View']
+    session.ask_ok('settings set Engine Tuning: Ray Tracing/View=Validation: Depth Comparison')
     session.ask_ok('frames 2')
     captured = change('validation capture', 'validation capture', 'validation')
     validation = session.ask_ok('state validation')['state']['validation']
     check('state validation has the values validation capture replies',
           validation['captured'] and validation.get('values') == captured['values'] and not whole['validation']['captured'],
           captured['line'])
-    session.ask_ok(f'settings set Ray Tracing View: View={original_view}')
+    session.ask_ok(f'settings set Engine Tuning: Ray Tracing/View={original_view}')
     session.ask_ok(f'frames {VALIDATION_VIEW_SETTLE_FRAMES}')
 
     check_changes(check, 'commands that change the state reply with the changed part as state then reads it', changes)
@@ -1574,50 +1574,50 @@ def check_editor(session, check, changes):
 
 def check_fit_needs_a_capture(session, check):
     """validation fit 이 Fit to Capture 처럼 그 view 의 capture 가 없으면 맞추지 않는지 본다. 아무 capture 도 하기 전에 부른다."""
-    section = 'Ray Tracing View'
-    original = session.ask_ok(f'settings get {section}')['values']['View']
-    session.ask_ok(f'settings set {section}: View=Validation: Depth Comparison')
-    session.ask_ok(f'settings set {section}: Heatmap=Depth Error')
+    section = 'Engine Tuning'
+    original = session.ask_ok(f'settings get {section}')['values']['Ray Tracing/View']
+    session.ask_ok(f'settings set {section}: Ray Tracing/View=Validation: Depth Comparison')
+    session.ask_ok(f'settings set {section}: Ray Tracing/Heatmap=Depth Error')
     before = session.ask_ok('state')['state']
     refused = session.ask('validation fit')
     unchanged = without_time_varying(session.ask_ok('state')['state']) == without_time_varying(before)
     check('validation fit fails without a capture of the view and changes nothing',
           not refused['ok'] and 'capture' in refused.get('error', '') and not before['validation']['captured'] and unchanged, refused.get('error'))
-    session.ask_ok(f'settings set {section}: View={original}')
+    session.ask_ok(f'settings set {section}: Ray Tracing/View={original}')
     session.ask_ok(f'frames {VALIDATION_VIEW_SETTLE_FRAMES}')
 
 
 def check_validation_fit(session, check, changes):
     """validation fit 이 Fit to Capture 처럼 Heatmap Range 를 마지막 capture 에 맞추고, 버튼이 disabled 인 조건에서는 거절하는지 본다.
-    Ray Tracing View 의 View 를 처음 값으로 되돌려 놓는다."""
-    section = 'Ray Tracing View'
+    Engine Tuning 의 Ray Tracing/View 를 처음 값으로 되돌려 놓는다."""
+    section = 'Engine Tuning'
     path = f'settings.{section}'
     usage = session.ask_ok('help')['commands']['validation']
     check('validation usage gives what fit changes', all(term in usage for term in ['fit', 'Fit to Capture', 'Heatmap Range', 'p1 ~ p99']), usage)
-    original = session.ask_ok(f'settings get {section}')['values']['View']
+    original = session.ask_ok(f'settings get {section}')['values']['Ray Tracing/View']
 
     def refused():
         before = session.ask_ok(f'state {path}')['state']
         reply = session.ask('validation fit')
         return not reply['ok'] and session.ask_ok(f'state {path}')['state'] == before, reply.get('error')
 
-    session.ask_ok(f'settings set {section}: View=Off')
+    session.ask_ok(f'settings set {section}: Ray Tracing/View=Off')
     not_validation = refused()
-    session.ask_ok(f'settings set {section}: View=Validation: Depth Comparison')
+    session.ask_ok(f'settings set {section}: Ray Tracing/View=Validation: Depth Comparison')
     # Validation view 를 고르면 heatmap 은 첫 category 에서 시작한다.
     category = refused()
     check('validation fit fails where Fit to Capture is disabled and changes nothing', not_validation[0] and category[0],
           f'not a Validation view: {not_validation[1]}; a category heatmap: {category[1]}')
 
     start_range = '-3,3'
-    session.ask_ok(f'settings set {section}: Heatmap=Depth Error; Heatmap Range={start_range}')
+    session.ask_ok(f'settings set {section}: Ray Tracing/Heatmap=Depth Error; Ray Tracing/Heatmap Range={start_range}')
     session.ask_ok('frames 2')
     session.ask_ok('validation capture')
-    fitted = record_change(session, changes, 'validation fit', 'validation fit', path)['state']['settings'][section]['Heatmap Range']
-    again = session.ask_ok('validation fit')['state']['settings'][section]['Heatmap Range']
+    fitted = record_change(session, changes, 'validation fit', 'validation fit', path)['state']['settings'][section]['Ray Tracing/Heatmap Range']
+    again = session.ask_ok('validation fit')['state']['settings'][section]['Ray Tracing/Heatmap Range']
     check('validation fit fits the Heatmap Range to the capture and gives the same range again', fitted != start_range and again == fitted,
           f'{start_range} -> {fitted} -> {again}')
-    session.ask_ok(f'settings set {section}: View={original}')
+    session.ask_ok(f'settings set {section}: Ray Tracing/View={original}')
     session.ask_ok(f'frames {VALIDATION_VIEW_SETTLE_FRAMES}')
 
 
@@ -1742,28 +1742,29 @@ def check_rest_of_ui_commands(session, check):
     moved_speed = session.ask_ok('state camera')['state']['camera']['move_speed']
     session.ask_ok(f'settings set Editor Camera: Move Speed={speed}')
 
-    back_faces = start['settings']['Ray Tracing View']['Show Single-Sided Back Faces']
-    for section, key, value in [('Ray Tracing View', 'Show Single-Sided Back Faces', '0' if back_faces == '1' else '1'),
-                                ('Path Tracer', 'Samples per Frame', str(int(start['settings']['Path Tracer']['Samples per Frame']) + 1))]:
-        change(f'settings set {section}', f'settings set {section}: {key}={value}', f'settings.{section}')
-        session.ask_ok(f'settings set {section}: {key}={start["settings"][section][key]}')
+    tuning = start['settings']['Engine Tuning']
+    back_faces = tuning['Ray Tracing/Show Single-Sided Back Faces']
+    for key, value in [('Ray Tracing/Show Single-Sided Back Faces', '0' if back_faces == '1' else '1'),
+                       ('Path Tracer/Samples per Frame', str(int(tuning['Path Tracer/Samples per Frame']) + 1))]:
+        change(f'settings set Engine Tuning: {key}', f'settings set Engine Tuning: {key}={value}', 'settings.Engine Tuning')
+        session.ask_ok(f'settings set Engine Tuning: {key}={tuning[key]}')
 
     # Show 가 꺼져 있으면 reset 은 다시 켤 때 일어나므로, 켜고 쌓은 뒤에 reset 한다.
-    session.ask_ok('settings set Path Tracer: Show=1')
+    session.ask_ok('settings set Engine Tuning: Path Tracer/Show=1')
     session.ask_ok('pt wait samples=2')
     change('pt reset', 'pt reset', 'pt')
-    session.ask_ok(f'settings set Path Tracer: Show={start["settings"]["Path Tracer"]["Show"]}')
+    session.ask_ok(f'settings set Engine Tuning: Path Tracer/Show={tuning["Path Tracer/Show"]}')
 
     line = session.ask_ok('describe')['line']
     camera = start['camera']
     session.ask_ok('pose ' + ' '.join(repr(float(camera[key]) + 10) for key in ['x', 'y', 'z']) + f' {camera["heading"]} {camera["pitch"]}')
     session.ask_ok('light set elevation=40')
-    change('restore', f'restore {line}', 'scene', 'model', 'camera', 'light', 'sky', 'settings.Engine Tuning', 'settings.Path Tracer')
+    change('restore', f'restore {line}', 'scene', 'model', 'camera', 'light', 'sky', 'settings.Engine Tuning')
     # restore 는 줄의 pt samples 를 Target Samples 로 둔다.
-    session.ask_ok(f'settings set Path Tracer: Target Samples={start["settings"]["Path Tracer"]["Target Samples"]}')
+    session.ask_ok(f'settings set Engine Tuning: Path Tracer/Target Samples={tuning["Path Tracer/Target Samples"]}')
 
-    check_changes(check, 'window, settings set Editor Camera, Ray Tracing View and Path Tracer, pt reset and restore change the state '
-                         'and reply with the changed part', changes)
+    check_changes(check, 'window, settings set Editor Camera and the Ray Tracing and Path Tracer of Engine Tuning, pt reset and restore '
+                         'change the state and reply with the changed part', changes)
     check('settings set Editor Camera changes the move speed in state camera', float(moved_speed) == faster != float(speed),
           f'{speed} -> {moved_speed}')
     # pt 는 reset 과 Show 를 켜고 끈 것이 resets 를 늘린다.
@@ -1775,11 +1776,11 @@ def check_rest_of_ui_commands(session, check):
 def check_profile(session, check, config):
     """profile 이 PT 를 그리는 동안 그 scope 의 GPU time 을 frame 수만큼 모으고, 없는 scope 와 그리지 않는 scope 는 거절하는지 본다.
     PT 의 Show 를 되돌려 놓는다."""
-    show = session.ask_ok('state settings.Path Tracer')['state']['settings']['Path Tracer']['Show']
+    show = session.ask_ok('state settings.Engine Tuning')['state']['settings']['Engine Tuning']['Path Tracer/Show']
     unknown = session.ask('profile No Such Scope frames=1')
     check('profile refuses a scope the profiler does not have', not unknown['ok'], unknown.get('error'))
 
-    session.ask_ok('settings set Path Tracer: Show=1')
+    session.ask_ok('settings set Engine Tuning: Path Tracer/Show=1')
     session.ask_ok('frames 2')
     measured = session.ask('profile Path Tracer frames=4')
     if config == 'Release':
@@ -1788,11 +1789,11 @@ def check_profile(session, check, config):
         gpu = measured.get('gpu_ms')
         check('profile gives the GPU time of Path Tracer over 4 frames',
               measured['ok'] and measured['frames'] == 4 and 0 < float(gpu['min']) <= float(gpu['mean']) <= float(gpu['max']), measured)
-        session.ask_ok('settings set Path Tracer: Show=0')
+        session.ask_ok('settings set Engine Tuning: Path Tracer/Show=0')
         session.ask_ok('frames 2')
         stopped = session.ask('profile Path Tracer frames=2')
         check('profile fails for a scope that does not run', not stopped['ok'], stopped.get('error'))
-    session.ask_ok(f'settings set Path Tracer: Show={show}')
+    session.ask_ok(f'settings set Engine Tuning: Path Tracer/Show={show}')
 
 
 def check_acceptance(session, check):
@@ -1831,9 +1832,8 @@ def check_acceptance(session, check):
               f'state editor {editor["selected"]}, {editor["gizmo_mode"]}; frame {saved["frame"]} file {saved["editor"]["selected"]}, '
               f'{saved["editor"]["gizmo_mode"]}')
 
-        section = 'Ray Tracing View'
-        unfitted = responses['unfitted']['state']['settings'][section]['Heatmap Range']
-        fitted = responses['fitted']['state']['settings'][section]['Heatmap Range']
+        unfitted = responses['unfitted']['state']['settings']['Engine Tuning']['Ray Tracing/Heatmap Range']
+        fitted = responses['fitted']['state']['settings']['Engine Tuning']['Ray Tracing/Heatmap Range']
         check('acceptance 3: validation fit changes the Heatmap Range', fitted != unfitted, f'{unfitted} -> {fitted}')
 
         floor, center = responses['floor']['pick'], responses['center']['pick']
@@ -1851,7 +1851,7 @@ def check_acceptance(session, check):
         session.ask_ok(f'restore {restore_line}')
         session.ask_ok(f'editor select {before["editor"]["selected"]}')
         session.ask_ok(f'editor mode {before["editor"]["gizmo_mode"]}')
-        session.ask_ok(f'settings set Ray Tracing View: View={before["settings"]["Ray Tracing View"]["View"]}')
+        session.ask_ok(f'settings set Engine Tuning: Ray Tracing/View={before["settings"]["Engine Tuning"]["Ray Tracing/View"]}')
         session.ask_ok('ui hide' if not before['ui']['visible'] else 'ui show')
         session.ask_ok(f'frames {VALIDATION_VIEW_SETTLE_FRAMES}')
 
@@ -2037,7 +2037,7 @@ def selftest_running_app(args, check):
         wrong = session.ask('settings set Engine Tuning: No/Such/Key=1')
         check('settings set with an unknown key fails', not wrong['ok'], wrong.get('error'))
         for section, assignment in [('Engine Tuning', f'{key}=abc'), ('Engine Tuning', 'Timing/VSync=maybe'),
-                                    ('Ray Tracing View', 'View=Bogus')]:
+                                    ('Engine Tuning', 'Ray Tracing/View=Bogus')]:
             values_before = session.ask_ok(f'settings get {section}')['values']
             rejected = session.ask(f'settings set {section}: {assignment}')
             unchanged = session.ask_ok(f'settings get {section}')['values'] == values_before

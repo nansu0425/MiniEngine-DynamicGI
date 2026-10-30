@@ -1,10 +1,8 @@
-#include "Model/PathTracer/PathTracerPanel.h"
+#include "Model/PathTracer/PathTracerTuning.h"
 #include "Model/PathTracer/PathTracer.h"
 #include "Core/pch.h"
 #include "Core/Automation/ControlChannel.h"
-#include "Core/Editor/EditorSettings.h"
 #include "Core/Editor/MeasurementConditions.h"
-#include "Core/UI/ImGuiLayer.h"
 
 #include <imgui.h>
 #include <algorithm>
@@ -12,7 +10,6 @@
 
 namespace
 {
-    const char* kSettingsSection = "Path Tracer";
     const char* kLogPrefix = "[Path Tracer] ";
 
     constexpr uint32_t kMaxSamplesPerFrame = 256;
@@ -22,11 +19,10 @@ namespace
     // Sponza의 albedo 1 furnace에서는 4096번 반사해도 escape하지 못하는 path가 남아서 그보다 넉넉히 둔다.
     constexpr uint32_t kMaxBounces = 1u << 16;
 
-    bool s_ShowPanel = false;
     bool s_Show = false;
     PathTracer::Settings s_Settings;
 
-    // PathTracer::Output과 PathTracer::Shading의 순서이고, editor.ini, settings 명령, 측정 조건의 줄이 이 이름으로 읽고 쓴다.
+    // PathTracer::Output과 PathTracer::Shading의 순서이고, Engine Tuning의 저장, settings 명령, 측정 조건의 줄이 이 이름으로 읽고 쓴다.
     const char* kOutputNames[] = { "Radiance", "Indirect Irradiance" };
     const char* kShadingNames[] = { "glTF", "Lambert", "DDGI Probe Hit" };
 
@@ -134,7 +130,7 @@ namespace
         return text;
     }
 
-    void SaveSettings(EditorSettings::Values& values)
+    void SaveSettings(TuningSection::Values& values)
     {
         values["Show"] = FormatFlag(s_Show);
         values["Output"] = kOutputNames[(int)s_Settings.output];
@@ -150,14 +146,14 @@ namespace
         values["Furnace Emission"] = FormatFloat(s_Settings.furnaceEmission);
     }
 
-    void ReadFlag(const EditorSettings::Values& values, const char* key, bool& value)
+    void ReadFlag(const TuningSection::Values& values, const char* key, bool& value)
     {
         const auto text = values.find(key);
         if (text != values.end() && (text->second == "0" || text->second == "1"))
             value = text->second == "1";
     }
 
-    void ReadUInt(const EditorSettings::Values& values, const char* key, uint32_t& value)
+    void ReadUInt(const TuningSection::Values& values, const char* key, uint32_t& value)
     {
         const auto text = values.find(key);
         uint32_t read = 0;
@@ -166,14 +162,14 @@ namespace
     }
 
     template <typename Enum, size_t Count>
-    void ReadName(const EditorSettings::Values& values, const char* key, const char* const (&names)[Count], Enum& value)
+    void ReadName(const TuningSection::Values& values, const char* key, const char* const (&names)[Count], Enum& value)
     {
         const auto text = values.find(key);
         if (text != values.end())
             ReadName(text->second, names, value);
     }
 
-    void ReadFloat(const EditorSettings::Values& values, const char* key, float& value)
+    void ReadFloat(const TuningSection::Values& values, const char* key, float& value)
     {
         const auto text = values.find(key);
         float read = 0.0f;
@@ -181,7 +177,7 @@ namespace
             value = read;
     }
 
-    void LoadSettings(const EditorSettings::Values& values)
+    void LoadSettings(const TuningSection::Values& values)
     {
         ReadFlag(values, "Show", s_Show);
         ReadName(values, "Output", kOutputNames, s_Settings.output);
@@ -199,7 +195,7 @@ namespace
     }
 
     // 측정 조건의 줄에 담는 path tracer의 설정과 sample 수. 설정은 PathTracer.cpp의 HaveSameImage가 견주는 것, 곧 image를 정하는 것만
-    // 담는다. 값은 editor.ini와 같은 형식으로 쓴다.
+    // 담는다. 값은 Engine Tuning이 저장하는 것과 같은 형식으로 쓴다.
     void DescribeConditions(MeasurementConditions::Values& values)
     {
         values["pt output"] = kOutputNames[(int)s_Settings.output];
@@ -349,37 +345,38 @@ namespace
             }
         });
     }
-}
 
-void PathTracerPanel::Initialize(void)
-{
-    PathTracer::Initialize();
-    EditorSettings::Register(kSettingsSection, SaveSettings, LoadSettings);
-    MeasurementConditions::Register("pt", { DescribeConditions, ReadConditions, { std::string("settings.") + kSettingsSection } });
-    RegisterCommands();
-    ControlChannel::RegisterState("pt", DescribeProgress);
-}
-
-void PathTracerPanel::Shutdown(void)
-{
-    s_SampleWaits.clear();
-    MeasurementConditions::Unregister("pt");
-    EditorSettings::Unregister(kSettingsSection);
-    PathTracer::Shutdown();
-}
-
-void PathTracerPanel::Update(void)
-{
-    AnswerSampleWaits();
-    ImGuiLayer::ShowPanel("Path Tracer", s_ShowPanel, []
+    void ShowSection(void)
     {
         ShowSettings();
         ShowProgress();
         ShowConditions();
-    });
+    }
+
+    TuningSection s_Section("Path Tracer", ShowSection, SaveSettings, LoadSettings);
 }
 
-void PathTracerPanel::Render(ComputeContext& context, const Math::Camera& camera, const D3D12_VIEWPORT& rasterViewport,
+void PathTracerTuning::Initialize(void)
+{
+    PathTracer::Initialize();
+    MeasurementConditions::Register("pt", { DescribeConditions, ReadConditions, { "settings.Engine Tuning" } });
+    RegisterCommands();
+    ControlChannel::RegisterState("pt", DescribeProgress);
+}
+
+void PathTracerTuning::Shutdown(void)
+{
+    s_SampleWaits.clear();
+    MeasurementConditions::Unregister("pt");
+    PathTracer::Shutdown();
+}
+
+void PathTracerTuning::Update(void)
+{
+    AnswerSampleWaits();
+}
+
+void PathTracerTuning::Render(ComputeContext& context, const Math::Camera& camera, const D3D12_VIEWPORT& rasterViewport,
     const RaytracingScene& scene, const Math::Vector3& lightDirection, const Math::Vector3& lightIlluminance, const Math::Vector3& skyRadiance,
     ShadowBuffer& shadowMap, const Math::Matrix4& shadowMatrix, ColorBuffer& sceneColor)
 {

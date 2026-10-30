@@ -205,6 +205,30 @@ private:
     void* m_Arguments;
 };
 
+// EngineVar의 widget 하나로 담을 수 없는 engine 설정과 그 설정을 쓰는 도구를 path의 group에 그린다. group을 펼치면 show가 그린 것이
+// group 아래의 변수보다 먼저 보인다. save가 채운 값은 key 앞에 path를 붙여 다른 변수와 함께 저장하고, load는 그중 이 section의 값만 받는다.
+// key에는 '/'를 쓰지 않고 group 아래의 변수와 같은 이름을 쓰지 않는다.
+class TuningSection : public EngineVar
+{
+public:
+    typedef std::map<std::string, std::string> Values;
+
+    TuningSection( const std::string& path, std::function<void (void)> show,
+        std::function<void (Values&)> save = nullptr, std::function<void (const Values&)> load = nullptr );
+
+    void Show( void ) const { m_Show(); }
+    void Save( Values& values ) const;
+    void Load( const Values& values ) const;
+
+    // 값은 Save와 Load로 저장한다.
+    virtual void SetFromString( const std::string& ) override {}
+
+private:
+    std::function<void (void)> m_Show;
+    std::function<void (Values&)> m_Save;
+    std::function<void (const Values&)> m_Load;
+};
+
 namespace EngineTuning
 {
     void Initialize( void );

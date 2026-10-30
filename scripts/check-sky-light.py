@@ -8,11 +8,11 @@
 app 을 직접 띄우고 끝낸다. 하나라도 실패하면 exit 1 이다. 끝낼 때 실행 중의 D3D12 CORRUPTION, ERROR, WARNING 이 0 이고 종료 때
 LIVE_DEVICE 하나만 남는지도 본다.
 
-판정은 harness baseline 에서 UI 를 숨기고 SKY_POSE 에서 찍은 capture 로 한다. sky pixel 은 Ray Tracing View 의 Front Face capture 에서
+판정은 harness baseline 에서 UI 를 숨기고 SKY_POSE 에서 찍은 capture 로 한다. sky pixel 은 Engine Tuning 의 Ray Tracing/View 가 Debug: Front Face 인 capture 에서
 아무 면도 만나지 않은 pixel 의 가장자리 EDGE_PIXELS 를 깎은 것이다. sky pixel 이 화면의 MIN_SKY_FRACTION 보다 적으면 [2], [3] 을
 판정하지 않고 실패한다. scene capture 는 post effects 전의 scene color 이고 format 이 R11G11B10_FLOAT 다.
 
-  [1] Sky Light 밖에 sky 를 정하는 설정이 없다. settings set Path Tracer: Sky Radiance=1 이 error 이고, Path Tracer section 에 Sky 가
+  [1] Sky Light 밖에 sky 를 정하는 설정이 없다. settings set Engine Tuning: Path Tracer/Sky Radiance=1 이 error 이고, Engine Tuning 의 Path Tracer 에 Sky 가
       든 key 가 없다.
   [2] SKY_LIGHTS 의 값마다 PT 를 끈 scene capture 의 sky pixel 이 모두 color x intensity 다. 값은 R11G11B10 이 정확히 담는 것으로
       골라 bit 로 비교한다.
@@ -41,7 +41,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from checks import Checks, stop_and_check
 from imagefiles import ImageFileError, read_dds_rgba32f
 from imagemasks import eroded
-from pathtracerchecks import BASE, SKY_COLOR, SKY_LIGHT_SECTION, SKY_RADIANCE, path_tracer_state, set_path_tracer
+from pathtracerchecks import (BASE, KEY_PREFIX, SECTION, SKY_COLOR, SKY_LIGHT_SECTION, SKY_RADIANCE, path_tracer_settings, path_tracer_state,
+                              set_path_tracer)
 from viewer import HARNESS_DIR, SETTLE_FRAMES, HarnessError, Session, default_scene_pose, capture, start_instance, stop_instance
 
 KEPT_DIR = HARNESS_DIR / 'kept' / 'sky-light'
@@ -92,10 +93,10 @@ def describe(sky_light):
 
 
 def sky_mask(session):
-    session.ask_ok('settings set Ray Tracing View: View=Debug: Front Face')
+    session.ask_ok('settings set Engine Tuning: Ray Tracing/View=Debug: Front Face')
     session.ask_ok(f'frames {SETTLE_FRAMES}')
     front_face = np.asarray(Image.open(capture(session, 'overlay', 'sky-pose-front-face')).convert('RGB'))
-    session.ask_ok('settings set Ray Tracing View: View=Off')
+    session.ask_ok('settings set Engine Tuning: Ray Tracing/View=Off')
     return eroded(np.all(front_face == 0, axis=2), EDGE_PIXELS)
 
 
@@ -105,11 +106,11 @@ def count_not(pixels, value):
 
 
 def check_settings_location(session, check):
-    tried = session.ask('settings set Path Tracer: Sky Radiance=1')
-    keys = session.ask_ok('state settings.Path Tracer')['state']['settings']['Path Tracer']
+    tried = session.ask(f'settings set {SECTION}: {KEY_PREFIX}Sky Radiance=1')
+    keys = path_tracer_settings(session.ask_ok(f'state settings.{SECTION}')['state']['settings'][SECTION])
     sky_keys = [key for key in keys if 'Sky' in key]
     check('[1] the path tracer has no sky setting of its own', not tried['ok'] and not sky_keys,
-          f'settings set Path Tracer: Sky Radiance=1 replied {"ok" if tried["ok"] else "an error"}; keys with Sky: {sky_keys}')
+          f'settings set {SECTION}: {KEY_PREFIX}Sky Radiance=1 replied {"ok" if tried["ok"] else "an error"}; keys with Sky: {sky_keys}')
 
 
 def raster_scene(session, name):
