@@ -1,6 +1,6 @@
 # Reference Path Tracer 로드맵
 
-DDGI 와 RT Reflection 의 정답 image 를 만드는 path tracer (PT) 를 inline RayQuery compute pass 로 만든다. 작업 branch 는 `feat/reference-path-tracer` 이고, 아래 작업을 끝내면 `main` 에 merge 한다. 10/30 WEEK 3 에 발표한다.
+DDGI 와 RT Reflection 의 정답 image 를 만드는 path tracer (PT) 를 inline RayQuery compute pass 로 만든다. 작업 branch 는 `feat/reference-path-tracer` 이고, 아래 작업을 끝내면 `main` 에 merge 한다. 11/3 WEEK 3 에 발표한다.
 
 이 문서는 기한 안에 할 작업과 그 순서만 정한다. 작업의 설계와 완료 기준은 그 작업을 시작할 때 코드와 spec 을 보고 정한다. 미리 정한 세부는 작업을 시작하면 달라지고, 그때마다 이 문서를 코드와 맞추는 비용이 들기 때문이다. 끝난 작업의 확인은 그 작업이 남긴 script 가, 다시 재면 바뀌거나 다시 재기 비싼 수치는 [측정 기록](reference-path-tracer-measurements.md) 이, 코드보다 오래 남아야 할 이유는 코드 주석이 갖는다. 끝난 작업이 뒤로 넘긴 일은 그 일을 할 작업이나 "뒤로 미룬 일" 에 적고, 끝난 작업에는 commit 만 적는다.
 
@@ -41,7 +41,7 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 10. Log 와 Restore (끝남: 773ada1, 39d9b61)
 11. Indirect Irradiance (끝남: a93d5bb)
 12. 수렴과 측정 (끝남: d1ad157, 60be7ec)
-13. Cornell box 와 외부 renderer (발표 뒤로 옮김): (a) 장면을 만들어 load 하고, (b) 외부 renderer 로 그린 image 와 비교한다. furnace 가 잡지 못하는 leak, self-hit, visibility, 방향 분포의 오류를 여기서 본다. `-model` 로 연 장면은 orbit camera 라서 측정 조건의 줄로 Restore 할 수 없으므로 (39d9b61), (a) 가 그 장면에서도 camera 를 되돌리게 한다.
+13. Cornell box 와 외부 renderer: (a) asset을 scene에 load 하고, (b) 외부 renderer 로 그린 image 와 비교한다. furnace 가 잡지 못하는 오류를 여기서 본다. `-model` 로 연 장면은 orbit camera 라서 측정 조건의 줄로 Restore 할 수 없으므로 (39d9b61), (a) 가 그 장면에서도 camera 를 되돌리게 한다.
 
 ## 일정
 
@@ -54,11 +54,15 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 | 10/26 | 끝남: 5, 6, C, 7 |
 | 10/27 | 끝남: 8, 9, 10 |
 | 10/28 | 끝남: 11, 12 |
-| 10/29 | 발표 자료 |
-| 발표 뒤 | 13. 기한은 발표 뒤에 정한다. |
+| 10/29 | 끝남: 발표 자료 |
+| 10/30 | 13 (a) |
+| 10/31 | 13 (b) |
+| 11/1 | 13 (b) 가 찾은 차이의 원인을 찾는다. 고쳤으면 발표에 쓴 image 와 수치를 다시 잰다. |
+| 11/2 | 발표 자료에 13 의 결과를 반영한다. |
 
-- 10/29 는 발표 자료의 날이라 밀린 작업을 넘기지 않는다.
-- 작업 13 은 "밀릴 때" 의 1 을 적용해 (a) 와 (b) 를 모두 발표 뒤로 옮겼다.
+- 발표가 10/30 에서 11/3 으로 미뤄져, 발표 뒤로 옮겼던 작업 13 을 발표 앞에 둔다.
+- 11/1 은 (b) 가 찾은 차이의 원인을 찾는 날이다. 작업 13 은 원인 찾기의 상한을 알 수 없어서 하루를 비워 둔다. (b) 가 10/31 에 통과하면 11/1 에 할 일은 그때 정한다.
+- 11/2 는 발표 자료 준비 날이라 밀린 작업을 넘기지 않는다.
 
 ### 순서의 이유
 
@@ -67,23 +71,23 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 - 작업 C 는 작업 7 앞이다. raster 의 빛을 directional light 와 emission 으로 먼저 줄여서, 작업 7 이 raster 에서 바꾸는 빛을 directional light 하나로 둔다.
 - 작업 9 는 작업 7 뒤다. 상수 sky 의 값은 directional light 의 lux 와의 비로 정하므로 그 단위가 먼저 있어야 한다.
 - 작업 10 은 작업 11, 12 앞이다. 측정의 고정 시점과 작업 13 의 camera 가 Restore 를 쓰고, 발표가 restart 뒤의 재현을 보일 수 있다.
-- 작업 13 은 마지막이다. 독립된 estimator 와 맞춰 보는 가장 강한 근거지만 원인 찾기의 상한을 알 수 없으므로, 작업 12 뒤에 두어 발표의 핵심 자료를 먼저 확보한다. (a) 를 하는 동안 작업 12 의 GPU run 을 돌린다.
+- 작업 13 은 마지막이다. 독립된 estimator 와 맞춰 보는 가장 강한 근거지만 원인 찾기의 상한을 알 수 없으므로, 작업 12 뒤에 두어 발표의 핵심 자료를 먼저 확보한다.
 
 ### 밀릴 때
 
-10/28 까지의 작업이 밀리면 이 순서로 발표 뒤로 옮긴다.
+작업 13 이 밀려도 11/2 로 넘기지 않는다.
 
-1. 작업 13 (a). 10/29 의 (b) 도 할 수 없으므로 외부 renderer 와의 비교 전체가 계획이 된다.
-2. 작업 8, 12 에서 발표의 핵심이 아닌 측정
-3. 작업 10. 측정 시점을 손으로 되돌리고, 발표는 재현을 같은 실행 안에서만 보인다.
-4. 작업 11. 작업 12 를 화면의 radiance 로 재고, 발표는 DDGI 와 비교할 양을 정의로만 보인다.
+- (a) 가 10/30 에 끝나지 않으면 (b) 의 기한을 11/1 로 옮긴다. 원인을 찾는 날은 없어진다.
+- 11/1 이 끝날 때 (b) 가 통과하지 못하면 멈춘다. 발표에서는 같은 시점의 PT image 와 외부 renderer 의 image, 그때의 차이, 원인 후보를 "진행 중" 으로 보인다.
+- 11/1 이 끝날 때 (a) 도 끝나지 않으면 외부 renderer 와의 비교 전체가 발표의 계획이 된다.
+- PT 를 고쳤는데 다시 재는 일이 11/1 에 끝나지 않으면, 발표의 image 와 수치는 고치기 전의 값이라고 적는다.
 
 ## 발표
 
-10/29 에는 새로 재지 않는다. 각 작업은 끝날 때 발표에 쓸 image 를 남기고, 수치는 측정 기록에 남긴다.
+11/2 에는 새로 재지 않는다. 각 작업은 끝날 때 발표에 쓸 image 를 남기고, 수치는 측정 기록에 남긴다.
 
 - PT 의 입력을 spec 에 맞춘 것: 1, A, B, 2, 4
-- PT 가 맞다는 근거: furnace (5, 6), BRDF 단위의 test (8), 수렴과 bias (12), 외부 renderer 와 비교하는 계획 (13)
+- PT 가 맞다는 근거: furnace (5, 6), BRDF 단위의 test (8), 수렴과 bias (12), 외부 renderer 와의 비교 (13)
 - raster 에서 IBL 과 Environment 를 빼고 sky 를 상수로 둔 이유, directional light 의 단위와 BRDF 를 고른 이유: C, 7, 8, 9
 - 같은 시점의 raster 와 PT, restart 뒤의 재현: 9, 10
 - DDGI 가 비교할 양과, 그 양으로 DDGI 의 오차를 나누는 Shading DDGI Probe Hit: 11, d84b6c3
