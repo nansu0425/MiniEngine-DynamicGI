@@ -345,6 +345,19 @@ uint32_t glTF::Asset::ReadTextureInfo( json& info_json, glTF::Texture* &info )
         return 0;
 }
 
+// 없으면 extension의 기본값 1이다.
+float ReadEmissiveStrength( json& material )
+{
+    const auto extensions = material.find("extensions");
+    if (extensions == material.end())
+        return 1.0f;
+    const auto extension = extensions->find("KHR_materials_emissive_strength");
+    if (extension == extensions->end())
+        return 1.0f;
+    const auto strength = extension->find("emissiveStrength");
+    return strength == extension->end() ? 1.0f : strength->get<float>();
+}
+
 void glTF::Asset::ProcessMaterials( json& materials )
 {
     m_materials.reserve(materials.size());
@@ -414,6 +427,11 @@ void glTF::Asset::ProcessMaterials( json& materials )
 
         if (thisMaterial.find("emissiveFactor") != thisMaterial.end())
             ReadFloats(thisMaterial.at("emissiveFactor"), material.emissiveFactor);
+
+        // KHR_materials_emissive_strength의 emissiveStrength는 core가 [0, 1]로 정한 emissiveFactor에 곱해, 그보다 밝은 emission을 준다.
+        const float emissiveStrength = ReadEmissiveStrength(thisMaterial);
+        for (float& factor : material.emissiveFactor)
+            factor *= emissiveStrength;
 
         if (thisMaterial.find("occlusionTexture") != thisMaterial.end())
             material.occlusionUV = ReadTextureInfo(thisMaterial.at("occlusionTexture"),
