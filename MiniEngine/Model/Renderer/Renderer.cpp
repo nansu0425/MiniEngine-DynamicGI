@@ -453,7 +453,7 @@ void MeshSorter::AddMesh( const Mesh& mesh, float distance,
 			return;
 
 		key.passID = kZPass;
-		// single-sided material의 앞면을 cull하는 기준은 README.md의 "camera 밖에서 본 doubleSided"다.
+		// single-sided material의 앞면을 cull하는 기준은 docs/policy.md의 "camera 밖에서 본 doubleSided"다.
 		key.psoIdx = DepthPSOIndex(kShadowPass, twoSided ? kCullNone : kCullFront, skinned, alphaTest);
         key.key = dist.u;
 		m_SortKeys.push_back(key.value);

@@ -28,7 +28,7 @@ furnace:
        FURNACE_TOLERANCE 안에서 맞는다. B 번 반사하기 전에 escape 한 path 는 1, 못한 path 는 1 - 0.5^(B+1) 이다. emission 의 누적,
        albedo < 1 의 반사, B 의 off-by-one 을 본다.
 
-shading normal: shading normal 둘레에서 고른 방향이 geometric normal 아래면 README 의 "camera 밖에서 본 doubleSided" 규칙대로 path 가
+shading normal: shading normal 둘레에서 고른 방향이 geometric normal 아래면 docs/policy.md 의 "camera 밖에서 본 doubleSided" 규칙대로 path 가
 끝나서 energy 를 잃는다. DDGI 는 이 규칙을 모르므로 DDGI 와 PT 의 차에 반사마다 이 손실이 섞인다.
   [N1] ONE_REFLECTION_FURNACE 를 Geometric Normals 를 켜고 끈 두 run 으로 SHADING_NORMAL_SAMPLES 만큼 쌓는다. path 의 값은 반사가 잘리면
        1, 아니면 2 이므로, 두 run 의 차가 camera 에서 보이는 면에서 반사 한 번이 잃는 energy 의 비율이다. 모든 pixel 에서 그 차가

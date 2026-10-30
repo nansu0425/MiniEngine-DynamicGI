@@ -62,7 +62,7 @@ namespace PathTracer
         // 기대값은 그대로다.
         bool russianRoulette = true;
 
-        // shading normal 대신 geometric normal로 반사한다. shading normal은 README.md의 "camera 밖에서 본 doubleSided" 규칙 때문에
+        // shading normal 대신 geometric normal로 반사한다. shading normal은 docs/policy.md의 "camera 밖에서 본 doubleSided" 규칙 때문에
         // geometric normal 아래로 고른 방향의 energy를 잃으므로, furnace의 답을 그 손실 없이 보려고 쓴다.
         bool geometricNormals = false;
         // 모든 surface의 albedo와 emission을 아래 값으로 두고 directional light를 끈다. sky light는 모든 방향에서 같으므로 답을 식으로 아는 장면이 된다.

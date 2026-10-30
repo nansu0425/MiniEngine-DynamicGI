@@ -8,7 +8,7 @@ def659b 의 이 문서에는 미리 조사해 둔 설계 (출력, BRDF, light, s
 
 ## 목표
 
-- glTF metallic-roughness material 을 bias 없이 path tracing 한 정답을 만든다. PT 와 PT 가 쓰는 engine 코드는 README "Rendering 기준" 을 따른다.
+- glTF metallic-roughness material 을 bias 없이 path tracing 한 정답을 만든다. PT 와 PT 가 쓰는 engine 코드는 docs/policy.md 의 "Rendering 기준" 을 따른다.
 - 정답이 맞다는 것을 furnace, BRDF 단위의 test, 수렴 측정, 외부 renderer 와의 비교로 보인다. DDGI 와 PT 의 비교 수치는 외부 renderer 와 맞춘 작업 13 이 통과한 뒤에 믿는다.
 - DDGI 가 같은 시점에서 비교할 양을 정의한다. DDGI 의 오차를 irradiance 근사의 오차와 probe hit 의 shading 이 정답과 다른 몫으로 나눌 수 있어야 한다 (PathTracer.h 의 Output).
 - 측정 조건을 Log 한 줄로 되돌리고 결과를 float image 로 export 해서, DDGI 가 같은 조건에서 비교하게 한다.
@@ -95,7 +95,7 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 
 ## 범위 밖
 
-- raster 에서 README 의 "Rendering 기준" 이 spec 을 따른다고 적은 곳 밖의 shader 코드 (normal map, emission, alpha mask 의 적용) 를 spec 에 맞추는 일
+- raster 에서 docs/policy.md 의 "Rendering 기준" 이 spec 을 따른다고 적은 곳 밖의 shader 코드 (normal map, emission, alpha mask 의 적용) 를 spec 에 맞추는 일
 - raster 의 visibility 를 PT 와 같게 만드는 일. raster 는 directional light 의 visibility 를 shadow map 으로 근사한다.
 - Sponza 같은 장면에서 raster 와 PT 를 수치로 비교하는 검증. 둘의 차이에 shadow map 의 근사와 위의 shader 코드가 섞인다. occluder 가 없는 test scene 에서는 작업 8 이 비교한다 (`scripts/check-gltf-brdf.py` 의 [R1]).
 - BLEND material, skinned mesh, animation 과 instance 변경, 여러 ModelInstance

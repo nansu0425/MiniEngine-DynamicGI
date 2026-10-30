@@ -31,7 +31,7 @@ direction 이다.
        kProbeHitTextureLod) texel 로 구한 ρ' 와 상대 MIP_TOLERANCE 안이다. 그 mip 은 1x1 이다. Lambert 의 비는 channel 마다 변동 계수가
        MIP_CONTRAST 이상이다.
   [E3] SHADOW_SCENE 은 floor quad 와, floor 를 향하는 single-sided occluder quad 다. camera 는 occluder 의 뒷면을 보므로 occluder 를
-       cull 해서 floor 를 다 보고, floor 에서 light 쪽을 보면 occluder 의 앞면이 막는다 (README 의 "camera 밖에서 본 doubleSided").
+       cull 해서 floor 를 다 보고, floor 에서 light 쪽을 보면 occluder 의 앞면이 막는다 (docs/policy.md 의 "camera 밖에서 본 doubleSided").
        Geometric Normals 는 끈다. image 마다, floor pixel 의 channel 최댓값이 floor 의 LIT_PERCENTILE percentile 의 반을 넘으면 lit 이고
        아니면 unlit 이다. 비교하는 두 image 각각의 lit 과 unlit 의 경계에서 SHADOW_EDGE_PIXELS 이상 떨어진 floor pixel 에서, Probe Hit 와
        raster (harness baseline 의 scene capture) 의 lit/unlit 이 SHADOW_RASTER_AGREEMENT 이상, Probe Hit 와 Lambert (shadow ray) 의

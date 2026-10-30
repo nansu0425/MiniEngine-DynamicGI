@@ -156,7 +156,7 @@ bool IsOpaqueAt(uint instanceIndex, uint geometryIndex, uint primitiveIndex, flo
     return alpha >= f16tof32(hitTriangle.material.flags >> 16);
 }
 
-// 어느 query가 이 flag로 쏘는지는 README.md의 "camera 밖에서 본 doubleSided"가 정한다.
+// 어느 query가 이 flag로 쏘는지는 docs/policy.md의 "camera 밖에서 본 doubleSided"가 정한다.
 // doubleSided material의 BLAS instance는 RaytracingScene이 culling을 끈다.
 static const uint kCullSingleSidedBackFaces = RAY_FLAG_CULL_BACK_FACING_TRIANGLES;
 

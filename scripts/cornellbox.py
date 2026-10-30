@@ -17,7 +17,7 @@ glTF 좌표는 Mitsuba 의 world 좌표 그대로이고 축을 바꾸지 않는�
 - twosided 안의 diffuse bsdf 는 baseColorFactor 가 reflectance 이고 metallic 0, roughness 1 인 doubleSided material 이다. glTF 의
   metallic-roughness 는 Lambert 가 아니므로 Mitsuba 와 같은 반사는 path tracer 의 Shading Lambert 로 그릴 때다
   (PathTracerCS.hlsl 의 LAMBERT_SHADING). twosided 가 아닌 bsdf 는 받지 않는다. Mitsuba 에서 그 뒷면은 빛을 받지 않으면서 ray 를
-  막는데, 이 repo 는 single-sided 의 뒷면을 없는 것으로 친다 (README 의 "camera 밖에서 본 doubleSided").
+  막는데, 이 repo 는 single-sided 의 뒷면을 없는 것으로 친다 (docs/policy.md 의 "camera 밖에서 본 doubleSided").
 - area emitter 는 normal 쪽으로만 빛난다. 그래서 emitter 가 붙은 shape 는 single-sided 인 앞면과, 같은 reflectance 로 반대쪽을
   향하는 single-sided 인 뒷면 두 primitive 로 나눈다. 두 면은 어느 쪽에서 오는 ray 든 하나만 맞으므로 twosided bsdf 처럼 ray 를
   막는다. emission 은 앞면의 material 에만 둔다. core 의 emissiveFactor 는 [0, 1] 이므로 radiance 를 그 최댓값으로 나눈 값과

@@ -1,6 +1,6 @@
 # MiniEngine-DynamicGI
 
-프로젝트 설명, 빌드, reference 정책은 [README.md](README.md) 를 따른다.
+프로젝트 설명과 빌드는 [README.md](README.md) 를, 작업 정책은 [docs/policy.md](docs/policy.md) 를 따른다.
 
 ## App build, 실행, 확인
 

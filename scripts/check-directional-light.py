@@ -28,7 +28,7 @@ PT 의 직접광 (test scene): Max Bounces 1, Sky Light 0, Russian roulette off 
        light 와 geometric normal 의 cos 이고, albedo 0.5, intensity 는 float 의 π 라서 cos 가 1 이면 0.5 cd/m² 다. geometric normal 은
        float 의 vertex 위치로 구하므로 식과 float 오차만큼만 다르다.
   [P2] Max Bounces 0 이면 모든 pixel 이 0 이다. light 를 등진 quad (back) 는 Light Visibility 가 모두 검정이고 PT 도 0 이다.
-  [P3] 가려진 pixel 은 0 이다. single-sided occluder 는 그 뒷면이 receiver 를 향하므로 README 의 "camera 밖에서 본 doubleSided" 대로
+  [P3] 가려진 pixel 은 0 이다. single-sided occluder 는 그 뒷면이 receiver 를 향하므로 docs/policy.md 의 "camera 밖에서 본 doubleSided" 대로
        그림자를 만들지 않고 (single 의 검정 pixel 0 개), doubleSided occluder 는 MIN_SHADOW_PIXELS 이상의 그림자를 만든다.
   [P4] Geometric Normals 를 끄면 보이는 pixel 의 cos 가 vertex NORMAL 로 구한 cos 와 SHADING_COSINE_TOLERANCE 안에서 같다. shading normal
        이 geometric normal 과 다른 quad (tilted, away) 에서 두 cos 는 그보다 훨씬 다르고, away 는 shading normal 이 light 를 등져 0 이다.
