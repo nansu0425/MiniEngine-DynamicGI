@@ -139,6 +139,8 @@ bool ModelH3D::BuildModel(ModelData& model, const std::wstring& basePath) const
         constantData.flags = 0x3C000000;
         if (alphaTest)
             constantData.flags |= 0x60; // twoSided + alphaTest
+        if (textureData.stringIdx[kNormal] != 0xFFFF)
+            constantData.flags |= 0x100; // normalTexture
     }
 
     ASSERT(model.m_TextureOptions.size() == model.m_TextureNames.size());

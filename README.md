@@ -61,7 +61,7 @@ asset 을 해석하고 그리는 방식은 glTF 2.0 spec 을 기준으로 한다
 
 - 기준 spec 은 `references/glTF/specification/2.0/Specification.adoc` 이다. 어느 판인지는 [references/manifest.json](references/manifest.json) 의 `glTF` commit 이 정한다.
 - spec 과 다르게 구현한 곳에는 `glTF spec과 다르다` 로 시작하는 주석으로 무엇이 다른지와 그 이유를 적는다. 이 문구로 검색하면 spec 과 다른 곳을 모두 찾을 수 있다.
-- raster 의 directional light 는 PT 와 같은 glTF BRDF (`MiniEngine/Core/Shaders/GltfBrdf.hlsli`) 로 반사한다. 그 밖의 upstream MiniEngine 의 raster 는 아직 이 기준에 맞추지 않았으므로, raster 에서 spec 과 다른 곳에는 이 주석이 없다.
+- raster 의 directional light 는 PT 와 같은 glTF BRDF (`MiniEngine/Core/Shaders/GltfBrdf.hlsli`) 로 반사한다. normalTexture 가 없는 material 은 raster 도 PT 처럼 surface normal 을 그대로 쓴다 (`Specification.adoc:2760`). 그 밖의 upstream MiniEngine 의 raster 는 아직 이 기준에 맞추지 않았으므로, raster 에서 spec 과 다른 곳에는 이 주석이 없다.
 - 작업이 spec 에 맞춰야 하는 곳에서 기존 engine 코드가 spec 과 다르면, 그 작업에서 engine 코드도 spec 에 맞게 고친다.
 - Reference Path Tracer 는 다른 기능의 정답이므로 spec 의 MUST 와 SHOULD 를 모두 따른다. PT 가 쓰는 engine 코드도 이 기준으로 고친다.
 

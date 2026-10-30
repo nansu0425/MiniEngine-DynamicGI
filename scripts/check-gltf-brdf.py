@@ -70,7 +70,7 @@ Sponza: harness baseline 의 시점과 light 에서 Shading glTF 로 쌓는다. 
        Normals off, Max Bounces 64, Russian roulette on, 256 spp) 을 쌓아 invalid sample 이 0 이다. 그리고 check-directional-light.py 의
        [P6], [P7] 을 Shading glTF 로 통과한다. [P6] 의 보이는데 어두움은 glTF 의 f 가 0 이 아닌 pixel (Metallic 이 1 이고 Base Color 가
        0 인 곳 밖) 에서 세고 임계값은 그대로다.
-  [S5] Lambert 의 bit 재현: BEFORE_DIR/start-pt.dds (47f6794, 조건은 BEFORE_DIR/manifest.json: baseline 시점, light 기본 방향, intensity
+  [S5] Lambert 의 bit 재현: REFERENCE_DIR/start-pt.dds (manifest.json 의 code 로 남겼고 조건도 그 manifest 에 있다: baseline 시점, light 기본 방향, intensity
        4, Sky 1, Max Bounces 64, Russian roulette on, Seed 0, Geometric Normals off, 64 spp) 와 Shading Lambert 로 같은 조건에서 쌓은
        export 의 rgba 가 bit 까지 같다.
   [R4] 기본 화면의 밝기: scripts/harness-baseline/editor.ini 의 Exposure 주석의 규칙대로, baseline 시점에서 Exposure 2^EXPOSURE_STOPS 의
@@ -119,7 +119,7 @@ from gltfwriter import GLTF_FLOAT, GLTF_UNSIGNED_SHORT, BufferBuilder, flatten
 from imagecompare import agreement, rmse
 from imagefiles import ImageFileError, read_dds_rgba32f
 from imagemasks import column_groups, eroded
-from pathtracerchecks import BASE, FURNACE_SAMPLES, SECTION, SKY_RADIANCE, WHITE_FURNACE, from_recorded, path_tracer_state, set_path_tracer
+from pathtracerchecks import BASE, FURNACE_SAMPLES, SECTION, SKY_RADIANCE, WHITE_FURNACE, path_tracer_state, set_path_tracer
 from viewer import (BASELINE_DIR, HARNESS_DIR, PREVIEW_EXPOSURE, REPO_ROOT, SETTLE_FRAMES, SNAPSHOT_POSES, VIEWER_DIR, HarnessError,
                     Session, baseline_pose, capture, make_view, start_instance, stop_instance)
 
@@ -127,7 +127,7 @@ SCENE_DIR = HARNESS_DIR / 'gltf-brdf'
 SCENE_NAME = 'GltfBrdf'
 KEPT_DIR = HARNESS_DIR / 'kept' / 'gltf-brdf'
 CELLS_FILE = KEPT_DIR / 'brdf' / 'cells.json'
-BEFORE_DIR = KEPT_DIR / 'before'
+REFERENCE_DIR = KEPT_DIR / 'reference'
 GLTF = {'Shading': 'glTF'}
 
 SEED = 8
@@ -803,14 +803,14 @@ def gltf_reflects_nothing(base_color, metallic):
 
 
 def check_lambert_bits(session, check):
-    manifest = json.loads((BEFORE_DIR / 'manifest.json').read_text(encoding='utf-8'))
+    manifest = json.loads((REFERENCE_DIR / 'manifest.json').read_text(encoding='utf-8'))
     entry = manifest['files']['start-pt.dds']
     session.ask_ok(f'pose {entry["pose"]}')
     set_light(session, entry['directional light'])
-    now, _ = export(session, from_recorded(entry['path tracer']) | {'Shading': 'Lambert'}, 'lambert-start-pt')
-    before = read_dds_rgba32f(BEFORE_DIR / 'start-pt.dds')
-    differing = np.any(now.view(np.uint32) != before.view(np.uint32), axis=2)
-    check(f'[S5] Shading Lambert accumulates the same rgba bits as before ({manifest["code"]})', not differing.any(),
+    now, _ = export(session, entry['path tracer'], 'lambert-start-pt')
+    reference = read_dds_rgba32f(REFERENCE_DIR / 'start-pt.dds')
+    differing = np.any(now.view(np.uint32) != reference.view(np.uint32), axis=2)
+    check(f'[S5] Shading Lambert accumulates the same rgba bits as the reference ({manifest["code"]})', not differing.any(),
           f'{int(differing.sum())} pixels differ')
 
 

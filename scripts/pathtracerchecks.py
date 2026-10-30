@@ -50,14 +50,6 @@ def set_path_tracer(session, settings):
     return replies.get(SECTION)
 
 
-def from_recorded(settings):
-    """작업 9 전에 기록한 PT 설정을 지금의 key 로. 그때 sky 는 PT 의 Sky Radiance 였고 지금은 흰 Sky Light 의 Intensity 다."""
-    if 'Sky Radiance' not in settings:
-        return settings
-    kept = {key: value for key, value in settings.items() if key != 'Sky Radiance'}
-    return kept | {SKY_COLOR: '1,1,1', SKY_RADIANCE: settings['Sky Radiance']}
-
-
 def light_by_sky_only(session):
     """directional light 를 끈다. 작업 5, 6 의 기준과 측정 기록은 sky 만 비추는 장면에서 정했다. furnace 는 light 를 스스로 끈다."""
     return session.ask_ok('light set intensity=0')

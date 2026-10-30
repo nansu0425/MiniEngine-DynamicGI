@@ -50,7 +50,11 @@ __declspec(align(256)) struct MaterialConstants
             uint32_t alphaTest : 1;
             uint32_t alphaBlend : 1;
 
-            uint32_t _pad : 8;
+            // normal texture가 있는지. 없으면 raster와 ray tracing이 surface normal을 그대로 쓴다 (Specification.adoc:2760). 기본 normal map을
+            // 적용하면 그 texel이 8 bit라 0.5가 아닌 128 / 255로 읽혀 normal이 기운다.
+            uint32_t normalTexture : 1;
+
+            uint32_t _pad : 7;
 
             uint32_t alphaRef : 16; // half float
         };

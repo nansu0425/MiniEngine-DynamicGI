@@ -95,7 +95,7 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 
 ## 범위 밖
 
-- raster 에서 directional light 항 밖의 shader 코드 (normal map, emission, alpha mask 의 적용) 를 spec 에 맞추는 일
+- raster 에서 README 의 "Rendering 기준" 이 spec 을 따른다고 적은 곳 밖의 shader 코드 (normal map, emission, alpha mask 의 적용) 를 spec 에 맞추는 일
 - raster 의 visibility 를 PT 와 같게 만드는 일. raster 는 directional light 의 visibility 를 shadow map 으로 근사한다.
 - Sponza 같은 장면에서 raster 와 PT 를 수치로 비교하는 검증. 둘의 차이에 shadow map 의 근사와 위의 shader 코드가 섞인다. occluder 가 없는 test scene 에서는 작업 8 이 비교한다 (`scripts/check-gltf-brdf.py` 의 [R1]).
 - BLEND material, skinned mesh, animation 과 instance 변경, 여러 ModelInstance

@@ -63,9 +63,11 @@ struct MaterialConstants
     float normalTextureScale;
     float metallicFactor;
     float roughnessFactor;
-    // texture 순서번째 bit가 그 texture에 UV1을 쓸지 고른다. 위 16 bit는 alpha cutoff를 half로 담는다.
+    // texture 순서번째 bit가 그 texture에 UV1을 쓸지 고른다. kNormalTextureFlag는 normal texture가 있는지다 (ConstantBuffers.h의 normalTexture).
+    // 위 16 bit는 alpha cutoff를 half로 담는다.
     uint flags;
 };
+static const uint kNormalTextureFlag = 1u << 8;
 static const uint kMaterialConstantsStride = 256;
 
 // ray가 맞은 triangle의 vertex와 material을 읽을 위치와 맞은 곳의 UV

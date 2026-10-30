@@ -32,8 +32,8 @@ PT 의 직접광 (test scene): Max Bounces 1, Sky Light 0, Russian roulette off 
        그림자를 만들지 않고 (single 의 검정 pixel 0 개), doubleSided occluder 는 MIN_SHADOW_PIXELS 이상의 그림자를 만든다.
   [P4] Geometric Normals 를 끄면 보이는 pixel 의 cos 가 vertex NORMAL 로 구한 cos 와 SHADING_COSINE_TOLERANCE 안에서 같다. shading normal
        이 geometric normal 과 다른 quad (tilted, away) 에서 두 cos 는 그보다 훨씬 다르고, away 는 shading normal 이 light 를 등져 0 이다.
-       허용 오차는 PT 가 받는 shading normal 의 오차다. normal map 이 없는 material 에도 기본 flat normal texture (8 bit 의 128, 128,
-       255) 를 적용해 (0.0039, 0.0039, 1) 로 기울고, vertex normal 은 R10G10B10A2 로 저장해 성분마다 1/1023 까지 다르다.
+       허용 오차는 PT 가 받는 shading normal 의 오차다. normal map 이 없는 material 은 vertex normal 을 그대로 쓰고 (HitSurface.hlsli),
+       vertex normal 은 R10G10B10A2 로 저장해 성분마다 1/1023 까지 다르다.
   [P5] color COLOR 와 intensity 2 배의 PT export 가 흰색, 원래 intensity 의 export 의 channel 별 배수와 rgb 의 bit 까지 같다. raster scene
        capture 도 앞면 pixel 에서 그렇다. 2 의 거듭제곱 배는 float 의 반올림 없이 곱해진다.
   [R1] intensity 0 이면 raster 의 앞면 pixel 이 모두 0 이다. test scene 에는 emission 이 없다.
@@ -53,9 +53,11 @@ PT 의 직접광 (Sponza): harness baseline 의 시점, Russian roulette off, Sk
        sample 수만큼까지 어두워질 수 있다. 작업 7 을 판정할 때 그런 pixel 은 1 ~ 2 ulp 였다.
   [P8] PT 를 쌓는 동안 light 의 direction, color, intensity 를 바꾸면 pt 의 resets 가 1 늘고, position 을 바꾸면 늘지 않는다.
 
-그대로인 것 (Sponza): before 는 작업 7 전 (a9423e3) 에 같은 조건으로 찍어 BEFORE_DIR 에 둔 capture 다 (BEFORE_DIR/manifest.json).
-  [K2] 기본 light 에서 Light Visibility, Light Culling Difference 의 overlay 가 before 의 Sun Visibility, Sun Culling Difference 와 같다.
-  [K3] intensity 0 으로 쌓은 PT export 가 before 와 rgba 의 bit 까지 같다. light 를 끄면 작업 7 전의 path 가 그대로 남는다.
+그대로인 것 (Sponza):
+  [K2] 기본 light 에서 Light Visibility, Light Culling Difference 의 overlay 가 BEFORE_DIR 의 Sun Visibility, Sun Culling Difference 와
+       같다. BEFORE_DIR 은 작업 7 전 (a9423e3) 에 같은 조건으로 찍은 capture 다 (BEFORE_DIR/manifest.json).
+  [K3] intensity 0 으로 쌓은 PT export 가 REFERENCE_DIR/start-pt.dds 와 rgba 의 bit 까지 같다. 그 export 를 남긴 code 와 조건은
+       REFERENCE_DIR/manifest.json 에 있다.
 
 source:
   [K8] tracked 와 untracked (ignore 하지 않은) 파일에서 sun 의 세 표기가 SUN_EXCEPTIONS 밖에 없다.
@@ -83,7 +85,7 @@ from imagefiles import ImageFileError, read_dds_rgba32f
 from directlightchecks import (DIRECT, EDGE_PIXELS, LIGHT_SECTION, WAIT_TIMEOUT, accumulate_export, check_bounces, check_sponza_direct,
                                overlay, set_light)
 from imagemasks import column_groups, eroded
-from pathtracerchecks import from_recorded, set_path_tracer
+from pathtracerchecks import set_path_tracer
 from viewer import (HARNESS_DIR, PREVIEW_EXPOSURE, REPO_ROOT, SETTLE_FRAMES, VIEWER_DIR, HarnessError, Session, capture, make_view,
                     start_instance, stop_instance)
 
@@ -91,6 +93,7 @@ SCENE_DIR = HARNESS_DIR / 'directional-light'
 SCENE_NAME = 'DirectionalLight'
 KEPT_DIR = HARNESS_DIR / 'kept' / 'directional-light'
 BEFORE_DIR = KEPT_DIR / 'before'
+REFERENCE_DIR = KEPT_DIR / 'reference'
 
 # light 는 위 앞쪽에서 온다. 앞면이 +z 인 quad 와의 cos 는 0.6 이다.
 LIGHT_DIRECTION = (0.0, 0.8, 0.6)
@@ -98,9 +101,8 @@ INTENSITY = float(np.float32(math.pi))
 ALBEDO = 0.5
 COLOR = (1.0, 0.5, 0.25)
 PT_TOLERANCE = 1e-5
-# 기본 flat normal texture 의 기울기 |(0.0039, 0.0039)| = 0.0055 와 R10G10B10A2 normal 의 성분마다 1/1023 을 더한 |Δn| 의 상한 0.0073 보다
-# 조금 크게 잡았다.
-SHADING_COSINE_TOLERANCE = 0.0075
+# R10G10B10A2 normal 의 성분마다 1/1023 인 |Δn| 의 상한 0.0017 보다 조금 크게 잡았다.
+SHADING_COSINE_TOLERANCE = 0.002
 MIN_PIXELS = 300
 MIN_SHADOW_PIXELS = 300
 FRONT_FACE_COLOR = (0, 255, 0)
@@ -234,14 +236,16 @@ def check_before(session, check):
             differing.append(f'{name}: {int(np.count_nonzero(np.any(now != before, axis=2)))} pixels')
     check(f'[K2] the light visibility views are as before ({manifest["code"]})', not differing, '; '.join(differing))
 
+
+def check_unlit_reference(session, check):
+    manifest = json.loads((REFERENCE_DIR / 'manifest.json').read_text(encoding='utf-8'))
     entry = manifest['files']['start-pt.dds']
     session.ask_ok(f'pose {entry["pose"]}')
     session.ask_ok('light set intensity=0')
-    # before 는 PT 에 Lambert 밖의 Shading 이 없던 때에 찍었다.
-    now, _ = accumulate(session, from_recorded(entry['path tracer']) | {'Shading': 'Lambert'}, 'after-start-pt')
-    before = read_dds_rgba32f(BEFORE_DIR / 'start-pt.dds')
-    differing = np.any(now.view(np.uint32) != before.view(np.uint32), axis=2)
-    check(f'[K3] the path tracer with intensity 0 is bit-identical to before ({manifest["code"]})', not differing.any(),
+    now, _ = accumulate(session, entry['path tracer'], 'after-start-pt')
+    reference = read_dds_rgba32f(REFERENCE_DIR / 'start-pt.dds')
+    differing = np.any(now.view(np.uint32) != reference.view(np.uint32), axis=2)
+    check(f'[K3] the path tracer with intensity 0 is bit-identical to the reference ({manifest["code"]})', not differing.any(),
           f'{int(differing.sum())} pixels differ')
 
 
@@ -279,6 +283,7 @@ def run_sponza(build_first, check):
             default_light = session.ask_ok(f'settings get {LIGHT_SECTION}')['values']
             check_saved_direction(session, check)
             check_before(session, check)
+            check_unlit_reference(session, check)
             check_sponza_direct(session, check, start_pose, default_light, '[P6]', {}, reflects_nothing, lambda path: keep(path, 'pt'))
             check_bounces(session, check, start_pose, '[P7]', {})
             check_resets(session, check)

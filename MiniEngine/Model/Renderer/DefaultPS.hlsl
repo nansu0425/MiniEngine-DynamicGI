@@ -65,6 +65,8 @@ static const uint METALLICROUGHNESS = 1;
 static const uint OCCLUSION = 2;
 static const uint EMISSIVE = 3;
 static const uint NORMAL = 4;
+// flags 의 이 bit 가 normal texture 가 있는지다 (ConstantBuffers.h 의 normalTexture).
+static const uint NORMAL_TEXTURE_FLAG = 1u << 8;
 #ifdef NO_SECOND_UV
 #define UVSET( offset ) vsOutput.uv0
 #else
@@ -78,6 +80,10 @@ float3 ComputeNormal(VSOutput vsOutput)
 #ifdef NO_TANGENT_FRAME
     return normal;
 #else
+    // normal texture가 없는 material은 surface normal을 그대로 쓴다 (ConstantBuffers.h의 normalTexture).
+    if ((flags & NORMAL_TEXTURE_FLAG) == 0)
+        return normal;
+
     // Construct tangent frame
     float3 tangent = normalize(vsOutput.tangent.xyz);
     float3 bitangent = normalize(cross(normal, tangent)) * vsOutput.tangent.w;

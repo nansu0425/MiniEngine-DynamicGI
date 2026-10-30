@@ -66,7 +66,8 @@ HitSurface GetHitSurface(RayHit hit, float textureLod)
 
     const float3 vertexNormal = ObjectToWorldNormal(hit, InterpolateSignedR10G10B10A2(data, vertexAddresses, geometry.normalOffset, weights).xyz);
     float3 normal = vertexNormal;
-    if (geometry.tangentOffset != 0)
+    // normal texture가 없는 material은 surface normal을 그대로 쓴다 (ConstantBuffers.h의 normalTexture).
+    if (geometry.tangentOffset != 0 && (material.flags & kNormalTextureFlag) != 0)
     {
         const float4 tangent = InterpolateSignedR10G10B10A2(data, vertexAddresses, geometry.tangentOffset, weights);
         // tangent는 면 위의 방향이므로 normal과 달리 objectToWorld로 옮긴다.

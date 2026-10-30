@@ -428,6 +428,7 @@ void glTF::Asset::ProcessMaterials( json& materials )
             json& normalTexture = thisMaterial.at("normalTexture");
 
             material.normalUV = ReadTextureInfo(normalTexture, material.textures[Material::kNormal]);
+            material.normalTexture = material.textures[Material::kNormal] != nullptr;
 
             if (normalTexture.find("scale") != normalTexture.end())
                 material.normalTextureScale = normalTexture.at("scale");

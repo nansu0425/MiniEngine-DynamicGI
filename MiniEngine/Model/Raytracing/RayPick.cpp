@@ -259,7 +259,7 @@ void RayPick::Initialize(void)
         "The ray passes the raster's sample position in it (sample, the pixel's center with TAA off) between the near and far planes, "
         "culling back faces of single-sided materials as the raster does. "
         "distance is along the ray and depth along the camera forward, in world units, as position is. normal is the triangle's, toward the camera. "
-        "vertex_normal is the interpolated vertex normal and shading_normal is it with the normal map applied as the path tracer shades, both toward the camera. "
+        "vertex_normal is the interpolated vertex normal and shading_normal is the normal the path tracer shades with: vertex_normal with the material's normal texture applied, if it has one. Both are toward the camera. "
         "instance is the mesh in the model, geometry the draw in the mesh, primitive the triangle in the draw and material the glTF material. "
         "base_color is the linear RGBA of the material there. alpha_test is whether alpha testing decided what the ray hit or missed, "
         "as in the Depth Comparison validation: there the raster, which reads the cutout's mip chain where the ray reads mip 0, may see something else. raster has the raster's depth buffer at the pixel: z as stored (reverse Z, 0 is the far plane) "

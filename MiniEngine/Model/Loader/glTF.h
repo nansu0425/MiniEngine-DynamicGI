@@ -119,7 +119,8 @@ namespace glTF
                 uint32_t twoSided : 1;
                 uint32_t alphaTest : 1;
                 uint32_t alphaBlend : 1;
-                uint32_t _pad : 8;
+                uint32_t normalTexture : 1;
+                uint32_t _pad : 7;
                 uint32_t alphaCutoff : 16; // FP16
             };
         };

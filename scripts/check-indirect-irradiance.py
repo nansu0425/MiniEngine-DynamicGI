@@ -1,8 +1,8 @@
 """PathTracer 의 Indirect Irradiance 출력이 정의대로 쌓이는지와, Radiance 출력이 Output 을 더하기 전과 같은지 판정한다.
 
-  python scripts/check-indirect-irradiance.py before   # Output 을 더하기 전의 code 로 [K1] 의 기준 export 를 BEFORE_DIR 에 남긴다
-  python scripts/check-indirect-irradiance.py check    # Debug 로 띄워 아래 기준을 판정한다
-  python scripts/check-indirect-irradiance.py keep     # Profile 로 띄워 발표에 쓸 image 를 KEPT_DIR 에 남긴다
+  python scripts/check-indirect-irradiance.py reference   # [K1] 이 비교할 기준 export 를 지금의 code 로 REFERENCE_DIR 에 남긴다
+  python scripts/check-indirect-irradiance.py check       # Debug 로 띄워 아래 기준을 판정한다
+  python scripts/check-indirect-irradiance.py keep        # Profile 로 띄워 발표에 쓸 image 를 KEPT_DIR 에 남긴다
 
 번호는 작업 11 의 완료 기준의 번호다. Indirect Irradiance 의 정의와 단위는 PathTracer.h 의 Output 에 있다. 이 script 밖에서 보는 기준:
   [U1] 의 저장과 reset: check-lambert-path.py check 의 [8], [9]
@@ -56,12 +56,12 @@ light (furnace off, light 는 harness baseline 의 것, Geometric Normals off):
   [U1] harness baseline 의 editor.ini 에는 Output 이 없고, 띄운 직후 state 의 Output 이 Radiance 다.
 
 그대로인 것:
-  [K1] BEFORE_DIR 의 export (Output 을 더하기 전의 code, 조건은 BEFORE_DIR/manifest.json) 와 Output Radiance 로 같은 조건에서 쌓은
-       export 를 비교한다. Shading glTF 는 rgba 가 bit 까지 같다. Shading Lambert 는 a 가 bit 까지 같고 rgb 가 LAMBERT_RUN_ULPS 안이다.
+  [K1] REFERENCE_DIR 의 export (REFERENCE_DIR/manifest.json 의 code 로 남겼고 조건도 그 manifest 에 있다) 와 Output Radiance 로 같은
+       조건에서 쌓은 export 를 비교한다. Shading glTF 는 rgba 가 bit 까지 같다. Shading Lambert 는 a 가 bit 까지 같고 rgb 가 LAMBERT_RUN_ULPS 안이다.
        Lambert 는 고치기 전의 code (d05ec6f) 로도 실행마다 rgb 가 4 ulp 까지 달라서 bit 로 비교할 수 없다. 같은 build 를 두 번 띄운
        export 에서 start 는 7502 pixel, courtyard-up 은 27447 pixel 이 달랐고 glTF 는 같았다. Shading 을 runtime 값으로 고를 때
        Lambert 의 결과가 반올림만큼 달라진 적이 있어서 (PathTracerCS.hlsl 의 LAMBERT_SHADING), Output 도 따로 compile 하고 그 결과를
-       이것으로 확인한다. before 는 Output 이 없는 code 에서 돌리므로 Output 을 정하지 않는다.
+       이것으로 확인한다.
 
 keep 은 harness baseline 의 시점에서 KEEP 을 Output Indirect Irradiance 의 glTF 와 Lambert, Output Radiance 의 glTF 로 KEEP_SAMPLES 만큼
 쌓아 KEPT_DIR 에 DDS 와 보기용 PNG 로 남긴다. Indirect Irradiance 의 PNG 는 E/π 를 Radiance 와 같은 exposure 로 보인다. 그림자 경계와
@@ -90,7 +90,7 @@ from viewer import (BASELINE_DIR, HARNESS_DIR, PREVIEW_EXPOSURE, SETTLE_FRAMES, 
                     make_view, shots_dir, start_instance, stop_instance)
 
 KEPT_DIR = HARNESS_DIR / 'kept' / 'indirect-irradiance'
-BEFORE_DIR = KEPT_DIR / 'before'
+REFERENCE_DIR = KEPT_DIR / 'reference'
 
 RADIANCE = {'Output': 'Radiance'}
 IRRADIANCE = {'Output': 'Indirect Irradiance'}
@@ -116,12 +116,11 @@ MISS_POSE = 'courtyard-up'
 R11G11B10_MANTISSA_BITS = np.array([6, 6, 5])
 R11G11B10_SMALLEST_NORMAL = 2.0 ** -14
 
-# [K1] 의 기준. Output 이 없는 code 에서 쌓으므로 Output 을 뺀다. light 는 harness baseline 의 것이다.
-BEFORE_SETTINGS = {key: value for key, value in BASE.items() if key != 'Output'} | {'Geometric Normals': 0, 'Max Bounces': 64,
-                                                                                    'Russian Roulette': 1, 'Seed': 0}
-BEFORE_SAMPLES = 64
-BEFORE_RUNS = [(pose_name, shading) for pose_name in ('start', MISS_POSE) for shading in ('glTF', 'Lambert')]
-# d05ec6f 를 두 번 띄워 BEFORE_RUNS 를 쌓은 Lambert 의 export 는 rgb 가 4 ulp 까지 달랐다. 그 두 배를 둔다.
+# [K1] 의 기준. light 는 harness baseline 의 것이다.
+REFERENCE_SETTINGS = BASE | {'Geometric Normals': 0, 'Max Bounces': 64, 'Russian Roulette': 1, 'Seed': 0}
+REFERENCE_SAMPLES = 64
+REFERENCE_RUNS = [(pose_name, shading) for pose_name in ('start', MISS_POSE) for shading in ('glTF', 'Lambert')]
+# d05ec6f 를 두 번 띄워 REFERENCE_RUNS 를 쌓은 Lambert 의 export 는 rgb 가 4 ulp 까지 달랐다. 그 두 배를 둔다.
 LAMBERT_RUN_ULPS = 8
 
 KEEP = SCENE
@@ -305,21 +304,21 @@ def check_reproduction(session, check, start_pose):
 
 
 def check_radiance_bits(session, check):
-    manifest = json.loads((BEFORE_DIR / 'manifest.json').read_text(encoding='utf-8'))
+    manifest = json.loads((REFERENCE_DIR / 'manifest.json').read_text(encoding='utf-8'))
     passed, details = True, []
     for name, entry in manifest['files'].items():
         session.ask_ok(f'pose {entry["pose"]}')
         set_light(session, entry['directional light'])
         now, _, _ = export(session, f'radiance-{Path(name).stem}', entry['path tracer'] | RADIANCE, entry['samples'])
-        before = read_dds_rgba32f(BEFORE_DIR / name)
-        pixels = count(np.any(now.view(np.uint32) != before.view(np.uint32), axis=2))
+        reference = read_dds_rgba32f(REFERENCE_DIR / name)
+        pixels = count(np.any(now.view(np.uint32) != reference.view(np.uint32), axis=2))
         # 양수 float 는 bit 를 정수로 읽은 차가 ulp 수다.
-        ulps = int(np.max(np.abs(now[..., :3].view(np.int32).astype(np.int64) - before[..., :3].view(np.int32).astype(np.int64))))
-        counts_same = same_bits(now[..., 3], before[..., 3])
+        ulps = int(np.max(np.abs(now[..., :3].view(np.int32).astype(np.int64) - reference[..., :3].view(np.int32).astype(np.int64))))
+        counts_same = same_bits(now[..., 3], reference[..., 3])
         allowed = 0 if entry['path tracer']['Shading'] == 'glTF' else LAMBERT_RUN_ULPS
         passed = passed and counts_same and ulps <= allowed
         details.append(f'{name}: {pixels} pixels differ by up to {ulps} ulps (allowed {allowed}), a {"same" if counts_same else "differs"}')
-    check(f'[K1] Output Radiance accumulates the same bits as before ({manifest["code"]}) for glTF and within {LAMBERT_RUN_ULPS} ulps for Lambert',
+    check(f'[K1] Output Radiance accumulates the same bits as the reference ({manifest["code"]}) for glTF and within {LAMBERT_RUN_ULPS} ulps for Lambert',
           passed, '; '.join(details))
 
 
@@ -351,7 +350,7 @@ def command_check(args):
     return 1 if check.failures else 0
 
 
-def command_before(args):
+def command_reference(args):
     check = Checks()
     instance = start_instance('Debug', build_first=not args.no_build)
     manifest = {'code': code_version(), 'config': 'Debug', 'files': {}}
@@ -360,25 +359,25 @@ def command_before(args):
         try:
             session.ask_ok('ui hide')
             light = session.ask_ok(f'settings get {LIGHT_SECTION}')['values']
-            BEFORE_DIR.mkdir(parents=True, exist_ok=True)
-            for pose_name, shading in BEFORE_RUNS:
+            REFERENCE_DIR.mkdir(parents=True, exist_ok=True)
+            for pose_name, shading in REFERENCE_RUNS:
                 pose = SNAPSHOT_POSES[pose_name] or baseline_pose()
                 session.ask_ok(f'pose {pose}')
-                settings = BEFORE_SETTINGS | {'Shading': shading}
-                _, _, path = export(session, f'{pose_name}-{shading.lower()}', settings, BEFORE_SAMPLES)
+                settings = REFERENCE_SETTINGS | {'Shading': shading}
+                _, _, path = export(session, f'{pose_name}-{shading.lower()}', settings, REFERENCE_SAMPLES)
                 name = f'{pose_name}-{shading.lower()}.dds'
-                shutil.copy2(path, BEFORE_DIR / name)
-                manifest['files'][name] = {'pose': pose, 'directional light': light, 'path tracer': settings, 'samples': BEFORE_SAMPLES}
+                shutil.copy2(path, REFERENCE_DIR / name)
+                manifest['files'][name] = {'pose': pose, 'directional light': light, 'path tracer': settings, 'samples': REFERENCE_SAMPLES}
         finally:
             session.close()
         stop_and_check(instance, check)
     except (HarnessError, ImageFileError) as error:
-        check('before ran to the end', False, str(error))
+        check('reference ran to the end', False, str(error))
         stop_instance(instance, kill_now=True)
     if check.failures:
         return 1
-    (BEFORE_DIR / 'manifest.json').write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
-    print(f'kept {len(manifest["files"])} exports of {manifest["code"]} in {BEFORE_DIR}')
+    (REFERENCE_DIR / 'manifest.json').write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+    print(f'kept {len(manifest["files"])} exports of {manifest["code"]} in {REFERENCE_DIR}')
     return 0
 
 
@@ -408,7 +407,7 @@ def command_keep(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     commands = parser.add_subparsers(dest='command', required=True)
-    for name, handler, help in [('before', command_before, 'keep the exports of [K1] with the code before Output, in Debug'),
+    for name, handler, help in [('reference', command_reference, 'keep the exports that [K1] compares against, with the code as it is, in Debug'),
                                 ('check', command_check, 'judge the criteria and the D3D12 messages in Debug'),
                                 ('keep', command_keep, 'keep the images for the presentation, in Profile')]:
         command = commands.add_parser(name, help=help)
