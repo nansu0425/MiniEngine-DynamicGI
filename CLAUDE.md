@@ -16,6 +16,13 @@
 
 기준마다 무엇을 어떤 조건에서 재고 어떤 값이면 통과인지 적는다. `viewer.py selftest` 는 harness 자체의 확인이므로 rendering 의 회귀 기준으로 쓰지 않는다. 완료를 보고할 때는 판정을 어떤 조건에서 했는지와 다루지 않은 조건을 함께 적는다.
 
+### 회귀 확인
+
+"그대로인 것" 은 그대로여야 하는 동작을 판정하는 check 로만 확인한다. 영향 범위는 바꾼 파일이 아니라, 바꾼 code 의 출력을 쓰는 code 로 정한다. 바꾼 code 의 출력이 닿지 않는 동작의 check 는 돌리지 않는다. 기존 check 전체를 회귀 기준으로 두지 않는다.
+
+- check 가 무엇을 판정하는지는 check script 의 docstring 에 있다. 찾은 code 에 닿는지 판단할 수 없는 check 는 돌린다.
+- code 를 고치는 동안에는 고친 동작의 check 만 돌린다. 고른 check 는 마지막 code 에서 모두 한 번 돌린다. 모두 돌린 뒤에 code 를 고치면, 새로 고친 code 가 닿는 check 만 다시 돌린다.
+
 ## Reference 검색
 
 - `references/` 는 `.gitignore` 대상이라 repo root 에서 Grep 하면 결과에 나오지 않는다. reference 를 검색할 때는 `path` 에 `references/<name>` 이하 경로를 지정한다.
