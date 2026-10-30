@@ -25,8 +25,8 @@ scene file 의 Scale 로 바꾼다.
        camera, heading, pitch 와 문자열로 같고, 같은 sample 수의 export E2 는 E1 과 rgba 가 bit 단위로 같다.
   [V5] pose 를 바꾸고 끝낸 run 의 editor.ini 의 Editor Camera 에는 Move Speed 만 있다. 예전 형식으로 camera 의 위치와 방향을 적은
        editor.ini 로 띄워도 camera 는 scene file 의 pose 로 시작한다.
-  [V6] L 은 scene=SCENE 을 담는다. Sponza 의 줄 (scene 을 Sponza 로 바꾼 L 과 scene 을 뺀 L) 을 Cornell box 에서, L 을 Sponza 에서
-       restore 하면 error 이고 unread 에 scene 이 있으며 state 가 바뀌지 않는다.
+  [V6] L 은 scene=SCENE 을 담는다. Sponza 의 줄 (scene 을 Sponza 로 바꾼 L 과 scene 을 뺀 L) 을 Cornell box 에서 restore 하면 Sponza 를
+       열고, L 을 Sponza 에서 restore 하면 Cornell box 를 연다. 그 뒤 state scene 이 줄의 scene 이고 state camera 가 줄과 문자열로 같다.
   [V7] 처음 화면의 pick grid 에 light, 두 상자, 바닥, 천장, 세 벽이 1 칸 이상씩 있다.
   [V8] scene file 에 적은 처음 pose 가 Mitsuba scene 의 sensor 와 같다. scene file 의 Position 과 띄운 직후 state camera 의
        위치가 sensor 의 to_world 의 이동에 Scale 을 곱한 float32 와 같고, state camera 의 forward 가 to_world 가 옮긴 +z 와 성분마다
@@ -48,8 +48,8 @@ from checks import Checks, stop_and_check
 from imagefiles import ImageFileError, read_dds_rgba32f
 from pathtracerchecks import BASE, SKY_LIGHT_SECTION, SKY_RADIANCE, set_path_tracer
 from pickanswers import PIXEL_CORNER_OFFSETS, PIXEL_EDGE_OFFSETS, camera_ray, grid_cells, is_unambiguous, nearest_face, vector_of
-from viewer import (BASELINE_DIR, HARNESS_DIR, SETTLE_FRAMES, VIEWER_DIR, HarnessError, Session, read_scene_file, shots_dir, start_instance,
-                    stop_instance, without_time_varying)
+from viewer import (BASELINE_DIR, HARNESS_DIR, SETTLE_FRAMES, VIEWER_DIR, HarnessError, Session, default_scene, read_scene_file, shots_dir,
+                    start_instance, stop_instance)
 
 SCENE = 'Scenes/CornellBox.ini'
 NO_STRENGTH_DIR = HARNESS_DIR / 'cornell-box-no-strength'
@@ -311,13 +311,14 @@ def set_line_conditions(session):
     return reply['line'], read_dds_rgba32f(reply['path'])
 
 
-def check_refused(session, check, line, label):
-    before = without_time_varying(session.ask_ok('state')['state'])
+def check_restored_scene(session, check, line, scene, label):
     reply = session.ask(f'restore {line}')
-    after = without_time_varying(session.ask_ok('state')['state'])
-    check(f'[V6] restore of {label} fails, names scene in unread and changes nothing',
-          not reply['ok'] and 'scene' in reply.get('unread', '').split(', ') and after == before,
-          f'{reply.get("error")} {reply.get("note")}' if not reply['ok'] else 'restored')
+    state = session.ask_ok('state')['state']
+    values = parse_line(line)
+    camera = [str(state['camera'][key]) for key in ['x', 'y', 'z', 'heading', 'pitch']]
+    check(f'[V6] restore of {label} opens {scene} and gives the camera of the line',
+          reply['ok'] and state['scene']['path'] == scene and camera == values['camera'].split(',') + [values['heading'], values['pitch']],
+          reply.get('error') or f'scene {state["scene"]["path"]}, camera {" ".join(camera)}')
 
 
 def check_commands(session, check):
@@ -351,9 +352,11 @@ def first_run(check, no_build, mitsuba, scale):
             check_commands(session, check)
             line, image = set_line_conditions(session)
             check('[V6] the line has the scene file', parse_line(line).get('scene') == SCENE, line)
-            check_refused(session, check, format_line(parse_line(line) | {'scene': 'Scenes/Sponza.ini'}), 'the line with the Sponza scene')
-            check_refused(session, check, format_line({key: value for key, value in parse_line(line).items() if key != 'scene'}),
-                          'the line without scene, which is of Sponza')
+            check_restored_scene(session, check, format_line(parse_line(line) | {'scene': default_scene()}), default_scene(),
+                                 'the line with the Sponza scene')
+            session.ask_ok(f'scene open {SCENE}')
+            check_restored_scene(session, check, format_line({key: value for key, value in parse_line(line).items() if key != 'scene'}),
+                                 default_scene(), 'the line without scene, which is of Sponza')
         finally:
             session.close()
         stopped = stop_and_check(instance, check)
@@ -426,7 +429,7 @@ def sponza_run(check, line):
     try:
         session = Session(instance)
         try:
-            check_refused(session, check, line, 'the Cornell box line in Sponza')
+            check_restored_scene(session, check, line, SCENE, 'the Cornell box line in Sponza')
         finally:
             session.close()
         stop_and_check(instance, check)

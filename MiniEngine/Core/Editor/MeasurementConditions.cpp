@@ -102,6 +102,8 @@ MeasurementConditions::Result MeasurementConditions::Restore(const Values& value
     Reading reading;
     for (const auto& group : s_Groups)
         group.second.read(values, reading);
+    for (size_t i = 0; i < reading.preparations.size() && reading.unread.empty(); ++i)
+        reading.preparations[i](reading);
     if (reading.unread.empty())
     {
         for (const auto& apply : reading.applies)

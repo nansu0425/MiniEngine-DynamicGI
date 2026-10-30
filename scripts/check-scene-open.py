@@ -18,6 +18,11 @@ Sponza 로 띄운 app 에서 scene 을 바꿔 가며 비교한다.
        texture descriptor 사용량이 두 scene 을 한 번씩 연 뒤와 같다.
   [O5] 열 수 없는 scene file (없는 파일, 형식이 틀린 파일, glTF 가 없는 파일) 의 scene open 은 error 이고 state 가 열기 전과 같다
        (시간에 따라 바뀌는 값 밖).
+  [O6] scene 을 연 뒤 describe 의 scene 이 연 scene file 이다. 처음부터 Cornell box 로 띄워 얻은 줄 L 을 Sponza 에서 restore 하면 Cornell
+       box 를 열고, state camera 가 L 과 문자열로 같으며, PT_SAMPLES 의 PT export 가 처음부터 Cornell box 로 띄워 L 을 restore 한 export 와
+       rgba 의 bit 까지 같다. Sponza 의 줄과 scene 이 없는 예전 줄을 Cornell box 에서 restore 하면 Sponza 를 열고 되돌린다.
+  [O7] 다른 scene 의 줄이라도 key 가 빠졌거나 받을 수 없는 값이 있으면 error 이고 scene 을 바꾸지 않으며 state 가 그대로다 (시간에 따라
+       바뀌는 값 밖). 줄의 scene file 을 열 수 없으면 error 이고 unread 에 scene 이 있다.
   [O9] scene 을 바꾸고 끝낸 run 의 editor.ini 에 scene 이 없고, 그 editor.ini 로 -scene 없이 띄우면 Sponza 다.
 """
 
@@ -43,6 +48,10 @@ PT_SAMPLES = 16
 PT_SETTINGS = BASE | {'Shading': 'glTF', 'Seed': 0, 'Target Samples': PT_SAMPLES}
 ROUND_TRIPS = 20
 WAIT_TIMEOUT = 900
+# [O6] 의 줄 L 을 얻는 조건. 처음과 모든 조건이 다르다.
+LINE_POSE = '150 400 2500 0.2 0.05'
+LINE_LIGHT = 'elevation=25 azimuth=80 color=1,0.9,0.8 intensity=6'
+LINE_SKY = 'Color=0.5,0.75,1; Intensity=0.25'
 # scene 을 열면 바뀌는 state 와 그대로인 state
 OPENED_STATE = ['scene', 'model', 'camera']
 KEPT_STATE = ['light', 'sky', 'settings']
@@ -72,8 +81,37 @@ def differing_pixels(first, second):
     return int(np.count_nonzero(np.any(first.view(np.uint32) != second.view(np.uint32), axis=2)))
 
 
+def parse_line(line):
+    return dict(item.split('=', 1) for item in line.split('; '))
+
+
+def format_line(values):
+    return '; '.join(f'{key}={value}' for key, value in values.items())
+
+
+def restored_export(session, line, name):
+    """line 을 restore 하고 PT 를 PT_SAMPLES 까지 쌓은 export"""
+    session.ask_ok(f'restore {line}')
+    set_path_tracer(session, {'Show': 1})
+    session.ask_ok(f'pt wait samples={PT_SAMPLES}', timeout=WAIT_TIMEOUT)
+    exported = read_dds_rgba32f(capture(session, 'pt', name))
+    set_path_tracer(session, {'Show': 0})
+    return exported
+
+
+def line_conditions(session):
+    """[O6] 의 줄. PT_SETTINGS 로 쌓은 뒤의 describe 다."""
+    session.ask_ok(f'pose {LINE_POSE}')
+    session.ask_ok(f'light set {LINE_LIGHT}')
+    session.ask_ok(f'settings set Sky Light: {LINE_SKY}')
+    set_path_tracer(session, PT_SETTINGS)
+    session.ask_ok('pt reset')
+    session.ask_ok(f'pt wait samples={PT_SAMPLES}', timeout=WAIT_TIMEOUT)
+    return session.ask_ok('describe')['line']
+
+
 def fresh_run(check, scene, build_first):
-    """처음부터 scene 으로 띄운 app 의 (state, raster, PT export)"""
+    """처음부터 scene 으로 띄운 app 의 (state, raster, PT export) 와, [O6] 의 줄과 그 줄을 restore 한 PT export"""
     instance = start_instance('Debug', scene=scene, build_first=build_first)
     try:
         session = Session(instance)
@@ -82,13 +120,15 @@ def fresh_run(check, scene, build_first):
             session.ask_ok(f'frames {SETTLE_FRAMES}')
             state = state_of(session, OPENED_STATE)
             raster, exported = pictures(session, f'fresh-{Path(scene).stem}')
+            line = line_conditions(session)
+            restored = restored_export(session, line, f'fresh-{Path(scene).stem}-line')
         finally:
             session.close()
         stop_and_check(instance, check)
     except (HarnessError, ImageFileError):
         stop_instance(instance, kill_now=True)
         raise
-    return {'state': state, 'raster': raster, 'pt': exported}
+    return {'state': state, 'raster': raster, 'pt': exported, 'line': line, 'restored': restored}
 
 
 def check_opened(session, check, scene, fresh, label):
@@ -110,6 +150,8 @@ def check_opened(session, check, scene, fresh, label):
     check(f'[O1] {label}: state scene, model and camera are as when started with -scene {scene}, and light, sky and settings stay',
           not differing and not replied and not changed,
           f'differ from the fresh app: {differing or "none"}; reply differs: {replied or "none"}; changed: {changed or "none"}')
+    described = parse_line(session.ask_ok('describe')['line']).get('scene')
+    check(f'[O6] {label}: describe has the scene file opened', described == scene, described)
     check_pictures(session, check, scene, fresh, label)
 
 
@@ -168,6 +210,54 @@ def check_unopenable(session, check):
     check('[O5] scene open of a scene file that cannot be opened fails and changes no state', not wrong, '; '.join(wrong) or 'three files')
 
 
+def camera_of_line(session, line):
+    """(state camera 의 위치, heading, pitch 의 text, 줄의 같은 값)"""
+    camera = session.ask_ok('state camera')['state']['camera']
+    values = parse_line(line)
+    return ([str(camera[key]) for key in ['x', 'y', 'z', 'heading', 'pitch']],
+            values['camera'].split(',') + [values['heading'], values['pitch']])
+
+
+def check_restored_scenes(session, check, fresh):
+    """[O6]. Sponza 에서 부른다."""
+    line = fresh[CORNELL_BOX]['line']
+    exported = restored_export(session, line, 'restored-cornell-box-line')
+    now, expected = camera_of_line(session, line)
+    scene = session.ask_ok('state scene')['state']['scene']['path']
+    pixels = differing_pixels(exported, fresh[CORNELL_BOX]['restored'])
+    check('[O6] restore in Sponza of a line taken in the Cornell box opens the Cornell box with the camera of the line, and the path tracer '
+          'export is bit-identical to restoring it in an app started with the Cornell box', scene == CORNELL_BOX and now == expected and pixels == 0,
+          f'scene {scene}, camera {" ".join(now)}, {pixels} pixels differ')
+    sponza = fresh[SPONZA]['line']
+    old = format_line({key: value for key, value in parse_line(sponza).items() if key != 'scene'})
+    for label, restored in [('a Sponza line', sponza), ('a line without scene', old)]:
+        session.ask_ok(f'scene open {CORNELL_BOX}')
+        reply = session.ask(f'restore {restored}')
+        now, expected = camera_of_line(session, restored)
+        scene = session.ask_ok('state scene')['state']['scene']['path']
+        check(f'[O6] restore in the Cornell box of {label} opens Sponza with the camera of the line', reply['ok'] and scene == SPONZA and now == expected,
+              reply.get('error') or f'scene {scene}, camera {" ".join(now)}')
+
+
+def check_unrestorable(session, check, fresh):
+    """[O7]. Cornell box 에서 부른다."""
+    sponza = parse_line(fresh[SPONZA]['line'])
+    lines = [('a Sponza line without heading', 'heading', format_line({key: value for key, value in sponza.items() if key != 'heading'})),
+             ('a Sponza line with light intensity -1', 'light intensity', format_line(sponza | {'light intensity': '-1'})),
+             ('a line of a missing scene file', 'scene', format_line(sponza | {'scene': write_unopenable()[0][1]}))]
+    wrong = []
+    for label, key, line in lines:
+        before = without_time_varying(session.ask_ok('state')['state'])
+        reply = session.ask(f'restore {line}')
+        after = without_time_varying(session.ask_ok('state')['state'])
+        if reply['ok'] or key not in reply.get('unread', '').split(', ') or after != before:
+            wrong.append(f'{label}: {"ok" if reply["ok"] else reply.get("unread")}{", state changed" if after != before else ""}')
+        else:
+            print(f'      {label}: {reply["error"]} {reply.get("note", "")}')
+    check('[O7] restore of a line of another scene that lacks a key, cannot set one or cannot open its scene file fails, names the key in '
+          'unread and changes no state, the scene neither', not wrong, '; '.join(wrong) or f'{len(lines)} lines')
+
+
 def started_in_cornell_box_run(check, fresh):
     """[O1], [O2], [O3]: Cornell box 로 띄운 app 에서 Sponza 를 처음 연다."""
     instance = start_instance('Debug', scene=CORNELL_BOX, build_first=False)
@@ -197,7 +287,9 @@ def switching_run(check, fresh):
             check_opened(session, check, SPONZA, fresh, 'the Cornell box to Sponza')
             check_round_trips(session, check, fresh)
             check_unopenable(session, check)
+            check_restored_scenes(session, check, fresh)
             session.ask_ok(f'scene open {CORNELL_BOX}')
+            check_unrestorable(session, check, fresh)
         finally:
             session.close()
         stop_and_check(instance, check)

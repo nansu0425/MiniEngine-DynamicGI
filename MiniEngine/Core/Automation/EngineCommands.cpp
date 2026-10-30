@@ -599,7 +599,8 @@ namespace ControlChannel
             "It has the scene file, camera, resolution, TAA, directional light, Sky Light, path tracer settings and the samples the path tracer has added", DescribeConditions);
         Register("restore", "restore <line>: sets every condition in a line printed by Log, left beside a capture or given by describe, as Restore does. "
             "Fails and sets nothing if the line lacks a condition or one cannot be set, and unread names them. "
-            "A line of another scene file than the one open is one, as the scene cannot change while running, and note says so. "
+            "A line of another scene file opens that scene file as scene open does, keeping the camera of the line, "
+            "and a scene file that cannot be opened is a condition that cannot be set, which note explains. "
             "The resolution is only compared and note says how it differs. pt samples becomes the Target Samples and the path tracer starts over",
             RestoreConditions);
         Register("ui", "ui show|hide: same as F1. Hidden, the scene fills the client", SetUIVisible);

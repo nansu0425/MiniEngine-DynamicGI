@@ -178,15 +178,18 @@ public:
 private:
 
     struct PreparedScene;
-    // path의 scene file로 scene 을 연다. Scene menu와 scene open 명령이 함께 쓴다. 열 수 없으면 error에 이유를 쓰고 false를 돌려주며
-    // 지금 scene 을 그대로 둔다.
+    // path의 scene file로 scene 을 연다. Scene menu와 scene open 명령이 함께 쓰고, 다른 scene 의 줄을 받은 Restore도 PrepareScene과
+    // ShowScene으로 같은 일을 한다. 열 수 없으면 error에 이유를 쓰고 false를 돌려주며 지금 scene 을 그대로 둔다.
     bool OpenScene(const std::wstring& path, std::string& error);
     // scene 을 바꾸지 않고 path의 scene file을 열 수 있는지 본다. 그 model을 처음 열면 load해서 m_Models에 남긴다.
     bool PrepareScene(const std::wstring& path, PreparedScene& scene, std::string& error);
-    // PrepareScene이 준비한 scene 으로 바꾼다. camera는 scene file의 처음 pose로 옮기고 path tracer는 처음부터 다시 쌓는다.
-    void ShowScene(const PreparedScene& scene);
+    // PrepareScene이 준비한 scene 으로 바꾼다. moveCamera면 camera를 scene file의 처음 pose로 옮긴다. path tracer는 처음부터 다시 쌓는다.
+    void ShowScene(const PreparedScene& scene, bool moveCamera);
     void ShowSceneMenu(void);
     void RegisterSceneCommand(void);
+    // 측정 조건의 줄에 지금 scene 을 담고, 다른 scene 의 줄을 Restore하면 그 scene 을 연다.
+    void RegisterSceneConditions(void);
+    void ReadSceneConditions(const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading);
 
     // 한 번 연 model을 glTF 경로마다 남겨 다시 쓴다. Renderer::LoadModel은 load할 때마다 scene texture descriptor heap에서
     // descriptor를 할당하고 풀지 않으므로, scene 을 오갈 때마다 load하면 heap이 찬다.
@@ -541,27 +544,10 @@ void ReadSkyLightConditions(SkyLight& sky, const MeasurementConditions::Values& 
     reading.applies.push_back([&sky, properties] { sky.SetProperties(properties); });
 }
 
-// 실행 중에는 scene 을 바꿀 수 없으므로 다른 scene 의 줄은 받지 않는다. scene이 없는 줄은 scene file을 쓰기 전의 줄이고, 그때는
-// -model로 연 scene 을 Restore할 수 없었으므로 kDefaultScene의 줄로 읽는다.
-void ReadSceneConditions(const std::string& openScene, const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading)
+// raster와 path tracer가 그리는 조건을 Log와 capture의 줄에 담고 Restore로 되돌리게 한다. scene 은 ModelViewer::RegisterSceneConditions가,
+// path tracer의 설정은 PathTracerPanel이 더한다.
+void RegisterMeasurementConditions(EditorCamera& editorCamera, DirectionalLight& light, SkyLight& sky)
 {
-    const auto scene = values.find("scene");
-    const std::string lineScene = scene != values.end() ? scene->second : Utility::ToUTF8(kDefaultScene);
-    if (lineScene != openScene)
-    {
-        reading.unread.push_back("scene");
-        reading.notes.push_back("the line is of the scene " + lineScene + ", but " + openScene + " is open, and Restore cannot open another scene.");
-    }
-}
-
-// raster와 path tracer가 그리는 조건을 Log와 capture의 줄에 담고 Restore로 되돌리게 한다. path tracer의 설정은 PathTracerPanel이 더한다.
-// scene은 연 scene file의 이름이다.
-void RegisterMeasurementConditions(const std::string& scene, EditorCamera& editorCamera, DirectionalLight& light, SkyLight& sky)
-{
-    MeasurementConditions::Register("scene", {
-        [&scene](MeasurementConditions::Values& values) { values["scene"] = scene; },
-        [&scene](const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading) { ReadSceneConditions(scene, values, reading); },
-        { "scene" } });
     MeasurementConditions::Register("camera", {
         [&editorCamera](MeasurementConditions::Values& values) { DescribeCameraConditions(editorCamera, values); },
         [&editorCamera](const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading) { ReadCameraConditions(editorCamera, values, reading); },
@@ -978,7 +964,8 @@ void DirectionalLight::ShowDetails()
 //   [Camera] Position=<x>,<y>,<z>, Heading, Pitch: 처음 pose. 단위는 state camera와 pose 명령과 같다.
 //            Fit=Model: 위 셋 대신 둔다. bounding sphere 중심의 +z 쪽 반지름의 2배와 near clip을 더한 거리에서 -z를 본다.
 //            예전 -model의 OrbitCamera가 처음 그린 화면과 bit 단위로 같다.
-// scene 을 열면 camera는 늘 scene file의 pose로 시작한다. editor.ini는 camera의 이동 속도만 남긴다.
+// scene 을 열면 camera는 scene file의 pose로 시작한다. 다른 scene 의 줄을 Restore하면 줄의 camera를 쓴다. editor.ini는 camera의 이동 속도만
+// 남긴다.
 struct SceneFile
 {
     // scale과 radius 중 0이 아닌 하나만 쓴다.
@@ -1102,7 +1089,7 @@ bool ModelViewer::PrepareScene(const std::wstring& path, PreparedScene& scene, s
     return true;
 }
 
-void ModelViewer::ShowScene(const PreparedScene& scene)
+void ModelViewer::ShowScene(const PreparedScene& scene, bool moveCamera)
 {
     // 지난 frame의 command가 아직 지금 model instance의 buffer와 TLAS를 읽을 수 있으므로 GPU가 끝내기를 기다린 뒤에 바꾼다.
     g_CommandManager.IdleGPU();
@@ -1110,7 +1097,8 @@ void ModelViewer::ShowScene(const PreparedScene& scene)
     m_RaytracingScene.Destroy();
     m_ModelInst = scene.model;
     ScaleModel(m_ModelInst, scene.file);
-    m_CameraController->SetPose(GetStartPose(scene.file, m_ModelInst, m_Camera.GetNearClip()));
+    if (moveCamera)
+        m_CameraController->SetPose(GetStartPose(scene.file, m_ModelInst, m_Camera.GetNearClip()));
     m_SceneModel.SetPath(Utility::ToUTF8(scene.file.gltfPath));
     m_SceneName = scene.name;
     PathTracer::Reset();
@@ -1121,8 +1109,39 @@ bool ModelViewer::OpenScene(const std::wstring& path, std::string& error)
     PreparedScene scene;
     if (!PrepareScene(path, scene, error))
         return false;
-    ShowScene(scene);
+    ShowScene(scene, true);
     return true;
+}
+
+// scene이 없는 줄은 scene file을 쓰기 전의 줄이고, 그때는 -model로 연 scene 을 Restore할 수 없었으므로 kDefaultScene의 줄로 읽는다.
+// 줄의 scene 이 지금 scene 과 다르면 줄의 나머지를 받을 수 있을 때만 그 scene 을 준비해 보고, 열 수 없으면 아무것도 되돌리지 않는다.
+// 연 scene 의 camera는 줄의 camera이므로 scene file의 처음 pose로 옮기지 않는다.
+void ModelViewer::ReadSceneConditions(const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading)
+{
+    const auto scene = values.find("scene");
+    const std::string lineScene = scene != values.end() ? scene->second : Utility::ToUTF8(kDefaultScene);
+    if (lineScene == m_SceneName)
+        return;
+    reading.preparations.push_back([this, lineScene](MeasurementConditions::Reading& reading)
+    {
+        const std::shared_ptr<PreparedScene> prepared = std::make_shared<PreparedScene>();
+        std::string error;
+        if (!PrepareScene(Utility::UTF8ToWideString(lineScene), *prepared, error))
+        {
+            reading.unread.push_back("scene");
+            reading.notes.push_back("the scene file " + lineScene + " " + error + ".");
+            return;
+        }
+        reading.applies.push_back([this, prepared] { ShowScene(*prepared, false); });
+    });
+}
+
+void ModelViewer::RegisterSceneConditions(void)
+{
+    MeasurementConditions::Register("scene", {
+        [this](MeasurementConditions::Values& values) { values["scene"] = m_SceneName; },
+        [this](const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading) { ReadSceneConditions(values, reading); },
+        { "scene", "model" } });
 }
 
 // Scene menu가 보이는 scene file. kScenesFolder의 .ini를 이름순으로 둔다.
@@ -1247,7 +1266,8 @@ void ModelViewer::Startup( void )
     SceneEditor::RegisterCommands(m_Camera);
     RegisterLight(m_Light);
     RegisterSkyLight(m_SkyLight);
-    RegisterMeasurementConditions(m_SceneName, editorCamera, m_Light, m_SkyLight);
+    RegisterSceneConditions();
+    RegisterMeasurementConditions(editorCamera, m_Light, m_SkyLight);
 }
 
 void ModelViewer::Cleanup( void )

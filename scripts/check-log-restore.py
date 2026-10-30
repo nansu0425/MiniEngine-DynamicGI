@@ -13,8 +13,9 @@ image 의 줄이다. B 는 Furnace 를 켠 줄이다. Furnace 는 directional li
 두 번째 실행은 harness baseline 에서 다시 시작하므로 조건이 모두 기본값으로 돌아간 상태다.
 
   [G1] 다시 띄운 직후, A, B 의 줄이 같은 key 를 가지고, size 와 scene 밖의 key 는 모두 "다시 띄운 직후와 A" 또는 "A 와 B" 사이에서
-       값이 다르다. 그래서 아래의 restore 가 key 마다 실제로 값을 바꾼다. size 는 되돌리지 않는 조건이라 [G4] 가 따로 본다. scene 은
-       실행 중에 바꿀 수 없는 조건이라 [G4] 가 다른 scene 의 줄과 scene 이 없는 줄로 본다.
+       값이 다르다. 그래서 아래의 restore 가 key 마다 실제로 값을 바꾼다. size 는 되돌리지 않는 조건이라 [G4] 가 따로 본다. A 와 B 는
+       같은 scene 의 줄이라 scene 은 [G4] 가 열 수 없는 scene file 의 줄과 scene 이 없는 줄로 본다. 다른 scene 의 줄이 그 scene 을 여는
+       것은 check-scene-open.py 의 [O6] 이 본다.
   [G2a] 다시 띄운 app 에 A 를, 그 뒤 B 를 restore 하면 그때마다 줄 (pt samples 밖) 과 state 의 camera, light, sky,
        settings.Engine Tuning, settings.Path Tracer (Show 밖) 가 줄을 얻을 때와 문자열로 같다. Target Samples 는 줄의 pt samples 다.
   [G2b] 다시 띄운 app 에서 export 의 줄을 restore 하고 Show 만 켜 SAMPLES 까지 쌓아 export 한 image 의 rgba 가 첫 실행의 export 와
@@ -24,7 +25,7 @@ image 의 줄이다. B 는 Furnace 를 켠 줄이다. Furnace 는 directional li
   [G4] A 의 줄에서 key 하나를 빼거나 값 하나를 받을 수 없는 값으로 바꾼 줄을 restore 하면 error 이고, unread 가 그 key 를 담고,
        state 가 바뀌지 않는다. size 만 다른 줄은 restore 되고, note 가 줄과 지금의 해상도를 알리며 scene 의 크기는 그대로다.
        taa=on 인 B 의 restore 는 note 로 jitter 를 재현할 수 없다고 알린다. scene 이 없는 줄은 scene file 전의 줄이라 -scene 없이 연
-       scene 의 줄로 restore 되고, scene 이 다른 줄 (위의 scene=x) 은 error 다.
+       scene 의 줄로 restore 되고, 열 수 없는 scene file 의 줄 (위의 scene=x) 은 error 다.
 
 A 의 두 export 와 보기용 PNG, 줄은 발표에 쓰도록 KEPT_DIR 에 남긴다.
 """

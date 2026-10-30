@@ -33,6 +33,9 @@ namespace MeasurementConditions
         std::vector<std::string> unread;
         // 되돌리지 않고 지금과 견주기만 하는 조건이 지금과 다른 점, 되돌려도 같아지지 않는 것
         std::vector<std::string> notes;
+        // 모든 group이 다 읽고 unread가 비었을 때 applies 앞에 차례로 부르는, 되돌릴 수 있는지 마저 보는 일. scene 의 model을 load하는
+        // 일처럼 줄의 나머지를 받을 수 있을 때만 할 일이다. 받을 수 없으면 unread에 key를 더하고, 받을 수 있으면 applies에 되돌리는 일을 더한다.
+        std::vector<std::function<void(Reading&)>> preparations;
         // 모든 group이 다 읽은 뒤에 차례로 부르는, 읽은 값으로 되돌리는 일
         std::vector<std::function<void()>> applies;
     };
