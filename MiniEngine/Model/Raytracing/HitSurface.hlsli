@@ -10,7 +10,9 @@ struct HitSurface
     float3 position;
     // triangle 면의 normal. ray가 온 쪽을 향한다.
     float3 geometryNormal;
-    // 보간한 vertex normal에 normal map을 적용한 normal. ray가 온 쪽을 향한다.
+    // 보간한 vertex normal. ray가 온 쪽을 향한다.
+    float3 vertexNormal;
+    // vertexNormal에 normal map을 적용한 normal. ray가 온 쪽을 향한다.
     float3 shadingNormal;
     float2 uv0;
     float4 baseColor;
@@ -62,7 +64,8 @@ HitSurface GetHitSurface(RayHit hit, float textureLod)
     surface.roughness = metallicRoughness.y;
     surface.emissive = material.emissiveFactor * SampleMaterialTexture(hitTriangle, kEmissiveTexture, textureLod).rgb;
 
-    float3 normal = ObjectToWorldNormal(hit, InterpolateSignedR10G10B10A2(data, vertexAddresses, geometry.normalOffset, weights).xyz);
+    const float3 vertexNormal = ObjectToWorldNormal(hit, InterpolateSignedR10G10B10A2(data, vertexAddresses, geometry.normalOffset, weights).xyz);
+    float3 normal = vertexNormal;
     if (geometry.tangentOffset != 0)
     {
         const float4 tangent = InterpolateSignedR10G10B10A2(data, vertexAddresses, geometry.tangentOffset, weights);
@@ -78,6 +81,7 @@ HitSurface GetHitSurface(RayHit hit, float textureLod)
     // cross(p1 - p0, p2 - p0)는 DXR이 front face로 판정하는 쪽을 향한다.
     const float side = hit.frontFace ? 1.0 : -1.0;
     surface.geometryNormal = side * ObjectToWorldNormal(hit, cross(p1 - p0, p2 - p0));
+    surface.vertexNormal = side * vertexNormal;
     surface.shadingNormal = side * normal;
     return surface;
 }

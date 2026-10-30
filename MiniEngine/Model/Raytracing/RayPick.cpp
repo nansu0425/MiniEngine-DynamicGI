@@ -49,6 +49,8 @@ namespace
         float depth;
         XMFLOAT3 position;
         XMFLOAT3 normal;
+        XMFLOAT3 vertexNormal;
+        XMFLOAT3 shadingNormal;
         uint32_t frontFace;
         uint32_t alphaTest;
         uint32_t instance;
@@ -59,7 +61,7 @@ namespace
         float rasterZ;
         float rasterDepth;
     };
-    static_assert(sizeof(Result) == 84, "RayPickCS.hlsl의 Result와 크기가 다르다");
+    static_assert(sizeof(Result) == 108, "RayPickCS.hlsl의 Result와 크기가 다르다");
 
     // grid의 칸은 그리는 frame의 scene 영역에서 정하므로 그때까지 칸 수만 둔다.
     struct Request
@@ -149,6 +151,8 @@ namespace
                 .Float("depth", result.depth)
                 .Object("position", DescribeVector(result.position))
                 .Object("normal", DescribeVector(result.normal))
+                .Object("vertex_normal", DescribeVector(result.vertexNormal))
+                .Object("shading_normal", DescribeVector(result.shadingNormal))
                 .Flag("front_face", result.frontFace != 0)
                 .Integer("instance", result.instance)
                 .Integer("geometry", result.geometry)
@@ -255,6 +259,7 @@ void RayPick::Initialize(void)
         "The ray passes the raster's sample position in it (sample, the pixel's center with TAA off) between the near and far planes, "
         "culling back faces of single-sided materials as the raster does. "
         "distance is along the ray and depth along the camera forward, in world units, as position is. normal is the triangle's, toward the camera. "
+        "vertex_normal is the interpolated vertex normal and shading_normal is it with the normal map applied as the path tracer shades, both toward the camera. "
         "instance is the mesh in the model, geometry the draw in the mesh, primitive the triangle in the draw and material the glTF material. "
         "base_color is the linear RGBA of the material there. alpha_test is whether alpha testing decided what the ray hit or missed, "
         "as in the Depth Comparison validation: there the raster, which reads the cutout's mip chain where the ray reads mip 0, may see something else. raster has the raster's depth buffer at the pixel: z as stored (reverse Z, 0 is the far plane) "

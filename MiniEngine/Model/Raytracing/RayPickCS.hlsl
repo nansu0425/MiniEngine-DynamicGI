@@ -27,6 +27,9 @@ struct Result
     float3 position;
     // triangle 면의 normal. ray가 온 쪽을 향한다.
     float3 normal;
+    // HitSurface의 vertexNormal과 shadingNormal
+    float3 vertexNormal;
+    float3 shadingNormal;
     uint frontFace;
     // alpha test가 ray가 맞은 것을 정했는지. 그런 pixel은 raster와 다른 것을 맞을 수 있다.
     uint alphaTest;
@@ -66,6 +69,8 @@ void main(uint index : SV_DispatchThreadID)
         result.depth = hit.t * dot(ray.Direction, CameraForward);
         result.position = surface.position;
         result.normal = surface.geometryNormal;
+        result.vertexNormal = surface.vertexNormal;
+        result.shadingNormal = surface.shadingNormal;
         result.frontFace = hit.frontFace;
         result.instance = hit.instanceIndex;
         result.geometry = hit.geometryIndex;
