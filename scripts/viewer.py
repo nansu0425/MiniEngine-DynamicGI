@@ -10,6 +10,7 @@ import ctypes
 import functools
 import hashlib
 import json
+import math
 import msvcrt
 import os
 import posixpath
@@ -838,6 +839,18 @@ SNAPSHOT_PANEL_SIZE = (640, 360)
 # SSAO 와 함께 linear depth 가 빠진 bug 는 0.30% ~ 6.74% 였다.
 SNAPSHOT_SAME_CODE_FACTOR = 4
 SNAPSHOT_SAME_CODE_FLOOR = 0.001
+# path tracer 의 shot. SNAPSHOT_PT_POSE 에서 Shading 과 Output 의 조합마다 같은 Seed 로 쌓아 export 한다. 나머지 설정은 harness baseline 과
+# app 의 기본값이다. raster 의 shot 을 찍는 순서가 PT 의 shot 을 넣기 전과 같도록 raster 의 shot 을 다 찍은 뒤에 찍는다. export 는 post
+# effects 전의 누적값이고 TAA 의 jitter 와 무관하므로 (check-indirect-irradiance.py 의 [I9]) app 의 기본 효과를 켠 채 찍어도 된다.
+SNAPSHOT_PT_POSE = 'start'
+SNAPSHOT_PT_SETTINGS = {'Show': 1, 'Seed': 0, 'Samples per Frame': 1, 'Max Bounces': 64, 'Russian Roulette': 1, 'Geometric Normals': 0,
+                        'Furnace': 0}
+SNAPSHOT_PT_RUNS = [(shading, output) for shading in ('glTF', 'Lambert', 'DDGI Probe Hit') for output in ('Radiance', 'Indirect Irradiance')]
+SNAPSHOT_PT_SAMPLES = 64
+# compare 가 같은 code 의 차이로 보는 rgb 의 ulp 차의 하한. 같은 build 를 두 번 띄워도 rgb 가 다른 Shading 이 있는데, save 의 두 실행만으로는
+# 그 차이를 다 재지 못한다. 0708952 의 snapshot 을 save 하고 두 번 compare 했을 때 Lambert 는 6 ulp, DDGI Probe Hit 는 4 ulp 까지 달랐고
+# (Probe Hit 의 Indirect Irradiance 는 save 의 두 실행에서 같았다), glTF 는 같았다. 그 두 배를 둔다.
+SNAPSHOT_PT_RUN_ULPS = {'glTF': 0, 'Lambert': 12, 'DDGI Probe Hit': 8}
 
 
 def default_scene_pose():
@@ -853,8 +866,34 @@ def code_revision():
     return git('rev-parse', '--short', 'HEAD') + ('+' if git('status', '--porcelain') else '')
 
 
+def path_tracer_snapshot():
+    """snapshot.json 에 남기는 PT shot 의 조건. JSON 으로 오간 값과 비교하도록 list 로 둔다."""
+    return {'pose': SNAPSHOT_POSES[SNAPSHOT_PT_POSE] or default_scene_pose(), 'settings': SNAPSHOT_PT_SETTINGS,
+            'runs': [list(run) for run in SNAPSHOT_PT_RUNS], 'samples': SNAPSHOT_PT_SAMPLES}
+
+
+def path_tracer_shot_name(shading, output):
+    return f'pt-{SNAPSHOT_PT_POSE}-{shading}-{output}'.lower().replace(' ', '-')
+
+
+def capture_path_tracer(session, folder):
+    """SNAPSHOT_PT_RUNS 를 쌓아 folder 에 export 하고 PT 를 끈다. 찍은 shot 을 돌려준다."""
+    session.ask_ok(f'pose {path_tracer_snapshot()["pose"]}')
+    shots = []
+    for shading, output in SNAPSHOT_PT_RUNS:
+        settings = SNAPSHOT_PT_SETTINGS | {'Shading': shading, 'Output': output, 'Target Samples': SNAPSHOT_PT_SAMPLES}
+        session.ask_ok('settings set Path Tracer: ' + '; '.join(f'{key}={value}' for key, value in settings.items()))
+        session.ask_ok('pt reset')
+        session.ask_ok(f'pt wait samples={SNAPSHOT_PT_SAMPLES}')
+        name = path_tracer_shot_name(shading, output)
+        session.ask_ok(f'capture pt {folder / name}')
+        shots.append(name)
+    session.ask_ok('settings set Path Tracer: Show=0')
+    return shots
+
+
 def capture_snapshot(config, build_first, folder):
-    """SNAPSHOT_SETTINGS x SNAPSHOT_POSES 의 scene 과 display 를 folder 에 찍고, 찍은 shot 과 app 의 끝을 돌려준다."""
+    """SNAPSHOT_SETTINGS x SNAPSHOT_POSES 의 scene 과 display, PT 의 shot 을 folder 에 찍고, 찍은 shot, PT 의 shot, app 의 끝을 돌려준다."""
     folder.mkdir(parents=True)
     instance = start_instance(config, build_first=build_first)
     shots = []
@@ -872,12 +911,13 @@ def capture_snapshot(config, build_first, folder):
                     for target in ['scene', 'display']:
                         session.ask_ok(f'capture {target} {folder / f"{name}-{target}"}')
                     shots.append(name)
+            path_tracer_shots = capture_path_tracer(session, folder)
         finally:
             session.close()
     except HarnessError:
         stop_instance(instance, kill_now=True)
         raise
-    return shots, stop_instance(instance)
+    return shots, path_tracer_shots, stop_instance(instance)
 
 
 def snapshot_ended_well(stopped):
@@ -905,8 +945,30 @@ def shot_change(before_folder, after_folder, name):
             'display_changed': int(np.count_nonzero(np.any(displays[0] != displays[1], axis=2)))}
 
 
+def path_tracer_change(before_folder, after_folder, name):
+    """한 PT shot 에서 rgba 가 바뀐 pixel 과 크게 바뀐 pixel 의 mask, rgb 의 가장 큰 ulp 차, a 가 같은지, after 의 NaN 과 Inf 수."""
+    import numpy as np
+    before = read_dds_rgba32f(before_folder / f'{name}.dds')
+    after = read_dds_rgba32f(after_folder / f'{name}.dds')
+    if before.shape != after.shape:
+        raise HarnessError(f'{name}: export is {before.shape} before and {after.shape} after')
+    changed = np.any(before.view(np.uint32) != after.view(np.uint32), axis=2)
+    relative = np.abs(np.nan_to_num(after[..., :3] - before[..., :3])).max(axis=2) / np.maximum(np.abs(before[..., :3]).max(axis=2), 1e-3)
+    # 0 이상의 float 는 bit 를 정수로 읽은 차가 ulp 수다.
+    ulps = np.abs(after[..., :3].view(np.int32).astype(np.int64) - before[..., :3].view(np.int32).astype(np.int64))
+    return {'changed': changed, 'large': changed & (relative > SNAPSHOT_LARGE_CHANGE), 'ulps': int(ulps.max()),
+            'samples_same': bool(np.array_equal(before[..., 3].view(np.uint32), after[..., 3].view(np.uint32))),
+            'nonfinite': int(np.count_nonzero(~np.isfinite(after[..., :3]).all(axis=2))),
+            'before': before, 'after': after}
+
+
 def change_counts(change):
     return {'changed': int(change['changed'].sum()), 'large': int(change['large'].sum()), 'pixels': int(change['changed'].size)}
+
+
+def path_tracer_counts(change):
+    return {'changed': int(change['changed'].sum()), 'ulps': change['ulps'], 'samples_same': change['samples_same'],
+            'pixels': int(change['changed'].size)}
 
 
 def exceeds_same_code(counts, same_code):
@@ -917,8 +979,17 @@ def exceeds_same_code(counts, same_code):
                                                     SNAPSHOT_SAME_CODE_FLOOR)
 
 
-def change_sheet(before_folder, after_folder, name, change):
-    """before display, after display, scene 의 차이 mask 를 나란히 놓은 image."""
+def path_tracer_allowed_ulps(same_code, shading):
+    return max(SNAPSHOT_SAME_CODE_FACTOR * same_code['ulps'], SNAPSHOT_PT_RUN_ULPS[shading])
+
+
+def path_tracer_exceeds_same_code(counts, same_code, shading):
+    """같은 code 로 쌓아도 생기는 차이보다 크게 바뀌었는가. a 가 다르거나 rgb 의 가장 큰 ulp 차가 path_tracer_allowed_ulps 를 넘으면 크다."""
+    return not counts['samples_same'] or counts['ulps'] > path_tracer_allowed_ulps(same_code, shading)
+
+
+def change_sheet(before, after, change):
+    """before, after 의 image 와 차이 mask 를 나란히 놓은 image."""
     import numpy as np
     from PIL import Image
     mask = np.zeros(change['changed'].shape, dtype=np.uint8)
@@ -926,10 +997,24 @@ def change_sheet(before_folder, after_folder, name, change):
     mask[change['large']] = 255
     width, height = SNAPSHOT_PANEL_SIZE
     sheet = Image.new('RGB', (width * 3 + 20, height), (255, 0, 255))
-    panels = [Image.open(before_folder / f'{name}-display.png'), Image.open(after_folder / f'{name}-display.png'), Image.fromarray(mask)]
-    for index, panel in enumerate(panels):
+    for index, panel in enumerate([before, after, Image.fromarray(mask)]):
         sheet.paste(panel.convert('RGB').resize(SNAPSHOT_PANEL_SIZE, Image.LANCZOS), (index * (width + 10), 0))
     return sheet
+
+
+def display_sheet(before_folder, after_folder, name, change):
+    """before display, after display, scene 의 차이 mask 를 나란히 놓은 image."""
+    from PIL import Image
+    return change_sheet(Image.open(before_folder / f'{name}-display.png'), Image.open(after_folder / f'{name}-display.png'), change)
+
+
+def path_tracer_sheet(change, output):
+    """before export, after export 의 보기용 image 와 export 의 차이 mask 를 나란히 놓은 image."""
+    from PIL import Image
+    # Indirect Irradiance 의 rgb 는 E 라서 radiance 로 보이게 π 로 나눈다 (PathTracer.h 의 Output).
+    exposure = PREVIEW_EXPOSURE / math.pi if output == 'Indirect Irradiance' else PREVIEW_EXPOSURE
+    before, after = (Image.fromarray(tone_map_for_view(change[key], exposure)) for key in ('before', 'after'))
+    return change_sheet(before, after, change)
 
 
 def command_snapshot_save(args):
@@ -938,25 +1023,31 @@ def command_snapshot_save(args):
         if not args.replace:
             raise HarnessError(f'{folder} exists. Use --replace to take it again')
         shutil.rmtree(folder)
-    shots, stopped = capture_snapshot(args.config, not args.no_build, folder)
+    shots, path_tracer_shots, stopped = capture_snapshot(args.config, not args.no_build, folder)
     ended_well = snapshot_ended_well(stopped)
     for line in describe_snapshot_end(stopped):
         print(line)
-    # TAA 와 adaptive exposure 는 같은 code 에서도 실행마다 결과를 바꾸므로, 한 번 더 띄워 그 차이를 compare 의 기준으로 남긴다.
+    # TAA, adaptive exposure 와 PT 의 Shading Lambert 는 같은 code 에서도 실행마다 결과를 바꾸므로, 한 번 더 띄워 그 차이를 compare 의
+    # 기준으로 남긴다.
     same_code_folder = folder / 'same-code'
-    _, stopped = capture_snapshot(args.config, False, same_code_folder)
+    _, _, stopped = capture_snapshot(args.config, False, same_code_folder)
     ended_well &= snapshot_ended_well(stopped)
     for line in describe_snapshot_end(stopped):
         print(line)
     same_code = {name: change_counts(shot_change(folder, same_code_folder, name)) for name in shots}
+    path_tracer_same_code = {name: path_tracer_counts(path_tracer_change(folder, same_code_folder, name)) for name in path_tracer_shots}
     manifest = {'code': code_revision(), 'config': args.config, 'created': time.strftime('%Y-%m-%d %H:%M:%S'), 'shots': shots,
                 'poses': {name: pose or default_scene_pose() for name, pose in SNAPSHOT_POSES.items()}, 'settings': SNAPSHOT_SETTINGS,
-                'same_code': same_code}
+                'same_code': same_code, 'path_tracer': path_tracer_snapshot(), 'path_tracer_same_code': path_tracer_same_code}
     (folder / 'snapshot.json').write_text(json.dumps(manifest, indent=2), encoding='utf-8')
     for name in shots:
         counts = same_code[name]
         print(f'same code {name}: {counts["changed"]} pixels changed, {counts["large"]} by more than {SNAPSHOT_LARGE_CHANGE:.0%}')
-    print(f'saved {len(shots)} shots of {manifest["code"]} to {folder}')
+    for name in path_tracer_shots:
+        counts = path_tracer_same_code[name]
+        print(f'same code {name}: {counts["changed"]} pixels changed by up to {counts["ulps"]} ulps, '
+              f'a {"same" if counts["samples_same"] else "differs"}')
+    print(f'saved {len(shots)} shots and {len(path_tracer_shots)} path tracer shots of {manifest["code"]} to {folder}')
     return 0 if ended_well else 1
 
 
@@ -967,27 +1058,42 @@ def command_snapshot_compare(args):
         raise HarnessError(f'no snapshot {before_folder}. Take it with snapshot save {args.name} before changing the code')
     manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
     poses = {name: pose or default_scene_pose() for name, pose in SNAPSHOT_POSES.items()}
-    if manifest['poses'] != poses or manifest['settings'] != SNAPSHOT_SETTINGS or manifest['config'] != args.config:
+    if (manifest['poses'] != poses or manifest['settings'] != SNAPSHOT_SETTINGS or manifest.get('path_tracer') != path_tracer_snapshot()
+            or manifest['config'] != args.config):
         raise HarnessError(f'{args.name} was taken with other poses, settings or config. Take a new snapshot with this viewer.py')
 
     after_folder = before_folder / f'compare-{time.strftime("%Y%m%d-%H%M%S")}'
-    shots, stopped = capture_snapshot(args.config, not args.no_build, after_folder)
+    shots, _, stopped = capture_snapshot(args.config, not args.no_build, after_folder)
     lines = [f'before: {manifest["code"]} ({manifest["created"]}), after: {code_revision()}',
              f'CHANGED marks a shot that changed more than two runs of the before code did (more than {SNAPSHOT_SAME_CODE_FACTOR}x '
-             f'the pixels changed by more than {SNAPSHOT_LARGE_CHANGE:.0%}, and more than {SNAPSHOT_SAME_CODE_FLOOR:.2%} of the scene)']
+             f'the pixels changed by more than {SNAPSHOT_LARGE_CHANGE:.0%}, and more than {SNAPSHOT_SAME_CODE_FLOOR:.2%} of the scene). '
+             f'A path tracer shot is CHANGED when its sample counts differ, or when an rgb changed by more ulps than allowed: '
+             f'{SNAPSHOT_SAME_CODE_FACTOR}x the ulps that changed between the two runs, and at least the run to run ulps of its Shading '
+             f'({", ".join(f"{shading} {ulps}" for shading, ulps in SNAPSHOT_PT_RUN_ULPS.items())})']
     nonfinite = 0
     for name in shots:
         change = shot_change(before_folder, after_folder, name)
-        change_sheet(before_folder, after_folder, name, change).save(after_folder / f'{name}-sheet.png')
+        display_sheet(before_folder, after_folder, name, change).save(after_folder / f'{name}-sheet.png')
         counts, same_code = change_counts(change), manifest['same_code'][name]
         nonfinite += change['nonfinite']
         lines.append(f'{"CHANGED" if exceeds_same_code(counts, same_code) else "same   "} {name}: scene {counts["changed"]} pixels changed '
                      f'({counts["changed"] / counts["pixels"]:.2%}), {counts["large"]} by more than {SNAPSHOT_LARGE_CHANGE:.0%} '
                      f'({counts["large"] / counts["pixels"]:.2%}; same code {same_code["large"] / same_code["pixels"]:.2%}), '
                      f'{change["nonfinite"]} NaN or Inf after; display {change["display_changed"]} pixels changed')
+    for shading, output in SNAPSHOT_PT_RUNS:
+        name = path_tracer_shot_name(shading, output)
+        change = path_tracer_change(before_folder, after_folder, name)
+        path_tracer_sheet(change, output).save(after_folder / f'{name}-sheet.png')
+        counts, same_code = path_tracer_counts(change), manifest['path_tracer_same_code'][name]
+        nonfinite += change['nonfinite']
+        lines.append(f'{"CHANGED" if path_tracer_exceeds_same_code(counts, same_code, shading) else "same   "} {name}: '
+                     f'{counts["changed"]} pixels changed ({counts["changed"] / counts["pixels"]:.2%}; same code '
+                     f'{same_code["changed"] / same_code["pixels"]:.2%}) by up to {counts["ulps"]} ulps (same code {same_code["ulps"]}, '
+                     f'allowed {path_tracer_allowed_ulps(same_code, shading)}), a {"same" if counts["samples_same"] else "differs"}, '
+                     f'{change["nonfinite"]} NaN or Inf after')
     lines += describe_snapshot_end(stopped)
-    lines.append(f'sheets (before display, after display, scene change: gray changed, white by more than {SNAPSHOT_LARGE_CHANGE:.0%}): '
-                 f'{after_folder}')
+    lines.append(f'sheets (before, after, change: gray changed, white by more than {SNAPSHOT_LARGE_CHANGE:.0%}; the display and the scene '
+                 f'for a raster shot, the export for a path tracer shot): {after_folder}')
     (after_folder / 'report.txt').write_text('\n'.join(lines) + '\n', encoding='utf-8')
     for line in lines:
         print(line)
@@ -2176,7 +2282,8 @@ def main():
     command.add_argument('--kill', action='store_true', help='kill without sending quit')
 
     command = add_command('snapshot', 'take the scene and display of fixed poses with the harness baseline and with the app defaults '
-                                      '(TAA, motion blur, adaptive exposure) before changing the code, then compare the same shots after it',
+                                      '(TAA, motion blur, adaptive exposure), and the path tracer export of each Shading and Output, '
+                                      'before changing the code, then compare the same shots after it',
                           None)
     actions = command.add_subparsers(dest='action', required=True)
     action = actions.add_parser('save', help=f'start a new instance and keep the shots in {SNAPSHOT_DIR}/<name>',

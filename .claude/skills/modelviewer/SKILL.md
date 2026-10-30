@@ -72,9 +72,9 @@ harness 로 할 수 없는 일을 만나면 그 일이 계획되어 있는지와
 
 ## 변경 전후 비교
 
-- rendering 이나 그 입력을 바꾸는 작업은 코드를 고치기 전에 `snapshot save <이름>` 으로 고정 시점의 scene 과 display 를 남기고, 고친 뒤 `snapshot compare <이름>` 으로 같은 shot 을 찍어 비교한다. shot 은 harness baseline 과 app 의 기본 효과 (TAA, motion blur, adaptive exposure) 두 설정에서 찍는다. 시점과 설정은 `viewer.py` 의 `SNAPSHOT_POSES`, `SNAPSHOT_SETTINGS` 에 있다.
+- rendering 이나 그 입력을 바꾸는 작업은 코드를 고치기 전에 `snapshot save <이름>` 으로 고정 시점의 scene, display, path tracer 의 export 를 남기고, 고친 뒤 `snapshot compare <이름>` 으로 같은 shot 을 찍어 비교한다. scene 과 display 는 harness baseline 과 app 의 기본 효과 (TAA, motion blur, adaptive exposure) 두 설정에서 찍는다. PT 의 shot 은 Shading 과 Output 의 조합마다 쌓는다. 시점과 설정은 `viewer.py` 의 `SNAPSHOT_POSES`, `SNAPSHOT_SETTINGS`, `SNAPSHOT_PT_` 로 시작하는 상수에 있다.
 - `CHANGED` 인 shot 은 sheet (`<shot>-sheet.png`) 를 보고 그 변화가 작업이 바꾸려던 것인지 밝힌다. 예상하지 않은 `CHANGED` 는 원인을 찾기 전까지 작업을 끝내지 않는다. 바뀐 정도는 report 의 수치로 말하고, sheet 는 어디가 바뀌었는지 보는 참고로 쓴다.
-- app 의 기본 효과는 같은 code 에서도 실행마다 결과를 바꾼다. `save` 가 app 을 두 번 띄워 그 차이를 재 두고, `compare` 는 그보다 크게 바뀐 shot 만 `CHANGED` 로 표시한다. 그래서 `same` 은 같은 code 의 차이 안에서 바뀌었다는 뜻이다. bit 단위로 같아야 하는 비교는 baseline 의 shot 이나 작업의 check script 로 한다.
+- app 의 기본 효과와 PT 의 Shading Lambert, DDGI Probe Hit 는 같은 code 에서도 실행마다 결과를 바꾼다. `save` 가 app 을 두 번 띄워 그 차이를 재 두고, `compare` 는 그보다 크게 바뀐 shot 만 `CHANGED` 로 표시한다. PT 의 차이는 두 실행으로 다 잴 수 없어서, Shading 마다 같은 code 의 차이로 보는 ulp 의 하한 (`SNAPSHOT_PT_RUN_ULPS`) 도 둔다. 그래서 `same` 은 같은 code 의 차이 안에서 바뀌었다는 뜻이다. `save` 가 찍는 `same code` 줄에서 바뀐 pixel 이 없는 raster 의 shot 과 PT 의 glTF shot 은, `compare` 에서 한 pixel 만 바뀌어도 `CHANGED` 다. 두 실행에서 바뀌는 shot 을 bit 단위로 비교해야 하면 작업의 check script 로 한다.
 - `compare` 는 app 이 정상으로 끝나지 않거나 D3D12 CORRUPTION, ERROR, WARNING 이 있거나 NaN, Inf 를 그리면 exit 1 이다.
 - camera 가 멈춘 shot 만 찍으므로 camera 가 움직일 때의 TAA 와 motion blur 는 보지 못한다.
 
