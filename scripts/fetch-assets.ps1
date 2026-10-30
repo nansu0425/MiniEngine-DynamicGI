@@ -45,6 +45,16 @@ function Test-Fetched($Source, $Destination) {
     return (Get-AbsentPaths $Source $Destination).Count -eq 0
 }
 
+# 다 받고 stamp 를 쓴 Partial 을 Destination 과 바꾼다. 중간에 실패해도 기존 Destination 은 그대로이고 반쯤 찬 Destination 이 남지 않는다.
+function Install-Fetched($Partial, $Destination, $Stamp) {
+    if (Test-Path $Destination) {
+        # stamp 를 먼저 지워, 지우다 멈춘 Root 를 다음 실행이 다 받은 것으로 보지 않게 한다.
+        Remove-Item -Force -ErrorAction SilentlyContinue ([System.IO.Path]::Combine($Destination, $Stamp))
+        Remove-Item -Recurse -Force $Destination
+    }
+    Move-Item $Partial $Destination
+}
+
 function Copy-Asset($From, $To) {
     if (Test-Path -PathType Leaf $From) {
         New-Item -ItemType Directory -Force (Split-Path -Parent $To) | Out-Null
@@ -64,7 +74,6 @@ foreach ($Source in $Sources) {
     }
 
     $TempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("minienginegi-assets-" + [guid]::NewGuid())
-    # 다 복사하고 stamp 를 쓴 뒤에 Root 와 바꾼다. 중간에 실패해도 기존 Root 는 그대로이고 반쯤 찬 Root 가 남지 않는다.
     $Partial = "$Destination.partial"
     try {
         Invoke-Git init --quiet $TempDir
@@ -85,13 +94,7 @@ foreach ($Source in $Sources) {
             Copy-Asset ([System.IO.Path]::Combine($Upstream, $Path)) ([System.IO.Path]::Combine($Partial, $Path))
         }
         Set-Content -NoNewline -Encoding ascii ([System.IO.Path]::Combine($Partial, $StampName)) $Source.Commit
-
-        if (Test-Path $Destination) {
-            # stamp 를 먼저 지워, 지우다 멈춘 Root 를 다음 실행이 다 받은 것으로 보지 않게 한다.
-            Remove-Item -Force -ErrorAction SilentlyContinue ([System.IO.Path]::Combine($Destination, $StampName))
-            Remove-Item -Recurse -Force $Destination
-        }
-        Move-Item $Partial $Destination
+        Install-Fetched $Partial $Destination $StampName
         Write-Host "Fetched $($Source.Root) at $($Source.Commit)"
     }
     finally {
