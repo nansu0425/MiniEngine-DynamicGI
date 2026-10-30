@@ -12,7 +12,7 @@
 
 ## 빌드와 실행
 
-1. asset 을 받는다. ModelViewer 가 쓰는 Sponza (KhronosGroup glTF-Sample-Assets) 는 용량 때문에 repo 에 두지 않는다.
+1. asset 을 받는다. ModelViewer 가 쓰는 Sponza (KhronosGroup glTF-Sample-Assets) 는 용량 때문에 repo 에 두지 않는다. Cornell box (Benedikt Bitterli 의 Mitsuba 3 scene) 도 받아 `scripts/cornellbox.py` 로 glTF 로 바꾼다. scene 은 `MiniEngine/ModelViewer/Scenes/` 의 scene file 로 연다.
 
    ```powershell
    .\scripts\fetch-assets.ps1
@@ -90,4 +90,4 @@ spec 의 doubleSided 는 camera 에서 그릴 때의 결과만 정하고, shadow
 
 ## License
 
-이 프로젝트의 작업은 MIT License 를 따른다([LICENSE](LICENSE)). upstream MiniEngine 코드는 Microsoft 의 MIT License 를 따른다([MiniEngine/License.txt](MiniEngine/License.txt)). 다른 project 에서 가져온 코드의 copyright 와 license 는 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 에 있다. Sponza asset 은 Cryengine Limited License Agreement 를 따르고, 그 license 표시는 받은 뒤 `MiniEngine/ModelViewer/glTF-Sample-Assets/Models/Sponza/LICENSE.md` 에 있다.
+이 프로젝트의 작업은 MIT License 를 따른다([LICENSE](LICENSE)). upstream MiniEngine 코드는 Microsoft 의 MIT License 를 따른다([MiniEngine/License.txt](MiniEngine/License.txt)). 다른 project 에서 가져온 코드의 copyright 와 license 는 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 에 있다. Sponza asset 은 Cryengine Limited License Agreement 를 따르고, 그 license 표시는 받은 뒤 `MiniEngine/ModelViewer/glTF-Sample-Assets/Models/Sponza/LICENSE.md` 에 있다. Cornell box asset 은 CC0 1.0 이고, 그 license 표시는 `scripts/fetch-assets.ps1` 이 받아 푼 zip 의 `cornell-box/LICENSE.txt` 에 있다.

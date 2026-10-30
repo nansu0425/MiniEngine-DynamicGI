@@ -511,8 +511,9 @@ def write_scene_file(gltf):
     return scene.relative_to(VIEWER_DIR).as_posix()
 
 
-def start_instance(config, scene=None, build_first=True, gpu_validation=False):
-    """scene (MiniEngine/ModelViewer 기준 scene file 경로) 을 -scene 으로 연 app 을 띄운다. None 이면 -scene 없이 default_scene() 을 연다."""
+def start_instance(config, scene=None, build_first=True, gpu_validation=False, baseline=BASELINE_DIR):
+    """scene (MiniEngine/ModelViewer 기준 scene file 경로) 을 -scene 으로 연 app 을 띄운다. None 이면 -scene 없이 default_scene() 을 연다.
+    baseline 은 run 폴더에 복사해 app 이 처음 읽게 할 editor.ini 와 imgui.ini 의 폴더다."""
     opened = scene or default_scene()
     if not (VIEWER_DIR / opened).exists():
         raise HarnessError(f'missing the scene file {VIEWER_DIR / opened}')
@@ -538,8 +539,8 @@ def start_instance(config, scene=None, build_first=True, gpu_validation=False):
         suffix += 1
         run_dir = RUNS_DIR / f'{run_id}-{suffix}'
     run_dir.mkdir(parents=True)
-    for baseline in BASELINE_DIR.glob('*.ini'):
-        shutil.copy2(baseline, run_dir / baseline.name)
+    for settings in Path(baseline).glob('*.ini'):
+        shutil.copy2(settings, run_dir / settings.name)
     prune_runs()
 
     log = run_dir / 'app.log'

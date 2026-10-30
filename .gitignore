@@ -18,8 +18,10 @@ editor.ini
 # Python 이 module 을 import 할 때 만드는 bytecode cache
 __pycache__/
 
-# scripts/fetch-assets.ps1 가 받아 오는 asset 과, 받다가 멈추면 남을 수 있는 폴더
+# scripts/fetch-assets.ps1 가 받아 오는 asset 과 그 asset 을 바꾼 glTF, 받다가 멈추면 남을 수 있는 폴더
 /MiniEngine/ModelViewer/glTF-Sample-Assets/
+/MiniEngine/ModelViewer/Bitterli/
+/MiniEngine/ModelViewer/CornellBox/
 /MiniEngine/ModelViewer/*.partial/
 # fetch-assets.ps1 가 예전에 받던 옛 Sponza 와 Environment 의 cubemap. 이제 쓰지 않으므로 지워도 된다.
 /MiniEngine/ModelViewer/Sponza/

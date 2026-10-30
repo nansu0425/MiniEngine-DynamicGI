@@ -42,6 +42,7 @@ Get sample assets from https://github.com/KhronosGroup/glTF-Sample-Models or mak
 * Write a scene file for it: the glTF path, the model's scale and the camera's starting pose. The keys are described above SceneFile in ModelViewer/ModelViewer.cpp, and Scenes/Sponza.ini is an example
 * Add to command line "-scene [scene file path relative to the ModelViewer folder]". Without it ModelViewer opens Scenes/Sponza.ini
 * Example:  ModelViewer.exe -scene Scenes/Sponza.ini
+* Scenes/CornellBox.ini opens the Cornell box that scripts/fetch-assets.ps1 fetches and converts to glTF
 * The camera always starts at the scene file's pose, and the scene cannot be changed while running
 
 DirectXMesh and DirectXTex are used for compiling content the first time it is loaded.  For example, image files will have mip maps generated, encoded to a block compressed format, and then saved as a DDS for subsequent loading.  This means that first-time loading takes a little longer.
