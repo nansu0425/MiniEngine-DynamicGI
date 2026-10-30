@@ -1,11 +1,11 @@
 """pick 명령의 결과를 견줄, 정답을 아는 test scene.
 
-selftest 가 이 scene 을 -model 로 띄우고, pick 이 돌려준 거리, 위치, normal, material 을 여기서 해석적으로 구한 정답과 견준다.
-scene 은 xy 평면의 벽 하나와 그 앞의 상자 하나이고, 모든 면이 single-sided 로 바깥을 향한다. -model 의 OrbitCamera 는 입력이
-없으면 model 중심의 +z 쪽에서 -z 를 보므로 (OrbitCamera::Update), 벽은 앞면이, 상자는 앞면과 camera 쪽 옆면이 보이고,
-벽의 위아래와 양옆으로는 아무것도 없다.
+selftest 가 이 scene 을 띄우고, pick 이 돌려준 거리, 위치, normal, material 을 여기서 해석적으로 구한 정답과 비교한다.
+scene 은 xy 평면의 벽 하나와 그 앞의 상자 하나이고, 모든 면이 single-sided 로 바깥을 향한다. scene file 의 camera 는 model 중심의
++z 쪽에서 -z 를 보므로 (viewer.py 의 write_scene_file), 벽은 앞면이, 상자는 앞면과 camera 쪽 옆면이 보이고, 벽의 위아래와
+양옆으로는 아무것도 없다.
 
-ModelViewer 는 -model 로 연 model 을 ModelInstance::Resize 로 늘리기만 하므로 world 위치는 glTF 위치를 한 배율로 늘리고
+ModelViewer 는 scene file 의 Radius 로 model 을 ModelInstance::Resize 로 늘리기만 하므로 world 위치는 glTF 위치를 한 배율로 늘리고
 옮긴 것이다. 그 배율과 이동은 state 의 model bounds 를 glTF 의 bounds 와 견줘 구한다 (world_transform).
 """
 

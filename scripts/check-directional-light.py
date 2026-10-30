@@ -86,8 +86,8 @@ from directlightchecks import (DIRECT, EDGE_PIXELS, LIGHT_SECTION, WAIT_TIMEOUT,
                                overlay, set_light)
 from imagemasks import column_groups, eroded
 from pathtracerchecks import set_path_tracer
-from viewer import (HARNESS_DIR, PREVIEW_EXPOSURE, REPO_ROOT, SETTLE_FRAMES, VIEWER_DIR, HarnessError, Session, capture, make_view,
-                    start_instance, stop_instance)
+from viewer import (HARNESS_DIR, PREVIEW_EXPOSURE, REPO_ROOT, SETTLE_FRAMES, HarnessError, Session, capture, make_view,
+                    start_instance, stop_instance, write_scene_file)
 
 SCENE_DIR = HARNESS_DIR / 'directional-light'
 SCENE_NAME = 'DirectionalLight'
@@ -380,7 +380,7 @@ def scene_rgb(session, name):
 
 
 def run_test_scene(build_first, check, stored):
-    instance = start_instance('Debug', model=f'{SCENE_DIR.relative_to(VIEWER_DIR).as_posix()}/{SCENE_NAME}.gltf', build_first=build_first)
+    instance = start_instance('Debug', scene=write_scene_file(SCENE_DIR / f'{SCENE_NAME}.gltf'), build_first=build_first)
     try:
         session = Session(instance)
         try:

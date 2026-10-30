@@ -120,8 +120,8 @@ from imagecompare import agreement, rmse
 from imagefiles import ImageFileError, read_dds_rgba32f
 from imagemasks import column_groups, eroded
 from pathtracerchecks import BASE, FURNACE_SAMPLES, SECTION, SKY_RADIANCE, WHITE_FURNACE, path_tracer_state, set_path_tracer
-from viewer import (BASELINE_DIR, HARNESS_DIR, PREVIEW_EXPOSURE, REPO_ROOT, SETTLE_FRAMES, SNAPSHOT_POSES, VIEWER_DIR, HarnessError,
-                    Session, baseline_pose, capture, make_view, start_instance, stop_instance)
+from viewer import (BASELINE_DIR, HARNESS_DIR, PREVIEW_EXPOSURE, REPO_ROOT, SETTLE_FRAMES, SNAPSHOT_POSES, HarnessError, Session,
+                    default_scene_pose, capture, make_view, start_instance, stop_instance, write_scene_file)
 
 SCENE_DIR = HARNESS_DIR / 'gltf-brdf'
 SCENE_NAME = 'GltfBrdf'
@@ -213,7 +213,7 @@ def test_scene_materials():
 
 
 def write_test_scene():
-    """+z 를 보는 flat quad 를 QUAD_ROUGHNESS x QUAD_METALLIC 의 격자로 둔다. -model 의 OrbitCamera 는 model 중심의 +z 쪽에서 -z 를 본다."""
+    """+z 를 보는 flat quad 를 QUAD_ROUGHNESS x QUAD_METALLIC 의 격자로 둔다. scene file 의 camera 는 model 중심의 +z 쪽에서 -z 를 보며 model 을 화면에 담는다 (viewer.py 의 write_scene_file)."""
     builder = BufferBuilder()
     position = builder.add(flatten([(-1.0, 1.0, 0.0), (1.0, 1.0, 0.0), (1.0, -1.0, 0.0), (-1.0, -1.0, 0.0)]), GLTF_FLOAT, 'VEC3', 4, with_bounds=True)
     normal = builder.add(flatten([(0.0, 0.0, 1.0)] * 4), GLTF_FLOAT, 'VEC3', 4)
@@ -646,7 +646,7 @@ def check_test_scene(session, check):
 
 
 def run_test_scene(build_first, check):
-    instance = start_instance('Debug', model=f'{SCENE_DIR.relative_to(VIEWER_DIR).as_posix()}/{SCENE_NAME}.gltf', build_first=build_first)
+    instance = start_instance('Debug', scene=write_scene_file(SCENE_DIR / f'{SCENE_NAME}.gltf'), build_first=build_first)
     try:
         session = Session(instance)
         try:
@@ -785,7 +785,7 @@ def check_sponza_finite(session, check, default_light):
     counts = {}
     for pose_name, pose in SNAPSHOT_POSES.items():
         for light_name, request in SPONZA_LIGHTS.items():
-            session.ask_ok(f'pose {pose or baseline_pose()}')
+            session.ask_ok(f'pose {pose or default_scene_pose()}')
             set_light(session, default_light)
             if request:
                 session.ask_ok(f'light set {request}')

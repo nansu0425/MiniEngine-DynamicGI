@@ -12,6 +12,7 @@ import hashlib
 import json
 import msvcrt
 import os
+import posixpath
 import re
 import shutil
 import subprocess
@@ -32,6 +33,8 @@ INSTANCE_FILE = HARNESS_DIR / 'instance.json'
 BASELINE_DIR = REPO_ROOT / 'scripts' / 'harness-baseline'
 USER_SETTINGS = [VIEWER_DIR / 'editor.ini', VIEWER_DIR / 'imgui.ini']
 MODEL_VIEWER_SOURCE = VIEWER_DIR / 'ModelViewer.cpp'
+# repo 가 갖는 scene file 의 폴더. 그 glTF 는 scripts/fetch-assets.ps1 이 받거나 만든다.
+SCENES_DIR = VIEWER_DIR / 'Scenes'
 VALIDATION_SHADER = ENGINE_DIR / 'Model' / 'Raytracing' / 'RayQueryValidationCS.hlsl'
 # selftest 가 pickscene.py 의 test scene 을 쓰는 HARNESS_DIR 안의 폴더
 PICK_SCENE = 'pick-known-answers'
@@ -472,24 +475,51 @@ def prune_runs():
             shutil.rmtree(run, ignore_errors=True)
 
 
-def default_model():
-    match = re.search(r'^const wchar_t kDefaultModel\[\] = L"([^"]+)";', MODEL_VIEWER_SOURCE.read_text(encoding='utf-8'), re.M)
+def default_scene():
+    """-scene 없이 띄운 app 이 여는 scene file 의 MiniEngine/ModelViewer 기준 경로"""
+    match = re.search(r'^const wchar_t kDefaultScene\[\] = L"([^"]+)";', MODEL_VIEWER_SOURCE.read_text(encoding='utf-8'), re.M)
     if match is None:
         raise HarnessError(f'{MODEL_VIEWER_SOURCE} has no line starting with '
-                           'const wchar_t kDefaultModel[] = L"<glTF path relative to MiniEngine/ModelViewer>";')
+                           'const wchar_t kDefaultScene[] = L"<scene file path relative to MiniEngine/ModelViewer>";')
     return match.group(1)
 
 
-def default_assets():
-    return [VIEWER_DIR / default_model()]
+def read_scene_file(scene):
+    """scene file (MiniEngine/ModelViewer 기준 경로) 의 section. 형식은 ModelViewer.cpp 의 SceneFile 주석에 있다."""
+    import configparser
+    ini = configparser.ConfigParser(delimiters=('=',), comment_prefixes=(';',), interpolation=None)
+    ini.optionxform = str
+    if not ini.read(VIEWER_DIR / scene, encoding='utf-8'):
+        raise HarnessError(f'cannot read the scene file {VIEWER_DIR / scene}')
+    return ini
 
 
-def start_instance(config, model=None, build_first=True, gpu_validation=False):
-    missing = [path for path in default_assets() if not path.exists()] if model is None else \
-        [path for path in [VIEWER_DIR / model] if not path.exists()]
-    if missing:
-        hint = ' Run .\\scripts\\fetch-assets.ps1.' if model is None else ''
-        raise HarnessError(f'missing {", ".join(str(path) for path in missing)}.{hint}')
+def scene_gltf(scene):
+    """scene file 이 여는 glTF 의 MiniEngine/ModelViewer 기준 경로. app 처럼 앞에 붙은 ../ 마다 scene file 폴더를 한 단계 올라간다."""
+    folder, path = posixpath.dirname(scene), read_scene_file(scene)['Model']['glTF']
+    while path.startswith('../') and folder and posixpath.basename(folder) != '..':
+        folder, path = posixpath.dirname(folder), path[3:]
+    return posixpath.join(folder, path) if folder else path
+
+
+def write_scene_file(gltf):
+    """확인 script 가 만든 test scene 의 glTF 옆에 scene file 을 쓰고 그 MiniEngine/ModelViewer 기준 경로를 돌려준다.
+    model 은 bounding sphere 반지름이 10 이 되게 늘리고, camera 는 그 sphere 를 화면에 담는다 (ModelViewer.cpp 의 SceneFile)."""
+    gltf = Path(gltf)
+    scene = gltf.with_suffix('.ini')
+    scene.write_text(f'[Model]\nglTF={gltf.name}\nRadius=10\n\n[Camera]\nFit=Model\n', encoding='utf-8')
+    return scene.relative_to(VIEWER_DIR).as_posix()
+
+
+def start_instance(config, scene=None, build_first=True, gpu_validation=False):
+    """scene (MiniEngine/ModelViewer 기준 scene file 경로) 을 -scene 으로 연 app 을 띄운다. None 이면 -scene 없이 default_scene() 을 연다."""
+    opened = scene or default_scene()
+    if not (VIEWER_DIR / opened).exists():
+        raise HarnessError(f'missing the scene file {VIEWER_DIR / opened}')
+    gltf = VIEWER_DIR / scene_gltf(opened)
+    if not gltf.exists():
+        hint = ' Run .\\scripts\\fetch-assets.ps1.' if (VIEWER_DIR / opened).resolve().is_relative_to(SCENES_DIR) else ''
+        raise HarnessError(f'missing {gltf}, which {opened} opens.{hint}')
 
     stop_running_instance()
     if build_first:
@@ -515,13 +545,13 @@ def start_instance(config, model=None, build_first=True, gpu_validation=False):
     log = run_dir / 'app.log'
     pipe = f'ModelViewerHarness-{run_dir.name}'
     command = [str(exe), '-settings_dir', str(run_dir), '-log', str(log), '-unattended', '1', '-control', pipe, '-hdr_output', '0']
-    if model is not None:
-        command += ['-model', model]
+    if scene is not None:
+        command += ['-scene', scene]
     if gpu_validation:
         command += ['-gpu_debug', '1']
     process = launch(command, VIEWER_DIR)
 
-    instance = {'pid': process.pid, 'exe': str(exe), 'config': config, 'model': model, 'pipe': pipe,
+    instance = {'pid': process.pid, 'exe': str(exe), 'config': config, 'scene': opened, 'pipe': pipe,
                 'run_dir': str(run_dir), 'log': str(log)}
     HARNESS_DIR.mkdir(parents=True, exist_ok=True)
     INSTANCE_FILE.write_text(json.dumps(instance, indent=2), encoding='utf-8')
@@ -726,7 +756,7 @@ def command_start(args):
     if args.gpu_validation and args.config != 'Debug':
         raise HarnessError(f'--gpu-validation works only in Debug: start does not turn on the D3D12 debug layer in {args.config}, '
                            'so GPU-based validation would stay off')
-    instance = start_instance(args.config, args.model, not args.no_build, args.gpu_validation)
+    instance = start_instance(args.config, args.scene, not args.no_build, args.gpu_validation)
     session = Session(instance)
     try:
         status = session.ask_ok('status')
@@ -785,7 +815,7 @@ def command_stop(args):
 # --- snapshot -----------------------------------------------------------------------------
 
 SNAPSHOT_DIR = HARNESS_DIR / 'kept' / 'snapshots'
-# harness baseline 의 시점과, 해가 닿는 곳과 닿지 않는 곳이 고루 보이도록 고른 기본 model 의 시점
+# -scene 없이 연 scene 의 처음 시점 (start) 과, 그 scene 에서 해가 닿는 곳과 닿지 않는 곳이 고루 보이도록 고른 시점
 SNAPSHOT_POSES = {
     'start': None,
     'courtyard-up': '0 300 0 1.5708 1.2',
@@ -809,14 +839,10 @@ SNAPSHOT_SAME_CODE_FACTOR = 4
 SNAPSHOT_SAME_CODE_FLOOR = 0.001
 
 
-def baseline_pose():
-    """harness baseline 의 editor.ini 가 정하는 시점을 pose 명령의 인자로."""
-    import configparser
-    ini = configparser.ConfigParser(delimiters=('=',), comment_prefixes=(';',), interpolation=None)
-    ini.optionxform = str
-    ini.read(BASELINE_DIR / 'editor.ini', encoding='utf-8')
-    camera = ini['Editor Camera']
-    return ' '.join(camera[key] for key in ['Position X', 'Position Y', 'Position Z', 'Heading', 'Pitch'])
+def default_scene_pose():
+    """harness 가 -scene 없이 띄운 app 의 처음 시점 (default_scene() 의 [Camera]) 을 pose 명령의 인자로."""
+    camera = read_scene_file(default_scene())['Camera']
+    return ' '.join(camera['Position'].split(',') + [camera['Heading'], camera['Pitch']])
 
 
 def code_revision():
@@ -839,7 +865,7 @@ def capture_snapshot(config, build_first, folder):
                 if settings:
                     session.ask_ok('settings set Engine Tuning: ' + '; '.join(f'{key}={value}' for key, value in settings.items()))
                 for pose_name, pose in SNAPSHOT_POSES.items():
-                    session.ask_ok(f'pose {pose or baseline_pose()}')
+                    session.ask_ok(f'pose {pose or default_scene_pose()}')
                     session.ask_ok(f'frames {SNAPSHOT_SETTLE_FRAMES[settings_name]}')
                     name = f'{settings_name}-{pose_name}'
                     for target in ['scene', 'display']:
@@ -923,7 +949,7 @@ def command_snapshot_save(args):
         print(line)
     same_code = {name: change_counts(shot_change(folder, same_code_folder, name)) for name in shots}
     manifest = {'code': code_revision(), 'config': args.config, 'created': time.strftime('%Y-%m-%d %H:%M:%S'), 'shots': shots,
-                'poses': {name: pose or baseline_pose() for name, pose in SNAPSHOT_POSES.items()}, 'settings': SNAPSHOT_SETTINGS,
+                'poses': {name: pose or default_scene_pose() for name, pose in SNAPSHOT_POSES.items()}, 'settings': SNAPSHOT_SETTINGS,
                 'same_code': same_code}
     (folder / 'snapshot.json').write_text(json.dumps(manifest, indent=2), encoding='utf-8')
     for name in shots:
@@ -939,7 +965,7 @@ def command_snapshot_compare(args):
     if not manifest_path.exists():
         raise HarnessError(f'no snapshot {before_folder}. Take it with snapshot save {args.name} before changing the code')
     manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
-    poses = {name: pose or baseline_pose() for name, pose in SNAPSHOT_POSES.items()}
+    poses = {name: pose or default_scene_pose() for name, pose in SNAPSHOT_POSES.items()}
     if manifest['poses'] != poses or manifest['settings'] != SNAPSHOT_SETTINGS or manifest['config'] != args.config:
         raise HarnessError(f'{args.name} was taken with other poses, settings or config. Take a new snapshot with this viewer.py')
 
@@ -1081,8 +1107,9 @@ def check_state(session, check):
     check('scene is bit-identical before and after reading state', np.array_equal(before_reading.view(np.uint32), after_reading.view(np.uint32)),
           describe_difference(before_reading, after_reading))
 
-    expected_model = session.instance['model'] or default_model()
-    check('state model is the model start opened', whole['model']['path'] == expected_model, whole['model']['path'])
+    scene = session.instance['scene']
+    check('state scene is the scene file start opened and state model the glTF it opens',
+          whole['scene']['path'] == scene and whole['model']['path'] == scene_gltf(scene), f'{whole["scene"]}, {whole["model"]["path"]}')
 
     status = session.ask_ok('status')
     ui, engine = whole['ui'], whole['engine']
@@ -1120,9 +1147,8 @@ def check_state(session, check):
           [str(camera[key]) for key in pose_keys] == described['camera'].split(',') + [described['heading'], described['pitch']],
           f'camera={described["camera"]}; heading={described["heading"]}; pitch={described["pitch"]}')
     section = session.ask_ok('settings get Editor Camera')['values']
-    check('state camera agrees with the Editor Camera section',
-          [str(camera[key]) for key in pose_keys + ['move_speed']] ==
-          [section[key] for key in ['Position X', 'Position Y', 'Position Z', 'Heading', 'Pitch', 'Move Speed']], section)
+    check('state camera agrees with the Editor Camera section, which has only the move speed',
+          section == {'Move Speed': str(camera['move_speed'])}, section)
 
     shot = capture_with_state(session, 'display', 'selftest-state-display')
     saved = json.loads(Path(shot['state']).read_text(encoding='utf-8'), parse_float=str)
@@ -1724,12 +1750,12 @@ def check_acceptance(session, check):
 
 
 def check_pick_known_answers(args, check):
-    """pickscene.py 의 정답을 아는 test scene 을 -model 로 띄워, pick 이 돌려준 것을 해석적으로 구한 정답과 견준다."""
+    """pickscene.py 의 정답을 아는 test scene 을 띄워, pick 이 돌려준 것을 해석적으로 구한 정답과 비교한다."""
     import numpy as np
     import pickscene
 
-    model = pickscene.write(HARNESS_DIR / PICK_SCENE).relative_to(VIEWER_DIR).as_posix()
-    instance = start_instance(args.config, model=model, build_first=False)
+    scene_file = write_scene_file(pickscene.write(HARNESS_DIR / PICK_SCENE))
+    instance = start_instance(args.config, scene=scene_file, build_first=False)
     session = Session(instance)
     try:
         session.ask_ok('ui hide')
@@ -1737,7 +1763,7 @@ def check_pick_known_answers(args, check):
         state = session.ask_ok('state')['state']
         camera, scene = state['camera'], state['ui']['scene']
         transform = pickscene.world_transform(state['model']['bounds'])
-        if not check('the pick test scene is opened and scaled by one factor', state['model']['path'] == model and transform is not None,
+        if not check('the pick test scene is opened and scaled by one factor', state['scene']['path'] == scene_file and transform is not None,
                      f'{state["model"]}'):
             return
         forward = vector_of(camera['forward'])
@@ -2118,7 +2144,8 @@ def main():
                                    "with a copy of scripts/harness-baseline as -settings_dir, so the user's editor.ini and imgui.ini "
                                    f'stay untouched. Deletes all but the newest {KEPT_RUNS} run folders, keeping the running one', command_start)
     add_config(command)
-    command.add_argument('--model', help='glTF path relative to MiniEngine/ModelViewer, passed as -model. Uses the orbit camera')
+    command.add_argument('--scene', help='scene file path relative to MiniEngine/ModelViewer, passed as -scene. '
+                                          'Without it the app opens the scene that kDefaultScene in ModelViewer.cpp names')
     command.add_argument('--no-build', action='store_true')
     command.add_argument('--gpu-validation', action='store_true',
                          help='pass -gpu_debug 1 for GPU-based validation, which checks on the GPU the state and descriptor of each '

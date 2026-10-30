@@ -165,6 +165,8 @@ public:
     void Render(Renderer::MeshSorter& sorter) const;
 
     void Resize(float newRadius);
+    // model 좌표에 곱할 배율. Resize와 달리 model의 크기와 상관없이 정한다.
+    void SetScale(float scale) { m_Locator.SetScale(scale); }
     Math::Vector3 GetCenter() const;
     Math::Scalar GetRadius() const;
     Math::BoundingSphere GetBoundingSphere() const;

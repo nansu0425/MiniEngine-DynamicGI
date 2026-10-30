@@ -7,7 +7,6 @@
 namespace
 {
     std::map<std::string, MeasurementConditions::Group> s_Groups;
-    std::string s_UnavailableReason;
 
     std::string JoinKeys(const std::vector<std::string>& keys)
     {
@@ -90,16 +89,6 @@ void MeasurementConditions::Unregister(const std::string& name)
     s_Groups.erase(name);
 }
 
-void MeasurementConditions::SetUnavailableReason(const std::string& reason)
-{
-    s_UnavailableReason = reason;
-}
-
-const std::string& MeasurementConditions::GetUnavailableReason(void)
-{
-    return s_UnavailableReason;
-}
-
 MeasurementConditions::Values MeasurementConditions::Describe(void)
 {
     Values values;
@@ -143,17 +132,14 @@ void MeasurementConditions::RestoreField::Show(void)
         m_HasResult = false;
     ImGui::SetItemTooltip("A line printed by Log, left beside a capture or given by describe.");
 
-    const std::string& unavailable = GetUnavailableReason();
-    ImGui::BeginDisabled(!unavailable.empty() || m_Line[0] == '\0');
+    ImGui::BeginDisabled(m_Line[0] == '\0');
     if (ImGui::Button("Restore"))
     {
         m_Result = Restore(Parse(m_Line));
         m_HasResult = true;
     }
     ImGui::EndDisabled();
-    ImGui::SetItemTooltip("%s", unavailable.empty() ?
-        "Sets every condition in the line, or nothing if the line lacks one or one cannot be set. The resolution is only compared." :
-        unavailable.c_str());
+    ImGui::SetItemTooltip("Sets every condition in the line, or nothing if the line lacks one or one cannot be set. The resolution is only compared.");
 
     const ImVec4 kWarningColor(1.0f, 0.75f, 0.2f, 1.0f);
     if (m_HasResult && !m_Result.unread.empty())

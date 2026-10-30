@@ -5,13 +5,13 @@ make 가 test scene 과 capture 명령 파일을 쓰고, ModelViewer 가 Ray Tra
 normal 을 얻으므로, 이 판정은 PT 가 받는 shading normal 의 판정이다.
 
   python scripts/check-normal-map-convention.py make
-  python scripts/viewer.py start --model Harness/normal-map-convention/NormalMapConvention.gltf
+  python scripts/viewer.py start --scene Harness/normal-map-convention/NormalMapConvention.ini
   python scripts/viewer.py run MiniEngine/ModelViewer/Harness/normal-map-convention/capture.txt
   python scripts/viewer.py stop
   python scripts/check-normal-map-convention.py judge
 
-test scene 은 xy 평면의 quad 셋을 x 축을 따라 놓은 것이다. -model 의 OrbitCamera 는 입력이 없으면 model 중심의 +z 쪽에서
--z 를 본다 (OrbitCamera::Update). 모든 quad 가 같은 normal map 을 쓰고, 모든 texel 이 같아서 sample 위치와 filter 가
+test scene 은 xy 평면의 quad 셋을 x 축을 따라 놓은 것이다. scene file 의 camera 는 model 중심의 +z 쪽에서 -z 를 보며 model 을 화면에 담는다 (viewer.py 의 write_scene_file).
+모든 quad 가 같은 normal map 을 쓰고, 모든 texel 이 같아서 sample 위치와 filter 가
 결과를 바꾸지 않는다.
 
   a: u 가 +x, v 가 -y 로 늘고 TANGENT 는 (1, 0, 0, 1) 이다.
@@ -52,7 +52,7 @@ from PIL import Image
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from gltfwriter import GLTF_FLOAT, GLTF_UNSIGNED_SHORT, BufferBuilder, flatten
 from imagemasks import column_groups, eroded
-from viewer import HARNESS_DIR, SETTLE_FRAMES
+from viewer import HARNESS_DIR, SETTLE_FRAMES, write_scene_file
 
 SCENE_DIR = HARNESS_DIR / 'normal-map-convention'
 GLTF_NAME = 'NormalMapConvention.gltf'
@@ -193,6 +193,7 @@ def command_make(args):
     }
     (SCENE_DIR / 'NormalMapConvention.bin').write_bytes(builder.data)
     (SCENE_DIR / GLTF_NAME).write_text(json.dumps(gltf, indent=2), encoding='utf-8')
+    scene = write_scene_file(SCENE_DIR / GLTF_NAME)
 
     lines = ['ui hide']
     for name, view in CAPTURES.items():
@@ -200,7 +201,7 @@ def command_make(args):
                   f'capture overlay {capture_path(name).with_suffix("")}']
     (SCENE_DIR / 'capture.txt').write_text('\n'.join(lines) + '\n', encoding='utf-8')
 
-    print(f'scene: {SCENE_DIR / GLTF_NAME}')
+    print(f'scene file: {scene}')
     print(f'capture commands: {SCENE_DIR / "capture.txt"}')
     return 0
 

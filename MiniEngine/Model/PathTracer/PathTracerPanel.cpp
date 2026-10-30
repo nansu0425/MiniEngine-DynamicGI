@@ -262,8 +262,6 @@ namespace
     void ShowConditions(void)
     {
         ImGui::SeparatorText("Conditions");
-        const std::string& unavailable = MeasurementConditions::GetUnavailableReason();
-        ImGui::BeginDisabled(!unavailable.empty());
         if (ImGui::Button("Log"))
         {
             const std::string line = kLogPrefix + MeasurementConditions::Format(MeasurementConditions::Describe());
@@ -271,11 +269,8 @@ namespace
             ImGui::SetClipboardText(line.c_str());
             s_RestoreField.SetLine(line);
         }
-        ImGui::EndDisabled();
-        ImGui::SetItemTooltip("%s", unavailable.empty() ?
-            "Prints the camera, resolution, lights, settings above and samples as one line to the Output window, copies it and fills in "
-            "the line below. Restoring it sets the Target Samples to those samples and starts over, so the image comes out the same." :
-            unavailable.c_str());
+        ImGui::SetItemTooltip("Prints the camera, resolution, lights, settings above and samples as one line to the Output window, copies it and fills in "
+            "the line below. Restoring it sets the Target Samples to those samples and starts over, so the image comes out the same.");
         s_RestoreField.Show();
     }
 

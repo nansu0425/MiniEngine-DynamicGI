@@ -52,11 +52,6 @@ namespace MeasurementConditions
     void Register(const std::string& name, const Group& group);
     void Unregister(const std::string& name);
 
-    // 조건 중 되돌릴 수 없는 것이 있으면 그 이유를 문장으로 둔다. 그동안 Restore와 describe 명령은 이 이유로 거절하고,
-    // capture는 줄을 남기지 않는다. 되돌릴 수 있으면 빈 문자열이다.
-    void SetUnavailableReason(const std::string& reason);
-    const std::string& GetUnavailableReason(void);
-
     // 등록한 모든 group의 지금 조건
     Values Describe(void);
 

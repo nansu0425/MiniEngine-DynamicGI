@@ -23,7 +23,7 @@
 ## Editor state:
 On exit, ModelViewer saves its state in the working directory, or in the folder given by -settings_dir, and restores it on the next start.
 * imgui.ini: panel layout, written by ImGui. Delete it to reset the layout
-* editor.ini: window size and position, open panels, engine tuning values, editor camera, ray tracing view. Delete it to reset them
+* editor.ini: window size and position, open panels, engine tuning values, editor camera movement speed, ray tracing view. Delete it to reset them. The camera's position and direction are not saved, as each scene file sets where the camera starts
 
 ## Command line options for automation:
 scripts/viewer.py starts ModelViewer with these options. They change nothing when omitted.
@@ -39,7 +39,9 @@ scripts/viewer.py starts ModelViewer with these options. They change nothing whe
 Get sample assets from https://github.com/KhronosGroup/glTF-Sample-Models or make your own.
 
 * Place asset folder underneath the ModelViewer folder
-* Add to command line "-model [relative path to gltf or glb file]"
-* Example:  ModelViewer.exe -model SciFiHelmet/glTF/SciFiHelmet.gltf
+* Write a scene file for it: the glTF path, the model's scale and the camera's starting pose. The keys are described above SceneFile in ModelViewer/ModelViewer.cpp, and Scenes/Sponza.ini is an example
+* Add to command line "-scene [scene file path relative to the ModelViewer folder]". Without it ModelViewer opens Scenes/Sponza.ini
+* Example:  ModelViewer.exe -scene Scenes/Sponza.ini
+* The camera always starts at the scene file's pose, and the scene cannot be changed while running
 
 DirectXMesh and DirectXTex are used for compiling content the first time it is loaded.  For example, image files will have mip maps generated, encoded to a block compressed format, and then saved as a DDS for subsequent loading.  This means that first-time loading takes a little longer.

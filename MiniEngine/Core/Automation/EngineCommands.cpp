@@ -318,23 +318,11 @@ namespace
 
     void DescribeConditions(const std::string&, const Reply& reply)
     {
-        const std::string& unavailable = MeasurementConditions::GetUnavailableReason();
-        if (!unavailable.empty())
-        {
-            reply.Error(unavailable);
-            return;
-        }
         reply.Ok(Fields().Text("line", MeasurementConditions::Format(MeasurementConditions::Describe())));
     }
 
     void RestoreConditions(const std::string& arguments, const Reply& reply)
     {
-        const std::string& unavailable = MeasurementConditions::GetUnavailableReason();
-        if (!unavailable.empty())
-        {
-            reply.Error(unavailable);
-            return;
-        }
         if (arguments.empty())
         {
             reply.Error("usage: restore <line>");
@@ -619,7 +607,7 @@ namespace ControlChannel
             "overlay is the debug view layer as .png with premultiplied alpha, display is the presented image with UI as .png, "
             "pt is the path tracer's accumulation as float32 .dds with the mean in rgb and the samples it added in a. "
             "pt replies on the next frame even while Show is off, and fails if the path tracer has not been shown. "
-            "Beside the image it writes the state of that frame as <path>.state.json and, unless describe fails, "
+            "Beside the image it writes the state of that frame as <path>.state.json and "
             "the line of its conditions as <path>.conditions.txt, which line in the reply also has", CaptureFrame);
         Register("profile", "profile <scope> frames=<n>: the GPU time in ms of the Profiler scope named <scope> (as in its Scope column) "
             "over the next n frames, as mean, min and max. Fails if the scope does not run in one of those frames. "

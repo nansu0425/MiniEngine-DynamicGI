@@ -46,6 +46,7 @@
 #include "Core/Editor/EditorSettings.h"
 #include "Core/Editor/MeasurementConditions.h"
 #include "Core/UI/ImGuiLayer.h"
+#include "Core/Utility/IniFile.h"
 
 #include <algorithm>
 #include <sstream>
@@ -174,7 +175,7 @@ public:
 private:
 
     Camera m_Camera;
-    unique_ptr<CameraController> m_CameraController;
+    unique_ptr<EditorCamera> m_CameraController;
 
     D3D12_VIEWPORT m_MainViewport;
     D3D12_RECT m_MainScissor;
@@ -514,18 +515,12 @@ void ReadSkyLightConditions(SkyLight& sky, const MeasurementConditions::Values& 
 }
 
 // raster와 path tracer가 그리는 조건을 Log와 capture의 줄에 담고 Restore로 되돌리게 한다. path tracer의 설정은 PathTracerPanel이 더한다.
-// OrbitCamera는 pose를 정할 수 없으므로 editorCamera가 없으면 Restore를 쓸 수 없다.
-void RegisterMeasurementConditions(EditorCamera* editorCamera, DirectionalLight& light, SkyLight& sky)
+void RegisterMeasurementConditions(EditorCamera& editorCamera, DirectionalLight& light, SkyLight& sky)
 {
-    if (editorCamera != nullptr)
-    {
-        MeasurementConditions::Register("camera", {
-            [editorCamera](MeasurementConditions::Values& values) { DescribeCameraConditions(*editorCamera, values); },
-            [editorCamera](const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading) { ReadCameraConditions(*editorCamera, values, reading); },
-            { "camera" } });
-    }
-    else
-        MeasurementConditions::SetUnavailableReason("The camera cannot be restored, as -model uses the orbit camera.");
+    MeasurementConditions::Register("camera", {
+        [&editorCamera](MeasurementConditions::Values& values) { DescribeCameraConditions(editorCamera, values); },
+        [&editorCamera](const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading) { ReadCameraConditions(editorCamera, values, reading); },
+        { "camera" } });
     MeasurementConditions::Register("size", { DescribeSceneSize, ReadSceneSize, {} });
     MeasurementConditions::Register("taa", { DescribeTaa, ReadTaa, { "settings.Engine Tuning" } });
     MeasurementConditions::Register("light", {
@@ -549,21 +544,19 @@ ControlChannel::Fields DescribeVector(Vector3 vector)
     return ControlChannel::Fields().Float("x", vector.GetX()).Float("y", vector.GetY()).Float("z", vector.GetZ());
 }
 
-// state의 camera. editorCamera가 없으면 OrbitCamera라 pose가 없다.
-ControlChannel::Fields DescribeCamera(const Camera& camera, const EditorCamera* editorCamera)
+// state의 camera
+ControlChannel::Fields DescribeCamera(const Camera& camera, const EditorCamera& editorCamera)
 {
     const Vector3 position = camera.GetPosition();
-    ControlChannel::Fields fields;
-    fields.Text("controller", editorCamera != nullptr ? "editor" : "orbit")
+    const EditorCamera::Pose pose = editorCamera.GetPose();
+    return ControlChannel::Fields()
+        .Text("controller", "editor")
         .Float("x", position.GetX())
         .Float("y", position.GetY())
-        .Float("z", position.GetZ());
-    if (editorCamera != nullptr)
-    {
-        const EditorCamera::Pose pose = editorCamera->GetPose();
-        fields.Float("heading", pose.heading).Float("pitch", pose.pitch).Float("move_speed", editorCamera->GetMoveSpeed());
-    }
-    return fields
+        .Float("z", position.GetZ())
+        .Float("heading", pose.heading)
+        .Float("pitch", pose.pitch)
+        .Float("move_speed", editorCamera.GetMoveSpeed())
         .Object("forward", DescribeVector(camera.GetForwardVec()))
         .Float("vertical_fov", camera.GetFOV())
         .Float("aspect", 1.0f / camera.GetAspectRatio())
@@ -579,20 +572,14 @@ ControlChannel::Fields DescribeModel(const std::string& path, const ModelInstanc
         .Object("bounds", ControlChannel::Fields().Object("min", DescribeVector(bounds.GetMin())).Object("max", DescribeVector(bounds.GetMax())));
 }
 
-// harness가 camera를 숫자로 읽고 정한다. editorCamera가 없으면 OrbitCamera라 pose를 정할 수 없다.
-void RegisterPoseCommand(EditorCamera* editorCamera)
+// harness가 camera를 숫자로 읽고 정한다.
+void RegisterPoseCommand(EditorCamera& editorCamera)
 {
-    ControlChannel::SetStatus("camera", editorCamera != nullptr ? "editor" : "orbit");
+    ControlChannel::SetStatus("camera", "editor");
     ControlChannel::Register("pose", "pose | pose <x> <y> <z> <heading> <pitch> | pose look-at <x> <y> <z>: the editor camera, "
         "in world units and radians as in state camera. look-at keeps the position and turns the camera toward the point. "
-        "Looking straight up or down keeps the heading", [editorCamera](const std::string& arguments, const ControlChannel::Reply& reply)
+        "Looking straight up or down keeps the heading", [&editorCamera](const std::string& arguments, const ControlChannel::Reply& reply)
     {
-        if (editorCamera == nullptr)
-        {
-            reply.Error("pose needs the editor camera. -model uses the orbit camera.");
-            return;
-        }
-
         float x, y, z, heading, pitch;
         const std::string usage = "usage: pose <x> <y> <z> <heading> <pitch> | pose look-at <x> <y> <z>";
         if (arguments.compare(0, 8, "look-at ") == 0)
@@ -604,12 +591,12 @@ void RegisterPoseCommand(EditorCamera* editorCamera)
                 return;
             }
             const Vector3 target(x, y, z);
-            if (LengthSquare(target - editorCamera->GetPose().position) == 0.0f)
+            if (LengthSquare(target - editorCamera.GetPose().position) == 0.0f)
             {
                 reply.Error("the point is where the camera is, so there is no direction to look in");
                 return;
             }
-            editorCamera->LookAt(target);
+            editorCamera.LookAt(target);
         }
         else if (!arguments.empty())
         {
@@ -618,10 +605,10 @@ void RegisterPoseCommand(EditorCamera* editorCamera)
                 reply.Error(usage);
                 return;
             }
-            editorCamera->SetPose({ Vector3(x, y, z), heading, pitch });
+            editorCamera.SetPose({ Vector3(x, y, z), heading, pitch });
         }
 
-        const EditorCamera::Pose pose = editorCamera->GetPose();
+        const EditorCamera::Pose pose = editorCamera.GetPose();
         reply.Ok(ControlChannel::Fields()
             .Float("x", pose.position.GetX())
             .Float("y", pose.position.GetY())
@@ -939,8 +926,104 @@ void DirectionalLight::ShowDetails()
     ImGui::TextDisabled("Rotate the light with the gizmo (E). The toolbar on the scene picks local or world rings.");
 }
 
-// scripts/viewer.py가 이 이름과 형식으로 기본 model 경로를 읽는다.
-const wchar_t kDefaultModel[] = L"glTF-Sample-Assets/Models/Sponza/glTF/Sponza.gltf";
+// scene 은 scene file 하나로 연다. 형식은 IniFile이고 key는 아래와 같다. 실행 중에는 scene 을 바꿀 수 없다.
+//   [Model]  glTF: scene file이 있는 폴더 기준의 glTF 경로
+//            Scale: glTF 좌표에 곱해 world 좌표로 바꾸는 배율. 다음의 Radius와 둘 중 하나만 둔다.
+//            Radius: model의 bounding sphere 반지름이 이 world 길이가 되는 배율 (ModelInstance::Resize)
+//   [Camera] Position=<x>,<y>,<z>, Heading, Pitch: 처음 pose. 단위는 state camera와 pose 명령과 같다.
+//            Fit=Model: 위 셋 대신 둔다. bounding sphere 중심의 +z 쪽 반지름의 2배와 near clip을 더한 거리에서 -z를 본다.
+//            예전 -model의 OrbitCamera가 처음 그린 화면과 bit 단위로 같다.
+// scene 을 열면 camera는 늘 scene file의 pose로 시작한다. editor.ini는 camera의 이동 속도만 남긴다.
+struct SceneFile
+{
+    // scale과 radius 중 0이 아닌 하나만 쓴다.
+    std::wstring gltfPath;
+    float scale = 0.0f;
+    float radius = 0.0f;
+    bool fitModel = false;
+    EditorCamera::Pose pose = { Vector3(kZero), 0.0f, 0.0f };
+};
+
+// scripts/viewer.py가 이 이름과 형식으로 -scene이 없을 때 여는 scene file의 경로를 읽는다.
+const wchar_t kDefaultScene[] = L"Scenes/Sponza.ini";
+
+// scene file 폴더 기준의 경로를 working directory 기준으로 바꾼다. 앞에 붙은 "../"마다 폴더를 한 단계 올라간다.
+std::wstring ResolveFromSceneFolder(const std::wstring& scenePath, std::wstring path)
+{
+    std::wstring folder = Utility::GetBasePath(scenePath);
+    while (path.compare(0, 3, L"../") == 0 && !folder.empty() && folder != L"../" &&
+        (folder.size() < 4 || folder.compare(folder.size() - 4, 4, L"/../") != 0))
+    {
+        folder = Utility::GetBasePath(folder.substr(0, folder.size() - 1));
+        path = path.substr(3);
+    }
+    return folder + path;
+}
+
+// 받을 수 없는 값이 있으면 error에 이유를 쓰고 false를 돌려준다.
+bool ReadSceneFile(const std::wstring& path, SceneFile& scene, std::string& error)
+{
+    IniFile::Sections sections = IniFile::Read(path);
+    const IniFile::Values& model = sections["Model"];
+    const IniFile::Values& camera = sections["Camera"];
+    const auto find = [](const IniFile::Values& values, const char* key) -> const std::string*
+    {
+        const auto value = values.find(key);
+        return value == values.end() ? nullptr : &value->second;
+    };
+
+    const std::string* gltf = find(model, "glTF");
+    if (gltf == nullptr)
+    {
+        error = "has no [Model] glTF, or cannot be read";
+        return false;
+    }
+    scene.gltfPath = ResolveFromSceneFolder(path, Utility::UTF8ToWideString(*gltf));
+
+    const std::string* scale = find(model, "Scale");
+    const std::string* radius = find(model, "Radius");
+    if ((scale == nullptr) == (radius == nullptr) || !ReadNumbers(scale != nullptr ? *scale : *radius, scale != nullptr ? &scene.scale : &scene.radius, 1) ||
+        scene.scale < 0.0f || scene.radius < 0.0f || scene.scale + scene.radius == 0.0f)
+    {
+        error = "needs either [Model] Scale or Radius as a number above 0";
+        return false;
+    }
+
+    const std::string* fit = find(camera, "Fit");
+    const std::string* position = find(camera, "Position");
+    const std::string* heading = find(camera, "Heading");
+    const std::string* pitch = find(camera, "Pitch");
+    scene.fitModel = fit != nullptr && *fit == "Model";
+    const bool hasPose = position != nullptr && heading != nullptr && pitch != nullptr && ReadVector(*position, scene.pose.position) &&
+        ReadNumbers(*heading, &scene.pose.heading, 1) && ReadNumbers(*pitch, &scene.pose.pitch, 1);
+    if (scene.fitModel == hasPose || (fit != nullptr && !scene.fitModel))
+    {
+        error = "needs either [Camera] Fit=Model or Position=<x>,<y>,<z> with Heading and Pitch";
+        return false;
+    }
+    return true;
+}
+
+void ScaleModel(ModelInstance& model, const SceneFile& scene)
+{
+    if (scene.scale > 0.0f)
+        model.SetScale(scene.scale);
+    else
+        model.Resize(scene.radius);
+}
+
+EditorCamera::Pose GetStartPose(const SceneFile& scene, const ModelInstance& model, float nearClip)
+{
+    if (!scene.fitModel)
+        return scene.pose;
+    const BoundingSphere sphere = model.GetBoundingSphere();
+    return { sphere.GetCenter() + Vector3(0.0f, 0.0f, sphere.GetRadius() * 2.0f + nearClip), 0.0f, 0.0f };
+}
+
+ControlChannel::Fields DescribeScene(const std::string& path)
+{
+    return ControlChannel::Fields().Text("path", path);
+}
 
 void ModelViewer::Startup( void )
 {
@@ -957,49 +1040,39 @@ void ModelViewer::Startup( void )
     PathTracerPanel::Initialize();
     BrdfTest::Initialize();
 
-    std::wstring gltfFileName;
-
     bool forceRebuild = false;
     uint32_t rebuildValue;
     if (CommandLineArgs::GetInteger(L"rebuild", rebuildValue))
         forceRebuild = rebuildValue != 0;
 
-    if (CommandLineArgs::GetString(L"model", gltfFileName) == false)
-    {
+    std::wstring scenePath = kDefaultScene;
+    CommandLineArgs::GetString(L"scene", scenePath);
+    SceneFile scene;
 #ifdef LEGACY_RENDERER
-        Sponza::Startup(m_Camera);
+    Sponza::Startup(m_Camera);
 #else
-        m_ModelInst = Renderer::LoadModel(kDefaultModel, forceRebuild);
-        // 옛 Sponza(DirectX-Graphics-Samples의 sponza2.gltf)로 정한 camera pose와 검증 Log 줄을 그대로 쓰도록,
-        // 옛 Sponza를 100배 하던 때와 world 좌표가 같아지는 배율이다 (Khronos 판은 node scale을 빼면 옛 판의 100배이고, node scale 0.008 × 125 ≈ 1).
-        m_ModelInst.Resize(125.0f * m_ModelInst.GetRadius());
-        OrientedBox obb = m_ModelInst.GetBoundingBox();
-        float modelRadius = Length(obb.GetDimensions()) * 0.5f;
-        const Vector3 eye = obb.GetCenter() + Vector3(modelRadius * 0.5f, 0.0f, 0.0f);
-        m_Camera.SetEyeAtUp( eye, Vector3(kZero), Vector3(kYUnitVector) );
-#endif
+    std::string error;
+    if (ReadSceneFile(scenePath, scene, error))
+    {
+        m_ModelInst = Renderer::LoadModel(scene.gltfPath, forceRebuild);
+        ScaleModel(m_ModelInst, scene);
     }
     else
-    {
-        m_ModelInst = Renderer::LoadModel(gltfFileName, forceRebuild);
-        m_ModelInst.LoopAllAnimations();
-        m_ModelInst.Resize(10.0f);
-
-        MotionBlur::Enable = false;
-    }
+        Utility::Printf("Error: the scene file %ws %s\n", scenePath.c_str(), error.c_str());
+#endif
 
     m_Camera.SetZRange(1.0f, 10000.0f);
-    EditorCamera* editorCamera = nullptr;
-    if (gltfFileName.size() == 0)
-    {
-        editorCamera = new EditorCamera(m_Camera, Vector3(kYUnitVector));
-        m_CameraController.reset(editorCamera);
-    }
-    else
-        m_CameraController.reset(new OrbitCamera(m_Camera, m_ModelInst.GetBoundingSphere(), Vector3(kYUnitVector)));
+    m_CameraController.reset(new EditorCamera(m_Camera, Vector3(kYUnitVector)));
+#ifndef LEGACY_RENDERER
+    // LEGACY_RENDERER는 scene file을 읽지 않으므로 Sponza::Startup이 정한 camera를 그대로 둔다.
+    m_CameraController->SetPose(GetStartPose(scene, m_ModelInst, m_Camera.GetNearClip()));
+#endif
+    EditorCamera& editorCamera = *m_CameraController;
     RegisterPoseCommand(editorCamera);
-    ControlChannel::RegisterState("camera", [this, editorCamera] { return DescribeCamera(m_Camera, editorCamera); });
-    m_SceneModel.SetPath(Utility::ToUTF8(gltfFileName.empty() ? std::wstring(kDefaultModel) : gltfFileName));
+    ControlChannel::RegisterState("camera", [this] { return DescribeCamera(m_Camera, *m_CameraController); });
+    const std::string scenePathText = Utility::ToUTF8(scenePath);
+    ControlChannel::RegisterState("scene", [scenePathText] { return DescribeScene(scenePathText); });
+    m_SceneModel.SetPath(Utility::ToUTF8(scene.gltfPath));
     ControlChannel::RegisterState("model", [this] { return DescribeModel(m_SceneModel.GetPath(), m_ModelInst); });
 
     SceneEditor::AddObject(m_SceneModel);

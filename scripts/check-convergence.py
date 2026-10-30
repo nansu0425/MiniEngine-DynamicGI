@@ -61,7 +61,7 @@ from checks import Checks
 from imagecompare import bias
 from imagefiles import ImageFileError, read_dds_rgba32f
 from pathtracerchecks import BASE, append_record_row, code_version, describe_machine, set_path_tracer
-from viewer import (BASELINE_DIR, ENGINE_DIR, HARNESS_DIR, PREVIEW_EXPOSURE, HarnessError, Session, baseline_pose, make_view, shots_dir,
+from viewer import (BASELINE_DIR, ENGINE_DIR, HARNESS_DIR, PREVIEW_EXPOSURE, HarnessError, Session, default_scene_pose, make_view, shots_dir,
                     start_instance, stop_instance)
 
 KEPT_DIR = HARNESS_DIR / 'kept' / 'convergence'
@@ -115,7 +115,7 @@ def baseline_light():
 
 
 def poses():
-    return {'start': (baseline_pose(), baseline_light()), 'corridor': (CORRIDOR_POSE, CORRIDOR_LIGHT)}
+    return {'start': (default_scene_pose(), baseline_light()), 'corridor': (CORRIDOR_POSE, CORRIDOR_LIGHT)}
 
 
 def powers_of_two(last):

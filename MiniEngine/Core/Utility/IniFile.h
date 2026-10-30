@@ -3,7 +3,8 @@
 #include <map>
 #include <string>
 
-// "[section]" 줄 아래에 "key=value" 줄을 두는 text 파일. '='가 없는 줄은 읽지 않는다. editor.ini가 이 형식이다.
+// "[section]" 줄 아래에 "key=value" 줄을 두는 text 파일. ';'로 시작하는 줄은 주석이고, '='가 없는 줄은 읽지 않는다.
+// editor.ini와 ModelViewer의 scene file이 이 형식이다.
 namespace IniFile
 {
     typedef std::map<std::string, std::string> Values;

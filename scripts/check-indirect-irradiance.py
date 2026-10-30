@@ -86,7 +86,7 @@ from imagecompare import agreement, rmse
 from imagefiles import ImageFileError, read_dds_rgba32f
 from pathtracerchecks import (BASE, EMISSION_FURNACE, FURNACE_SAMPLES, SECTION, SKY_RADIANCE, WHITE_FURNACE, code_version, path_tracer_state,
                               set_path_tracer)
-from viewer import (BASELINE_DIR, HARNESS_DIR, PREVIEW_EXPOSURE, SETTLE_FRAMES, SNAPSHOT_POSES, HarnessError, Session, baseline_pose, capture,
+from viewer import (BASELINE_DIR, HARNESS_DIR, PREVIEW_EXPOSURE, SETTLE_FRAMES, SNAPSHOT_POSES, HarnessError, Session, default_scene_pose, capture,
                     make_view, shots_dir, start_instance, stop_instance)
 
 KEPT_DIR = HARNESS_DIR / 'kept' / 'indirect-irradiance'
@@ -330,7 +330,7 @@ def command_check(args):
         try:
             session.ask_ok('ui hide')
             check_default_output(session, check)
-            start_pose = baseline_pose()
+            start_pose = default_scene_pose()
             check_radiance_bits(session, check)
             session.ask_ok(f'pose {start_pose}')
             hits = front_face_hits(session, 'front-face-start')
@@ -361,7 +361,7 @@ def command_reference(args):
             light = session.ask_ok(f'settings get {LIGHT_SECTION}')['values']
             REFERENCE_DIR.mkdir(parents=True, exist_ok=True)
             for pose_name, shading in REFERENCE_RUNS:
-                pose = SNAPSHOT_POSES[pose_name] or baseline_pose()
+                pose = SNAPSHOT_POSES[pose_name] or default_scene_pose()
                 session.ask_ok(f'pose {pose}')
                 settings = REFERENCE_SETTINGS | {'Shading': shading}
                 _, _, path = export(session, f'{pose_name}-{shading.lower()}', settings, REFERENCE_SAMPLES)
@@ -387,7 +387,7 @@ def command_keep(args):
         session = Session(instance)
         try:
             session.ask_ok('ui hide')
-            session.ask_ok(f'pose {baseline_pose()}')
+            session.ask_ok(f'pose {default_scene_pose()}')
             KEPT_DIR.mkdir(parents=True, exist_ok=True)
             for name, settings in KEEP_RUNS.items():
                 _, _, path = export(session, f'start-{name}-{KEEP_SAMPLES}spp', KEEP | settings, KEEP_SAMPLES)

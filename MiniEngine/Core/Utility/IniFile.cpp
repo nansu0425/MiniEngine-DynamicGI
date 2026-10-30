@@ -18,7 +18,7 @@ IniFile::Sections IniFile::Read(const std::wstring& path)
         }
 
         const size_t separator = line.find('=');
-        if (values != nullptr && separator != std::string::npos)
+        if (values != nullptr && separator != std::string::npos && line.front() != ';')
             (*values)[line.substr(0, separator)] = line.substr(separator + 1);
     }
     return sections;

@@ -163,16 +163,13 @@ void FrameCapture::Capture(Target target, CommandContext& context, PixelBuffer& 
         .Integer("height", buffer.GetHeight())
         .Integer("frame", Graphics::GetFrameCount())
         .Text("state", statePath);
-    if (MeasurementConditions::GetUnavailableReason().empty())
+    const std::string conditionsPath = pathWithoutExtension + ".conditions.txt";
+    const std::string line = MeasurementConditions::Format(MeasurementConditions::Describe());
+    if (!SaveConditions(conditionsPath, line))
     {
-        const std::string conditionsPath = pathWithoutExtension + ".conditions.txt";
-        const std::string line = MeasurementConditions::Format(MeasurementConditions::Describe());
-        if (!SaveConditions(conditionsPath, line))
-        {
-            reply.Error("cannot write " + conditionsPath);
-            return;
-        }
-        fields.Text("conditions", conditionsPath).Text("line", line);
+        reply.Error("cannot write " + conditionsPath);
+        return;
     }
+    fields.Text("conditions", conditionsPath).Text("line", line);
     reply.Ok(fields);
 }

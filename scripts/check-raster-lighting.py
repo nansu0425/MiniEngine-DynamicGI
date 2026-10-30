@@ -12,8 +12,8 @@ app 을 Debug 로 세 번 띄우고 끝내며, 이미 띄운 harness instance �
 판정은 harness baseline 에서 UI 를 숨기고 찍은 scene capture 로 한다. scene capture 는 post effects 전의 scene color 이고, 같다는 것은
 float 의 bit 가 같다는 뜻이다.
 
-test scene 은 xy 평면의 quad 셋을 x 축을 따라 놓은 것이다. -model 의 OrbitCamera 는 model 중심의 +z 쪽에서 -z 를 본다
-(OrbitCamera::Update). 모든 material 은 흰 baseColor, metallic 0, roughness 1 이고, light 는 light set direction=LIGHT_DIRECTION 으로
+test scene 은 xy 평면의 quad 셋을 x 축을 따라 놓은 것이다. scene file 의 camera 는 model 중심의 +z 쪽에서 -z 를 보며 model 을 화면에 담는다 (viewer.py 의 write_scene_file).
+모든 material 은 흰 baseColor, metallic 0, roughness 1 이고, light 는 light set direction=LIGHT_DIRECTION 으로
 quad 의 뒤쪽 위에 둔다.
 
   dark: +z 를 향해 light 를 등지고, emission 이 없다.
@@ -61,7 +61,7 @@ from gltfwriter import GLTF_FLOAT, GLTF_UNSIGNED_SHORT, BufferBuilder, flatten
 from imagefiles import ImageFileError, read_dds_rgba32f
 from imagemasks import column_groups, eroded
 from viewer import (ENGINE_DIR, HARNESS_DIR, REPO_ROOT, SETTLE_FRAMES, VIEWER_DIR, HarnessError, Session, capture, describe_difference,
-                    start_instance, stop_instance)
+                    start_instance, stop_instance, write_scene_file)
 
 SCENE_DIR = HARNESS_DIR / 'raster-lighting'
 TEST_SCENES = {'plain': 'RasterLighting', 'occluded': 'RasterLightingOccluded'}
@@ -144,8 +144,7 @@ def write_test_scene(name, occluded):
 
 def run_test_scene(scene, build_first, check):
     """test scene 의 scene capture rgb 와 Front Face capture. app 이 끝까지 돌지 않으면 None 이다."""
-    instance = start_instance('Debug', model=f'{SCENE_DIR.relative_to(VIEWER_DIR).as_posix()}/{TEST_SCENES[scene]}.gltf',
-                              build_first=build_first)
+    instance = start_instance('Debug', scene=write_scene_file(SCENE_DIR / f'{TEST_SCENES[scene]}.gltf'), build_first=build_first)
     try:
         session = Session(instance)
         try:

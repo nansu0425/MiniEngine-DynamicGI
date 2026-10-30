@@ -49,25 +49,12 @@ EditorCamera::EditorCamera(Camera& camera, Vector3 worldUp) : CameraController(c
     m_MoveSpeed = 1000.0f;
 
     EditorSettings::Register(kSettingsSection,
-        [this](EditorSettings::Values& values)
-        {
-            const Pose pose = GetPose();
-            values["Position X"] = FormatFloat(pose.position.GetX());
-            values["Position Y"] = FormatFloat(pose.position.GetY());
-            values["Position Z"] = FormatFloat(pose.position.GetZ());
-            values["Heading"] = FormatFloat(pose.heading);
-            values["Pitch"] = FormatFloat(pose.pitch);
-            values["Move Speed"] = FormatFloat(m_MoveSpeed);
-        },
+        [this](EditorSettings::Values& values) { values["Move Speed"] = FormatFloat(m_MoveSpeed); },
         [this](const EditorSettings::Values& values)
         {
-            float x, y, z, heading, pitch, moveSpeed;
-            if (!ReadFloat(values, "Position X", x) || !ReadFloat(values, "Position Y", y) || !ReadFloat(values, "Position Z", z) ||
-                !ReadFloat(values, "Heading", heading) || !ReadFloat(values, "Pitch", pitch) || !ReadFloat(values, "Move Speed", moveSpeed))
-                return;
-
-            m_MoveSpeed = Clamp(moveSpeed, kMinMoveSpeed, kMaxMoveSpeed);
-            SetPose({ Vector3(x, y, z), heading, pitch });
+            float moveSpeed;
+            if (ReadFloat(values, "Move Speed", moveSpeed))
+                m_MoveSpeed = Clamp(moveSpeed, kMinMoveSpeed, kMaxMoveSpeed);
         });
 }
 

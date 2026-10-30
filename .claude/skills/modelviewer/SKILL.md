@@ -27,7 +27,7 @@ harness 로 할 수 없는 일을 만나면 그 일이 계획되어 있는지와
 - 앞 명령의 응답에 있는 값을 뒤 명령에 넣거나 같은 순서를 되풀이하려면 명령을 파일에 적어 `run` 으로 보낸다. 형식은 `run --help` 에 있고, `scripts/harness-scenarios/acceptance.txt` 가 그 예다.
 - 나중에 비교할 shot 은 `MiniEngine/ModelViewer/Harness/kept/` 로 복사해 둔다. `runs/` 의 run 은 뒤의 `start` 와 `selftest` 가 지울 수 있다.
 - 사용자가 직접 띄운 ModelViewer 와 동시에 실행하면 `.mini` 와 DDS cache 쓰기가 겹칠 수 있다.
-- `--model` 로 띄우면 orbit camera 라서 `pose`, `pose look-at`, `describe`, `restore` 가 error 를 돌려준다.
+- `start` 는 `--scene` 이 없으면 Sponza 의 scene file 을 연다. 다른 scene 은 `--scene <scene file>` 로 연다. 확인 script 가 만든 test scene 은 `write_scene_file` 이 쓴 scene file 로 연다. camera 는 늘 scene file 의 pose 로 시작한다.
 
 ## capture 고르기
 

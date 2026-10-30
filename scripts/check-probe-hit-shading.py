@@ -15,7 +15,7 @@
   [E12] 의 build: Debug 와 Profile build 가 성공하고 build log 에 warning 이 없다.
   [E13] 정의: PathTracer.h 의 Output 과 Shading, PathTracerCS.hlsl 의 LAMBERT_SHADING, panel tooltip 의 글은 사람이 읽는다.
 
-test scene (SCENE_DIR): -model 의 OrbitCamera 는 model 중심의 +z 쪽에서 -z 를 본다. light 는 direction LIGHT_DIRECTION, 흰색, intensity
+test scene (SCENE_DIR): scene file 의 camera 는 model 중심의 +z 쪽에서 -z 를 보며 model 을 화면에 담는다 (viewer.py 의 write_scene_file). light 는 direction LIGHT_DIRECTION, 흰색, intensity
 float 의 π 라서 E⊥ / π 가 1 이다. PT 는 Output Radiance, Max Bounces 1, Sky Light 0, Russian roulette off, TEST_SAMPLES spp 다. 처음
 맞은 곳에서 반사한 뒤에는 emission 과 sky 가 0 이므로 path 의 값은 처음 맞은 곳의 직접광뿐이다. 면의 pixel 은 Front Face view 의 앞면을
 EDGE_PIXELS 깎고 column 으로 나눈 것이다. 비는 export / (E⊥ max(0, n·l) / π) 이고 n 은 quad 의 normal (0, 0, 1), l 은 state light 의
@@ -92,8 +92,8 @@ from gltfwriter import GLTF_FLOAT, GLTF_UNSIGNED_SHORT, BufferBuilder, flatten
 from imagefiles import DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, ImageFileError, read_dds_rgba32f, read_dds_rgba8
 from imagemasks import column_groups, eroded
 from pathtracerchecks import BASE, FURNACE_SAMPLES, SECTION, SKY_LIGHT_SECTION, SKY_RADIANCE, code_version, path_tracer_state, set_path_tracer
-from viewer import (HARNESS_DIR, REPO_ROOT, SETTLE_FRAMES, SNAPSHOT_DIR, SNAPSHOT_POSES, VIEWER_DIR, HarnessError, Session, baseline_pose,
-                    capture, start_instance, stop_instance)
+from viewer import (HARNESS_DIR, REPO_ROOT, SETTLE_FRAMES, SNAPSHOT_DIR, SNAPSHOT_POSES, HarnessError, Session, default_scene_pose,
+                    capture, start_instance, stop_instance, write_scene_file)
 
 KEPT_DIR = HARNESS_DIR / 'kept' / 'probe-hit-shading'
 REFERENCE_DIR = KEPT_DIR / 'reference'
@@ -417,7 +417,7 @@ def check_shadow_scene(session, check):
 
 
 def run_test_scene(name, judge, build_first, check):
-    instance = start_instance('Debug', model=f'{SCENE_DIR.relative_to(VIEWER_DIR).as_posix()}/{name}.gltf', build_first=build_first)
+    instance = start_instance('Debug', scene=write_scene_file(SCENE_DIR / f'{name}.gltf'), build_first=build_first)
     try:
         session = Session(instance)
         try:
@@ -477,7 +477,7 @@ def compare_lambert_bits(now, reference):
 def check_first_point(session, check, default_light):
     details, passed = [], True
     for pose_name in REFERENCE_POSES:
-        session.ask_ok(f'pose {SNAPSHOT_POSES[pose_name] or baseline_pose()}')
+        session.ask_ok(f'pose {SNAPSHOT_POSES[pose_name] or default_scene_pose()}')
         set_light(session, default_light)
         images = {}
         for shading in (PROBE_HIT, LAMBERT):
@@ -581,7 +581,7 @@ def run_sponza(check, build_first):
         try:
             session.ask_ok('ui hide')
             default_light = session.ask_ok(f'settings get {LIGHT_SECTION}')['values']
-            start_pose = baseline_pose()
+            start_pose = default_scene_pose()
             check_existing_shadings(session, check)
             session.ask_ok(f'pose {start_pose}')
             set_light(session, default_light)
@@ -703,7 +703,7 @@ def command_reference(args):
             light = session.ask_ok(f'settings get {LIGHT_SECTION}')['values']
             REFERENCE_DIR.mkdir(parents=True, exist_ok=True)
             for pose_name, output, shading in REFERENCE_RUNS:
-                pose = SNAPSHOT_POSES[pose_name] or baseline_pose()
+                pose = SNAPSHOT_POSES[pose_name] or default_scene_pose()
                 session.ask_ok(f'pose {pose}')
                 set_light(session, light)
                 settings = REFERENCE_SETTINGS | {'Output': output, 'Shading': shading}

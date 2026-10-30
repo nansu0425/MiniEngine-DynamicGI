@@ -43,7 +43,7 @@ from checks import Checks, stop_and_check
 from imagefiles import ImageFileError, read_dds_rgba32f
 from imagemasks import eroded
 from pathtracerchecks import BASE, SKY_COLOR, SKY_LIGHT_SECTION, SKY_RADIANCE, path_tracer_state, set_path_tracer
-from viewer import HARNESS_DIR, SETTLE_FRAMES, HarnessError, Session, baseline_pose, capture, start_instance, stop_instance
+from viewer import HARNESS_DIR, SETTLE_FRAMES, HarnessError, Session, default_scene_pose, capture, start_instance, stop_instance
 
 KEPT_DIR = HARNESS_DIR / 'kept' / 'sky-light'
 
@@ -262,7 +262,7 @@ def command_keep(args):
         session = Session(instance)
         try:
             session.ask_ok('ui hide')
-            for pose_name, pose in [('start', baseline_pose()), ('sky-pose', SKY_POSE)]:
+            for pose_name, pose in [('start', default_scene_pose()), ('sky-pose', SKY_POSE)]:
                 session.ask_ok(f'pose {pose}')
                 set_path_tracer(session, {'Show': 0})
                 session.ask_ok(f'frames {SETTLE_FRAMES}')
