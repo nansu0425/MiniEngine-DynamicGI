@@ -14,7 +14,7 @@
 
 #include "Core/pch.h"
 #include "Core/UI/ImGuiLayer.h"
-#include "Core/Editor/EditorSettings.h"
+#include "Core/App/UserSettings.h"
 #include <imgui.h>
 
 using namespace std;
@@ -60,8 +60,8 @@ public:
     void ShowChildren( void );
 
     // 변수의 key는 root group부터의 경로다. 그래서 변수가 더해지거나 빠져도 나머지 변수의 값은 그대로 되돌린다.
-    void SaveValues( EditorSettings::Values& values, const string& pathPrefix ) const;
-    void LoadValues( const EditorSettings::Values& values, const string& pathPrefix );
+    void SaveValues( UserSettings::Values& values, const string& pathPrefix ) const;
+    void LoadValues( const UserSettings::Values& values, const string& pathPrefix );
 
     virtual void SetFromString( const std::string& ) override {}
 
@@ -115,7 +115,7 @@ void VariableGroup::ShowContent( void )
     ShowChildren();
 }
 
-void VariableGroup::SaveValues( EditorSettings::Values& values, const string& pathPrefix ) const
+void VariableGroup::SaveValues( UserSettings::Values& values, const string& pathPrefix ) const
 {
     if (m_Section != nullptr)
     {
@@ -140,7 +140,7 @@ void VariableGroup::SaveValues( EditorSettings::Values& values, const string& pa
     }
 }
 
-void VariableGroup::LoadValues( const EditorSettings::Values& values, const string& pathPrefix )
+void VariableGroup::LoadValues( const UserSettings::Values& values, const string& pathPrefix )
 {
     if (m_Section != nullptr)
     {
@@ -510,9 +510,9 @@ void EngineTuning::Initialize( void )
     }
     s_UnregisteredCount = -1;
 
-    EditorSettings::Register("Engine Tuning",
-        [](EditorSettings::Values& values) { VariableGroup::sm_RootGroup.SaveValues(values, ""); },
-        [](const EditorSettings::Values& values) { VariableGroup::sm_RootGroup.LoadValues(values, ""); });
+    UserSettings::Register("Engine Tuning",
+        [](UserSettings::Values& values) { VariableGroup::sm_RootGroup.SaveValues(values, ""); },
+        [](const UserSettings::Values& values) { VariableGroup::sm_RootGroup.LoadValues(values, ""); });
 }
 
 void EngineTuning::Update( void )

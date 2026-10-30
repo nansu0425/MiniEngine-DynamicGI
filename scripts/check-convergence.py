@@ -109,7 +109,7 @@ Run = namedtuple('Run', 'group name pose settings exports')
 def baseline_light():
     ini = configparser.ConfigParser(delimiters=('=',), comment_prefixes=(';',), interpolation=None)
     ini.optionxform = str
-    ini.read(BASELINE_DIR / 'editor.ini', encoding='utf-8')
+    ini.read(BASELINE_DIR / 'user.ini', encoding='utf-8')
     light = ini['Directional Light']
     return f'direction={light["Direction"]} intensity={light["Intensity"]}'
 

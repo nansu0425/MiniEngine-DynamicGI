@@ -7,8 +7,8 @@
 
 # ImGui 가 실행 중에 저장하는 window 배치
 imgui.ini
-# 종료할 때 저장하는 editor 상태
-editor.ini
+# 종료할 때 저장하는 사용자의 설정
+user.ini
 # harness 가 실행마다 복사해 쓰는 결정성 baseline
 !/scripts/harness-baseline/*.ini
 

@@ -23,8 +23,8 @@ scene file 의 Scale 로 바꾼다.
   [V3] pose, pose look-at, describe, restore 가 error 없이 동작하고 state camera 의 controller 가 editor, state scene 이 SCENE 이다.
   [V4] 처음과 다른 pose, light, sky, PT 설정의 export E1 과 그 줄 L 을 얻는다. app 을 다시 띄워 L 을 restore 하면 state camera 가 L 의
        camera, heading, pitch 와 문자열로 같고, 같은 sample 수의 export E2 는 E1 과 rgba 가 bit 단위로 같다.
-  [V5] pose 를 바꾸고 끝낸 run 의 editor.ini 의 Editor Camera 에는 Move Speed 만 있다. 예전 형식으로 camera 의 위치와 방향을 적은
-       editor.ini 로 띄워도 camera 는 scene file 의 pose 로 시작한다.
+  [V5] pose 를 바꾸고 끝낸 run 의 user.ini 의 Editor Camera 에는 Move Speed 만 있다. 예전 형식으로 camera 의 위치와 방향을 적은
+       user.ini 로 띄워도 camera 는 scene file 의 pose 로 시작한다.
   [V6] L 은 scene=SCENE 을 담는다. Sponza 의 줄 (scene 을 Sponza 로 바꾼 L 과 scene 을 뺀 L) 을 Cornell box 에서 restore 하면 Sponza 를
        열고, L 을 Sponza 에서 restore 하면 Cornell box 를 연다. 그 뒤 state scene 이 줄의 scene 이고 state camera 가 줄과 문자열로 같다.
   [V7] 처음 화면의 pick grid 에 light, 두 상자, 바닥, 천장, 세 벽이 1 칸 이상씩 있다.
@@ -53,7 +53,7 @@ from viewer import (BASELINE_DIR, HARNESS_DIR, SETTLE_FRAMES, VIEWER_DIR, Harnes
 
 SCENE = 'Scenes/CornellBox.ini'
 NO_STRENGTH_DIR = HARNESS_DIR / 'cornell-box-no-strength'
-OLD_BASELINE_DIR = HARNESS_DIR / 'cornell-box-old-editor-ini'
+OLD_BASELINE_DIR = HARNESS_DIR / 'cornell-box-old-user-ini'
 # 행이 light 를 지나는 grid. light 는 처음 화면에서 세로로 약 10 pixel 이므로 행의 간격과 위치를 보고 골랐다.
 GRID = (81, 50)
 SHAPES = ['Light', 'ShortBox', 'TallBox', 'Floor', 'Ceiling', 'BackWall', 'LeftWall', 'RightWall']
@@ -363,18 +363,18 @@ def first_run(check, no_build, mitsuba, scale):
     except (HarnessError, ImageFileError):
         stop_instance(instance, kill_now=True)
         raise
-    check_saved_camera(check, Path(instance['run_dir']) / 'editor.ini')
+    check_saved_camera(check, Path(instance['run_dir']) / 'user.ini')
     return line, image, stopped
 
 
 def check_saved_camera(check, path):
-    """[V5] 의 앞: 끝낸 run 의 editor.ini 에는 camera 의 이동 속도만 남는다."""
+    """[V5] 의 앞: 끝낸 run 의 user.ini 에는 camera 의 이동 속도만 남는다."""
     import configparser
     ini = configparser.ConfigParser(delimiters=('=',), interpolation=None)
     ini.optionxform = str
     ini.read(path, encoding='utf-8')
     keys = list(ini['Editor Camera']) if ini.has_section('Editor Camera') else None
-    check('[V5] the editor.ini a run left after moving the camera has only Move Speed in Editor Camera', keys == ['Move Speed'], keys)
+    check('[V5] the user.ini a run left after moving the camera has only Move Speed in Editor Camera', keys == ['Move Speed'], keys)
 
 
 def write_old_baseline():
@@ -382,10 +382,10 @@ def write_old_baseline():
     if OLD_BASELINE_DIR.exists():
         shutil.rmtree(OLD_BASELINE_DIR)
     shutil.copytree(BASELINE_DIR, OLD_BASELINE_DIR)
-    editor = OLD_BASELINE_DIR / 'editor.ini'
+    settings = OLD_BASELINE_DIR / 'user.ini'
     old = 'Heading=1.60599577\nPitch=-0.534952283\nPosition X=1098.72424\nPosition Y=651.495239\nPosition Z=-38.6904297\n'
-    text = editor.read_text(encoding='utf-8')
-    editor.write_text(text.replace('[Editor Camera]\n', '[Editor Camera]\n' + old, 1), encoding='utf-8')
+    text = settings.read_text(encoding='utf-8')
+    settings.write_text(text.replace('[Editor Camera]\n', '[Editor Camera]\n' + old, 1), encoding='utf-8')
     return OLD_BASELINE_DIR
 
 
@@ -400,7 +400,7 @@ def second_run(check, line, image):
             start = read_scene_file(SCENE)['Camera']
             expected = [np.float32(value) for value in start['Position'].split(',') + [start['Heading'], start['Pitch']]]
             got = [np.float32(camera[key]) for key in ['x', 'y', 'z', 'heading', 'pitch']]
-            check('[V5] with an old editor.ini that has the camera position and direction, the camera starts at the scene file pose',
+            check('[V5] with an old user.ini that has the camera position and direction, the camera starts at the scene file pose',
                   got == expected, f'{got} vs {expected}')
 
             session.ask_ok(f'restore {line}')

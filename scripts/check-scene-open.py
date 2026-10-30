@@ -23,7 +23,7 @@ Sponza 로 띄운 app 에서 scene 을 바꿔 가며 비교한다.
        rgba 의 bit 까지 같다. Sponza 의 줄과 scene 이 없는 예전 줄을 Cornell box 에서 restore 하면 Sponza 를 열고 되돌린다.
   [O7] 다른 scene 의 줄이라도 key 가 빠졌거나 받을 수 없는 값이 있으면 error 이고 scene 을 바꾸지 않으며 state 가 그대로다 (시간에 따라
        바뀌는 값 밖). 줄의 scene file 을 열 수 없으면 error 이고 unread 에 scene 이 있다.
-  [O9] scene 을 바꾸고 끝낸 run 의 editor.ini 에 scene 이 없고, 그 editor.ini 로 -scene 없이 띄우면 Sponza 다.
+  [O9] scene 을 바꾸고 끝낸 run 의 user.ini 에 scene 이 없고, 그 user.ini 로 -scene 없이 띄우면 Sponza 다.
 """
 
 import argparse
@@ -301,7 +301,7 @@ def switching_run(check, fresh):
 
 def check_saved_scene(check, run_dir):
     """[O9]"""
-    saved = (run_dir / 'editor.ini').read_text(encoding='utf-8')
+    saved = (run_dir / 'user.ini').read_text(encoding='utf-8')
     names = [name for name in SCENES + [Path(scene).stem for scene in SCENES] if name in saved]
     baseline = WORK_DIR / 'after-switching'
     if baseline.exists():
@@ -320,8 +320,8 @@ def check_saved_scene(check, run_dir):
     except HarnessError:
         stop_instance(instance, kill_now=True)
         raise
-    check('[O9] the editor.ini of a run that ended in the Cornell box names no scene, and the app started with it opens Sponza',
-          not names and scene == default_scene() == SPONZA, f'names in editor.ini: {names or "none"}; opened {scene}')
+    check('[O9] the user.ini of a run that ended in the Cornell box names no scene, and the app started with it opens Sponza',
+          not names and scene == default_scene() == SPONZA, f'names in user.ini: {names or "none"}; opened {scene}')
 
 
 def command_check(args):

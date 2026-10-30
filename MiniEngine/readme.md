@@ -22,14 +22,14 @@
 * gizmo mode of the selected object: W translate, E rotate (without holding the right mouse button). The toolbar at the top right of the scene picks them too, and whether the rotate rings follow the object's own axes (Local) or the world axes (World). Translate always follows the world axes
 * directional light: select its icon and rotate it with the rotate gizmo. It is a KHR_lights_punctual directional light, so the light goes along its local -Z, as the arrow shows, and turning it about its local Z (the blue ring with Local axes) leaves the light as it is. Its color and intensity (lux) are in its Details panel, whose Reset Transform sets the transform to no rotation at the origin, so the light goes along world -Z
 
-## Editor state:
-On exit, ModelViewer saves its state in the working directory, or in the folder given by -settings_dir, and restores it on the next start.
+## User settings:
+On exit, ModelViewer saves these settings in the working directory, or in the folder given by -settings_dir, and restores them on the next start.
 * imgui.ini: panel layout, written by ImGui. Delete it to reset the layout
-* editor.ini: window size and position, open panels, engine tuning values (with the ray tracing view and the path tracer settings), editor camera movement speed. Delete it to reset them. The camera's position and direction are not saved, as each scene file sets where the camera starts
+* user.ini: window size and position, open panels, engine tuning values (with the ray tracing view and the path tracer settings), editor camera movement speed. Delete it to reset them. The camera's position and direction are not saved, as each scene file sets where the camera starts
 
 ## Command line options for automation:
 scripts/viewer.py starts ModelViewer with these options. They change nothing when omitted.
-* -settings_dir <folder>: read and write editor.ini and imgui.ini in <folder> instead of the working directory
+* -settings_dir <folder>: read and write user.ini and imgui.ini in <folder> instead of the working directory
 * -log <file>: also write the debug output to <file>, flushed at every message. While the D3D12 debug layer is on, its messages go there too, in the lines described in Core/Automation/D3D12MessageLog.h
 * -gpu_debug 1: also turn on GPU-based validation of the D3D12 debug layer. The debug layer is always on in Debug, and in the other configurations only with -debug 1
 * -unattended 1: for runs that nobody watches. What it changes is described in Core/Automation/UnattendedRun.h

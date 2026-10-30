@@ -82,7 +82,7 @@ harness 로 할 수 없는 일을 만나면 그 일이 계획되어 있는지와
 
 - Windows 에서는 Claude desktop app 의 Code tab session 에서만 쓸 수 있고, CLI 에서는 쓸 수 없다. 도구는 `mcp__computer-use__*` 다.
 - OS 를 거쳐야만 보이는 것을 확인할 때만 쓴다: 실제로 present 된 화면, HDR, DPI, 실제 입력 경로 (WM message, DirectInput 의 foreground 검사). 그 밖의 확인은 harness 명령으로 한다. harness 가 frame 단위로 결정적이고 비용도 싸다.
-- app 은 이때도 `start` 로 띄운다. `open_application` 은 flag 없이 새 instance 를 띄워 사용자의 `editor.ini`, `imgui.ini` 를 덮어쓸 수 있으므로 쓰지 않는다.
+- app 은 이때도 `start` 로 띄운다. `open_application` 은 flag 없이 새 instance 를 띄워 사용자의 `user.ini`, `imgui.ini` 를 덮어쓸 수 있으므로 쓰지 않는다.
 - `request_access` 에는 이름 `ModelViewer` 가 아니라 `do status` 가 돌려주는 `exe` 경로를 준다. 이름으로는 찾지 못하고, 경로로는 full tier 로 승인된다. config 마다 exe 경로가 다르므로 config 를 바꾸면 다시 승인받아야 할 수 있다 (확인하지 않았다).
 - screenshot 에는 D3D 영역도 그려지고 `shot display` 와 구도가 같다. `scale` 을 0.6 정도로 줄여 찍는다. click 좌표는 응답이 알려 주는 coordinate frame 기준이다. 허용하지 않은 app 은 가려지지만 File Explorer 창은 그대로 보인다.
 - 조작 (결과는 판정 절에 따라 `state` 로 확인한다)

@@ -1,6 +1,6 @@
 #include "Core/pch.h"
 #include "Core/Editor/EditorCamera.h"
-#include "Core/Editor/EditorSettings.h"
+#include "Core/App/UserSettings.h"
 #include "Core/Camera/Camera.h"
 #include "Core/App/GameInput.h"
 
@@ -28,7 +28,7 @@ namespace
         return text;
     }
 
-    bool ReadFloat(const EditorSettings::Values& values, const char* key, float& value)
+    bool ReadFloat(const UserSettings::Values& values, const char* key, float& value)
     {
         const auto text = values.find(key);
         return text != values.end() && sscanf_s(text->second.c_str(), "%f", &value) == 1;
@@ -48,9 +48,9 @@ EditorCamera::EditorCamera(Camera& camera, Vector3 worldUp) : CameraController(c
     // 처음 속도는 upstream의 FlyingFPSCamera와 같다.
     m_MoveSpeed = 1000.0f;
 
-    EditorSettings::Register(kSettingsSection,
-        [this](EditorSettings::Values& values) { values["Move Speed"] = FormatFloat(m_MoveSpeed); },
-        [this](const EditorSettings::Values& values)
+    UserSettings::Register(kSettingsSection,
+        [this](UserSettings::Values& values) { values["Move Speed"] = FormatFloat(m_MoveSpeed); },
+        [this](const UserSettings::Values& values)
         {
             float moveSpeed;
             if (ReadFloat(values, "Move Speed", moveSpeed))
@@ -60,7 +60,7 @@ EditorCamera::EditorCamera(Camera& camera, Vector3 worldUp) : CameraController(c
 
 EditorCamera::~EditorCamera()
 {
-    EditorSettings::Unregister(kSettingsSection);
+    UserSettings::Unregister(kSettingsSection);
 }
 
 EditorCamera::Pose EditorCamera::GetPose() const

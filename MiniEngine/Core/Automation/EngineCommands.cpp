@@ -1,9 +1,9 @@
 #include "Core/pch.h"
+#include "Core/App/UserSettings.h"
 #include "Core/Automation/ControlChannel.h"
 #include "Core/Automation/D3D12MessageLog.h"
 #include "Core/Automation/FrameCapture.h"
 #include "Core/Display/Display.h"
-#include "Core/Editor/EditorSettings.h"
 #include "Core/Editor/MeasurementConditions.h"
 #include "Core/Graphics/GraphicsCore.h"
 #include "Core/Graphics/Resource/BufferManager.h"
@@ -120,8 +120,8 @@ namespace
     {
         const RECT client = GetClientSize();
         const RECT scene = ImGuiLayer::GetSceneViewport();
-        EditorSettings::Values panels;
-        EditorSettings::ReadSection("Panels", panels);
+        UserSettings::Values panels;
+        UserSettings::ReadSection("Panels", panels);
         Fields open;
         for (const auto& panel : panels)
             open.Flag(panel.first, panel.second == "1");
@@ -136,7 +136,7 @@ namespace
             .Object("panels", open);
     }
 
-    Fields DescribeSection(const EditorSettings::Values& values)
+    Fields DescribeSection(const UserSettings::Values& values)
     {
         Fields fields;
         for (const auto& value : values)
@@ -147,10 +147,10 @@ namespace
     Fields DescribeSettings(void)
     {
         Fields sections;
-        for (const std::string& section : EditorSettings::GetSectionNames())
+        for (const std::string& section : UserSettings::GetSectionNames())
         {
-            EditorSettings::Values values;
-            EditorSettings::ReadSection(section, values);
+            UserSettings::Values values;
+            UserSettings::ReadSection(section, values);
             sections.Object(section, DescribeSection(values));
         }
         return sections;
@@ -182,8 +182,8 @@ namespace
     void ReplyStatus(const std::string&, const Reply& reply)
     {
         const RECT client = GetClientSize();
-        EditorSettings::Values tuning;
-        EditorSettings::ReadSection("Engine Tuning", tuning);
+        UserSettings::Values tuning;
+        UserSettings::ReadSection("Engine Tuning", tuning);
         reply.Ok(Fields()
             .Integer("frame", Graphics::GetFrameCount())
             .Text("client", FormatSize(client.right, client.bottom))
@@ -213,15 +213,15 @@ namespace
     void Quit(const std::string&, const Reply& reply)
     {
         reply.Ok();
-        // 사용자가 창을 닫을 때와 같은 길로 끝내 editor 상태를 저장한다.
+        // 사용자가 창을 닫을 때와 같은 길로 끝내 user.ini를 저장한다.
         PostMessage(GameCore::g_hWnd, WM_CLOSE, 0, 0);
     }
 
-    bool ReadExistingSection(const std::string& section, EditorSettings::Values& values, const Reply& reply)
+    bool ReadExistingSection(const std::string& section, UserSettings::Values& values, const Reply& reply)
     {
-        if (!EditorSettings::ReadSection(section, values))
+        if (!UserSettings::ReadSection(section, values))
         {
-            reply.Error("unknown section '" + section + "'. Sections: " + JoinNames(EditorSettings::GetSectionNames()));
+            reply.Error("unknown section '" + section + "'. Sections: " + JoinNames(UserSettings::GetSectionNames()));
             return false;
         }
         return true;
@@ -256,10 +256,10 @@ namespace
             reply.Error("the Window section cannot be set while running because applying it hides the window. Use window client <W>x<H>.");
             return;
         }
-        EditorSettings::Values values;
+        UserSettings::Values values;
         if (!ReadExistingSection(section, values, reply))
             return;
-        const EditorSettings::Values original = values;
+        const UserSettings::Values original = values;
 
         std::vector<std::pair<std::string, std::string>> requests;
         const std::string assignments = arguments.substr(sectionEnd + 1);
@@ -283,8 +283,8 @@ namespace
             requests.emplace_back(key, value);
         }
 
-        EditorSettings::ApplySection(section, values);
-        EditorSettings::ReadSection(section, values);
+        UserSettings::ApplySection(section, values);
+        UserSettings::ReadSection(section, values);
         Fields applied, rejected;
         bool anyRejected = false;
         for (const auto& request : requests)
@@ -300,7 +300,7 @@ namespace
         if (anyRejected)
         {
             // BoolVar처럼 틀린 값을 다른 값으로 읽은 경우도 있으므로 요청 전의 값으로 되돌린다.
-            EditorSettings::ApplySection(section, original);
+            UserSettings::ApplySection(section, original);
             reply.Error("the section did not take some values, so nothing was set. rejected has what they were read back as.",
                 Fields().Object("rejected", rejected));
             return;
@@ -310,7 +310,7 @@ namespace
 
     void GetSettings(const std::string& section, const Reply& reply)
     {
-        EditorSettings::Values values;
+        UserSettings::Values values;
         if (!ReadExistingSection(section, values, reply))
             return;
         reply.Ok(Fields().Object("values", DescribeSection(values)));
@@ -384,8 +384,8 @@ namespace
         }
 
         const std::string name = Trim(arguments.substr(0, actionStart));
-        EditorSettings::Values panels;
-        EditorSettings::ReadSection("Panels", panels);
+        UserSettings::Values panels;
+        UserSettings::ReadSection("Panels", panels);
         if (panels.find(name) == panels.end())
         {
             std::vector<std::string> names;
@@ -396,7 +396,7 @@ namespace
         }
 
         panels[name] = action == "open" ? "1" : "0";
-        EditorSettings::ApplySection("Panels", panels);
+        UserSettings::ApplySection("Panels", panels);
         AfterFrames(kFramesToSettleLayout, [reply] { reply.Ok(Fields().Object("state", GetState("ui"))); });
     }
 
@@ -592,8 +592,8 @@ namespace ControlChannel
             "settings has every section as settings get reads it. Commands that change the state reply with the changed part as state", ReplyState);
         Register("status", "status", ReplyStatus);
         Register("frames", "frames <n>: replies after n more frames", WaitFrames);
-        Register("quit", "quit: exits as if the window were closed, saving the editor state", Quit);
-        Register("settings", "settings get <section> | settings set <section>: <key>=<value>; <key>=<value>  (sections and values as in editor.ini). "
+        Register("quit", "quit: exits as if the window were closed, saving user.ini", Quit);
+        Register("settings", "settings get <section> | settings set <section>: <key>=<value>; <key>=<value>  (sections and values as in user.ini). "
             "set changes nothing and fails if a value does not read back as given", HandleSettings);
         Register("describe", "describe: the conditions the scene and the path tracer are drawn in now, as a line that restore takes. "
             "It has the scene file, camera, resolution, TAA, directional light, Sky Light, path tracer settings and the samples the path tracer has added", DescribeConditions);

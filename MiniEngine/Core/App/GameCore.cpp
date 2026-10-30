@@ -22,7 +22,7 @@
 #include "Core/Display/Display.h"
 #include "Core/UI/ImGuiLayer.h"
 #include "Core/Utility/CommandLineArg.h"
-#include "Core/Editor/EditorSettings.h"
+#include "Core/App/UserSettings.h"
 #include "Core/Automation/ControlChannel.h"
 #include "Core/Automation/FrameCapture.h"
 #include "Core/Automation/UnattendedRun.h"
@@ -43,7 +43,7 @@ namespace GameCore
     {
         // 창을 닫아 message loop가 끝나면 Save 때 창이 이미 없으므로, 없어지기 직전의 배치를 둔다.
         WINDOWPLACEMENT s_DestroyedPlacement = { sizeof(WINDOWPLACEMENT) };
-        // editor.ini에서 되돌린, 창이 처음 보일 때의 상태. 없으면 음수다.
+        // user.ini에서 되돌린, 창이 처음 보일 때의 상태. 없으면 음수다.
         int s_ShowCommand = -1;
 
         bool IsMaximized(const WINDOWPLACEMENT& placement)
@@ -52,7 +52,7 @@ namespace GameCore
                 (placement.showCmd == SW_SHOWMINIMIZED && (placement.flags & WPF_RESTORETOMAXIMIZED) != 0);
         }
 
-        void Save(EditorSettings::Values& values)
+        void Save(UserSettings::Values& values)
         {
             WINDOWPLACEMENT placement = { sizeof(placement) };
             if (!GetWindowPlacement(g_hWnd, &placement))
@@ -66,7 +66,7 @@ namespace GameCore
         }
 
         // 창이 보이기 전에 부르므로 위치만 바꾸고, 최대화는 처음 보일 때 한다.
-        void Load(const EditorSettings::Values& values)
+        void Load(const UserSettings::Values& values)
         {
             const auto position = values.find("Normal Position");
             RECT rect = {};
@@ -99,11 +99,11 @@ namespace GameCore
         GameInput::Initialize();
         EngineTuning::Initialize();
         ImGuiLayer::Initialize();
-        EditorSettings::Register("Window", WindowSettings::Save, WindowSettings::Load);
+        UserSettings::Register("Window", WindowSettings::Save, WindowSettings::Load);
 
         game.Startup();
         // Startup이 정한 기본값을 지난 실행의 상태로 덮어쓴다.
-        EditorSettings::Load();
+        UserSettings::Load();
         ControlChannel::Initialize();
     }
 
@@ -112,7 +112,7 @@ namespace GameCore
         ControlChannel::Shutdown();
         g_CommandManager.IdleGPU();
 
-        EditorSettings::Save();
+        UserSettings::Save();
         game.Cleanup();
 
         ImGuiLayer::Shutdown();

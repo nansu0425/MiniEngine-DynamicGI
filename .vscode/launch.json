@@ -1,5 +1,5 @@
 {
-    // cwd 는 Visual Studio 의 기본 작업 폴더인 project 폴더다. 그래야 VS 로 띄울 때와 같은 asset 경로, editor.ini, imgui.ini 를 쓴다.
+    // cwd 는 Visual Studio 의 기본 작업 폴더인 project 폴더다. 그래야 VS 로 띄울 때와 같은 asset 경로, user.ini, imgui.ini 를 쓴다.
     "version": "0.2.0",
     "configurations": [
         {

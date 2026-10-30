@@ -6,7 +6,7 @@
 #include "Core/Graphics/Command/CommandListManager.h"
 #include "Core/Graphics/Descriptor/DescriptorHeap.h"
 #include "Core/Graphics/Resource/BufferManager.h"
-#include "Core/Editor/EditorSettings.h"
+#include "Core/App/UserSettings.h"
 
 #include <imgui.h>
 #include <imgui_impl_dx12.h>
@@ -44,7 +44,7 @@ namespace
 
     // View 메뉴로 여닫는 창의 열림 여부. ShowPanel의 창은 처음 그릴 때 등록된다.
     std::map<std::string, bool*> s_PanelStates;
-    // editor.ini에서 읽었지만 아직 등록되지 않은 창의 열림 여부
+    // user.ini에서 읽었지만 아직 등록되지 않은 창의 열림 여부
     std::map<std::string, bool> s_UnregisteredPanelStates;
 
     void RegisterPanelState(const std::string& name, bool& open)
@@ -58,7 +58,7 @@ namespace
         s_UnregisteredPanelStates.erase(loaded);
     }
 
-    void SavePanelStates(EditorSettings::Values& values)
+    void SavePanelStates(UserSettings::Values& values)
     {
         for (const auto& panel : s_UnregisteredPanelStates)
             values[panel.first] = panel.second ? "1" : "0";
@@ -66,7 +66,7 @@ namespace
             values[panel.first] = *panel.second ? "1" : "0";
     }
 
-    void LoadPanelStates(const EditorSettings::Values& values)
+    void LoadPanelStates(const UserSettings::Values& values)
     {
         for (const auto& value : values)
         {
@@ -175,7 +175,7 @@ void ImGuiLayer::Initialize(void)
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-    s_IniFilePath = Utility::ToUTF8(EditorSettings::GetFilePath(L"imgui.ini"));
+    s_IniFilePath = Utility::ToUTF8(UserSettings::GetFilePath(L"imgui.ini"));
     ImGui::GetIO().IniFilename = s_IniFilePath.c_str();
 
     ImGui_ImplWin32_Init(GameCore::g_hWnd);
@@ -195,7 +195,7 @@ void ImGuiLayer::Initialize(void)
     ImGui_ImplDX12_Init(&initInfo);
 
     RegisterPanelState("Scene Overlay", s_ShowSceneOverlay);
-    EditorSettings::Register("Panels", SavePanelStates, LoadPanelStates);
+    UserSettings::Register("Panels", SavePanelStates, LoadPanelStates);
 }
 
 void ImGuiLayer::Shutdown(void)

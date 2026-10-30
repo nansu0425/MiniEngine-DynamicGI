@@ -3,7 +3,7 @@
 # baseline 의 client 1920x1080 에서 UI 를 숨기면 scene 의 가운데 pixel 은 960 540 이다.
 ui hide
 
-# 1. directional light 를 낮게 둔다. 판정: state 의 light 가 요청한 고도와 방위이고, editor.ini 에 남는 Direction 이 그 방향이다.
+# 1. directional light 를 낮게 둔다. 판정: state 의 light 가 요청한 고도와 방위이고, user.ini 에 남는 Direction 이 그 방향이다.
 light_before = state light
 light set elevation=20 azimuth=200
 lit = state

@@ -22,7 +22,7 @@ SCENE 은 furnace 와 directional light 를 끈 Sponza 다.
 
 설정과 reset:
 
-  [8] PT 의 설정이 state 에 보이고 settings set 으로 바뀌며, 끝낼 때 editor.ini 에 남는다.
+  [8] PT 의 설정이 state 에 보이고 settings set 으로 바뀌며, 끝낼 때 user.ini 에 남는다.
   [9] image 를 정하는 설정을 하나씩 바꾸면 pt 의 resets 가 1 늘고 samples 를 처음부터 센다. Samples per Frame 과 Target Samples 를
       바꾸면 늘지 않는다.
   [10] SCENE 을 쌓다가 white furnace 로 바꾼 뒤 처음 찍은 capture 에서 모든 pixel 이 1.0 이다. reset 뒤에 옛 sample 이 남지 않는다.
@@ -69,7 +69,7 @@ SCENE = BASE
 IMAGE_SETTING_CHANGES = {'Output': 'Indirect Irradiance', 'Shading': 'glTF', 'Seed': 1, 'Max Bounces': 63, 'Russian Roulette': 0, SKY_RADIANCE: 2, 'Geometric Normals': 1,
                          'Furnace': 1, 'Furnace Albedo': 0.5, 'Furnace Emission': 0.5}
 PACE_SETTING_CHANGES = {'Samples per Frame': 2, 'Target Samples': 8192}
-# [8] 에서 끝내기 전에 두는 값. BASE 와도 IMAGE_SETTING_CHANGES 와도 달라서 editor.ini 에서 이 run 이 쓴 값인지 알 수 있다. Output 과
+# [8] 에서 끝내기 전에 두는 값. BASE 와도 IMAGE_SETTING_CHANGES 와도 달라서 user.ini 에서 이 run 이 쓴 값인지 알 수 있다. Output 과
 # Shading 은 IMAGE_SETTING_CHANGES 와 같은 값이지만 [9] 가 BASE 로 되돌린 뒤에 바꾸므로 같은 것을 알 수 있다. Output 은 값이 둘뿐이라
 # BASE 와도 IMAGE_SETTING_CHANGES 와도 다른 값이 없다.
 SAVED_SETTINGS = {'Output': 'Indirect Irradiance', 'Shading': 'glTF', 'Max Bounces': 7, 'Russian Roulette': 0, 'Geometric Normals': 1, 'Furnace': 1,
@@ -166,9 +166,9 @@ def read_ini_section(path, section):
 
 def check_stopped(instance, check):
     stop_and_check(instance, check)
-    saved = path_tracer_settings(read_ini_section(Path(instance['run_dir']) / 'editor.ini', SECTION))
+    saved = path_tracer_settings(read_ini_section(Path(instance['run_dir']) / 'user.ini', SECTION))
     expected = {key: str(value) for key, value in SAVED_SETTINGS.items()}
-    check('[8] editor.ini keeps the path tracer settings', {key: saved.get(key) for key in expected} == expected, saved)
+    check('[8] user.ini keeps the path tracer settings', {key: saved.get(key) for key in expected} == expected, saved)
 
 
 def command_check(args):

@@ -20,7 +20,7 @@ LIVE_DEVICE 하나만 남는지도 본다.
       와 bit 가 같고, scene capture 가 [2] 의 PT 를 끈 capture 와 sky pixel 에서 bit 가 같다. ROUNDED_SKY_LIGHT 처럼 R11G11B10 이
       정확히 담지 못하는 값에서도 PT 의 UAV 쓰기와 raster 의 render target 쓰기가 같은 값으로 반올림하는지 본다.
   [4] PT 를 쌓는 동안 Color 나 Intensity 를 바꾸면 pt 의 resets 가 1 늘고 samples 를 처음부터 센다. Intensity 의 inf 는 받고
-      (check-path-tracer-export.py 가 쓴다) NaN 과 음수는 받지 않는다. 끝내기 전에 둔 SAVED_SKY_LIGHT 가 editor.ini 의 Sky Light
+      (check-path-tracer-export.py 가 쓴다) NaN 과 음수는 받지 않는다. 끝내기 전에 둔 SAVED_SKY_LIGHT 가 user.ini 의 Sky Light
       section 에 남는다.
   [5] state sky 의 color 와 intensity 가 settings 의 Sky Light 와 같은 값이고, Scene Hierarchy panel 의 목록 (state editor 의 objects)
       에 Sky Light 가 있어 Details panel 에서 그 값을 바꿀 수 있다.
@@ -59,7 +59,7 @@ MIN_SKY_FRACTION = 0.1
 SKY_LIGHTS = [((1.0, 1.0, 1.0), 1.0), ((1.0, 1.0, 1.0), 0.25), ((1.0, 1.0, 1.0), 2.0), ((0.5, 0.75, 1.0), 1.0)]
 # 0.6 은 R11G11B10 의 어느 channel 도 정확히 담지 못한다.
 ROUNDED_SKY_LIGHT = ((1.0, 1.0, 1.0), 0.6)
-# [4] 에서 끝내기 전에 두는 값. SKY_LIGHTS 의 어느 것과도 달라서 editor.ini 에서 이 run 이 쓴 값인지 알 수 있다.
+# [4] 에서 끝내기 전에 두는 값. SKY_LIGHTS 의 어느 것과도 달라서 user.ini 에서 이 run 이 쓴 값인지 알 수 있다.
 SAVED_SKY_LIGHT = ((0.25, 0.5, 1.0), 0.75)
 
 # miss 한 sample 은 모두 같은 값이라 sample 수와 상관없이 평균이 그 값이다. 수를 줄여 시간을 아낀다.
@@ -211,10 +211,10 @@ def read_ini_section(path, section):
 
 
 def check_saved(instance, check):
-    saved = read_ini_section(Path(instance['run_dir']) / 'editor.ini', SKY_LIGHT_SECTION)
+    saved = read_ini_section(Path(instance['run_dir']) / 'user.ini', SKY_LIGHT_SECTION)
     color, intensity = SAVED_SKY_LIGHT
     expected = {'Color': format_color(color), 'Intensity': f'{intensity:.9g}'}
-    check('[4] editor.ini keeps the Sky Light', saved == expected, f'{saved}, expected {expected}')
+    check('[4] user.ini keeps the Sky Light', saved == expected, f'{saved}, expected {expected}')
 
 
 def command_check(args):

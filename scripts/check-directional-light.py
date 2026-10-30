@@ -14,9 +14,9 @@ app 을 Debug 로 Sponza 에서 한 번, test scene 에서 한 번 띄우고 끝
 의 float export 로 본다.
 
 light:
-  [L1] state light 의 direction 이 rotation (quaternion) 으로 돌린 +Z 와 1e-6 안에서 같고, editor.ini 에 남는 Direction 과 float 로 같다.
-  [L4] Sponza 에서 바꾼 light 를 끝낼 때 editor.ini 에 남고, 그 값을 test scene 의 실행에 settings set 으로 넣으면 state light 가 모든
-       값에서 같다. settings set 은 app 이 시작할 때 editor.ini 를 읽는 것과 같은 load 를 부른다. 그 editor.ini 의 Engine Tuning 에
+  [L1] state light 의 direction 이 rotation (quaternion) 으로 돌린 +Z 와 1e-6 안에서 같고, user.ini 에 남는 Direction 과 float 로 같다.
+  [L4] Sponza 에서 바꾼 light 를 끝낼 때 user.ini 에 남고, 그 값을 test scene 의 실행에 settings set 으로 넣으면 state light 가 모든
+       값에서 같다. settings set 은 app 이 시작할 때 user.ini 를 읽는 것과 같은 load 를 부른다. 그 user.ini 의 Engine Tuning 에
        Viewer/Lighting 의 예전 light 항목이 없다.
 
 PT 의 직접광 (test scene): Max Bounces 1, Sky Light 0, Russian roulette off 다. sky 와 emission 이 0 이라 path 의 값은 처음 맞은 곳에서
@@ -206,7 +206,7 @@ def check_saved_direction(session, check):
     direction = vector_of(light['direction'])
     rotated = rotate(vector_of(light['rotation'], 'xyzw'), np.array([0.0, 0.0, 1.0]))
     in_ini = np.array([float(value) for value in saved['Direction'].split(',')])
-    check('[L1] state light direction is the +Z of its rotation and the Direction editor.ini keeps',
+    check('[L1] state light direction is the +Z of its rotation and the Direction user.ini keeps',
           np.abs(rotated - direction).max() <= 1e-6 and same_bits(in_ini, direction),
           f'rotation {light["rotation"]}, direction {light["direction"]}, saved {saved["Direction"]}')
 
@@ -233,7 +233,7 @@ def check_resets(session, check):
 
 
 def run_sponza(build_first, check):
-    """Sponza 의 판정을 하고, 끝낼 때 editor.ini 에 남은 light 와 그때의 state light 를 돌려준다."""
+    """Sponza 의 판정을 하고, 끝낼 때 user.ini 에 남은 light 와 그때의 state light 를 돌려준다."""
     instance = start_instance('Debug', build_first=build_first)
     stored = None
     try:
@@ -258,7 +258,7 @@ def run_sponza(build_first, check):
         return None
     ini = configparser.ConfigParser(delimiters=('=',), comment_prefixes=(';',), interpolation=None)
     ini.optionxform = str
-    ini.read(Path(instance['run_dir']) / 'editor.ini', encoding='utf-8')
+    ini.read(Path(instance['run_dir']) / 'user.ini', encoding='utf-8')
     return SimpleNamespace(state=stored, saved=dict(ini[LIGHT_SECTION]) if ini.has_section(LIGHT_SECTION) else {},
                            tuning=dict(ini['Engine Tuning']) if ini.has_section('Engine Tuning') else {})
 
@@ -270,11 +270,11 @@ def check_stored(session, check, stored):
         return
     old = [key for key in stored.tuning if key.startswith('Viewer/Lighting/')]
     if not stored.saved:
-        check('[L4] editor.ini keeps the light', False, f'no [{LIGHT_SECTION}] section')
+        check('[L4] user.ini keeps the light', False, f'no [{LIGHT_SECTION}] section')
         return
     set_light(session, stored.saved)
     loaded = light_state(session)
-    check('[L4] the light saved in editor.ini loads back as it was, and Engine Tuning keeps no light of its own',
+    check('[L4] the light saved in user.ini loads back as it was, and Engine Tuning keeps no light of its own',
           loaded == stored.state and not old, f'{stored.state} -> {loaded}; Engine Tuning {old}')
 
 

@@ -65,11 +65,11 @@ Sponza: harness baseline 의 시점과 light 에서 Shading glTF 로 쌓는다. 
        Normals off, Max Bounces 64, Russian roulette on, 256 spp) 을 쌓아 invalid sample 이 0 이다. 그리고 check-directional-light.py 의
        [P6], [P7] 을 Shading glTF 로 통과한다. [P6] 의 보이는데 어두움은 glTF 의 f 가 0 이 아닌 pixel (Metallic 이 1 이고 Base Color 가
        0 인 곳 밖) 에서 세고 임계값은 그대로다.
-  [R4] 기본 화면의 밝기: scripts/harness-baseline/editor.ini 의 Exposure 주석의 규칙대로, baseline 시점에서 Exposure 2^EXPOSURE_STOPS 의
+  [R4] 기본 화면의 밝기: scripts/harness-baseline/user.ini 의 Exposure 주석의 규칙대로, baseline 시점에서 Exposure 2^EXPOSURE_STOPS 의
        display 와 adaptive exposure 를 ADAPTATION_FRAMES 만큼 수렴시킨 display 의 평균 밝기를 견줘 stop 으로 가장 가까운 Exposure 가 1
        이다. 수렴은 마지막 두 밝기의 비가 ADAPTATION_SETTLED 안인 것으로 본다.
-  [M1] Shading 설정: 기본은 glTF 다. Shading key 가 없는 editor.ini (harness baseline) 로 띄우면 state 와 settings get Engine Tuning 의 Path Tracer/Shading 이
-       glTF 이고, settings set 으로 바꾸면 state 가 따르고 pt 의 resets 가 1 늘며, 끝낼 때 editor.ini 에 마지막 값이 남는다.
+  [M1] Shading 설정: 기본은 glTF 다. Shading key 가 없는 user.ini (harness baseline) 로 띄우면 state 와 settings get Engine Tuning 의 Path Tracer/Shading 이
+       glTF 이고, settings set 으로 바꾸면 state 가 따르고 pt 의 resets 가 1 늘며, 끝낼 때 user.ini 에 마지막 값이 남는다.
        check-lambert-path.py 의 [8], [9] 도 Shading 을 넣어 판정한다.
 
 source 와 생성 파일:
@@ -661,8 +661,8 @@ def run_test_scene(build_first, check):
 def check_default_shading(session, check):
     shown = path_tracer_settings(session.ask_ok(f'state settings.{SECTION}')['state']['settings'][SECTION]).get('Shading')
     got = path_tracer_settings(session.ask_ok(f'settings get {SECTION}')['values']).get('Shading')
-    baseline = (BASELINE_DIR / 'editor.ini').read_text(encoding='utf-8')
-    check('[M1] Shading is glTF in state and settings get when editor.ini has no Shading key',
+    baseline = (BASELINE_DIR / 'user.ini').read_text(encoding='utf-8')
+    check('[M1] Shading is glTF in state and settings get when user.ini has no Shading key',
           shown == 'glTF' and got == 'glTF' and 'Shading' not in baseline, f'state {shown}, settings get {got}')
 
 
@@ -670,7 +670,7 @@ def check_shading_resets(session, check):
     set_path_tracer(session, GLTF | {'Target Samples': 1 << 20})
     session.ask_ok('pt reset')
     counts = []
-    # 기본값 glTF 와 다른 Lambert 로 끝내서, [M1] 이 끝낼 때 editor.ini 에 마지막 값이 남는지를 기본값과 구별해 본다.
+    # 기본값 glTF 와 다른 Lambert 로 끝내서, [M1] 이 끝낼 때 user.ini 에 마지막 값이 남는지를 기본값과 구별해 본다.
     for shading in ['Lambert', 'glTF', 'Lambert']:
         session.ask_ok('pt wait samples=2', timeout=WAIT_TIMEOUT)
         before = path_tracer_state(session)['resets']
@@ -683,7 +683,7 @@ def check_shading_resets(session, check):
 
 
 def display_luminance(session, name):
-    """display 의 sRGB 를 decode 한 Rec.709 luminance 의 평균 (scripts/harness-baseline/editor.ini 의 Exposure 주석)"""
+    """display 의 sRGB 를 decode 한 Rec.709 luminance 의 평균 (scripts/harness-baseline/user.ini 의 Exposure 주석)"""
     session.ask_ok(f'frames {SETTLE_FRAMES + 1}')
     srgb = np.asarray(Image.open(capture(session, 'display', name)).convert('RGB'), dtype=np.float64) / 255.0
     linear = np.where(srgb <= 0.04045, srgb / 12.92, ((srgb + 0.055) / 1.055) ** 2.4)
@@ -822,9 +822,9 @@ def run_sponza(check):
         return
     ini = configparser.ConfigParser(delimiters=('=',), comment_prefixes=(';',), interpolation=None)
     ini.optionxform = str
-    ini.read(Path(instance['run_dir']) / 'editor.ini', encoding='utf-8')
+    ini.read(Path(instance['run_dir']) / 'user.ini', encoding='utf-8')
     saved = path_tracer_settings(ini[SECTION]).get('Shading') if ini.has_section(SECTION) else None
-    check('[M1] editor.ini keeps the Shading set last (Lambert)', saved == 'Lambert', f'Shading={saved}')
+    check('[M1] user.ini keeps the Shading set last (Lambert)', saved == 'Lambert', f'Shading={saved}')
 
 
 # --- source: [C1] ------------------------------------------------------------------------------

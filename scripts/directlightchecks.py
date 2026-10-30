@@ -49,7 +49,7 @@ def accumulate_export(session, settings, name):
 
 
 def set_light(session, values):
-    """editor.ini 의 key 와 value 로 light 를 정한다."""
+    """user.ini 의 key 와 value 로 light 를 정한다."""
     session.ask_ok(f'settings set {LIGHT_SECTION}: ' + '; '.join(f'{key}={value}' for key, value in values.items()))
 
 

@@ -101,6 +101,7 @@
     <ClInclude Include="Graphics\Resource\GpuResource.h" />
     <ClInclude Include="Profiling\GpuTimeManager.h" />
     <ClInclude Include="App\GameCore.h" />
+    <ClInclude Include="App\UserSettings.h" />
     <ClInclude Include="Graphics\GraphicsCommon.h" />
     <ClInclude Include="Graphics\GraphicsCore.h" />
     <ClInclude Include="Utility\Hash.h" />
@@ -132,7 +133,6 @@
     <ClInclude Include="Automation\FrameCapture.h" />
     <ClInclude Include="Automation\UnattendedRun.h" />
     <ClInclude Include="Editor\EditorCamera.h" />
-    <ClInclude Include="Editor\EditorSettings.h" />
     <ClInclude Include="Editor\MeasurementConditions.h" />
     <ClInclude Include="Editor\SceneEditor.h" />
     <ClInclude Include="Utility\IniFile.h" />
@@ -179,7 +179,6 @@
     <ClCompile Include="Automation\FrameCapture.cpp" />
     <ClCompile Include="Automation\UnattendedRun.cpp" />
     <ClCompile Include="Editor\EditorCamera.cpp" />
-    <ClCompile Include="Editor\EditorSettings.cpp" />
     <ClCompile Include="Editor\MeasurementConditions.cpp" />
     <ClCompile Include="Editor\SceneEditor.cpp" />
     <ClCompile Include="Utility\IniFile.cpp" />
@@ -189,6 +188,7 @@
     <ClCompile Include="Effects\FXAA\FXAA.cpp" />
     <ClCompile Include="App\Input.cpp" />
     <ClCompile Include="App\GameCore.cpp" />
+    <ClCompile Include="App\UserSettings.cpp" />
     <ClCompile Include="Graphics\Resource\GpuBuffer.cpp" />
     <ClCompile Include="Graphics\Resource\AccelerationStructureBuffer.cpp" />
     <ClCompile Include="Profiling\GpuTimeManager.cpp" />

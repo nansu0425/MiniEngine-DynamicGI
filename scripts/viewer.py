@@ -32,7 +32,7 @@ HARNESS_DIR = VIEWER_DIR / 'Harness'
 RUNS_DIR = HARNESS_DIR / 'runs'
 INSTANCE_FILE = HARNESS_DIR / 'instance.json'
 BASELINE_DIR = REPO_ROOT / 'scripts' / 'harness-baseline'
-USER_SETTINGS = [VIEWER_DIR / 'editor.ini', VIEWER_DIR / 'imgui.ini']
+USER_SETTINGS = [VIEWER_DIR / 'user.ini', VIEWER_DIR / 'imgui.ini']
 MODEL_VIEWER_SOURCE = VIEWER_DIR / 'ModelViewer.cpp'
 # repo 가 갖는 scene file 의 폴더. 그 glTF 는 scripts/fetch-assets.ps1 이 받거나 만든다.
 SCENES_DIR = VIEWER_DIR / 'Scenes'
@@ -514,7 +514,7 @@ def write_scene_file(gltf):
 
 def start_instance(config, scene=None, build_first=True, gpu_validation=False, baseline=BASELINE_DIR):
     """scene (MiniEngine/ModelViewer 기준 scene file 경로) 을 -scene 으로 연 app 을 띄운다. None 이면 -scene 없이 default_scene() 을 연다.
-    baseline 은 run 폴더에 복사해 app 이 처음 읽게 할 editor.ini 와 imgui.ini 의 폴더다."""
+    baseline 은 run 폴더에 복사해 app 이 처음 읽게 할 user.ini 와 imgui.ini 의 폴더다."""
     opened = scene or default_scene()
     if not (VIEWER_DIR / opened).exists():
         raise HarnessError(f'missing the scene file {VIEWER_DIR / opened}')
@@ -824,7 +824,7 @@ SNAPSHOT_POSES = {
     'shadowed-wall': '1500 150 0 1.5708 0.05',
     'gallery': '-1200 150 400 -1.5708 0.1',
 }
-# harness baseline 은 결정성을 위해 이 app 의 기본 효과를 끈다 (scripts/harness-baseline/editor.ini). app-default 는 사용자가 보는 화면이다.
+# harness baseline 은 결정성을 위해 이 app 의 기본 효과를 끈다 (scripts/harness-baseline/user.ini). app-default 는 사용자가 보는 화면이다.
 SNAPSHOT_SETTINGS = {
     'baseline': {},
     'app-default': {'Graphics/AA/TAA/Enable': 'on', 'Graphics/Motion Blur/Enable': 'on', 'Graphics/HDR/Adaptive Exposure': 'on'},
@@ -1122,7 +1122,7 @@ def command_selftest(args):
         instance = load_instance()
         if instance is not None and is_running(instance):
             stop_instance(instance, kill_now=True)
-        check('user editor.ini and imgui.ini are unchanged', hash_user_settings() == user_settings)
+        check("the user's user.ini and imgui.ini are unchanged", hash_user_settings() == user_settings)
 
     print(f'{len(failures)} failed' if failures else 'all passed')
     return 1 if failures else 0
@@ -1324,7 +1324,7 @@ def quaternion_of(fields):
 
 
 def check_light(session, check, changes):
-    """light set 이 gizmo 와 panel 이 바꾸는 값을 바꾸고, state light 가 조명이 쓰는 방향과 editor.ini 에 남는 값에 맞는지 본다.
+    """light set 이 gizmo 와 panel 이 바꾸는 값을 바꾸고, state light 가 조명이 쓰는 방향과 user.ini 에 남는 값에 맞는지 본다.
     UI 를 숨기고 TAA 를 끈 상태에서 부르고, light 를 처음 상태로 되돌려 놓는다."""
     import numpy as np
 
@@ -1343,7 +1343,7 @@ def check_light(session, check, changes):
     original, original_saved = light_state(), saved()
     direction = vector_of(original['direction'])
     elevation, azimuth = elevation_and_azimuth_of(direction)
-    check('state light direction is the +Z of its rotation and the Direction saved in editor.ini, and elevation, azimuth are of that direction',
+    check('state light direction is the +Z of its rotation and the Direction saved in user.ini, and elevation, azimuth are of that direction',
           np.abs(rotate(quaternion_of(original['rotation']), [0, 0, 1]) - direction).max() <= 1e-6
           and np.array_equal(numbers_of(original_saved['Direction']).astype(np.float32), direction.astype(np.float32))
           and abs(float(original['elevation']) - elevation) <= 1e-4 and degrees_between(float(original['azimuth']), azimuth) <= 1e-4,
@@ -1418,7 +1418,7 @@ def check_light(session, check, changes):
 
     record_change(session, changes, 'light set color, intensity', 'light set color=0.5,0.25,1 intensity=2.5', 'light')
     light, values = light_state(), saved()
-    check('light set color and intensity read back as given and are what editor.ini keeps',
+    check('light set color and intensity read back as given and are what user.ini keeps',
           light['color'] == {'r': '0.5', 'g': '0.25', 'b': 1} and light['intensity'] == '2.5'
           and values['Color'] == '0.5,0.25,1' and values['Intensity'] == '2.5',
           f'{light["color"]}, {light["intensity"]}; saved {values["Color"]}, {values["Intensity"]}')
@@ -1816,7 +1816,7 @@ def check_acceptance(session, check):
         requested = dict(item.split('=') for item in argument_of('light set ').split())
         lit = responses['lit']['state']
         light, saved = lit['light'], numbers_of(lit['settings'][LIGHT_SECTION]['Direction'])
-        check('acceptance 1: state light is at the elevation and azimuth light set asked for, and editor.ini keeps that direction',
+        check('acceptance 1: state light is at the elevation and azimuth light set asked for, and user.ini keeps that direction',
               abs(float(light['elevation']) - float(requested['elevation'])) <= 1e-4
               and degrees_between(float(light['azimuth']), float(requested['azimuth'])) <= 1e-4
               and np.array_equal(saved.astype(np.float32), vector_of(light['direction']).astype(np.float32))
@@ -2248,7 +2248,7 @@ def main():
     add_config(command)
 
     command = add_command('start', 'build, then start ModelViewer in a new run folder under MiniEngine/ModelViewer/Harness/runs '
-                                   "with a copy of scripts/harness-baseline as -settings_dir, so the user's editor.ini and imgui.ini "
+                                   "with a copy of scripts/harness-baseline as -settings_dir, so the user's user.ini and imgui.ini "
                                    f'stay untouched. Deletes all but the newest {KEPT_RUNS} run folders, keeping the running one', command_start)
     add_config(command)
     command.add_argument('--scene', help='scene file path relative to MiniEngine/ModelViewer, passed as -scene. '

@@ -1,22 +1,22 @@
 #include "Core/pch.h"
-#include "Core/Editor/EditorSettings.h"
+#include "Core/App/UserSettings.h"
 #include "Core/Utility/IniFile.h"
 
 #include <fstream>
 
 namespace
 {
-    const wchar_t* kFileName = L"editor.ini";
+    const wchar_t* kFileName = L"user.ini";
 
     struct Section
     {
-        std::function<void(EditorSettings::Values&)> save;
-        std::function<void(const EditorSettings::Values&)> load;
+        std::function<void(UserSettings::Values&)> save;
+        std::function<void(const UserSettings::Values&)> load;
     };
 
     std::map<std::string, Section> s_Sections;
-    // editor.ini에서 읽은 값. 등록되지 않은 section도 Save가 다시 쓸 수 있게 남겨 둔다.
-    std::map<std::string, EditorSettings::Values> s_LoadedValues;
+    // user.ini에서 읽은 값. 등록되지 않은 section도 Save가 다시 쓸 수 있게 남겨 둔다.
+    std::map<std::string, UserSettings::Values> s_LoadedValues;
     bool s_Loaded = false;
 
     void ApplyLoadedValues(const std::string& name, const Section& section)
@@ -27,7 +27,7 @@ namespace
     }
 }
 
-std::wstring EditorSettings::GetFilePath(const std::wstring& fileName)
+std::wstring UserSettings::GetFilePath(const std::wstring& fileName)
 {
     std::wstring directory;
     if (!CommandLineArgs::GetString(L"settings_dir", directory) || directory.empty())
@@ -37,19 +37,19 @@ std::wstring EditorSettings::GetFilePath(const std::wstring& fileName)
     return directory + fileName;
 }
 
-void EditorSettings::Register(const std::string& section, const std::function<void(Values&)>& save, const std::function<void(const Values&)>& load)
+void UserSettings::Register(const std::string& section, const std::function<void(Values&)>& save, const std::function<void(const Values&)>& load)
 {
     s_Sections[section] = { save, load };
     if (s_Loaded)
         ApplyLoadedValues(section, s_Sections[section]);
 }
 
-void EditorSettings::Unregister(const std::string& section)
+void UserSettings::Unregister(const std::string& section)
 {
     s_Sections.erase(section);
 }
 
-void EditorSettings::Load(void)
+void UserSettings::Load(void)
 {
     s_LoadedValues = IniFile::Read(GetFilePath(kFileName));
 
@@ -58,7 +58,7 @@ void EditorSettings::Load(void)
         ApplyLoadedValues(section.first, section.second);
 }
 
-void EditorSettings::Save(void)
+void UserSettings::Save(void)
 {
     std::map<std::string, Values> sections = s_LoadedValues;
     for (const auto& section : s_Sections)
@@ -78,7 +78,7 @@ void EditorSettings::Save(void)
     }
 }
 
-std::vector<std::string> EditorSettings::GetSectionNames(void)
+std::vector<std::string> UserSettings::GetSectionNames(void)
 {
     std::vector<std::string> names;
     for (const auto& section : s_Sections)
@@ -86,7 +86,7 @@ std::vector<std::string> EditorSettings::GetSectionNames(void)
     return names;
 }
 
-bool EditorSettings::ReadSection(const std::string& section, Values& values)
+bool UserSettings::ReadSection(const std::string& section, Values& values)
 {
     const auto found = s_Sections.find(section);
     if (found == s_Sections.end())
@@ -97,7 +97,7 @@ bool EditorSettings::ReadSection(const std::string& section, Values& values)
     return true;
 }
 
-bool EditorSettings::ApplySection(const std::string& section, const Values& values)
+bool UserSettings::ApplySection(const std::string& section, const Values& values)
 {
     const auto found = s_Sections.find(section);
     if (found == s_Sections.end())

@@ -48,7 +48,7 @@ SCENE (glTF, light, Sky 1, Geometric Normals off, Max Bounces 64, Russian roulet
        TAA 를 켜고 쌓은 export 가 rgba 의 bit 까지 같다. PT 는 TAA jitter 와 무관하게 pixel 격자의 중심을 쏘기 때문이다.
 
 설정:
-  [U1] harness baseline 의 editor.ini 에는 Output 이 없고, 띄운 직후 state 의 Output 이 Radiance 다.
+  [U1] harness baseline 의 user.ini 에는 Output 이 없고, 띄운 직후 state 의 Output 이 Radiance 다.
 
 keep 은 harness baseline 의 시점에서 KEEP 을 Output Indirect Irradiance 의 glTF 와 Lambert, Output Radiance 의 glTF 로 KEEP_SAMPLES 만큼
 쌓아 KEPT_DIR 에 DDS 와 보기용 PNG 로 남긴다. Indirect Irradiance 의 PNG 는 E/π 를 Radiance 와 같은 exposure 로 보인다. 그림자 경계와
@@ -144,11 +144,11 @@ def count(mask):
 def check_default_output(session, check):
     ini = configparser.ConfigParser(delimiters=('=',), comment_prefixes=(';',), interpolation=None)
     ini.optionxform = str
-    ini.read(BASELINE_DIR / 'editor.ini', encoding='utf-8')
+    ini.read(BASELINE_DIR / 'user.ini', encoding='utf-8')
     in_baseline = ini.has_section(SECTION) and 'Output' in path_tracer_settings(ini[SECTION])
     output = path_tracer_settings(session.ask_ok(f'state settings.{SECTION}')['state']['settings'][SECTION]).get('Output')
     check('[U1] the harness baseline has no Output and the path tracer starts with Radiance', not in_baseline and output == 'Radiance',
-          f'Output in the baseline editor.ini: {in_baseline}; state Output {output}')
+          f'Output in the baseline user.ini: {in_baseline}; state Output {output}')
 
 
 def check_furnaces(session, check, hits):

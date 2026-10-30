@@ -5,18 +5,18 @@
 #include <string>
 #include <vector>
 
-// 종료할 때 editor의 상태를 editor.ini에 쓰고, 다음 실행 때 되돌린다.
+// 종료할 때 사용자의 설정을 user.ini에 쓰고, 다음 실행 때 되돌린다.
 // 무엇을 저장할지는 각 기능이 section으로 등록해 정한다. panel의 배치는 ImGui가 imgui.ini에 따로 저장한다.
-namespace EditorSettings
+namespace UserSettings
 {
-    // editor.ini와 imgui.ini의 경로. -settings_dir <dir>이 있으면 working directory 대신 그 폴더에 둔다.
+    // user.ini와 imgui.ini의 경로. -settings_dir <dir>이 있으면 working directory 대신 그 폴더에 둔다.
     // harness가 사용자의 파일을 건드리지 않고 정해진 상태에서 시작하게 하려는 것이다.
     std::wstring GetFilePath(const std::wstring& fileName);
 
     // section 안의 key와 value
     typedef std::map<std::string, std::string> Values;
 
-    // save는 Save 때 section의 값을 채우고, load는 editor.ini에 그 section이 있을 때 그 값을 받는다.
+    // save는 Save 때 section의 값을 채우고, load는 user.ini에 그 section이 있을 때 그 값을 받는다.
     // Load 뒤에 등록한 section은 등록할 때 바로 load를 받는다.
     void Register(const std::string& section, const std::function<void(Values&)>& save, const std::function<void(const Values&)>& load);
     void Unregister(const std::string& section);

@@ -33,7 +33,7 @@ public:
 
     // Edit과 SetFromString의 구현은 값을 바꿨으면 Increment, Decrement, Bang 중 하나를 거쳐 action callback을 불러야 한다.
     virtual void Edit( const char* /*label*/ ) {}
-    // ToString이 만든 문자열을 SetFromString이 읽어 editor.ini에 저장한 값을 되돌린다.
+    // ToString이 만든 문자열을 SetFromString이 읽어 user.ini에 저장한 값을 되돌린다.
     virtual std::string ToString( void ) const { return ""; }
     virtual void SetFromString( const std::string& text ) = 0;
 

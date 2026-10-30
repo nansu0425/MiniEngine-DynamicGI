@@ -44,7 +44,7 @@
 #include "Core/Editor/EditorCamera.h"
 #include "Core/Editor/SceneEditor.h"
 #include "Core/Automation/ControlChannel.h"
-#include "Core/Editor/EditorSettings.h"
+#include "Core/App/UserSettings.h"
 #include "Core/Editor/MeasurementConditions.h"
 #include "Core/UI/ImGuiLayer.h"
 #include "Core/Utility/IniFile.h"
@@ -71,7 +71,7 @@ using Renderer::MeshSorter;
 class DirectionalLight : public SceneEditor::IconObject
 {
 public:
-    // gizmo, light set 명령, Details panel, editor.ini가 바꾸는 값
+    // gizmo, light set 명령, Details panel, user.ini가 바꾸는 값
     struct Properties
     {
         // GetX, GetY, GetZ가 local의 +X, +Y, +Z를 world에서 본 방향이다. 조명이 쓰는 +Z를 계산 없이 그대로 읽도록
@@ -115,7 +115,7 @@ private:
 class SkyLight : public SceneEditor::Object
 {
 public:
-    // Details panel, editor.ini, settings 명령이 바꾸는 값
+    // Details panel, user.ini, settings 명령이 바꾸는 값
     struct Properties
     {
         // directional light처럼 color는 linear RGB이고 성분마다 0 ~ 1이며, intensity와 곱한 것이 빛이다. intensity는 lux가 아니라
@@ -306,7 +306,7 @@ std::string FormatVector(Vector3 vector)
     return text;
 }
 
-void SaveLightSettings(const DirectionalLight& light, EditorSettings::Values& values)
+void SaveLightSettings(const DirectionalLight& light, UserSettings::Values& values)
 {
     const DirectionalLight::Properties& properties = light.GetProperties();
     values["Direction"] = FormatVector(properties.rotation.GetZ());
@@ -319,7 +319,7 @@ void SaveLightSettings(const DirectionalLight& light, EditorSettings::Values& va
 }
 
 // 받을 수 없는 값은 건너뛰고 그 값은 그대로 둔다.
-void LoadLightSettings(DirectionalLight& light, const EditorSettings::Values& values)
+void LoadLightSettings(DirectionalLight& light, const UserSettings::Values& values)
 {
     const auto read = [&values](const char* key, Vector3& vector)
     {
@@ -348,7 +348,7 @@ SkyLight::SkyLight()
     m_Properties.intensity = kDefaultSkyLightIntensity;
 }
 
-void SaveSkyLightSettings(const SkyLight& sky, EditorSettings::Values& values)
+void SaveSkyLightSettings(const SkyLight& sky, UserSettings::Values& values)
 {
     const SkyLight::Properties& properties = sky.GetProperties();
     values["Color"] = FormatVector(properties.color);
@@ -359,7 +359,7 @@ void SaveSkyLightSettings(const SkyLight& sky, EditorSettings::Values& values)
 
 // 받을 수 없는 값은 건너뛰고 그 값은 그대로 둔다. directional light와 달리 intensity의 inf는 받는다.
 // scripts/check-path-tracer-export.py가 inf로 두어 path tracer에 NaN과 Inf인 sample을 만든다.
-void LoadSkyLightSettings(SkyLight& sky, const EditorSettings::Values& values)
+void LoadSkyLightSettings(SkyLight& sky, const UserSettings::Values& values)
 {
     SkyLight::Properties properties = sky.GetProperties();
     const auto color = values.find("Color");
@@ -383,12 +383,12 @@ ControlChannel::Fields DescribeSkyLight(const SkyLight& sky)
         .Float("intensity", properties.intensity);
 }
 
-// sky light를 editor.ini의 section과 harness의 settings 명령, state로 읽고 바꾸게 한다.
+// sky light를 user.ini의 section과 harness의 settings 명령, state로 읽고 바꾸게 한다.
 void RegisterSkyLight(SkyLight& sky)
 {
-    EditorSettings::Register(kSkyLightSettingsSection,
-        [&sky](EditorSettings::Values& values) { SaveSkyLightSettings(sky, values); },
-        [&sky](const EditorSettings::Values& values) { LoadSkyLightSettings(sky, values); });
+    UserSettings::Register(kSkyLightSettingsSection,
+        [&sky](UserSettings::Values& values) { SaveSkyLightSettings(sky, values); },
+        [&sky](const UserSettings::Values& values) { LoadSkyLightSettings(sky, values); });
     ControlChannel::RegisterState("sky", [&sky] { return DescribeSkyLight(sky); });
 }
 
@@ -495,7 +495,7 @@ void ReadTaa(const MeasurementConditions::Values& values, MeasurementConditions:
     reading.applies.push_back([taa] { TemporalEffects::EnableTAA = taa; });
 }
 
-// light의 rotation은 editor.ini처럼 +Z와 +Y로 적어, 다시 읽으면 bit 단위로 같은 rotation이 된다. position은 조명에 영향이 없어 적지 않는다.
+// light의 rotation은 user.ini처럼 +Z와 +Y로 적어, 다시 읽으면 bit 단위로 같은 rotation이 된다. position은 조명에 영향이 없어 적지 않는다.
 void DescribeLightConditions(const DirectionalLight& light, MeasurementConditions::Values& values)
 {
     const DirectionalLight::Properties& properties = light.GetProperties();
@@ -842,12 +842,12 @@ void SetLight(DirectionalLight& light, const std::string& arguments, const Contr
     reply.Ok(fields.Object("state", ControlChannel::GetState("light")));
 }
 
-// light를 editor.ini의 section, harness의 light 명령과 state로 읽고 바꾸게 한다.
+// light를 user.ini의 section, harness의 light 명령과 state로 읽고 바꾸게 한다.
 void RegisterLight(DirectionalLight& light)
 {
-    EditorSettings::Register(kLightSettingsSection,
-        [&light](EditorSettings::Values& values) { SaveLightSettings(light, values); },
-        [&light](const EditorSettings::Values& values) { LoadLightSettings(light, values); });
+    UserSettings::Register(kLightSettingsSection,
+        [&light](UserSettings::Values& values) { SaveLightSettings(light, values); },
+        [&light](const UserSettings::Values& values) { LoadLightSettings(light, values); });
     ControlChannel::RegisterState("light", [&light] { return DescribeLight(light); });
     ControlChannel::Register("light", "light set <key>=<value> ... | light reset: the directional light, as its rotate and translate gizmos and its "
         "Details panel change it. reset sets the transform to no rotation at the origin, so the light goes along world -Z, "
@@ -963,7 +963,7 @@ void DirectionalLight::ShowDetails()
 //   [Camera] Position=<x>,<y>,<z>, Heading, Pitch: 처음 pose. 단위는 state camera와 pose 명령과 같다.
 //            Fit=Model: 위 셋 대신 둔다. bounding sphere 중심의 +z 쪽 반지름의 2배와 near clip을 더한 거리에서 -z를 본다.
 //            예전 -model의 OrbitCamera가 처음 그린 화면과 bit 단위로 같다.
-// scene 을 열면 camera는 scene file의 pose로 시작한다. 다른 scene 의 줄을 Restore하면 줄의 camera를 쓴다. editor.ini는 camera의 이동 속도만
+// scene 을 열면 camera는 scene file의 pose로 시작한다. 다른 scene 의 줄을 Restore하면 줄의 camera를 쓴다. user.ini는 camera의 이동 속도만
 // 남긴다.
 struct SceneFile
 {
@@ -1272,8 +1272,8 @@ void ModelViewer::Startup( void )
 void ModelViewer::Cleanup( void )
 {
     UnregisterMeasurementConditions();
-    EditorSettings::Unregister(kSkyLightSettingsSection);
-    EditorSettings::Unregister(kLightSettingsSection);
+    UserSettings::Unregister(kSkyLightSettingsSection);
+    UserSettings::Unregister(kLightSettingsSection);
     SceneEditor::RemoveObject(m_SkyLight);
     SceneEditor::RemoveObject(m_Light);
     SceneEditor::RemoveObject(m_SceneModel);
