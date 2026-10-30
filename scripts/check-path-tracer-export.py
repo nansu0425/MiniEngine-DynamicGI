@@ -1,11 +1,12 @@
-"""PathTracer 의 누적값을 float image 로 export 해서 furnace 의 답, 같은 Seed 의 재현, NaN 과 Inf 인 sample 의 처리를 판정하고, shading
-normal 이 잃는 energy 와 Russian roulette 의 pixel 단위 bias 를 잰다.
+"""PathTracer 의 누적값을 float image 로 export 해서 furnace 의 답, SCENE 의 값의 범위, 같은 Seed 의 재현, NaN 과 Inf 인 sample 의 처리를
+판정하고, shading normal 이 잃는 energy 와 Russian roulette 의 bias 를 잰다.
 
   python scripts/check-path-tracer-export.py check            # Debug 로 띄워 아래 기준을 모두 판정한다
   python scripts/check-path-tracer-export.py check --record   # 모두 통과하면 [N1], [R1] 에서 잰 값을 RECORD 에 덧붙인다
 
-app 을 직접 띄우고 끝내며, 이미 띄운 harness instance 는 먼저 끝낸다. 하나라도 실패하면 exit 1 이다. 작업 5 의 확인은
-check-lambert-path.py 가 따로 한다. PT 의 Shading 은 pathtracerchecks.BASE 의 Lambert 다. glTF BRDF 는 check-gltf-brdf.py 가 본다.
+app 을 직접 띄우고 끝내며, 이미 띄운 harness instance 는 먼저 끝낸다. 하나라도 실패하면 exit 1 이다. Max Bounces 를 올릴 때 path 를
+이어 가는지와 설정의 reset 은 check-lambert-path.py 가 본다. PT 의 Shading 은 pathtracerchecks.BASE 의 Lambert 다. glTF BRDF 는
+check-gltf-brdf.py 가 본다.
 
 export 는 capture pt 가 쓰는 누적 buffer 의 DDS 다. rgb 는 평균, a 는 더한 sample 수다. 옆의 state 파일의 pt.samples 는 dispatch 한
 sample 수이므로, 그 차가 NaN 이나 Inf 라서 더하지 않은 sample 수다. r 의 식과 뜻은 imagecompare.py 에 있다.
@@ -17,7 +18,7 @@ camera ray 가 바로 miss 한 path 도 escape 한 것으로 센다.
 
 export:
   [E1] export 는 scene 크기다. NaN 과 Inf 를 만들지 않는 모든 run 에서 모든 pixel 의 a 가 pt.samples 와 같다.
-  [E2] 장면을 Target 까지 쌓은 뒤 찍은 scene capture q 와 export v 가 모든 pixel, channel 에서 |q - v| <= 2^-m max(v, 2^-14) 다.
+  [E2] SCENE 을 Target 까지 쌓은 뒤 찍은 scene capture q 와 export v 가 모든 pixel, channel 에서 |q - v| <= 2^-m max(v, 2^-14) 다.
        scene color 는 R11G11B10_FLOAT 이고 m 은 mantissa 의 bit 수 (R, G 는 6, B 는 5), 2^-14 는 가장 작은 normal 값이다. 오른쪽은 v 가 든
        binade 의 1 ulp 이고 2^-14 아래에서는 denormal 의 ulp 라서, GPU 의 rounding mode 를 몰라도 성립한다. 이 GPU 가 denormal 을 0 으로
        flush 하지 않는 것은 작업 5 의 scene capture 에 2^-20 과 2^-19 격자의 값이 있는 것으로 봤다.
@@ -32,17 +33,21 @@ shading normal: shading normal 둘레에서 고른 방향이 geometric normal �
 끝나서 energy 를 잃는다. DDGI 는 이 규칙을 모르므로 DDGI 와 PT 의 차에 반사마다 이 손실이 섞인다.
   [N1] ONE_REFLECTION_FURNACE 를 Geometric Normals 를 켜고 끈 두 run 으로 SHADING_NORMAL_SAMPLES 만큼 쌓는다. path 의 값은 반사가 잘리면
        1, 아니면 2 이므로, 두 run 의 차가 camera 에서 보이는 면에서 반사 한 번이 잃는 energy 의 비율이다. 모든 pixel 에서 그 차가
-       [-FURNACE_TOLERANCE, 1 + FURNACE_TOLERANCE] 안이다. Geometric Normals 를 끈 white furnace 는 모든 pixel 이 1 + FURNACE_TOLERANCE
-       이하다. 반사 한 번의 평균 손실, 손실이 있는 pixel 의 비율, 그 pixel 들의 평균 손실, white furnace 의 평균 손실을 찍는다. white
-       furnace 는 path 가 escape 할 때까지 반사마다 손실이 쌓인 값이라 albedo 1 에서만 나오는 크기다.
+       [-FURNACE_TOLERANCE, 1 + FURNACE_TOLERANCE] 안이다. Geometric Normals 를 끈 white furnace 를 FURNACE_SAMPLES 만큼 (--record 면
+       SHADING_NORMAL_SAMPLES 만큼) 쌓으면 모든 pixel 이 1 + FURNACE_TOLERANCE 이하다. 반사 한 번의 평균 손실, 손실이 있는 pixel 의 비율,
+       그 pixel 들의 평균 손실, white furnace 의 평균 손실을 찍는다. white furnace 는 path 가 escape 할 때까지 반사마다 손실이 쌓인 값이라
+       albedo 1 에서만 나오는 크기다.
 
-Russian roulette:
-  [R1] furnace 와 directional light 를 끈 Sponza 를 SCENE_SAMPLES 만큼 Russian roulette off (A) 와 on (B) 로, 각각 Seed 0 과 1 로 쌓은 네 export 의 r 이
-       AGREEMENT_LIMIT 이하다. r^2 ~ 1 + bias^2 / noise^2 이므로 bias 의 rms 가 noise 의 0.14 배 아래라는 뜻이다. r, bias, noise 를 찍는다.
-       Seed 0 과 1 이 독립이 아니면 분모가 작아져 r 이 커지므로 Seed 의 독립도 같이 본다.
+Russian roulette: SCENE 은 furnace 와 directional light 를 끈 Sponza 다. Sponza 에는 emission 이 없고 albedo 가 1 이하라 radiance 가 Sky
+Light 의 radiance 를 넘을 수 없다. SCENE 을 SCENE_SAMPLES 만큼 Russian roulette off (A) 와 on (B) 로, 각각 Seed 0 과 1 로 쌓는다.
+  [R1] 네 export 의 r 이 AGREEMENT_LIMIT 이하다. r^2 ~ 1 + bias^2 / noise^2 이므로 bias 의 rms 가 noise 의 0.14 배 아래라는 뜻이다. r,
+       bias, noise 를 찍는다. Seed 0 과 1 이 독립이 아니면 분모가 작아져 r 이 커지므로 Seed 의 독립도 같이 본다.
+  [R2] Seed 0 의 A 와 B 가 모든 pixel 에서 유한하고 [0, 1] 안이다.
+  [R3] Seed 0 의 A 와 B 의 image 평균이 상대 RUSSIAN_ROULETTE_TOLERANCE 안에서 같다. image 전체에 고르게 퍼진 bias 는 pixel 의 noise 보다
+       훨씬 작아 [R1] 이 보지 못해도 평균에는 드러난다 (추론). 기준은 noise 를 어림해 정했으므로 같은 조건의 Seed 0 과 1 의 차도 찍는다.
 
 재현:
-  [S1] 장면을 Russian roulette on, Seed 0 으로 REPRODUCTION_SAMPLES 만큼 쌓은 export, Seed 1 로 바꿨다가 되돌려 다시 쌓은 export,
+  [S1] SCENE 을 Russian roulette on, Seed 0 으로 REPRODUCTION_SAMPLES 만큼 쌓은 export, Seed 1 로 바꿨다가 되돌려 다시 쌓은 export,
        Samples per Frame 4 로 다시 쌓은 export 가 rgba 의 bit 까지 같다. 뒤의 둘은 그 사이에 누적이 다시 시작된 것도 본다.
        sample 번호가 frame 과 무관하게 reset 뒤의 순번이므로 Samples per Frame 은 image 를 바꾸지 않는다.
 
@@ -52,8 +57,9 @@ NaN 과 Inf: Sky Light 의 Intensity 를 inf 로 두고 white furnace 를 Max Bo
   둘 다 모든 pixel 의 a 가 escape 하지 못한 path 수 FURNACE_SAMPLES x (1 - X_WF(INVALID_BOUNCES)) 와 같고 rgb 가 0 이다. 더한 sample 과
   버린 sample 이 섞인 pixel 이 있고, 버린 sample 이 0 보다 많다.
 
-check 는 끝낼 때 실행 중의 D3D12 CORRUPTION, ERROR, WARNING 이 0 이고 종료 때 LIVE_DEVICE 하나만 남는지도 본다. [N1] 의 export 는
-발표에 쓰도록 KEPT_DIR 에 DDS 와 보기용 PNG 로, 반사 한 번의 손실은 PNG 로 남긴다.
+check 는 끝낼 때 실행 중의 D3D12 CORRUPTION, ERROR, WARNING 이 0 이고 종료 때 LIVE_DEVICE 하나만 남는지도 본다. [F1] 의 Russian
+roulette off, [F2] 의 B 64, [R1] 의 Seed 0 과 --record 로 쌓은 [N1] 의 white furnace 의 export 는 발표에 쓰도록 KEPT_DIR 에 DDS 와 보기용
+PNG 로, 반사 한 번의 손실은 PNG 로 남긴다.
 """
 
 import argparse
@@ -82,7 +88,8 @@ FURNACE_TOLERANCE = 1e-4
 EMISSION_FURNACE_BOUNCES = [0, 1, 2, 4, 64]
 # Sponza 에서 escape 한 path 와 못한 path 가 한 pixel 에 섞이는 반사 횟수
 INVALID_BOUNCES = 4
-# white furnace 가 Debug 에서 1 분쯤 걸린다.
+# [N1] 의 반사 한 번 furnace 와 --record 의 white furnace 가 쌓는 sample 수. 측정 기록의 값은 SHADING_NORMAL_SAMPLES 로 쟀다.
+# SHADING_NORMAL_SAMPLES 로 쌓는 white furnace 는 Debug 에서 1 분쯤 걸린다.
 SHADING_NORMAL_SAMPLES = 256
 # 처음 맞은 곳의 emission 1 에, 반사가 잘리지 않으면 다음 hit 의 emission 이나 sky 1 을 더하고 끝난다.
 ONE_REFLECTION_FURNACE = WHITE_FURNACE | {'Furnace Emission': 1, 'Max Bounces': 1}
@@ -92,6 +99,8 @@ SCENE = BASE
 SCENE_SAMPLES = 256
 # r 은 약 200 만 pixel 의 합이라 bias 가 없으면 1 근처에 모인다. imagecompare.py selftest 가 그 흔들림을 본다.
 AGREEMENT_LIMIT = 1.01
+# 1 spp 의 상대 표준편차를 2 정도로, pixel 사이를 독립으로 보면 1920x1080 의 SCENE_SAMPLES 평균의 상대 표준편차는 약 1e-4 다 (추측).
+RUSSIAN_ROULETTE_TOLERANCE = 1e-3
 REPRODUCTION_SAMPLES = 64
 # [S1] 에서 Seed 1 로 쌓다가 Seed 0 으로 되돌리기 전에 기다리는 sample 수
 SAMPLES_BEFORE_RETURN = 8
@@ -99,7 +108,7 @@ SAMPLES_BEFORE_RETURN = 8
 R11G11B10_MANTISSA_BITS = np.array([6, 6, 5])
 R11G11B10_SMALLEST_NORMAL = 2.0 ** -14
 
-# 가장 느린 run 은 Russian roulette 를 끈 장면의 SCENE_SAMPLES 로, Debug 에서 1 분쯤 걸린다.
+# 가장 느린 run 은 Russian roulette 를 끈 SCENE 의 SCENE_SAMPLES 로, Debug 에서 1 분쯤 걸린다.
 WAIT_TIMEOUT = 900
 
 
@@ -141,15 +150,19 @@ def keep(path):
 def check_furnaces(accumulate, check):
     """X_WF(INVALID_BOUNCES) 를 돌려준다."""
     for russian_roulette in (0, 1):
-        image, _ = accumulate(f'white-furnace-rr{russian_roulette}', WHITE_FURNACE | {'Russian Roulette': russian_roulette}, FURNACE_SAMPLES)
+        image, path = accumulate(f'white-furnace-rr{russian_roulette}', WHITE_FURNACE | {'Russian Roulette': russian_roulette}, FURNACE_SAMPLES)
         deviation = float(np.max(np.abs(rgb64(image) - 1.0)))
         check(f'[F1] white furnace with Russian roulette {"on" if russian_roulette else "off"} is within {FURNACE_TOLERANCE:g} of 1',
               deviation <= FURNACE_TOLERANCE, f'max |X - 1| {deviation:.3g}')
+        if not russian_roulette:
+            keep(path)
 
     escaped, deviations = {}, {}
     for bounces in EMISSION_FURNACE_BOUNCES:
         white, _ = accumulate(f'white-furnace-b{bounces}', WHITE_FURNACE | {'Max Bounces': bounces}, FURNACE_SAMPLES)
-        emission, _ = accumulate(f'emission-furnace-b{bounces}', EMISSION_FURNACE | {'Max Bounces': bounces}, FURNACE_SAMPLES)
+        emission, path = accumulate(f'emission-furnace-b{bounces}', EMISSION_FURNACE | {'Max Bounces': bounces}, FURNACE_SAMPLES)
+        if bounces == EMISSION_FURNACE_BOUNCES[-1]:
+            keep(path)
         escaped[bounces] = rgb64(white)
         predicted = 1.0 - 0.5 ** (bounces + 1) * (1.0 - escaped[bounces])
         deviations[bounces] = float(np.max(np.abs(rgb64(emission) / predicted - 1.0)))
@@ -182,8 +195,9 @@ def keep_loss_map(loss, name):
     Image.fromarray(gray).save(KEPT_DIR / f'{name}.png')
 
 
-def check_shading_normals(accumulate, check):
-    """측정 기록의 (반사 한 번의 평균 손실, 손실이 있는 pixel 의 비율, 그 pixel 들의 평균 손실, white furnace 의 평균 손실) 을 돌려준다."""
+def check_shading_normals(accumulate, check, record):
+    """측정 기록의 (반사 한 번의 평균 손실, 손실이 있는 pixel 의 비율, 그 pixel 들의 평균 손실, white furnace 의 평균 손실) 을 돌려준다.
+    white furnace 의 평균 손실은 record 일 때만 측정 기록의 sample 수로 잰 값이다."""
     geometric, _ = accumulate('one-reflection-geometric-normals', ONE_REFLECTION_FURNACE, SHADING_NORMAL_SAMPLES)
     shading, _ = accumulate('one-reflection-shading-normals', ONE_REFLECTION_FURNACE | {'Geometric Normals': 0}, SHADING_NORMAL_SAMPLES)
     loss = (rgb64(geometric) - rgb64(shading)).mean(axis=2)
@@ -194,11 +208,13 @@ def check_shading_normals(accumulate, check):
           f'min {loss.min():.4g}, max {loss.max():.4g}; mean {loss.mean():.4g}, {lossy.mean():.2%} of pixels lose energy, '
           f'by {loss[lossy].mean() if lossy.any() else 0.0:.4g} on average')
 
-    white, path = accumulate('white-furnace-shading-normals', WHITE_FURNACE | {'Geometric Normals': 0}, SHADING_NORMAL_SAMPLES)
-    keep(path)
+    samples = SHADING_NORMAL_SAMPLES if record else FURNACE_SAMPLES
+    white, path = accumulate('white-furnace-shading-normals', WHITE_FURNACE | {'Geometric Normals': 0}, samples)
+    if record:
+        keep(path)
     rgb = rgb64(white)
     check(f'[N1] white furnace with shading normals is {1 + FURNACE_TOLERANCE:g} or less everywhere', rgb.max() <= 1.0 + FURNACE_TOLERANCE,
-          f'max {rgb.max():.9g}, mean loss {1.0 - rgb.mean():.4g}')
+          f'max {rgb.max():.9g}, mean loss {1.0 - rgb.mean():.4g} at {samples} spp')
     return (float(loss.mean()), float(lossy.mean()), float(loss[lossy].mean()) if lossy.any() else 0.0, float(1.0 - rgb.mean()))
 
 
@@ -218,8 +234,14 @@ def check_russian_roulette(session, accumulate, check):
     images = {}
     for seed in (0, 1):
         for russian_roulette in (0, 1):
-            images[russian_roulette, seed], _ = accumulate(f'scene-rr{russian_roulette}-seed{seed}',
-                                                           SCENE | {'Seed': seed, 'Russian Roulette': russian_roulette}, SCENE_SAMPLES)
+            images[russian_roulette, seed], path = accumulate(f'scene-rr{russian_roulette}-seed{seed}',
+                                                              SCENE | {'Seed': seed, 'Russian Roulette': russian_roulette}, SCENE_SAMPLES)
+            if seed == 0:
+                rgb = rgb64(images[russian_roulette, seed])
+                finite = bool(np.all(np.isfinite(rgb)))
+                check(f'[R2] the scene with Russian roulette {"on" if russian_roulette else "off"} is finite and in [0, 1]',
+                      finite and rgb.min() >= 0.0 and rgb.max() <= 1.0, f'finite {finite}; min {rgb.min():.9g}, max {rgb.max():.9g}')
+                keep(path)
             if (russian_roulette, seed) == (1, 0):
                 check_scene_capture(session, check, images[1, 0])
     result = agreement(images[0, 0], images[0, 1], images[1, 0], images[1, 1])
@@ -227,6 +249,13 @@ def check_russian_roulette(session, accumulate, check):
     measured = (result.ratio, result.bias / scale, result.noise / scale)
     check(f'[R1] r of the scene with Russian roulette off and on is {AGREEMENT_LIMIT:g} or less', result.ratio <= AGREEMENT_LIMIT,
           f'r {result.ratio:.5g}, bias rms {measured[1]:.3g} and noise rms {measured[2]:.3g} of the image rms {scale:.4g}')
+
+    means = {key: float(rgb64(image).mean()) for key, image in images.items()}
+    difference = abs(means[1, 0] - means[0, 0]) / means[0, 0]
+    noise = {rr: abs(means[rr, 0] - means[rr, 1]) / means[rr, 0] for rr in (0, 1)}
+    check(f'[R3] the scene mean with Russian roulette on is within {RUSSIAN_ROULETTE_TOLERANCE:g} of off', difference <= RUSSIAN_ROULETTE_TOLERANCE,
+          f'off {means[0, 0]:.9g}, on {means[1, 0]:.9g}, relative difference {difference:.3g}; '
+          f'seed 0 and 1 differ by {noise[0]:.3g} with it off and {noise[1]:.3g} with it on')
     return measured
 
 
@@ -282,7 +311,7 @@ def command_check(args):
             accumulate = Accumulations(session)
             escaped = check_furnaces(accumulate, check)
             check_invalid_samples(accumulate, check, escaped)
-            shading_normals = check_shading_normals(accumulate, check)
+            shading_normals = check_shading_normals(accumulate, check, args.record)
             russian_roulette = check_russian_roulette(session, accumulate, check)
             check_reproduction(session, accumulate, check)
             check_counts(session, accumulate, check, escaped.shape)

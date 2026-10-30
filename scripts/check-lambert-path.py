@@ -1,50 +1,36 @@
-"""PathTracer 의 Lambert path loop 가 답을 식으로 아는 장면에서 그 답을 내는지, 설정이 누적을 다시 시작하는지 확인하고 1 spp 의 비용을 잰다.
+"""PathTracer 의 Lambert path loop 가 Max Bounces 를 올릴 때 앞의 path 를 이어 가는지, 설정이 누적을 다시 시작하는지 확인하고 1 spp 의
+비용을 잰다.
 
-  python scripts/check-lambert-path.py check   # Debug 로 띄워 [1] ~ [10] 과 D3D12 message 를 판정한다
+  python scripts/check-lambert-path.py check   # Debug 로 띄워 [6], [8] ~ [10] 과 D3D12 message 를 판정한다
   python scripts/check-lambert-path.py cost    # Profile 로 띄워 1 spp 의 GPU time 을 잰다. --record 를 주면 RECORD 에 덧붙인다
 
-둘 다 app 을 직접 띄우고 끝내며, 이미 띄운 harness instance 는 먼저 끝낸다. 하나라도 실패하면 exit 1 이다.
+둘 다 app 을 직접 띄우고 끝내며, 이미 띄운 harness instance 는 먼저 끝낸다. 하나라도 실패하면 exit 1 이다. furnace 의 답, SCENE 의 값의
+범위, Russian roulette 의 bias 는 같은 run 을 쌓는 check-path-tracer-export.py 가 export 로 판정한다.
 
 판정은 harness baseline 의 시점에서 UI 를 숨기고 찍은 scene capture 로 한다. scene capture 는 post effects 전의 scene color 이고 그
-format 이 R11G11B10_FLOAT 라서, PT 의 평균은 이 format 으로 양자화되어 있다. 이 format 은 1.0, 0.875, 0.75, 0.5 를 정확히 담으므로
-furnace 의 답을 그런 값으로 골라 bit 로 비교한다. 1.0 근처에서 이 비교가 볼 수 있는 오차는 mantissa 가 R, G 는 6 bit, B 는 5 bit 라서
-약 0.4% ~ 1.6% 보다 큰 것이다.
+format 이 R11G11B10_FLOAT 라서, PT 의 평균은 이 format 으로 양자화되어 있다. 이 format 은 1.0 을 정확히 담으므로 white furnace 의 답을
+bit 로 비교한다.
 
 PT 의 Shading 은 pathtracerchecks.BASE 의 Lambert 다. Lambert 의 f cos / pdf 는 albedo 이고 PT 는 그 값을 곱하므로
-(PathTracerCS.hlsl), albedo 가 1 이나 0.5 이면 throughput 은 fp32 에서 정확하고 아래 furnace 의 답은 bit 단위로 맞아야 한다. furnace 는
+(PathTracerCS.hlsl), albedo 가 1 이면 throughput 은 fp32 에서 정확하고 white furnace 의 답은 bit 단위로 맞아야 한다. white furnace 는
 Geometric Normals 를 켜서 normal map 이 잃는 energy 를 빼고, 분산이 0 이라 FURNACE_SAMPLES 로 본다. sky 는 늘 흰 Sky Light 의 Intensity 1 이다.
+SCENE 은 furnace 와 directional light 를 끈 Sponza 다.
 
-  [1] white furnace (albedo 1, emission 0, Max Bounces WHITE_FURNACE_BOUNCES): Russian roulette 를 끈 run 과 켠 run 모두 모든 pixel 이
-      1.0 이다. throughput 의 정규화와 sky 로의 escape, throughput 이 1 이면 Russian roulette 가 path 를 끊지 않는 것을 본다.
-  [2] emission furnace (albedo 0.5, emission 0.5, Russian roulette off, Max Bounces 64): 해는 어디서나 emission / (1 - albedo) = 1 이고
-      모든 pixel 이 1.0 이다. emission 에 throughput 을 곱해 더하는 것과 albedo < 1 의 반사를 본다. 64 번 안에 escape 하지 못한 path 의
-      값 1 - 0.5^65 도 fp32 에서 1.0 이다.
-  [3] [2] 를 Max Bounces 0 으로 돌리면 모든 pixel 이 0.5 (hit) 나 1.0 (miss) 이다. 1 이면 모든 pixel 이 [0.75, 1] 안이고 0.875 보다
-      작은 pixel 이 있다. 반사를 하나 더 하면 path 의 값이 0.875 이상이 되므로 그런 pixel 이 없어진다. 반사를 0 부터 세는지 본다.
-  [4] Geometric Normals 를 끈 white furnace (Russian roulette off): 모든 pixel 이 1.0 이하다. shading normal 이 energy 를 만들지 않는
-      것을 본다. 평균은 shading normal 이 잃는 energy 의 첫 수치로 찍는다.
-
-장면은 furnace 와 directional light 를 끈 Sponza 다. Sponza 에는 emission 이 없고 albedo 가 1 이하라 radiance 가 Sky Light 의 radiance 를 넘을 수
-없다.
-
-  [5] Max Bounces 64, SCENE_SAMPLES 에서 Russian roulette 를 끈 run 과 켠 run 모두 모든 pixel 이 [0, 1] 안이고 NaN, Inf 가 없다.
   [6] Russian roulette 를 끄고 Max Bounces 를 BOUNCE_STEPS 로 올리면 같은 Seed 와 FURNACE_SAMPLES 에서 어떤 pixel 도 어두워지지
       않고, image 평균은 VISIBLE_BOUNCES 까지 매번 는다. RNG 를 쓰는 양이 Max Bounces 에 따라 달라지지 않아 path 가 앞 run 의 path 를
       그대로 이어 가므로 pixel 이 어두워질 수 없다. VISIBLE_BOUNCES 뒤의 반사가 더하는 빛은 pixel 값의 양자화보다 작다.
-  [7] Max Bounces 64, SCENE_SAMPLES 에서 Russian roulette 를 끈 run 과 켠 run 의 image 평균이 상대 RUSSIAN_ROULETTE_TOLERANCE 안에서
-      같다. 기준은 noise 를 어림해 정했으므로 같은 조건의 Seed 0 과 1 의 차도 찍는다. pixel 단위의 bias 는 보지 않는다.
 
 설정과 reset:
 
   [8] PT 의 설정이 state 에 보이고 settings set 으로 바뀌며, 끝낼 때 editor.ini 에 남는다.
   [9] image 를 정하는 설정을 하나씩 바꾸면 pt 의 resets 가 1 늘고 samples 를 처음부터 센다. Samples per Frame 과 Target Samples 를
       바꾸면 늘지 않는다.
-  [10] 장면을 쌓다가 white furnace 로 바꾼 뒤 처음 찍은 capture 에서 모든 pixel 이 1.0 이다. reset 뒤에 옛 sample 이 남지 않는다.
+  [10] SCENE 을 쌓다가 white furnace 로 바꾼 뒤 처음 찍은 capture 에서 모든 pixel 이 1.0 이다. reset 뒤에 옛 sample 이 남지 않는다.
 
-check 는 끝낼 때 실행 중의 D3D12 CORRUPTION, ERROR, WARNING 이 0 이고 종료 때 LIVE_DEVICE 하나만 남는지도 본다. [1], [2], [4] 와
-장면의 capture 는 발표에 쓰도록 KEPT_DIR 에 DDS 와 보기용 PNG 로 남긴다.
+check 는 끝낼 때 실행 중의 D3D12 CORRUPTION, ERROR, WARNING 이 0 이고 종료 때 LIVE_DEVICE 하나만 남는지도 본다. [6] 의 Max Bounces 1
+과 64 의 capture 는 발표에 쓰도록 KEPT_DIR 에 DDS 와 보기용 PNG 로 남긴다.
 
-cost 는 장면을 Max Bounces 64, Samples per Frame 1 로 쌓는 동안 Profiler 의 "Path Tracer" GPU time 을 COST_FRAMES 동안 읽는다.
+cost 는 SCENE 을 Max Bounces 64, Samples per Frame 1 로 쌓는 동안 Profiler 의 "Path Tracer" GPU time 을 COST_FRAMES 동안 읽는다.
 Russian roulette 를 켠 것과 끈 것을 잰다.
 """
 
@@ -59,25 +45,22 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from checks import Checks, stop_and_check
 from imagefiles import ImageFileError, read_dds_rgba32f
-from pathtracerchecks import (BASE, EMISSION_FURNACE, FURNACE_SAMPLES, RECORD, light_by_sky_only, SECTION, WHITE_FURNACE, append_record_row, code_version,
+from pathtracerchecks import (BASE, FURNACE_SAMPLES, RECORD, light_by_sky_only, SECTION, WHITE_FURNACE, append_record_row, code_version,
                               describe_machine, path_tracer_state, set_path_tracer, SKY_RADIANCE)
 from viewer import HARNESS_DIR, PREVIEW_EXPOSURE, HarnessError, Session, capture, make_view, start_instance, stop_instance
 
 KEPT_DIR = HARNESS_DIR / 'kept' / 'lambert-path'
 COST_RECORD_SECTION = '## 작업 5: 1 spp 의 GPU time'
 
-SCENE_SAMPLES = 256
 BOUNCE_STEPS = [1, 2, 4, 16, 64]
-# Max Bounces 16 과 64 의 capture 는 bit 까지 같았다. 16 번 뒤의 반사가 더하는 빛이 장면의 pixel 값 (평균 0.004) 에서
+# Max Bounces 16 과 64 의 capture 는 bit 까지 같았다. 16 번 뒤의 반사가 더하는 빛이 SCENE 의 pixel 값 (평균 0.004) 에서
 # R11G11B10 의 반 ulp (0.004 근처에서 약 3e-5) 보다 작은 것으로 본다 (추측).
 VISIBLE_BOUNCES = 16
-# 1 spp 의 상대 표준편차를 2 정도로, pixel 사이를 독립으로 보면 1920x1080 의 SCENE_SAMPLES 평균의 상대 표준편차는 약 1e-4 다 (추측).
-RUSSIAN_ROULETTE_TOLERANCE = 1e-3
 # [9] 에서 설정을 바꾸기 전에 쌓아 두는 sample 수. 바꾼 뒤 몇 frame 안에 이만큼 다시 쌓이지 않을 만큼 둔다.
 SAMPLES_BEFORE_CHANGE = 32
 COST_WARMUP_SAMPLES = 16
 COST_FRAMES = 256
-# 가장 느린 run 은 Russian roulette 를 끈 장면의 SCENE_SAMPLES 로, Debug 에서 1 분쯤 걸린다.
+# 가장 오래 기다리는 명령은 cost 가 Russian roulette 를 끄고 COST_FRAMES 동안 재는 profile 로, 1 분쯤 걸린다.
 WAIT_TIMEOUT = 900
 
 SCENE = BASE
@@ -117,55 +100,7 @@ def describe_values(rgb):
     return f'min {rgb.min():.9g}, max {rgb.max():.9g}, mean {rgb.mean():.9g}'
 
 
-def check_furnaces(session, check):
-    for russian_roulette in (0, 1):
-        rgb, path = accumulate(session, f'white-furnace-rr{russian_roulette}', WHITE_FURNACE | {'Russian Roulette': russian_roulette},
-                               FURNACE_SAMPLES)
-        check(f'[1] white furnace with Russian roulette {"on" if russian_roulette else "off"} is 1.0 everywhere', count_not(rgb, 1.0) == 0,
-              f'{count_not(rgb, 1.0)} pixels are not; {describe_values(rgb)}')
-        if not russian_roulette:
-            keep(path)
-
-    rgb, path = accumulate(session, 'emission-furnace', EMISSION_FURNACE, FURNACE_SAMPLES)
-    check('[2] emission furnace is 1.0 everywhere', count_not(rgb, 1.0) == 0, f'{count_not(rgb, 1.0)} pixels are not; {describe_values(rgb)}')
-    keep(path)
-
-    rgb, _ = accumulate(session, 'emission-furnace-b0', EMISSION_FURNACE | {'Max Bounces': 0}, FURNACE_SAMPLES)
-    hits = int(np.count_nonzero(np.all(rgb == 0.5, axis=2)))
-    misses = int(np.count_nonzero(np.all(rgb == 1.0, axis=2)))
-    check('[3] emission furnace with Max Bounces 0 is 0.5 or 1.0 everywhere', hits + misses == rgb.shape[0] * rgb.shape[1],
-          f'{hits} pixels 0.5, {misses} pixels 1.0, {rgb.shape[0] * rgb.shape[1] - hits - misses} other')
-    rgb, _ = accumulate(session, 'emission-furnace-b1', EMISSION_FURNACE | {'Max Bounces': 1}, FURNACE_SAMPLES)
-    below = int(np.count_nonzero(np.any(rgb < 0.875, axis=2)))
-    check('[3] emission furnace with Max Bounces 1 is in [0.75, 1] and has pixels below 0.875',
-          rgb.min() >= 0.75 and rgb.max() <= 1.0 and below > 0, f'{describe_values(rgb)}; {below} pixels below 0.875')
-
-    rgb, path = accumulate(session, 'white-furnace-shading-normals', WHITE_FURNACE | {'Geometric Normals': 0}, FURNACE_SAMPLES)
-    below = int(np.count_nonzero(np.any(rgb < 1.0, axis=2)))
-    check('[4] white furnace with shading normals is 1.0 or less everywhere', rgb.max() <= 1.0,
-          f'{describe_values(rgb)}; {below} pixels below 1.0')
-    keep(path)
-
-
-def check_scene(session, check):
-    means = {}
-    for seed in (0, 1):
-        for russian_roulette in (0, 1):
-            rgb, path = accumulate(session, f'scene-b64-rr{russian_roulette}-seed{seed}',
-                                   SCENE | {'Seed': seed, 'Russian Roulette': russian_roulette}, SCENE_SAMPLES)
-            means[seed, russian_roulette] = float(rgb.mean(dtype=np.float64))
-            if seed == 0:
-                finite = bool(np.all(np.isfinite(rgb)))
-                check(f'[5] scene with Russian roulette {"on" if russian_roulette else "off"} is finite and in [0, 1]',
-                      finite and rgb.min() >= 0.0 and rgb.max() <= 1.0, f'finite {finite}; {describe_values(rgb)}')
-                keep(path)
-
-    difference = abs(means[0, 1] - means[0, 0]) / means[0, 0]
-    noise = {rr: abs(means[0, rr] - means[1, rr]) / means[0, rr] for rr in (0, 1)}
-    check(f'[7] scene mean with Russian roulette on is within {RUSSIAN_ROULETTE_TOLERANCE:g} of off', difference <= RUSSIAN_ROULETTE_TOLERANCE,
-          f'off {means[0, 0]:.9g}, on {means[0, 1]:.9g}, relative difference {difference:.3g}; '
-          f'seed 0 and 1 differ by {noise[0]:.3g} with it off and {noise[1]:.3g} with it on')
-
+def check_bounces(session, check):
     images, bounce_means = [], []
     for bounces in BOUNCE_STEPS:
         rgb, path = accumulate(session, f'scene-b{bounces}-rr0', SCENE | {'Max Bounces': bounces, 'Russian Roulette': 0}, FURNACE_SAMPLES)
@@ -244,8 +179,7 @@ def command_check(args):
         try:
             session.ask_ok('ui hide')
             light_by_sky_only(session)
-            check_furnaces(session, check)
-            check_scene(session, check)
+            check_bounces(session, check)
             check_resets(session, check)
             check_settings_state(session, check)
         finally:
@@ -297,7 +231,7 @@ def command_cost(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     commands = parser.add_subparsers(dest='command', required=True)
-    for name, handler, help in [('check', command_check, 'judge [1] to [10] and the D3D12 messages in Debug'),
+    for name, handler, help in [('check', command_check, 'judge [6], [8] to [10] and the D3D12 messages in Debug'),
                                 ('cost', command_cost, 'measure the GPU time of 1 spp in Profile')]:
         command = commands.add_parser(name, help=help)
         command.add_argument('--no-build', action='store_true', help='use the exe as it is')
