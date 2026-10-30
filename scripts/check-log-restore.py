@@ -12,8 +12,9 @@ D3D12 CORRUPTION, ERROR, WARNING 이 0 이고 종료 때 LIVE_DEVICE 하나만 �
 image 의 줄이다. B 는 Furnace 를 켠 줄이다. Furnace 는 directional light 를 끄므로 light 의 값이 image 에 보이지 않아 A 와 나눈다.
 두 번째 실행은 harness baseline 에서 다시 시작하므로 조건이 모두 기본값으로 돌아간 상태다.
 
-  [G1] 다시 띄운 직후, A, B 의 줄이 같은 key 를 가지고, size 밖의 key 는 모두 "다시 띄운 직후와 A" 또는 "A 와 B" 사이에서 값이
-       다르다. 그래서 아래의 restore 가 key 마다 실제로 값을 바꾼다. size 는 되돌리지 않는 조건이라 [G4] 가 따로 본다.
+  [G1] 다시 띄운 직후, A, B 의 줄이 같은 key 를 가지고, size 와 scene 밖의 key 는 모두 "다시 띄운 직후와 A" 또는 "A 와 B" 사이에서
+       값이 다르다. 그래서 아래의 restore 가 key 마다 실제로 값을 바꾼다. size 는 되돌리지 않는 조건이라 [G4] 가 따로 본다. scene 은
+       실행 중에 바꿀 수 없는 조건이라 [G4] 가 다른 scene 의 줄과 scene 이 없는 줄로 본다.
   [G2a] 다시 띄운 app 에 A 를, 그 뒤 B 를 restore 하면 그때마다 줄 (pt samples 밖) 과 state 의 camera, light, sky,
        settings.Engine Tuning, settings.Path Tracer (Show 밖) 가 줄을 얻을 때와 문자열로 같다. Target Samples 는 줄의 pt samples 다.
   [G2b] 다시 띄운 app 에서 export 의 줄을 restore 하고 Show 만 켜 SAMPLES 까지 쌓아 export 한 image 의 rgba 가 첫 실행의 export 와
@@ -22,7 +23,8 @@ image 의 줄이다. B 는 Furnace 를 켠 줄이다. Furnace 는 directional li
        validation capture 의 줄도 describe 의 조건을 모두 담고, 그 줄을 restore 하면 그 조건으로 돌아온다.
   [G4] A 의 줄에서 key 하나를 빼거나 값 하나를 받을 수 없는 값으로 바꾼 줄을 restore 하면 error 이고, unread 가 그 key 를 담고,
        state 가 바뀌지 않는다. size 만 다른 줄은 restore 되고, note 가 줄과 지금의 해상도를 알리며 scene 의 크기는 그대로다.
-       taa=on 인 B 의 restore 는 note 로 jitter 를 재현할 수 없다고 알린다.
+       taa=on 인 B 의 restore 는 note 로 jitter 를 재현할 수 없다고 알린다. scene 이 없는 줄은 scene file 전의 줄이라 -scene 없이 연
+       scene 의 줄로 restore 되고, scene 이 다른 줄 (위의 scene=x) 은 error 다.
 
 A 의 두 export 와 보기용 PNG, 줄은 발표에 쓰도록 KEPT_DIR 에 남긴다.
 """
@@ -181,14 +183,15 @@ def check_coverage(check, start, line_a, line_b):
     check('[G1] the lines at the start, of A and of B have the same keys', keys[0] == keys[1] == keys[2],
           ', '.join(sorted(keys[0] ^ keys[1] | keys[1] ^ keys[2])) or ', '.join(sorted(keys[0])))
     start, line_a, line_b = parse(start), parse(line_a), parse(line_b)
-    unchanged = [key for key in line_a if key != 'size' and start.get(key) == line_a[key] and line_a[key] == line_b.get(key)]
-    check('[G1] restoring A after the start and then B changes every condition but size at least once', not unchanged,
+    unchanged = [key for key in line_a if key not in ('size', 'scene') and start.get(key) == line_a[key] and line_a[key] == line_b.get(key)]
+    check('[G1] restoring A after the start and then B changes every condition but size and scene at least once', not unchanged,
           ', '.join(unchanged) or f'{len(line_a) - 1} conditions')
 
 
 def check_unreadable(session, check, line_a):
     values = parse(line_a)
-    lines = [(f'without {key}', key, format_line(without(values, key))) for key in values]
+    # scene 이 없는 줄은 받는 줄이라 check_line_without_scene 이 본다.
+    lines = [(f'without {key}', key, format_line(without(values, key))) for key in values if key != 'scene']
     lines += [(f'{key}=x', key, format_line(values | {key: 'x'})) for key in values]
     lines += [(f'{key}={value!r}', key, format_line(values | {key: value})) for key, value in OUT_OF_RANGE]
     wrong = []
@@ -200,6 +203,15 @@ def check_unreadable(session, check, line_a):
             wrong.append(f'{label} ({"ok" if response["ok"] else response.get("unread")}{", state changed" if after != before else ""})')
     check(f'[G4] restore of a line that lacks a key or cannot set one fails, names the key in unread and changes nothing', not wrong,
           '; '.join(wrong) or f'{len(lines)} lines')
+
+
+def check_line_without_scene(session, check, line_a):
+    session.ask_ok('pose 0 300 0 1.5708 1.2')
+    reply = session.ask(f'restore {format_line(without(parse(line_a), "scene"))}')
+    now = parse(session.ask_ok('describe')['line'])
+    differing = [key for key in parse(line_a) if key != 'pt samples' and now.get(key) != parse(line_a)[key]]
+    check('[G4] restore of A without scene, as a line from before scene files, restores it in the scene opened without -scene',
+          reply['ok'] and not differing, reply.get('error') or ', '.join(differing) or 'same')
 
 
 def check_notes(session, check, line_a, restored_b):
@@ -258,6 +270,7 @@ def second_run(check, line_a, image_a, state_a, line_b, state_b):
             restored_b = check_restored(session, check, line_b, state_b, 'B')
             session.ask_ok(f'pt wait samples={LINE_B["samples"]}', timeout=WAIT_TIMEOUT)
             check_unreadable(session, check, line_a)
+            check_line_without_scene(session, check, line_a)
             check_notes(session, check, line_a, restored_b)
             check_validation_line(session, check)
         finally:

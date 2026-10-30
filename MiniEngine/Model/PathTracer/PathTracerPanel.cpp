@@ -269,7 +269,7 @@ namespace
             ImGui::SetClipboardText(line.c_str());
             s_RestoreField.SetLine(line);
         }
-        ImGui::SetItemTooltip("Prints the camera, resolution, lights, settings above and samples as one line to the Output window, copies it and fills in "
+        ImGui::SetItemTooltip("Prints the scene file, camera, resolution, lights, settings above and samples as one line to the Output window, copies it and fills in "
             "the line below. Restoring it sets the Target Samples to those samples and starts over, so the image comes out the same.");
         s_RestoreField.Show();
     }

@@ -1651,7 +1651,7 @@ def check_rest_of_ui_commands(session, check):
     camera = start['camera']
     session.ask_ok('pose ' + ' '.join(repr(float(camera[key]) + 10) for key in ['x', 'y', 'z']) + f' {camera["heading"]} {camera["pitch"]}')
     session.ask_ok('light set elevation=40')
-    change('restore', f'restore {line}', 'camera', 'light', 'sky', 'settings.Engine Tuning', 'settings.Path Tracer')
+    change('restore', f'restore {line}', 'scene', 'camera', 'light', 'sky', 'settings.Engine Tuning', 'settings.Path Tracer')
     # restore 는 줄의 pt samples 를 Target Samples 로 둔다.
     session.ask_ok(f'settings set Path Tracer: Target Samples={start["settings"]["Path Tracer"]["Target Samples"]}')
 

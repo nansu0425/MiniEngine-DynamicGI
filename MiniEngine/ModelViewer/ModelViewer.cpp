@@ -200,6 +200,9 @@ constexpr float kDefaultLightIntensity = 4.0f * XM_PI;
 
 const char kSkyLightSettingsSection[] = "Sky Light";
 
+// scripts/viewer.py가 이 이름과 형식으로 -scene이 없을 때 여는 scene file의 경로를 읽는다.
+const wchar_t kDefaultScene[] = L"Scenes/Sponza.ini";
+
 // 기본값은 맑은 날 한낮의 두 illuminance의 비로 정한다. 하나는 해가 비추는 면이고, 다른 하나는 해만 가려진 그늘이다.
 // 그늘은 하늘의 빛만 받는다고 본다. 실제로는 그늘을 만든 물체가 하늘 일부를 가리고 빛을 반사하기도 하는데, 이 둘은 무시한다.
 // Wikipedia "Daylight"의 illuminance 표는 앞의 것을 111,000 lux로, 뒤의 것을 20,000 lux로 든다. 표에는 출처 표기가 없고 값도
@@ -514,9 +517,27 @@ void ReadSkyLightConditions(SkyLight& sky, const MeasurementConditions::Values& 
     reading.applies.push_back([&sky, properties] { sky.SetProperties(properties); });
 }
 
-// raster와 path tracer가 그리는 조건을 Log와 capture의 줄에 담고 Restore로 되돌리게 한다. path tracer의 설정은 PathTracerPanel이 더한다.
-void RegisterMeasurementConditions(EditorCamera& editorCamera, DirectionalLight& light, SkyLight& sky)
+// 실행 중에는 scene 을 바꿀 수 없으므로 다른 scene 의 줄은 받지 않는다. scene이 없는 줄은 scene file을 쓰기 전의 줄이고, 그때는
+// -model로 연 scene 을 Restore할 수 없었으므로 kDefaultScene의 줄로 읽는다.
+void ReadSceneConditions(const std::string& openScene, const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading)
 {
+    const auto scene = values.find("scene");
+    const std::string lineScene = scene != values.end() ? scene->second : Utility::ToUTF8(kDefaultScene);
+    if (lineScene != openScene)
+    {
+        reading.unread.push_back("scene");
+        reading.notes.push_back("the line is of the scene " + lineScene + ", but " + openScene + " is open, and Restore cannot open another scene.");
+    }
+}
+
+// raster와 path tracer가 그리는 조건을 Log와 capture의 줄에 담고 Restore로 되돌리게 한다. path tracer의 설정은 PathTracerPanel이 더한다.
+// scene은 연 scene file의 이름이다.
+void RegisterMeasurementConditions(const std::string& scene, EditorCamera& editorCamera, DirectionalLight& light, SkyLight& sky)
+{
+    MeasurementConditions::Register("scene", {
+        [scene](MeasurementConditions::Values& values) { values["scene"] = scene; },
+        [scene](const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading) { ReadSceneConditions(scene, values, reading); },
+        { "scene" } });
     MeasurementConditions::Register("camera", {
         [&editorCamera](MeasurementConditions::Values& values) { DescribeCameraConditions(editorCamera, values); },
         [&editorCamera](const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading) { ReadCameraConditions(editorCamera, values, reading); },
@@ -535,7 +556,7 @@ void RegisterMeasurementConditions(EditorCamera& editorCamera, DirectionalLight&
 
 void UnregisterMeasurementConditions(void)
 {
-    for (const char* group : { "camera", "size", "taa", "light", "sky" })
+    for (const char* group : { "scene", "camera", "size", "taa", "light", "sky" })
         MeasurementConditions::Unregister(group);
 }
 
@@ -944,9 +965,6 @@ struct SceneFile
     EditorCamera::Pose pose = { Vector3(kZero), 0.0f, 0.0f };
 };
 
-// scripts/viewer.py가 이 이름과 형식으로 -scene이 없을 때 여는 scene file의 경로를 읽는다.
-const wchar_t kDefaultScene[] = L"Scenes/Sponza.ini";
-
 // scene file 폴더 기준의 경로를 working directory 기준으로 바꾼다. 앞에 붙은 "../"마다 폴더를 한 단계 올라간다.
 std::wstring ResolveFromSceneFolder(const std::wstring& scenePath, std::wstring path)
 {
@@ -1070,8 +1088,10 @@ void ModelViewer::Startup( void )
     EditorCamera& editorCamera = *m_CameraController;
     RegisterPoseCommand(editorCamera);
     ControlChannel::RegisterState("camera", [this] { return DescribeCamera(m_Camera, *m_CameraController); });
-    const std::string scenePathText = Utility::ToUTF8(scenePath);
-    ControlChannel::RegisterState("scene", [scenePathText] { return DescribeScene(scenePathText); });
+    // state와 측정 조건의 줄이 scene 을 가리키는 이름. '\'로 적은 경로도 '/'로 적은 줄과 같은 scene 이 되게 한다.
+    std::string sceneName = Utility::ToUTF8(scenePath);
+    std::replace(sceneName.begin(), sceneName.end(), '\\', '/');
+    ControlChannel::RegisterState("scene", [sceneName] { return DescribeScene(sceneName); });
     m_SceneModel.SetPath(Utility::ToUTF8(scene.gltfPath));
     ControlChannel::RegisterState("model", [this] { return DescribeModel(m_SceneModel.GetPath(), m_ModelInst); });
 
@@ -1081,7 +1101,7 @@ void ModelViewer::Startup( void )
     SceneEditor::RegisterCommands(m_Camera);
     RegisterLight(m_Light);
     RegisterSkyLight(m_SkyLight);
-    RegisterMeasurementConditions(editorCamera, m_Light, m_SkyLight);
+    RegisterMeasurementConditions(sceneName, editorCamera, m_Light, m_SkyLight);
 }
 
 void ModelViewer::Cleanup( void )

@@ -330,10 +330,16 @@ namespace
         }
 
         const MeasurementConditions::Result result = MeasurementConditions::Restore(MeasurementConditions::Parse(arguments));
+        std::string notes;
+        for (const std::string& note : result.notes)
+            notes += (notes.empty() ? "" : " ") + note;
         if (!result.unread.empty())
         {
-            reply.Error("the line lacks or cannot set " + JoinNames(result.unread) + ", so nothing was restored.",
-                Fields().Text("unread", JoinNames(result.unread)));
+            Fields fields;
+            fields.Text("unread", JoinNames(result.unread));
+            if (!notes.empty())
+                fields.Text("note", notes);
+            reply.Error("the line lacks or cannot set " + JoinNames(result.unread) + ", so nothing was restored.", fields);
             return;
         }
         Fields state;
@@ -341,13 +347,8 @@ namespace
             state.Merge(GetState(path));
         Fields fields;
         fields.Text("line", MeasurementConditions::Format(MeasurementConditions::Describe()));
-        if (!result.notes.empty())
-        {
-            std::string notes;
-            for (const std::string& note : result.notes)
-                notes += (notes.empty() ? "" : " ") + note;
+        if (!notes.empty())
             fields.Text("note", notes);
-        }
         reply.Ok(fields.Object("state", state));
     }
 
@@ -595,9 +596,10 @@ namespace ControlChannel
         Register("settings", "settings get <section> | settings set <section>: <key>=<value>; <key>=<value>  (sections and values as in editor.ini). "
             "set changes nothing and fails if a value does not read back as given", HandleSettings);
         Register("describe", "describe: the conditions the scene and the path tracer are drawn in now, as a line that restore takes. "
-            "It has the camera, resolution, TAA, directional light, Sky Light, path tracer settings and the samples the path tracer has added", DescribeConditions);
+            "It has the scene file, camera, resolution, TAA, directional light, Sky Light, path tracer settings and the samples the path tracer has added", DescribeConditions);
         Register("restore", "restore <line>: sets every condition in a line printed by Log, left beside a capture or given by describe, as Restore does. "
             "Fails and sets nothing if the line lacks a condition or one cannot be set, and unread names them. "
+            "A line of another scene file than the one open is one, as the scene cannot change while running, and note says so. "
             "The resolution is only compared and note says how it differs. pt samples becomes the Target Samples and the path tracer starts over",
             RestoreConditions);
         Register("ui", "ui show|hide: same as F1. Hidden, the scene fills the client", SetUIVisible);
