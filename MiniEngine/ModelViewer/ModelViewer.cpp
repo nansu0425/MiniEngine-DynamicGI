@@ -132,7 +132,7 @@ LightComponent& AssembleLight(Scene::Object& object)
 // ray tracing으로 간접광을 구하는 곳 (path tracer, 앞으로의 DDGI)이 miss에서 이 radiance를 쓴다. raster는 이 빛으로 surface를 비추지
 // 않고 camera에서 바로 보이는 배경으로만 그린다. raster에는 sky의 visibility가 없어서 surface에 더하면 sky가 가려진 실내까지 밝아지고,
 // 그 빛은 DDGI가 구한다. 무한히 멀어 icon을 둘 자리가 없으므로 Scene Hierarchy로만 고른다.
-class SkyLightComponent : public Scene::Component
+class SkyComponent : public Scene::Component
 {
 public:
     // Details panel, scene file, editor set 명령이 바꾸는 값
@@ -144,7 +144,7 @@ public:
         float intensity;
     };
 
-    SkyLightComponent();
+    SkyComponent();
 
     const Properties& GetProperties() const { return m_Properties; }
     void SetProperties(const Properties& properties) { m_Properties = properties; }
@@ -263,8 +263,8 @@ private:
     ShadowCamera m_ShadowCamera;
     Scene::Object m_LightObject{ "Directional Light" };
     LightComponent& m_Light = AssembleLight(m_LightObject);
-    Scene::Object m_SkyLightObject{ "Sky Light" };
-    SkyLightComponent& m_SkyLight = m_SkyLightObject.AddComponent<SkyLightComponent>();
+    Scene::Object m_SkyObject{ "Sky" };
+    SkyComponent& m_Sky = m_SkyObject.AddComponent<SkyComponent>();
 };
 
 CREATE_APPLICATION( ModelViewer )
@@ -284,7 +284,7 @@ const wchar_t kScenesFolder[] = L"Scenes/";
 // 그늘은 하늘의 빛만 받는다고 본다. 실제로는 그늘을 만든 물체가 하늘 일부를 가리고 빛을 반사하기도 하는데, 이 둘은 무시한다.
 // Wikipedia "Daylight"의 illuminance 표는 앞의 것을 111,000 lux로, 뒤의 것을 20,000 lux로 든다. 표에는 출처 표기가 없고 값도
 // 어림이다. sky의 radiance가 L이면 위를 향한 면은 πL lux를 받는다. 그래서 πL : kDefaultLightIntensity = 20,000 : 111,000이다.
-constexpr float kDefaultSkyLightIntensity = kDefaultLightIntensity / XM_PI * (20000.0f / 111000.0f);
+constexpr float kDefaultSkyIntensity = kDefaultLightIntensity / XM_PI * (20000.0f / 111000.0f);
 
 // direction을 그대로 +Z로 두고 +Y를 world의 위쪽에 가깝게 둔 rotation. direction은 단위 vector다.
 Matrix3 MakeRotationToward(Vector3 direction)
@@ -397,19 +397,19 @@ void LightComponent::LoadSettings(const IniFile::Values& values)
     m_Properties = properties;
 }
 
-SkyLightComponent::Properties SkyLightComponent::GetDefaultProperties()
+SkyComponent::Properties SkyComponent::GetDefaultProperties()
 {
     Properties properties;
     properties.color = Vector3(1.0f, 1.0f, 1.0f);
-    properties.intensity = kDefaultSkyLightIntensity;
+    properties.intensity = kDefaultSkyIntensity;
     return properties;
 }
 
-SkyLightComponent::SkyLightComponent() : Component({ "Color", "Intensity" }), m_Properties(GetDefaultProperties())
+SkyComponent::SkyComponent() : Component({ "Color", "Intensity" }), m_Properties(GetDefaultProperties())
 {
 }
 
-void SkyLightComponent::SaveSettings(IniFile::Values& values) const
+void SkyComponent::SaveSettings(IniFile::Values& values) const
 {
     values["Color"] = FormatVector(m_Properties.color);
     char text[32];
@@ -419,7 +419,7 @@ void SkyLightComponent::SaveSettings(IniFile::Values& values) const
 
 // directional light와 달리 intensity의 inf는 받는다. scripts/check-path-tracer-export.py가 inf로 두어 path tracer에 NaN과 Inf인
 // sample을 만든다.
-void SkyLightComponent::LoadSettings(const IniFile::Values& values)
+void SkyComponent::LoadSettings(const IniFile::Values& values)
 {
     Properties properties = GetDefaultProperties();
     const auto color = values.find("Color");
@@ -434,24 +434,24 @@ void SkyLightComponent::LoadSettings(const IniFile::Values& values)
 }
 
 // state의 sky
-ControlChannel::Fields DescribeSkyLight(const SkyLightComponent& sky)
+ControlChannel::Fields DescribeSky(const SkyComponent& sky)
 {
-    const SkyLightComponent::Properties& properties = sky.GetProperties();
+    const SkyComponent::Properties& properties = sky.GetProperties();
     return ControlChannel::Fields()
         .Object("color", ControlChannel::Fields()
             .Float("r", properties.color.GetX()).Float("g", properties.color.GetY()).Float("b", properties.color.GetZ()))
         .Float("intensity", properties.intensity);
 }
 
-// sky light를 harness의 state로 읽게 한다. 값은 Details panel처럼 editor 명령으로 바꾼다.
-void RegisterSkyLight(SkyLightComponent& sky)
+// Sky를 harness의 state로 읽게 한다. 값은 Details panel처럼 editor 명령으로 바꾼다.
+void RegisterSky(SkyComponent& sky)
 {
-    ControlChannel::RegisterState("sky", [&sky] { return DescribeSkyLight(sky); });
+    ControlChannel::RegisterState("sky", [&sky] { return DescribeSky(sky); });
 }
 
-void ShowSkyLightDetails(SkyLightComponent& sky)
+void ShowSkyDetails(SkyComponent& sky)
 {
-    SkyLightComponent::Properties properties = sky.GetProperties();
+    SkyComponent::Properties properties = sky.GetProperties();
     float color[3] = { properties.color.GetX(), properties.color.GetY(), properties.color.GetZ() };
     if (ImGui::ColorEdit3("Color", color, ImGuiColorEditFlags_Float))
         properties.color = Min(Max(Vector3(color[0], color[1], color[2]), Vector3(kZero)), Vector3(1.0f, 1.0f, 1.0f));
@@ -579,17 +579,17 @@ void ReadLightConditions(LightComponent& light, const MeasurementConditions::Val
     reading.applies.push_back([&light, properties] { light.SetProperties(properties); });
 }
 
-void DescribeSkyLightConditions(const SkyLightComponent& sky, MeasurementConditions::Values& values)
+void DescribeSkyConditions(const SkyComponent& sky, MeasurementConditions::Values& values)
 {
-    const SkyLightComponent::Properties& properties = sky.GetProperties();
+    const SkyComponent::Properties& properties = sky.GetProperties();
     values["sky color"] = FormatVector(properties.color);
     values["sky intensity"] = FormatFloat(properties.intensity);
 }
 
-// intensity는 Sky Light의 settings처럼 inf도 받는다 (SkyLightComponent::LoadSettings). /fp:fast에서는 NaN과의 비교가 참일 수 있어 NaN을 따로 본다.
-void ReadSkyLightConditions(SkyLightComponent& sky, const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading)
+// intensity는 Sky의 settings처럼 inf도 받는다 (SkyComponent::LoadSettings). /fp:fast에서는 NaN과의 비교가 참일 수 있어 NaN을 따로 본다.
+void ReadSkyConditions(SkyComponent& sky, const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading)
 {
-    SkyLightComponent::Properties properties = sky.GetProperties();
+    SkyComponent::Properties properties = sky.GetProperties();
     ReadValue(values, "sky color", reading, [&properties](const std::string& text) { return ReadVector(text, properties.color) && IsColor(properties.color); });
     ReadValue(values, "sky intensity", reading, [&properties](const std::string& text)
     {
@@ -600,7 +600,7 @@ void ReadSkyLightConditions(SkyLightComponent& sky, const MeasurementConditions:
 
 // raster와 path tracer가 그리는 조건을 Log와 capture의 줄에 담고 Restore로 되돌리게 한다. scene 은 ModelViewer::RegisterSceneConditions가,
 // path tracer의 설정은 PathTracerTuning이 더한다.
-void RegisterMeasurementConditions(EditorCameraController& cameraController, LightComponent& light, SkyLightComponent& sky)
+void RegisterMeasurementConditions(EditorCameraController& cameraController, LightComponent& light, SkyComponent& sky)
 {
     MeasurementConditions::Register("camera", {
         [&cameraController](MeasurementConditions::Values& values) { DescribeCameraConditions(cameraController, values); },
@@ -613,8 +613,8 @@ void RegisterMeasurementConditions(EditorCameraController& cameraController, Lig
         [&light](const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading) { ReadLightConditions(light, values, reading); },
         { "light" } });
     MeasurementConditions::Register("sky", {
-        [&sky](MeasurementConditions::Values& values) { DescribeSkyLightConditions(sky, values); },
-        [&sky](const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading) { ReadSkyLightConditions(sky, values, reading); },
+        [&sky](MeasurementConditions::Values& values) { DescribeSkyConditions(sky, values); },
+        [&sky](const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading) { ReadSkyConditions(sky, values, reading); },
         { "sky" } });
 }
 
@@ -1030,13 +1030,13 @@ struct CameraSection
 };
 
 // scene 은 scene file 하나로 연다. 형식은 IniFile이고 key는 아래와 같다. 실행 중에는 Scene menu와 scene open 명령으로 다른 scene 을 연다.
-// section은 이름이 같은 Scene Hierarchy의 object (Model, Camera, Directional Light, Sky Light) 의 것이다. Scene menu의 Save와 scene save
+// section은 이름이 같은 Scene Hierarchy의 object (Model, Camera, Directional Light, Sky) 의 것이다. Scene menu의 Save와 scene save
 // 명령은 모든 object의 지금 설정을 object의 section에 쓴다. 설정의 key는 object의 component가 가진 setting key다 (Scene::Component).
 //   [Model]  아래 key는 scene 을 열 때 model을 load하고 크기를 정하는 데 읽는다. Model object의 설정이 아니므로 Save가 쓰지 않는다.
 //            glTF: scene file이 있는 폴더 기준의 glTF 경로
 //            Scale: glTF 좌표에 곱해 world 좌표로 바꾸는 배율. 다음의 Radius와 둘 중 하나만 둔다.
 //            Radius: model의 bounding sphere 반지름이 이 world 길이가 되는 배율 (ModelInstance::Resize)
-//   [Directional Light], [Sky Light] light의 section이나 key가 없으면 기본값이다.
+//   [Directional Light], [Sky] section이나 key가 없으면 기본값이다.
 //   [Camera] Position=<x>,<y>,<z>, Heading, Pitch: camera의 pose. 단위는 state camera와 pose 명령과 같다.
 //            Fit=Model: 위 셋 대신 둘 수 있다. bounding sphere 중심의 +z 쪽 반지름의 2배와 near clip을 더한 거리에서 -z를 본다.
 //            예전 -model의 OrbitCamera가 처음 그린 화면과 bit 단위로 같다. Save는 Fit=Model 줄을 지우고 지금 pose를 위 셋으로 쓴다.
@@ -1412,7 +1412,7 @@ void ModelViewer::Startup( void )
     Scene::AddObject(m_ModelObject);
     Scene::AddObject(m_CameraObject);
     Scene::AddObject(m_LightObject);
-    Scene::AddObject(m_SkyLightObject);
+    Scene::AddObject(m_SkyObject);
 #ifdef LEGACY_RENDERER
     // LEGACY_RENDERER는 scene file을 읽지 않으므로 Sponza::Startup이 정한 camera를 그대로 둔다.
     m_SceneName = GetSceneName(scenePath);
@@ -1436,18 +1436,18 @@ void ModelViewer::Startup( void )
     SceneEditor::RegisterComponentDetails<ModelComponent>(ShowModelDetails);
     SceneEditor::RegisterComponentDetails<CameraComponent>(ShowCameraDetails);
     SceneEditor::RegisterComponentDetails<LightComponent>(ShowLightDetails);
-    SceneEditor::RegisterComponentDetails<SkyLightComponent>(ShowSkyLightDetails);
+    SceneEditor::RegisterComponentDetails<SkyComponent>(ShowSkyDetails);
     SceneEditor::RegisterCommands(m_Camera);
     RegisterLight(m_Light);
-    RegisterSkyLight(m_SkyLight);
+    RegisterSky(m_Sky);
     RegisterSceneConditions();
-    RegisterMeasurementConditions(cameraController, m_Light, m_SkyLight);
+    RegisterMeasurementConditions(cameraController, m_Light, m_Sky);
 }
 
 void ModelViewer::Cleanup( void )
 {
     UnregisterMeasurementConditions();
-    Scene::RemoveObject(m_SkyLightObject);
+    Scene::RemoveObject(m_SkyObject);
     Scene::RemoveObject(m_LightObject);
     Scene::RemoveObject(m_CameraObject);
     Scene::RemoveObject(m_ModelObject);
@@ -1601,7 +1601,7 @@ void ModelViewer::RenderScene( void )
                 sorter.RenderMeshes(MeshSorter::kOpaque, gfxContext, globals);
             }
 
-            Renderer::DrawSkyBackground(gfxContext, viewport, scissor, m_SkyLight.GetRadiance());
+            Renderer::DrawSkyBackground(gfxContext, viewport, scissor, m_Sky.GetRadiance());
 
             sorter.RenderMeshes(MeshSorter::kTransparent, gfxContext, globals);
         }
@@ -1626,7 +1626,7 @@ void ModelViewer::RenderScene( void )
     // raster는 그대로 그린다. ray tracing view의 validation이 raster의 depth를 읽는다. PT의 Shading DDGI Probe Hit는 이 frame의 shadow
     // pass가 그린 shadow map을 읽는다.
     PathTracerTuning::Render(gfxContext.GetComputeContext(), m_Camera, m_MainViewport, m_RaytracingScene, m_Light.GetDirection(), m_Light.GetIlluminance(),
-        m_SkyLight.GetRadiance(), g_ShadowBuffer, m_ShadowCamera.GetShadowMatrix(), g_SceneColorBuffer);
+        m_Sky.GetRadiance(), g_ShadowBuffer, m_ShadowCamera.GetShadowMatrix(), g_SceneColorBuffer);
 
     gfxContext.Finish();
 

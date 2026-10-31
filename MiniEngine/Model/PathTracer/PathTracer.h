@@ -65,7 +65,7 @@ namespace PathTracer
         // shading normal 대신 geometric normal로 반사한다. shading normal은 docs/policy.md의 "camera 밖에서 본 doubleSided" 규칙 때문에
         // geometric normal 아래로 고른 방향의 energy를 잃으므로, furnace의 답을 그 손실 없이 보려고 쓴다.
         bool geometricNormals = false;
-        // 모든 surface의 albedo와 emission을 아래 값으로 두고 directional light를 끈다. sky light는 모든 방향에서 같으므로 답을 식으로 아는 장면이 된다.
+        // 모든 surface의 albedo와 emission을 아래 값으로 두고 directional light를 끈다. sky는 모든 방향에서 같으므로 답을 식으로 아는 장면이 된다.
         // glTF에서는 baseColor 1, metallic 0, material의 roughness인 BRDF에 albedo를 곱해, 모든 view 방향에서 directional albedo가 albedo다.
         bool furnace = false;
         float furnaceAlbedo = 1.0f;
@@ -91,7 +91,7 @@ namespace PathTracer
 
     // camera ray는 rasterViewport로 그린 raster의 pixel 격자를 따른다. sceneColor는 raster가 그린 scene이고, 그 크기로 누적해 그 위에 평균을 쓴다.
     // lightDirection은 surface에서 directional light를 향하는 단위 vector이고, lightIlluminance는 light에 수직인 면의 illuminance (lux)다.
-    // skyRadiance는 ray가 아무 면도 만나지 않을 때 받는 sky light의 radiance (cd/m²)이고 모든 방향에서 같다.
+    // skyRadiance는 ray가 아무 면도 만나지 않을 때 받는 sky의 radiance (cd/m²)이고 모든 방향에서 같다.
     // shadowMap은 raster가 이번 frame에 그린 directional light의 shadow map이고, shadowMatrix는 world position을 그 uv와 depth로 옮긴다.
     // Shading DDGI Probe Hit만 둘을 읽는다.
     void Render(ComputeContext& context, const Settings& settings, const Math::Camera& camera, const D3D12_VIEWPORT& rasterViewport,

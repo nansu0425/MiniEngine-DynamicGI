@@ -47,7 +47,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from checks import Checks, stop_and_check
 from imagefiles import ImageFileError, read_dds_rgba32f
-from pathtracerchecks import BASE, SECTION, set_path_tracer
+from pathtracerchecks import BASE, SECTION, SKY_OBJECT, set_path_tracer
 from viewer import (HARNESS_DIR, SETTLE_FRAMES, VIEWER_DIR, HarnessError, Session, capture, default_scene, read_scene_file, start_instance,
                     stop_instance, without_time_varying)
 
@@ -76,7 +76,7 @@ CAMERA_OBJECT = 'Camera'
 # OBJECTS_SCENE 의 물체의 설정. 기본값과 다르고, editor get 이 글자 그대로 다시 주는 값이다.
 OBJECT_SETTINGS = {
     'Directional Light': {'Color': '0.75,0.5,0.25', 'Direction': '0,1,0', 'Intensity': '6', 'Position': '10,20,30', 'Up': '0,0,1'},
-    'Sky Light': {'Color': '0.5,0.75,1', 'Intensity': '0.25'},
+    SKY_OBJECT: {'Color': '0.5,0.75,1', 'Intensity': '0.25'},
 }
 
 
@@ -126,7 +126,7 @@ def line_conditions(session):
     """[O6] 의 줄. PT_SETTINGS 로 쌓은 뒤의 describe 다."""
     session.ask_ok(f'pose {LINE_POSE}')
     session.ask_ok(f'light set {LINE_LIGHT}')
-    session.ask_ok(f'editor set Sky Light: {LINE_SKY}')
+    session.ask_ok(f'editor set {SKY_OBJECT}: {LINE_SKY}')
     set_path_tracer(session, PT_SETTINGS)
     session.ask_ok('pt reset')
     session.ask_ok(f'pt wait samples={PT_SAMPLES}', timeout=WAIT_TIMEOUT)
@@ -158,7 +158,7 @@ def check_opened(session, check, scene, fresh, label):
     """[O1], [O2], [O3]: 지금 scene 에서 scene 을 연다."""
     # 저장하지 않은 물체의 설정은 연 scene file 의 값으로 바뀌어야 한다. PT 가 다시 쌓기 시작한 뒤에 [O3] 의 resets 를 세도록 먼저 바꾼다.
     session.ask_ok(f'light set {LINE_LIGHT}')
-    session.ask_ok(f'editor set Sky Light: {LINE_SKY}')
+    session.ask_ok(f'editor set {SKY_OBJECT}: {LINE_SKY}')
     set_path_tracer(session, PT_SETTINGS | {'Target Samples': 1 << 20})
     session.ask_ok('pt reset')
     session.ask_ok(f'pt wait samples={4 * SETTLE_FRAMES + 8}', timeout=WAIT_TIMEOUT)
@@ -400,7 +400,7 @@ def check_object_sections(session, check, objects_scene, no_objects_scene, defau
     session.ask_ok(f'scene open {objects_scene}')
     opened = object_settings(session)
     session.ask_ok(f'light set {LINE_LIGHT}')
-    session.ask_ok(f'editor set Sky Light: {LINE_SKY}')
+    session.ask_ok(f'editor set {SKY_OBJECT}: {LINE_SKY}')
     session.ask_ok(f'scene open {no_objects_scene}')
     without = object_settings(session)
     session.ask_ok(f'light set {LINE_LIGHT}')
@@ -419,7 +419,7 @@ def check_saved_objects(session, check, objects_scene, no_objects_scene, default
     session.ask_ok(f'scene open {objects_scene}')
     session.ask_ok(f'pose {LINE_POSE}')
     session.ask_ok(f'light set {LINE_LIGHT}')
-    session.ask_ok(f'editor set Sky Light: {LINE_SKY}')
+    session.ask_ok(f'editor set {SKY_OBJECT}: {LINE_SKY}')
     changed, (camera, posed) = object_settings(session), camera_settings(session)
     path = VIEWER_DIR / objects_scene
     before = path.read_bytes().decode('utf-8')

@@ -2,7 +2,7 @@
 
 cbuffer PSConstants : register(b0)
 {
-    // sky light의 radiance (cd/m²). 모든 방향에서 같다.
+    // sky의 radiance (cd/m²). 모든 방향에서 같다.
     float3 SkyRadiance;
 };
 

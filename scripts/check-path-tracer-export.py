@@ -38,8 +38,8 @@ shading normal: shading normal 둘레에서 고른 방향이 geometric normal �
        그 pixel 들의 평균 손실, white furnace 의 평균 손실을 찍는다. white furnace 는 path 가 escape 할 때까지 반사마다 손실이 쌓인 값이라
        albedo 1 에서만 나오는 크기다.
 
-Russian roulette: SCENE 은 furnace 와 directional light 를 끈 Sponza 다. Sponza 에는 emission 이 없고 albedo 가 1 이하라 radiance 가 Sky
-Light 의 radiance 를 넘을 수 없다. SCENE 을 SCENE_SAMPLES 만큼 Russian roulette off (A) 와 on (B) 로, 각각 Seed 0 과 1 로 쌓는다.
+Russian roulette: SCENE 은 furnace 와 directional light 를 끈 Sponza 다. Sponza 에는 emission 이 없고 albedo 가 1 이하라 radiance 가
+Sky 의 radiance 를 넘을 수 없다. SCENE 을 SCENE_SAMPLES 만큼 Russian roulette off (A) 와 on (B) 로, 각각 Seed 0 과 1 로 쌓는다.
   [R1] 네 export 의 r 이 AGREEMENT_LIMIT 이하다. r^2 ~ 1 + bias^2 / noise^2 이므로 bias 의 rms 가 noise 의 0.14 배 아래라는 뜻이다. r,
        bias, noise 를 찍는다. Seed 0 과 1 이 독립이 아니면 분모가 작아져 r 이 커지므로 Seed 의 독립도 같이 본다.
   [R2] Seed 0 의 A 와 B 가 모든 pixel 에서 유한하고 [0, 1] 안이다.
@@ -51,7 +51,7 @@ Light 의 radiance 를 넘을 수 없다. SCENE 을 SCENE_SAMPLES 만큼 Russian
        Samples per Frame 4 로 다시 쌓은 export 가 rgba 의 bit 까지 같다. 뒤의 둘은 그 사이에 누적이 다시 시작된 것도 본다.
        sample 번호가 frame 과 무관하게 reset 뒤의 순번이므로 Samples per Frame 은 image 를 바꾸지 않는다.
 
-NaN 과 Inf: Sky Light 의 Intensity 를 inf 로 두고 white furnace 를 Max Bounces INVALID_BOUNCES 로 쌓는다. escape 한 path 만 sky 를 본다.
+NaN 과 Inf: Sky 의 Intensity 를 inf 로 두고 white furnace 를 Max Bounces INVALID_BOUNCES 로 쌓는다. escape 한 path 만 sky 를 본다.
   [V1] albedo 1 이면 escape 한 path 가 Inf 다.
   [V2] albedo 0 이면 escape 한 path 가 0 x Inf = NaN 이다.
   둘 다 모든 pixel 의 a 가 escape 하지 못한 path 수 FURNACE_SAMPLES x (1 - X_WF(INVALID_BOUNCES)) 와 같고 rgb 가 0 이다. 더한 sample 과

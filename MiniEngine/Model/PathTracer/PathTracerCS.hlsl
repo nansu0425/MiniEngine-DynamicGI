@@ -45,7 +45,7 @@ cbuffer Constants : register(b0)
     // surface에서 directional light를 향하는 단위 vector와, light에 수직인 면의 illuminance (lux)
     float3 LightDirection;
     float3 LightIlluminance;
-    // ray가 아무 면도 만나지 않을 때 받는 sky light의 radiance (cd/m²). 모든 방향에서 같다.
+    // ray가 아무 면도 만나지 않을 때 받는 sky의 radiance (cd/m²). 모든 방향에서 같다.
     float3 SkyRadiance;
     // raster의 DefaultVS.hlsl처럼 world position을 ShadowMap의 uv와 비교할 depth로 옮긴다. Shading DDGI Probe Hit만 쓴다.
     float4x4 ShadowMatrix;

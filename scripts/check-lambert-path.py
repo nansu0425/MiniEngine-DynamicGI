@@ -13,7 +13,7 @@ bit 로 비교한다.
 
 PT 의 Shading 은 pathtracerchecks.BASE 의 Lambert 다. Lambert 의 f cos / pdf 는 albedo 이고 PT 는 그 값을 곱하므로
 (PathTracerCS.hlsl), albedo 가 1 이면 throughput 은 fp32 에서 정확하고 white furnace 의 답은 bit 단위로 맞아야 한다. white furnace 는
-Geometric Normals 를 켜서 normal map 이 잃는 energy 를 빼고, 분산이 0 이라 FURNACE_SAMPLES 로 본다. sky 는 늘 흰 Sky Light 의 Intensity 1 이다.
+Geometric Normals 를 켜서 normal map 이 잃는 energy 를 빼고, 분산이 0 이라 FURNACE_SAMPLES 로 본다. sky 는 늘 흰 Sky 의 Intensity 1 이다.
 SCENE 은 furnace 와 directional light 를 끈 Sponza 다.
 
   [6] Russian roulette 를 끄고 Max Bounces 를 BOUNCE_STEPS 로 올리면 같은 Seed 와 FURNACE_SAMPLES 에서 어떤 pixel 도 어두워지지

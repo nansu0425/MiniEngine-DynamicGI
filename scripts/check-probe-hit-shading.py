@@ -9,7 +9,7 @@ PT 의 값은 capture pt 의 export 로 본다. export 의 rgb 는 sample 의 �
   [E13] 정의: PathTracer.h 의 Output 과 Shading, PathTracerCS.hlsl 의 LAMBERT_SHADING, panel tooltip 의 글은 사람이 읽는다.
 
 test scene (SCENE_DIR): scene file 의 camera 는 model 중심의 +z 쪽에서 -z 를 보며 model 을 화면에 담는다 (viewer.py 의 write_scene_file). light 는 direction LIGHT_DIRECTION, 흰색, intensity
-float 의 π 라서 E⊥ / π 가 1 이다. PT 는 Output Radiance, Max Bounces 1, Sky Light 0, Russian roulette off, TEST_SAMPLES spp 다. 처음
+float 의 π 라서 E⊥ / π 가 1 이다. PT 는 Output Radiance, Max Bounces 1, Sky 0, Russian roulette off, TEST_SAMPLES spp 다. 처음
 맞은 곳에서 반사한 뒤에는 emission 과 sky 가 0 이므로 path 의 값은 처음 맞은 곳의 직접광뿐이다. 면의 pixel 은 Front Face view 의 앞면을
 EDGE_PIXELS 깎고 column 으로 나눈 것이다. 비는 export / (E⊥ max(0, n·l) / π) 이고 n 은 quad 의 normal (0, 0, 1), l 은 state light 의
 direction 이다.
@@ -75,7 +75,7 @@ from directlightchecks import EDGE_PIXELS, LIGHT_OBJECT, accumulate_export, over
 from gltfwriter import GLTF_FLOAT, GLTF_UNSIGNED_SHORT, BufferBuilder, flatten
 from imagefiles import DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, ImageFileError, read_dds_rgba32f, read_dds_rgba8
 from imagemasks import column_groups, eroded
-from pathtracerchecks import BASE, FURNACE_SAMPLES, SECTION, SKY_LIGHT_OBJECT, SKY_RADIANCE, path_tracer_state, set_path_tracer
+from pathtracerchecks import BASE, FURNACE_SAMPLES, SECTION, SKY_OBJECT, SKY_RADIANCE, path_tracer_state, set_path_tracer
 from viewer import (HARNESS_DIR, REPO_ROOT, SETTLE_FRAMES, SNAPSHOT_POSES, HarnessError, Session, baseline_scene_pose,
                     capture, start_instance, stop_instance, write_scene_file)
 
@@ -507,7 +507,7 @@ def take_restore_line(session):
     line = RESTORE_LINE
     session.ask_ok(f'pose {line["pose"]}')
     session.ask_ok(f'light set {line["light"]}')
-    session.ask_ok(f'editor set {SKY_LIGHT_OBJECT}: {line["sky"]}')
+    session.ask_ok(f'editor set {SKY_OBJECT}: {line["sky"]}')
     set_path_tracer(session, line['path tracer'] | {'Show': 1, 'Samples per Frame': 1, 'Target Samples': line['samples']})
     session.ask_ok('pt reset')
     session.ask_ok(f'pt wait samples={line["samples"]}', timeout=900)

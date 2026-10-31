@@ -8,7 +8,7 @@
 exit 1 이다. 이 script 밖에서 보는 기준:
   [C7] d, b 와 그 상한의 식: imagecompare.py selftest
 
-조건: 시점마다 POSES 의 camera 와 directional light, MEASUREMENT (Output Indirect Irradiance, Sky Light 1, Max Bounces 64, Russian
+조건: 시점마다 POSES 의 camera 와 directional light, MEASUREMENT (Output Indirect Irradiance, Sky 1, Max Bounces 64, Russian
 roulette on, Geometric Normals off). Indirect Irradiance 는 DDGI 가 비교할 양이다. 정답을 만들 Profile 에서 1920x1080 으로 쌓는다.
 export 의 rgb 는 E (lux) 의 평균, a 는 더한 sample 수다. X_s(N) 은 Seed s 로 N spp 쌓은 export 다. 한 run 에서 Target Samples 만
 올려 2 의 거듭제곱마다 export 하며, Target Samples 를 올려도 누적은 처음부터 다시 시작하지 않는다 (check-lambert-path.py 의 [9]).

@@ -38,7 +38,7 @@ cell 이고, 하한이 걸리지 않는 작은 roughness 는 node 사이의 값�
 
 test scene: +z 를 보는 flat quad 를 roughness QUAD_ROUGHNESS x metallic QUAD_METALLIC 의 격자로 두고 baseColor 는 QUAD_COLORS 에서
 돌려 쓴다 (texture 없는 material factor). light 는 direction LIGHT_DIRECTION, intensity float 의 π 다. quad 의 pixel 은 Front Face view 의
-앞면을 가장자리 EDGE_PIXELS 깎고 column 과 row 로 나눈 것이다. PT 는 Shading glTF, Max Bounces 1, Sky Light 0, Russian roulette off,
+앞면을 가장자리 EDGE_PIXELS 깎고 column 과 row 로 나눈 것이다. PT 는 Shading glTF, Max Bounces 1, Sky 0, Russian roulette off,
 16 spp 다. sky 와 emission 이 0 이라 path 의 값은 처음 맞은 곳의 직접광뿐이다.
   [S3] NEE 의 절대값: Geometric Normals on 의 PT export 가 quad 마다 3 x 3 pick 점에서 참조의 f(v, l) E max(0, n_g·l) 와 channel 마다
        상대 S3_TOLERANCE 안이다. v 는 pick 의 위치에서 state camera 의 위치로 가는 방향, n_g 는 pick 의 normal 이다.

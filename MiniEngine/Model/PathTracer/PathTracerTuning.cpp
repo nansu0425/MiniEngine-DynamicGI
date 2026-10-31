@@ -105,13 +105,13 @@ namespace
         TuningSection::MakeItemResettable("Geometric Normals");
         ImGui::Checkbox("Furnace", &s_Settings.furnace);
         ImGui::SetItemTooltip("Gives every surface the albedo and emission below and turns off the directional light. "
-            "As the Sky Light is the same in every direction, the answer is known. With glTF the albedo scales the BRDF of base color 1, "
+            "As the Sky is the same in every direction, the answer is known. With glTF the albedo scales the BRDF of base color 1, "
             "metallic 0 and the material's roughness, which reflects all light from every direction.");
         TuningSection::MakeItemResettable("Furnace");
         ImGui::InputFloat("Furnace Albedo", &s_Settings.furnaceAlbedo);
         TuningSection::MakeItemResettable("Furnace Albedo");
         ImGui::InputFloat("Furnace Emission", &s_Settings.furnaceEmission);
-        ImGui::SetItemTooltip("In cd/m2. With albedo a < 1 and the Sky Light at emission / (1 - a), every pixel is the Sky Light's radiance.");
+        ImGui::SetItemTooltip("In cd/m2. With albedo a < 1 and the Sky at emission / (1 - a), every pixel is the Sky's radiance.");
         TuningSection::MakeItemResettable("Furnace Emission");
         ClampSettings();
 

@@ -22,12 +22,12 @@ FURNACE_SAMPLES = 16
 # 4096 번에서 12 개, 16384 번에서 1 개였다.
 WHITE_FURNACE_BOUNCES = 65536
 
-# Scene Hierarchy panel 과 editor 명령이 Sky Light 를 가리키는 이름
-SKY_LIGHT_OBJECT = 'Sky Light'
-# PT 가 miss 에서 받는 radiance 는 PT 의 설정이 아니라 scene 물체인 Sky Light 의 color 와 intensity 다. 이 둘도 PT 의 image 를 정하므로
-# PT 의 설정과 같은 dict 에 '<물체>: <key>' 로 적고, set_path_tracer 가 그 물체에 넘긴다. 확인들은 흰 Sky Light 의 intensity 를 radiance 로 쓴다.
-SKY_COLOR = f'{SKY_LIGHT_OBJECT}: Color'
-SKY_RADIANCE = f'{SKY_LIGHT_OBJECT}: Intensity'
+# Scene Hierarchy panel 과 editor 명령이 Sky 를 가리키는 이름
+SKY_OBJECT = 'Sky'
+# PT 가 miss 에서 받는 radiance 는 PT 의 설정이 아니라 scene object 인 Sky 의 color 와 intensity 다. 이 둘도 PT 의 image 를 정하므로
+# PT 의 설정과 같은 dict 에 '<object>: <key>' 로 적고, set_path_tracer 가 editor set 으로 <object> 에 넘긴다. 확인들은 흰 Sky 의 intensity 를 radiance 로 쓴다.
+SKY_COLOR = f'{SKY_OBJECT}: Color'
+SKY_RADIANCE = f'{SKY_OBJECT}: Intensity'
 
 # 작업 5 ~ 7 의 기준과 측정 기록은 Lambert 로 정했으므로 Shading 을 Lambert 로 둔다. glTF BRDF 의 확인은 check-gltf-brdf.py 가 한다.
 # 작업 5 ~ 10 의 기준은 Radiance 로 정했으므로 Output 을 Radiance 로 둔다. Indirect Irradiance 의 확인은 check-indirect-irradiance.py 가 한다.
@@ -35,7 +35,7 @@ BASE = {'Show': 1, 'Output': 'Radiance', 'Shading': 'Lambert', 'Samples per Fram
         'Max Bounces': 64, 'Russian Roulette': 1, 'Geometric Normals': 0, 'Furnace': 0, 'Furnace Albedo': 1, 'Furnace Emission': 0}
 WHITE_FURNACE = BASE | {'Furnace': 1, 'Furnace Albedo': 1, 'Furnace Emission': 0, 'Geometric Normals': 1,
                         'Max Bounces': WHITE_FURNACE_BOUNCES, 'Russian Roulette': 0}
-# 해는 어디서나 emission / (1 - albedo) = Sky Light 의 radiance = 1 이다.
+# 해는 어디서나 emission / (1 - albedo) = Sky 의 radiance = 1 이다.
 EMISSION_FURNACE = BASE | {'Furnace': 1, 'Furnace Albedo': 0.5, 'Furnace Emission': 0.5, 'Geometric Normals': 1, 'Max Bounces': 64,
                            'Russian Roulette': 0}
 
@@ -46,7 +46,7 @@ def path_tracer_settings(values):
 
 
 def set_path_tracer(session, settings):
-    """settings 의 '<물체>: <key>' 는 scene 의 그 물체에, 나머지는 PT 의 설정에 넣고, PT 의 설정을 넣었으면 넣은 뒤의 PT 의 설정을 돌려준다."""
+    """settings 의 '<object>: <key>' 는 scene 의 그 object 에, 나머지는 PT 의 설정에 넣고, PT 의 설정을 넣었으면 넣은 뒤의 PT 의 설정을 돌려준다."""
     sections = {}
     for key, value in settings.items():
         section, separator, name = key.partition(': ')

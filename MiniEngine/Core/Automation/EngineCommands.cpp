@@ -559,7 +559,7 @@ namespace ControlChannel
             "reset sets the setting at path, or every setting under the group at path, to its default as Reset to Default in Engine Tuning does, "
             "and an empty path resets all as Reset All does. The default is what the app has when user.ini does not have the setting", HandleSettings);
         Register("describe", "describe: the conditions the scene and the path tracer are drawn in now, as a line that restore takes. "
-            "It has the scene file, camera, resolution, TAA, directional light, Sky Light, path tracer settings and the samples the path tracer has added", DescribeConditions);
+            "It has the scene file, camera, resolution, TAA, directional light, Sky, path tracer settings and the samples the path tracer has added", DescribeConditions);
         Register("restore", "restore <line>: sets every condition in a line printed by Log, left beside a capture or given by describe, as Restore does. "
             "Fails and sets nothing if the line lacks a condition or one cannot be set, and unread names them. "
             "A line of another scene file opens that scene file as scene open does, keeping the camera of the line, "
