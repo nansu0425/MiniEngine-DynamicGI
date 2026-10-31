@@ -21,6 +21,7 @@
 "그대로인 것" 은 그대로여야 하는 동작을 판정하는 check 로만 확인한다. 영향 범위는 바꾼 파일이 아니라, 바꾼 code 의 출력을 쓰는 code 로 정한다. 바꾼 code 의 출력이 닿지 않는 동작의 check 는 돌리지 않는다. 기존 check 전체를 회귀 기준으로 두지 않는다.
 
 - check 가 무엇을 판정하는지는 check script 의 docstring 에 있다. 찾은 code 에 닿는지 판단할 수 없는 check 는 돌린다.
+- 바꾼 code 의 출력을 변경 전 build 의 출력과 직접 비교해 bit 단위로 같으면, 바꾼 code 의 출력을 쓰는 code 의 check 는 돌리지 않는다. 비교하는 입력에는 바꾼 code 의 경계값을 넣는다.
 - code 를 고치는 동안에는 고친 동작의 check 만 돌린다. 고른 check 는 마지막 code 에서 모두 한 번 돌린다. 모두 돌린 뒤에 code 를 고치면, 새로 고친 code 가 닿는 check 만 다시 돌린다.
 
 ## Reference 검색
