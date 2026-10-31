@@ -9,7 +9,8 @@ using namespace ControlChannel;
 
 namespace
 {
-    // 숫자는 float로 비교하되, ExpVar처럼 log2로 저장했다가 되돌리며 생기는 몇 ulp의 차이는 같은 값으로 본다.
+    // 유한한 숫자는 float로 비교하되, ExpVar처럼 log2로 저장했다가 되돌리며 생기는 몇 ulp의 차이는 같은 값으로 본다. inf와 nan은
+    // 글자로 비교한다. /fp:fast에서는 nan과의 비교가 참이 될 수 있어, 받지 않은 nan을 받은 것으로 볼 수 있다.
     bool IsAppliedAsRequested(const std::string& requested, const std::string& applied)
     {
         char* requestedEnd = nullptr;
@@ -17,7 +18,7 @@ namespace
         const float requestedNumber = strtof(requested.c_str(), &requestedEnd);
         const float appliedNumber = strtof(applied.c_str(), &appliedEnd);
         const bool bothNumbers = requestedEnd != requested.c_str() && *requestedEnd == '\0' && appliedEnd != applied.c_str() && *appliedEnd == '\0';
-        if (!bothNumbers)
+        if (!bothNumbers || !std::isfinite(requestedNumber) || !std::isfinite(appliedNumber))
             return requested == applied;
         return std::fabs(requestedNumber - appliedNumber) <= 1e-6f * std::max(std::fabs(requestedNumber), std::fabs(appliedNumber));
     }

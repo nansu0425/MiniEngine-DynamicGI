@@ -2036,7 +2036,7 @@ def selftest_running_app(args, check):
         session.ask_ok(f'settings set Engine Tuning: {key}={original}')
         wrong = session.ask('settings set Engine Tuning: No/Such/Key=1')
         check('settings set with an unknown key fails', not wrong['ok'], wrong.get('error'))
-        for section, assignment in [('Engine Tuning', f'{key}=abc'), ('Engine Tuning', 'Timing/VSync=maybe'),
+        for section, assignment in [('Engine Tuning', f'{key}=abc'), ('Engine Tuning', f'{key}=nan'), ('Engine Tuning', 'Timing/VSync=maybe'),
                                     ('Engine Tuning', 'Ray Tracing/View=Bogus')]:
             values_before = session.ask_ok(f'settings get {section}')['values']
             rejected = session.ask(f'settings set {section}: {assignment}')
