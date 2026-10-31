@@ -89,6 +89,11 @@ void EditorCameraController::LookAt(Vector3 target)
     SetPose(pose);
 }
 
+float EditorCameraController::GetCameraNearClip() const
+{
+    return m_TargetCamera.GetNearClip();
+}
+
 Matrix3 EditorCameraController::GetOrientation() const
 {
     return Matrix3(m_WorldEast, m_WorldUp, -m_WorldNorth) *

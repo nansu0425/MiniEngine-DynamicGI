@@ -176,9 +176,9 @@ const char kCameraName[] = "Camera";
 class SceneCamera : public SceneEditor::Object
 {
 public:
-    // model은 scene file의 Fit=Model이 화면에 담는 model이고, camera는 controller가 옮기는 camera다.
-    SceneCamera(EditorCameraController& controller, const Camera& camera, const ModelInstance& model)
-        : m_Controller(controller), m_Camera(camera), m_Model(model) {}
+    // model은 scene file의 Fit=Model이 화면에 담는 model이다.
+    SceneCamera(EditorCameraController& controller, const ModelInstance& model)
+        : m_Controller(controller), m_Model(model) {}
 
     // 원점에서 -z를 본다.
     static EditorCameraController::Pose GetDefaultPose();
@@ -191,7 +191,6 @@ public:
 
 private:
     EditorCameraController& m_Controller;
-    const Camera& m_Camera;
     const ModelInstance& m_Model;
 };
 
@@ -1127,7 +1126,7 @@ void SceneCamera::LoadSettings(const IniFile::Values& values)
         return;
     }
     const BoundingSphere sphere = m_Model.GetBoundingSphere();
-    m_Controller.SetPose({ sphere.GetCenter() + Vector3(0.0f, 0.0f, sphere.GetRadius() * 2.0f + m_Camera.GetNearClip()), 0.0f, 0.0f });
+    m_Controller.SetPose({ sphere.GetCenter() + Vector3(0.0f, 0.0f, sphere.GetRadius() * 2.0f + m_Controller.GetCameraNearClip()), 0.0f, 0.0f });
 }
 
 void SceneCamera::ShowDetails()
@@ -1381,7 +1380,7 @@ void ModelViewer::Startup( void )
 #endif
     m_Camera.SetZRange(1.0f, 10000.0f);
     m_CameraController.reset(new EditorCameraController(m_Camera, Vector3(kYUnitVector)));
-    m_SceneCamera.reset(new SceneCamera(*m_CameraController, m_Camera, m_ModelInst));
+    m_SceneCamera.reset(new SceneCamera(*m_CameraController, m_ModelInst));
     // scene 을 열 때 물체가 scene file의 설정을 받도록 먼저 등록한다.
     SceneEditor::AddObject(m_SceneModel);
     SceneEditor::AddObject(*m_SceneCamera);

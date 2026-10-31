@@ -29,6 +29,8 @@ public:
     // target은 camera 위치와 달라야 한다.
     void LookAt(Math::Vector3 target);
     float GetMoveSpeed() const { return m_MoveSpeed; }
+    // 옮기는 camera의 near clip. camera가 near clip보다 가까운 것을 그리지 않으므로, 물체를 화면에 담는 pose를 정하는 code가 쓴다.
+    float GetCameraNearClip() const;
 
 private:
     Math::Matrix3 GetOrientation() const;
