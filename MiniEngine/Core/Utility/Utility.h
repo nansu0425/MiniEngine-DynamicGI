@@ -85,6 +85,8 @@ namespace Utility
     std::wstring GetFileExtension(const std::wstring& str);
     std::string RemoveExtension(const std::string& str);
     std::wstring RemoveExtension(const std::wstring& str);
+    // 앞뒤의 ' '를 뺀다.
+    std::string Trim(const std::string& str);
 
 
 } // namespace Utility

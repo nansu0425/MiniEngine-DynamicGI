@@ -131,6 +131,7 @@
     <ClInclude Include="Automation\ControlChannel.h" />
     <ClInclude Include="Automation\D3D12MessageLog.h" />
     <ClInclude Include="Automation\FrameCapture.h" />
+    <ClInclude Include="Automation\SettingsAssignment.h" />
     <ClInclude Include="Automation\UnattendedRun.h" />
     <ClInclude Include="Editor\EditorCamera.h" />
     <ClInclude Include="Editor\MeasurementConditions.h" />
@@ -177,6 +178,7 @@
     <ClCompile Include="Automation\D3D12MessageLog.cpp" />
     <ClCompile Include="Automation\EngineCommands.cpp" />
     <ClCompile Include="Automation\FrameCapture.cpp" />
+    <ClCompile Include="Automation\SettingsAssignment.cpp" />
     <ClCompile Include="Automation\UnattendedRun.cpp" />
     <ClCompile Include="Editor\EditorCamera.cpp" />
     <ClCompile Include="Editor\MeasurementConditions.cpp" />

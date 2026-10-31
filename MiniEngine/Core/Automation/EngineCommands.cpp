@@ -3,6 +3,7 @@
 #include "Core/Automation/ControlChannel.h"
 #include "Core/Automation/D3D12MessageLog.h"
 #include "Core/Automation/FrameCapture.h"
+#include "Core/Automation/SettingsAssignment.h"
 #include "Core/Display/Display.h"
 #include "Core/Editor/MeasurementConditions.h"
 #include "Core/Graphics/GraphicsCore.h"
@@ -40,14 +41,6 @@ namespace
 
     // Window section을 적용하면 창을 숨긴 채로 배치만 바꾸므로 읽기만 한다. 창의 크기는 window 명령으로 바꾼다.
     const char* kReadOnlySection = "Window";
-
-    std::string Trim(const std::string& text)
-    {
-        const size_t first = text.find_first_not_of(' ');
-        if (first == std::string::npos)
-            return std::string();
-        return text.substr(first, text.find_last_not_of(' ') - first + 1);
-    }
 
     bool StartsWith(const std::string& text, const std::string& prefix)
     {
@@ -136,14 +129,6 @@ namespace
             .Object("panels", open);
     }
 
-    Fields DescribeSection(const UserSettings::Values& values)
-    {
-        Fields fields;
-        for (const auto& value : values)
-            fields.Text(value.first, value.second);
-        return fields;
-    }
-
     Fields DescribeSettings(void)
     {
         Fields sections;
@@ -151,7 +136,7 @@ namespace
         {
             UserSettings::Values values;
             UserSettings::ReadSection(section, values);
-            sections.Object(section, DescribeSection(values));
+            sections.Object(section, SettingsAssignment::Describe(values));
         }
         return sections;
     }
@@ -227,30 +212,14 @@ namespace
         return true;
     }
 
-    // section은 형식이 틀린 값을 조용히 버리거나 다른 값으로 읽으므로, 적용한 뒤 다시 읽은 값이 요청과 같은지 본다.
-    // 숫자는 float로 비교하되, ExpVar처럼 log2로 저장했다가 되돌리며 생기는 몇 ulp의 차이는 같은 값으로 본다.
-    bool IsAppliedAsRequested(const std::string& requested, const std::string& applied)
-    {
-        char* requestedEnd = nullptr;
-        char* appliedEnd = nullptr;
-        const float requestedNumber = strtof(requested.c_str(), &requestedEnd);
-        const float appliedNumber = strtof(applied.c_str(), &appliedEnd);
-        const bool bothNumbers = requestedEnd != requested.c_str() && *requestedEnd == '\0' && appliedEnd != applied.c_str() && *appliedEnd == '\0';
-        if (!bothNumbers)
-            return requested == applied;
-        return std::fabs(requestedNumber - appliedNumber) <= 1e-6f * std::max(std::fabs(requestedNumber), std::fabs(appliedNumber));
-    }
-
     void SetSettings(const std::string& arguments, const Reply& reply)
     {
-        const size_t sectionEnd = arguments.find(':');
-        if (sectionEnd == std::string::npos)
+        std::string section, assignments;
+        if (!SettingsAssignment::Split(arguments, section, assignments))
         {
             reply.Error("usage: settings set <section>: <key>=<value>; <key>=<value>");
             return;
         }
-
-        const std::string section = Trim(arguments.substr(0, sectionEnd));
         if (section == kReadOnlySection)
         {
             reply.Error("the Window section cannot be set while running because applying it hides the window. Use window client <W>x<H>.");
@@ -259,50 +228,13 @@ namespace
         UserSettings::Values values;
         if (!ReadExistingSection(section, values, reply))
             return;
-        const UserSettings::Values original = values;
 
-        std::vector<std::pair<std::string, std::string>> requests;
-        const std::string assignments = arguments.substr(sectionEnd + 1);
-        for (size_t start = 0; start < assignments.size();)
+        Fields applied;
+        if (!SettingsAssignment::Assign(section, assignments,
+            [&section](SettingsAssignment::Values& values) { UserSettings::ReadSection(section, values); },
+            [&section](const SettingsAssignment::Values& values) { UserSettings::ApplySection(section, values); },
+            applied, reply))
         {
-            const size_t end = std::min(assignments.find("; ", start), assignments.size());
-            const std::string assignment = assignments.substr(start, end - start);
-            start = end + 2;
-            if (Trim(assignment).empty())
-                continue;
-
-            const size_t separator = assignment.find('=');
-            const std::string key = Trim(assignment.substr(0, separator));
-            if (separator == std::string::npos || values.find(key) == values.end())
-            {
-                reply.Error("unknown key '" + key + "' in " + section + ". Nothing was set.");
-                return;
-            }
-            const std::string value = Trim(assignment.substr(separator + 1));
-            values[key] = value;
-            requests.emplace_back(key, value);
-        }
-
-        UserSettings::ApplySection(section, values);
-        UserSettings::ReadSection(section, values);
-        Fields applied, rejected;
-        bool anyRejected = false;
-        for (const auto& request : requests)
-        {
-            applied.Text(request.first, values[request.first]);
-            if (!IsAppliedAsRequested(request.second, values[request.first]))
-            {
-                rejected.Text(request.first, values[request.first]);
-                anyRejected = true;
-            }
-        }
-
-        if (anyRejected)
-        {
-            // BoolVar처럼 틀린 값을 다른 값으로 읽은 경우도 있으므로 요청 전의 값으로 되돌린다.
-            UserSettings::ApplySection(section, original);
-            reply.Error("the section did not take some values, so nothing was set. rejected has what they were read back as.",
-                Fields().Object("rejected", rejected));
             return;
         }
         reply.Ok(Fields().Object("values", applied).Object("state", GetState("settings." + section)));
@@ -313,7 +245,7 @@ namespace
         UserSettings::Values values;
         if (!ReadExistingSection(section, values, reply))
             return;
-        reply.Ok(Fields().Object("values", DescribeSection(values)));
+        reply.Ok(Fields().Object("values", SettingsAssignment::Describe(values)));
     }
 
     void DescribeConditions(const std::string&, const Reply& reply)
@@ -357,7 +289,7 @@ namespace
         if (StartsWith(arguments, "set "))
             SetSettings(arguments.substr(4), reply);
         else if (arguments == "get" || StartsWith(arguments, "get "))
-            GetSettings(arguments.size() > 4 ? Trim(arguments.substr(4)) : std::string(), reply);
+            GetSettings(arguments.size() > 4 ? Utility::Trim(arguments.substr(4)) : std::string(), reply);
         else
             reply.Error("usage: settings get <section> | settings set <section>: <key>=<value>; <key>=<value>");
     }
@@ -383,7 +315,7 @@ namespace
             return;
         }
 
-        const std::string name = Trim(arguments.substr(0, actionStart));
+        const std::string name = Utility::Trim(arguments.substr(0, actionStart));
         UserSettings::Values panels;
         UserSettings::ReadSection("Panels", panels);
         if (panels.find(name) == panels.end())
@@ -430,7 +362,7 @@ namespace
     void CaptureFrame(const std::string& arguments, const Reply& reply)
     {
         const size_t targetEnd = arguments.find(' ');
-        const std::string path = targetEnd == std::string::npos ? std::string() : Trim(arguments.substr(targetEnd + 1));
+        const std::string path = targetEnd == std::string::npos ? std::string() : Utility::Trim(arguments.substr(targetEnd + 1));
         FrameCapture::Target target;
         if (!FrameCapture::FindTarget(arguments.substr(0, targetEnd), target) || path.empty())
         {
@@ -490,7 +422,7 @@ namespace
     void MeasureGpuTime(const std::string& arguments, const Reply& reply)
     {
         const size_t framesStart = arguments.rfind(" frames=");
-        const std::string scope = framesStart == std::string::npos ? std::string() : Trim(arguments.substr(0, framesStart));
+        const std::string scope = framesStart == std::string::npos ? std::string() : Utility::Trim(arguments.substr(0, framesStart));
         uint32_t frames = 0;
         if (scope.empty() || sscanf_s(arguments.c_str() + framesStart, " frames=%u", &frames) != 1 || frames == 0)
         {

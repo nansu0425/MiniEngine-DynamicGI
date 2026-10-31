@@ -280,6 +280,14 @@ std::wstring Utility::RemoveExtension(const std::wstring& filePath)
     return filePath.substr(0, filePath.rfind(L"."));
 }
 
+std::string Utility::Trim(const std::string& text)
+{
+    const size_t first = text.find_first_not_of(' ');
+    if (first == std::string::npos)
+        return std::string();
+    return text.substr(first, text.find_last_not_of(' ') - first + 1);
+}
+
 namespace
 {
     // Print하는 중에 crash해서 unhandled exception filter가 같은 thread에서 다시 Print해도 막히지 않게 recursive로 둔다.
