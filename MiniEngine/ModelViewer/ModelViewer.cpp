@@ -65,12 +65,16 @@ using namespace std;
 
 using Renderer::MeshSorter;
 
-// KHR_lights_punctual의 light. 지금은 directional light (references/glTF/extensions/2.0/Khronos/KHR_lights_punctual/README.md:110)만 있다.
-// 무한히 멀어서 감쇠하지 않고, 자기 transform의 local -Z 방향으로 빛을 낸다. transform의 위치는 조명에 영향을 주지 않고,
-// scene editor에서 light를 보고 고르는 자리다.
+// KHR_lights_punctual의 light 하나 (references/glTF/extensions/2.0/Khronos/KHR_lights_punctual/README.md). light의 종류는 Type이 정한다.
+// 지금 받는 Type은 directional light (README.md:110) 하나다. directional light는 무한히 멀어서 감쇠하지 않고, 자기 transform의 local -Z
+// 방향으로 빛을 낸다. transform의 위치는 조명에 영향을 주지 않고, scene editor에서 light를 보고 고르는 자리다.
 class LightComponent : public Scene::Component
 {
 public:
+    // Type은 spec의 light type이다 (README.md:91). Type에는 renderer가 지금 지원하는 directional만 있다. point와 spot은 renderer가
+    // 지원할 때 range나 cone angle 같은 값과 함께 Type에 들어간다.
+    enum class Type { Directional };
+
     // gizmo, light set 명령, Details panel, scene file이 바꾸는 값
     struct Properties
     {
@@ -85,6 +89,8 @@ public:
 
     LightComponent();
 
+    // type은 Properties와 달리 scene file과 editor set만 바꾼다 (LoadSettings).
+    Type GetType() const { return m_Type; }
     const Properties& GetProperties() const { return m_Properties; }
     void SetProperties(const Properties& properties) { m_Properties = properties; }
 
@@ -102,6 +108,7 @@ public:
 private:
     static Properties GetDefaultProperties();
 
+    Type m_Type;
     Properties m_Properties;
 };
 
@@ -269,6 +276,8 @@ private:
 
 CREATE_APPLICATION( ModelViewer )
 
+// scene file에 Type이 없거나 받을 수 없는 값이 있을 때의 type
+constexpr LightComponent::Type kDefaultLightType = LightComponent::Type::Directional;
 // 예전에 방위 -0.5 rad와 고도 0.75 x 90°로 정하던 기본 방향을 bit 단위로 옮겨서, 기본 화면이 그때와 같다.
 const Vector3 kDefaultLightDirection(0.335837096f, 0.923879147f, -0.18346864f);
 // spec의 기본 intensity는 1 lux이지만, 기본 화면과 harness baseline의 Exposure가 맞춰 둔 밝기를 지키도록 4π로 둔다. 그 Exposure를
@@ -316,7 +325,8 @@ LightComponent::Properties LightComponent::GetDefaultProperties()
     return properties;
 }
 
-LightComponent::LightComponent() : Component({ "Direction", "Up", "Position", "Color", "Intensity" }), m_Properties(GetDefaultProperties())
+LightComponent::LightComponent()
+    : Component({ "Type", "Direction", "Up", "Position", "Color", "Intensity" }), m_Type(kDefaultLightType), m_Properties(GetDefaultProperties())
 {
 }
 
@@ -363,8 +373,37 @@ std::string FormatVector(Vector3 vector)
     return text;
 }
 
+// scene file의 Type이 쓰는 이름. LightComponent::Type에 type을 추가하면 kLightTypeNames에도 추가한 type의 이름을 넣는다.
+const std::pair<LightComponent::Type, const char*> kLightTypeNames[] = { { LightComponent::Type::Directional, "Directional" } };
+
+const char* GetLightTypeName(LightComponent::Type type)
+{
+    for (const auto& name : kLightTypeNames)
+    {
+        if (name.first == type)
+            return name.second;
+    }
+    ASSERT(false, "kLightTypeNames has no name for a light type.");
+    return "";
+}
+
+// text가 받는 type의 이름이면 type에 담고 true를 돌려준다.
+bool ReadLightType(const std::string& text, LightComponent::Type& type)
+{
+    for (const auto& name : kLightTypeNames)
+    {
+        if (text == name.second)
+        {
+            type = name.first;
+            return true;
+        }
+    }
+    return false;
+}
+
 void LightComponent::SaveSettings(IniFile::Values& values) const
 {
+    values["Type"] = GetLightTypeName(m_Type);
     values["Direction"] = FormatVector(m_Properties.rotation.GetZ());
     values["Up"] = FormatVector(m_Properties.rotation.GetY());
     values["Position"] = FormatVector(m_Properties.position);
@@ -382,6 +421,11 @@ void LightComponent::LoadSettings(const IniFile::Values& values)
         return text != values.end() && ReadVector(text->second, vector);
     };
 
+    Type type = kDefaultLightType;
+    const auto typeName = values.find("Type");
+    if (typeName != values.end())
+        ReadLightType(typeName->second, type);
+
     Properties properties = GetDefaultProperties();
     Vector3 direction, up, position, color;
     if (read("Direction", direction) && read("Up", up))
@@ -394,6 +438,7 @@ void LightComponent::LoadSettings(const IniFile::Values& values)
     float number = 0.0f;
     if (intensity != values.end() && ReadNumbers(intensity->second, &number, 1) && number >= 0.0f)
         properties.intensity = number;
+    m_Type = type;
     m_Properties = properties;
 }
 
@@ -905,6 +950,7 @@ void RegisterLight(LightComponent& light)
     ControlChannel::Register("light", "light set <key>=<value> ... | light reset: the directional light, as its rotate and translate gizmos and its "
         "Details panel change it. reset sets the transform to no rotation at the origin, so the light goes along world -Z, "
         "and keeps the color and intensity, as Reset Transform in the Details panel does. It is a KHR_lights_punctual directional light and goes along the local -Z of its transform. "
+        "Its Type, which editor get gives and the scene file keeps, is Directional, the only type for now, and light set does not change it. "
         "rotation=<x>,<y>,<z>,<w> is the quaternion of the transform, as a glTF node's rotation. "
         "direction=<x>,<y>,<z> points from a surface toward the light, the local +Z, and is normalized. "
         "elevation=<degrees> is up from the horizon, -90 to 90. azimuth=<degrees> turns about +y from +x toward +z, 0 to 360. "
@@ -999,9 +1045,13 @@ void LightIconComponent::Rotate(const Camera& camera, ImGuizmo::MODE axes)
     m_Light.SetProperties(properties);
 }
 
-// color와 intensity를 바꾸고 transform을 되돌린다.
+// type을 표시하고, color와 intensity를 바꾸고, transform을 되돌린다. type은 고를 수 있는 값이 하나뿐이라 표시만 한다.
 void ShowLightDetails(LightComponent& light)
 {
+    ImGui::LabelText("Type", "%s", GetLightTypeName(light.GetType()));
+    ImGui::SetItemTooltip("KHR_lights_punctual type of the light, which the scene file keeps as Type. Directional is the only type "
+        "the renderer supports now.");
+
     LightComponent::Properties properties = light.GetProperties();
     float color[3] = { properties.color.GetX(), properties.color.GetY(), properties.color.GetZ() };
     if (ImGui::ColorEdit3("Color", color, ImGuiColorEditFlags_Float))

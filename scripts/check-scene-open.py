@@ -73,9 +73,11 @@ NO_OBJECTS_SCENE = WORK_DIR / 'no-objects.ini'
 FIT_MODEL_SCENE = WORK_DIR / 'fit-model.ini'
 # Scene Hierarchy 와 editor 명령이 camera 를 가리키는 이름이자 scene file 의 section 이름
 CAMERA_OBJECT = 'Camera'
-# OBJECTS_SCENE 의 물체의 설정. 기본값과 다르고, editor get 이 글자 그대로 다시 주는 값이다.
+# OBJECTS_SCENE 의 object 의 설정. editor get 이 글자 그대로 다시 주는 값이다. light 의 Type 은 받는 값이 기본값 하나뿐이라 기본값이고,
+# 나머지는 기본값과 다르다.
 OBJECT_SETTINGS = {
-    'Directional Light': {'Color': '0.75,0.5,0.25', 'Direction': '0,1,0', 'Intensity': '6', 'Position': '10,20,30', 'Up': '0,0,1'},
+    'Directional Light': {'Color': '0.75,0.5,0.25', 'Direction': '0,1,0', 'Intensity': '6', 'Position': '10,20,30', 'Type': 'Directional',
+                          'Up': '0,0,1'},
     SKY_OBJECT: {'Color': '0.5,0.75,1', 'Intensity': '0.25'},
 }
 
