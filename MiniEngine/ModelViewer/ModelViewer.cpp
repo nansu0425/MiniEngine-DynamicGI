@@ -41,7 +41,7 @@
 #include "Core/Camera/ShadowCamera.h"
 #include "Core/Display/Display.h"
 #include "Core/Graphics/GraphicsCore.h"
-#include "Core/Editor/EditorCamera.h"
+#include "Core/Editor/EditorCameraController.h"
 #include "Core/Editor/SceneEditor.h"
 #include "Core/Automation/ControlChannel.h"
 #include "Core/Editor/MeasurementConditions.h"
@@ -172,16 +172,16 @@ private:
 const char kCameraName[] = "Camera";
 
 // scene 을 보는 editor camera. 사용자가 이 camera로 보므로 icon과 gizmo가 없고, mouse와 keyboard나 Details panel로 옮긴다.
-// pose는 scene 마다 다르므로 scene file에 저장하고, scene 과 무관한 이동 속도는 EditorCamera가 user.ini에 남긴다.
+// pose는 scene 마다 다르므로 scene file에 저장하고, scene 과 무관한 이동 속도는 EditorCameraController가 user.ini에 남긴다.
 class SceneCamera : public SceneEditor::Object
 {
 public:
     // model은 scene file의 Fit=Model이 화면에 담는 model이고, camera는 controller가 옮기는 camera다.
-    SceneCamera(EditorCamera& controller, const Camera& camera, const ModelInstance& model)
+    SceneCamera(EditorCameraController& controller, const Camera& camera, const ModelInstance& model)
         : m_Controller(controller), m_Camera(camera), m_Model(model) {}
 
     // 원점에서 -z를 본다.
-    static EditorCamera::Pose GetDefaultPose();
+    static EditorCameraController::Pose GetDefaultPose();
 
     virtual const char* GetName() const override { return kCameraName; }
     virtual void ShowDetails() override;
@@ -190,7 +190,7 @@ public:
     virtual void LoadSettings(const IniFile::Values& values) override;
 
 private:
-    EditorCamera& m_Controller;
+    EditorCameraController& m_Controller;
     const Camera& m_Camera;
     const ModelInstance& m_Model;
 };
@@ -234,7 +234,7 @@ private:
     std::map<std::wstring, std::shared_ptr<const Model>> m_Models;
 
     Camera m_Camera;
-    unique_ptr<EditorCamera> m_CameraController;
+    unique_ptr<EditorCameraController> m_CameraController;
     // m_CameraController보다 먼저 없어지도록 뒤에 둔다.
     unique_ptr<SceneCamera> m_SceneCamera;
     // -rebuild 1이면 처음 load하는 model의 .mini를 다시 만든다.
@@ -479,21 +479,21 @@ std::string FormatFloat(float value)
 // 글자가 있거나 받을 수 없는 값을 받지 않는다 (MeasurementConditions::Restore).
 using MeasurementConditions::ReadValue;
 
-void DescribeCameraConditions(const EditorCamera& camera, MeasurementConditions::Values& values)
+void DescribeCameraConditions(const EditorCameraController& controller, MeasurementConditions::Values& values)
 {
-    const EditorCamera::Pose pose = camera.GetPose();
+    const EditorCameraController::Pose pose = controller.GetPose();
     values["camera"] = FormatVector(pose.position);
     values["heading"] = FormatFloat(pose.heading);
     values["pitch"] = FormatFloat(pose.pitch);
 }
 
-void ReadCameraConditions(EditorCamera& camera, const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading)
+void ReadCameraConditions(EditorCameraController& controller, const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading)
 {
-    EditorCamera::Pose pose = camera.GetPose();
+    EditorCameraController::Pose pose = controller.GetPose();
     ReadValue(values, "camera", reading, [&pose](const std::string& text) { return ReadVector(text, pose.position); });
     ReadValue(values, "heading", reading, [&pose](const std::string& text) { return ReadNumbers(text, &pose.heading, 1); });
     ReadValue(values, "pitch", reading, [&pose](const std::string& text) { return ReadNumbers(text, &pose.pitch, 1); });
-    reading.applies.push_back([&camera, pose] { camera.SetPose(pose); });
+    reading.applies.push_back([&controller, pose] { controller.SetPose(pose); });
 }
 
 // scene의 해상도는 camera ray가 지나는 pixel 격자를 정하지만, UI가 보이면 dock 배치가 정하므로 되돌리지 않고 다르면 알린다.
@@ -588,11 +588,11 @@ void ReadSkyLightConditions(SkyLight& sky, const MeasurementConditions::Values& 
 
 // raster와 path tracer가 그리는 조건을 Log와 capture의 줄에 담고 Restore로 되돌리게 한다. scene 은 ModelViewer::RegisterSceneConditions가,
 // path tracer의 설정은 PathTracerTuning이 더한다.
-void RegisterMeasurementConditions(EditorCamera& editorCamera, DirectionalLight& light, SkyLight& sky)
+void RegisterMeasurementConditions(EditorCameraController& cameraController, DirectionalLight& light, SkyLight& sky)
 {
     MeasurementConditions::Register("camera", {
-        [&editorCamera](MeasurementConditions::Values& values) { DescribeCameraConditions(editorCamera, values); },
-        [&editorCamera](const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading) { ReadCameraConditions(editorCamera, values, reading); },
+        [&cameraController](MeasurementConditions::Values& values) { DescribeCameraConditions(cameraController, values); },
+        [&cameraController](const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading) { ReadCameraConditions(cameraController, values, reading); },
         { "camera" } });
     MeasurementConditions::Register("size", { DescribeSceneSize, ReadSceneSize, {} });
     MeasurementConditions::Register("taa", { DescribeTaa, ReadTaa, { "settings.Engine Tuning" } });
@@ -618,10 +618,10 @@ ControlChannel::Fields DescribeVector(Vector3 vector)
 }
 
 // state의 camera
-ControlChannel::Fields DescribeCamera(const Camera& camera, const EditorCamera& editorCamera)
+ControlChannel::Fields DescribeCamera(const Camera& camera, const EditorCameraController& controller)
 {
     const Vector3 position = camera.GetPosition();
-    const EditorCamera::Pose pose = editorCamera.GetPose();
+    const EditorCameraController::Pose pose = controller.GetPose();
     return ControlChannel::Fields()
         .Text("controller", "editor")
         .Float("x", position.GetX())
@@ -629,7 +629,7 @@ ControlChannel::Fields DescribeCamera(const Camera& camera, const EditorCamera& 
         .Float("z", position.GetZ())
         .Float("heading", pose.heading)
         .Float("pitch", pose.pitch)
-        .Float("move_speed", editorCamera.GetMoveSpeed())
+        .Float("move_speed", controller.GetMoveSpeed())
         .Object("forward", DescribeVector(camera.GetForwardVec()))
         .Float("vertical_fov", camera.GetFOV())
         .Float("aspect", 1.0f / camera.GetAspectRatio())
@@ -646,13 +646,13 @@ ControlChannel::Fields DescribeModel(const std::string& path, const ModelInstanc
 }
 
 // harness가 camera를 숫자로 읽고 정한다.
-void RegisterPoseCommand(EditorCamera& editorCamera)
+void RegisterPoseCommand(EditorCameraController& controller)
 {
     ControlChannel::SetStatus("camera", "editor");
     ControlChannel::Register("pose", "pose | pose <x> <y> <z> <heading> <pitch> | pose look-at <x> <y> <z>: the editor camera, "
         "in world units and radians as in state camera. look-at keeps the position and turns the camera toward the point. "
         "Looking straight up or down keeps the heading. The camera is the Camera of the Scene Hierarchy, so scene save writes this pose "
-        "to the scene file", [&editorCamera](const std::string& arguments, const ControlChannel::Reply& reply)
+        "to the scene file", [&controller](const std::string& arguments, const ControlChannel::Reply& reply)
     {
         float x, y, z, heading, pitch;
         const std::string usage = "usage: pose <x> <y> <z> <heading> <pitch> | pose look-at <x> <y> <z>";
@@ -665,12 +665,12 @@ void RegisterPoseCommand(EditorCamera& editorCamera)
                 return;
             }
             const Vector3 target(x, y, z);
-            if (LengthSquare(target - editorCamera.GetPose().position) == 0.0f)
+            if (LengthSquare(target - controller.GetPose().position) == 0.0f)
             {
                 reply.Error("the point is where the camera is, so there is no direction to look in");
                 return;
             }
-            editorCamera.LookAt(target);
+            controller.LookAt(target);
         }
         else if (!arguments.empty())
         {
@@ -679,10 +679,10 @@ void RegisterPoseCommand(EditorCamera& editorCamera)
                 reply.Error(usage);
                 return;
             }
-            editorCamera.SetPose({ Vector3(x, y, z), heading, pitch });
+            controller.SetPose({ Vector3(x, y, z), heading, pitch });
         }
 
-        const EditorCamera::Pose pose = editorCamera.GetPose();
+        const EditorCameraController::Pose pose = controller.GetPose();
         reply.Ok(ControlChannel::Fields()
             .Float("x", pose.position.GetX())
             .Float("y", pose.position.GetY())
@@ -1001,7 +1001,7 @@ void DirectionalLight::ShowDetails()
 struct CameraSection
 {
     bool fitModel = false;
-    EditorCamera::Pose pose = { Vector3(kZero), 0.0f, 0.0f };
+    EditorCameraController::Pose pose = { Vector3(kZero), 0.0f, 0.0f };
 };
 
 // scene 은 scene file 하나로 연다. 형식은 IniFile이고 key는 아래와 같다. 실행 중에는 Scene menu와 scene open 명령으로 다른 scene 을 연다.
@@ -1100,14 +1100,14 @@ void ScaleModel(ModelInstance& model, const SceneFile& scene)
         model.Resize(scene.radius);
 }
 
-EditorCamera::Pose SceneCamera::GetDefaultPose()
+EditorCameraController::Pose SceneCamera::GetDefaultPose()
 {
     return { Vector3(kZero), 0.0f, 0.0f };
 }
 
 void SceneCamera::SaveSettings(IniFile::Values& values) const
 {
-    const EditorCamera::Pose pose = m_Controller.GetPose();
+    const EditorCameraController::Pose pose = m_Controller.GetPose();
     values["Position"] = FormatVector(pose.position);
     values["Heading"] = FormatFloat(pose.heading);
     values["Pitch"] = FormatFloat(pose.pitch);
@@ -1132,7 +1132,7 @@ void SceneCamera::LoadSettings(const IniFile::Values& values)
 
 void SceneCamera::ShowDetails()
 {
-    EditorCamera::Pose pose = m_Controller.GetPose();
+    EditorCameraController::Pose pose = m_Controller.GetPose();
     float position[3] = { pose.position.GetX(), pose.position.GetY(), pose.position.GetZ() };
     bool changed = ImGui::DragFloat3("Position", position, 1.0f, 0.0f, 0.0f, "%.1f");
     ImGui::SetItemTooltip("World units, as state camera and the pose command give it.");
@@ -1380,7 +1380,7 @@ void ModelViewer::Startup( void )
     Sponza::Startup(m_Camera);
 #endif
     m_Camera.SetZRange(1.0f, 10000.0f);
-    m_CameraController.reset(new EditorCamera(m_Camera, Vector3(kYUnitVector)));
+    m_CameraController.reset(new EditorCameraController(m_Camera, Vector3(kYUnitVector)));
     m_SceneCamera.reset(new SceneCamera(*m_CameraController, m_Camera, m_ModelInst));
     // scene 을 열 때 물체가 scene file의 설정을 받도록 먼저 등록한다.
     SceneEditor::AddObject(m_SceneModel);
@@ -1399,8 +1399,8 @@ void ModelViewer::Startup( void )
         m_SceneName = GetSceneName(scenePath);
     }
 #endif
-    EditorCamera& editorCamera = *m_CameraController;
-    RegisterPoseCommand(editorCamera);
+    EditorCameraController& cameraController = *m_CameraController;
+    RegisterPoseCommand(cameraController);
     ControlChannel::RegisterState("camera", [this] { return DescribeCamera(m_Camera, *m_CameraController); });
     ControlChannel::RegisterState("scene", [this] { return DescribeScene(m_SceneName); });
     ControlChannel::RegisterState("model", [this] { return DescribeModel(m_SceneModel.GetPath(), m_ModelInst); });
@@ -1411,7 +1411,7 @@ void ModelViewer::Startup( void )
     RegisterLight(m_Light);
     RegisterSkyLight(m_SkyLight);
     RegisterSceneConditions();
-    RegisterMeasurementConditions(editorCamera, m_Light, m_SkyLight);
+    RegisterMeasurementConditions(cameraController, m_Light, m_SkyLight);
 }
 
 void ModelViewer::Cleanup( void )

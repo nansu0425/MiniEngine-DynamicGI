@@ -133,7 +133,7 @@
     <ClInclude Include="Automation\FrameCapture.h" />
     <ClInclude Include="Automation\SettingsAssignment.h" />
     <ClInclude Include="Automation\UnattendedRun.h" />
-    <ClInclude Include="Editor\EditorCamera.h" />
+    <ClInclude Include="Editor\EditorCameraController.h" />
     <ClInclude Include="Editor\MeasurementConditions.h" />
     <ClInclude Include="Editor\SceneEditor.h" />
     <ClInclude Include="Utility\IniFile.h" />
@@ -180,7 +180,7 @@
     <ClCompile Include="Automation\FrameCapture.cpp" />
     <ClCompile Include="Automation\SettingsAssignment.cpp" />
     <ClCompile Include="Automation\UnattendedRun.cpp" />
-    <ClCompile Include="Editor\EditorCamera.cpp" />
+    <ClCompile Include="Editor\EditorCameraController.cpp" />
     <ClCompile Include="Editor\MeasurementConditions.cpp" />
     <ClCompile Include="Editor\SceneEditor.cpp" />
     <ClCompile Include="Utility\IniFile.cpp" />

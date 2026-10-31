@@ -1,5 +1,5 @@
 #include "Core/pch.h"
-#include "Core/Editor/EditorCamera.h"
+#include "Core/Editor/EditorCameraController.h"
 #include "Core/App/UserSettings.h"
 #include "Core/Camera/Camera.h"
 #include "Core/App/GameInput.h"
@@ -35,7 +35,7 @@ namespace
     }
 }
 
-EditorCamera::EditorCamera(Camera& camera, Vector3 worldUp) : CameraController(camera)
+EditorCameraController::EditorCameraController(Camera& camera, Vector3 worldUp) : CameraController(camera)
 {
     m_WorldUp = Normalize(worldUp);
     m_WorldNorth = Normalize(Cross(m_WorldUp, Vector3(kXUnitVector)));
@@ -58,17 +58,17 @@ EditorCamera::EditorCamera(Camera& camera, Vector3 worldUp) : CameraController(c
         });
 }
 
-EditorCamera::~EditorCamera()
+EditorCameraController::~EditorCameraController()
 {
     UserSettings::Unregister(kSettingsSection);
 }
 
-EditorCamera::Pose EditorCamera::GetPose() const
+EditorCameraController::Pose EditorCameraController::GetPose() const
 {
     return { m_TargetCamera.GetPosition(), m_Heading, m_Pitch };
 }
 
-void EditorCamera::SetPose(const Pose& pose)
+void EditorCameraController::SetPose(const Pose& pose)
 {
     m_Heading = pose.heading;
     m_Pitch = Clamp(pose.pitch, -XM_PIDIV2, XM_PIDIV2);
@@ -76,7 +76,7 @@ void EditorCamera::SetPose(const Pose& pose)
     m_TargetCamera.Update();
 }
 
-void EditorCamera::LookAt(Vector3 target)
+void EditorCameraController::LookAt(Vector3 target)
 {
     Pose pose = GetPose();
     const Vector3 direction = Normalize(target - pose.position);
@@ -89,14 +89,14 @@ void EditorCamera::LookAt(Vector3 target)
     SetPose(pose);
 }
 
-Matrix3 EditorCamera::GetOrientation() const
+Matrix3 EditorCameraController::GetOrientation() const
 {
     return Matrix3(m_WorldEast, m_WorldUp, -m_WorldNorth) *
         Matrix3::MakeYRotation(m_Heading) *
         Matrix3::MakeXRotation(m_Pitch);
 }
 
-void EditorCamera::Update(float deltaTime)
+void EditorCameraController::Update(float deltaTime)
 {
     const float mouseX = GameInput::GetAnalogInput(GameInput::kAnalogMouseX);
     const float mouseY = GameInput::GetAnalogInput(GameInput::kAnalogMouseY);
