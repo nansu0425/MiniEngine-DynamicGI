@@ -76,6 +76,22 @@ private:
 
 VariableGroup VariableGroup::sm_RootGroup;
 
+namespace
+{
+    // values에서 pathPrefix의 group에 붙은 section의 값을 골라 key 앞의 pathPrefix를 뗀다.
+    TuningSection::Values SelectSectionValues( const UserSettings::Values& values, const string& pathPrefix )
+    {
+        // key는 path 순서로 정렬되어 있으므로 pathPrefix로 시작하는 key는 lower_bound부터 이어진다. 그중 '/'가 더 있는 key는 아래 group의 것이다.
+        TuningSection::Values sectionValues;
+        for (auto value = values.lower_bound(pathPrefix); value != values.end() && value->first.compare(0, pathPrefix.size(), pathPrefix) == 0; ++value)
+        {
+            if (value->first.find('/', pathPrefix.size()) == string::npos)
+                sectionValues[value->first.substr(pathPrefix.size())] = value->second;
+        }
+        return sectionValues;
+    }
+}
+
 //=====================================================================================================================
 // VariableGroup implementation
 
@@ -143,16 +159,7 @@ void VariableGroup::SaveValues( UserSettings::Values& values, const string& path
 void VariableGroup::LoadValues( const UserSettings::Values& values, const string& pathPrefix )
 {
     if (m_Section != nullptr)
-    {
-        // key는 path 순서로 정렬되어 있으므로 pathPrefix로 시작하는 key는 lower_bound부터 이어진다. 그중 '/'가 더 있는 key는 아래 group의 것이다.
-        TuningSection::Values sectionValues;
-        for (auto value = values.lower_bound(pathPrefix); value != values.end() && value->first.compare(0, pathPrefix.size(), pathPrefix) == 0; ++value)
-        {
-            if (value->first.find('/', pathPrefix.size()) == string::npos)
-                sectionValues[value->first.substr(pathPrefix.size())] = value->second;
-        }
-        m_Section->Load(sectionValues);
-    }
+        m_Section->Load(SelectSectionValues(values, pathPrefix));
 
     for (const auto& child : m_Children)
     {
