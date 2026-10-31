@@ -114,7 +114,7 @@ from imagemasks import column_groups, eroded
 from pathtracerchecks import (BASE, FURNACE_SAMPLES, SECTION, SKY_RADIANCE, WHITE_FURNACE, path_tracer_settings, path_tracer_state,
                               set_path_tracer)
 from viewer import (BASELINE_DIR, HARNESS_DIR, PREVIEW_EXPOSURE, REPO_ROOT, SETTLE_FRAMES, SNAPSHOT_POSES, HarnessError, Session,
-                    default_scene_pose, capture, make_view, start_instance, stop_instance, write_scene_file)
+                    baseline_scene_pose, capture, make_view, start_instance, stop_instance, write_scene_file)
 
 SCENE_DIR = HARNESS_DIR / 'gltf-brdf'
 SCENE_NAME = 'GltfBrdf'
@@ -778,7 +778,7 @@ def check_sponza_finite(session, check, default_light):
     counts = {}
     for pose_name, pose in SNAPSHOT_POSES.items():
         for light_name, request in SPONZA_LIGHTS.items():
-            session.ask_ok(f'pose {pose or default_scene_pose()}')
+            session.ask_ok(f'pose {pose or baseline_scene_pose()}')
             set_light(session, default_light)
             if request:
                 session.ask_ok(f'light set {request}')

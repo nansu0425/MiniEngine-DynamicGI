@@ -32,6 +32,8 @@ HARNESS_DIR = VIEWER_DIR / 'Harness'
 RUNS_DIR = HARNESS_DIR / 'runs'
 INSTANCE_FILE = HARNESS_DIR / 'instance.json'
 BASELINE_DIR = REPO_ROOT / 'scripts' / 'harness-baseline'
+# harness 가 측정에 여는 scene file 의 폴더. SCENES_DIR 을 측정에 쓰지 않는 이유는 이 폴더의 Sponza.ini 머리말에 있다.
+BASELINE_SCENES_DIR = BASELINE_DIR / 'scenes'
 USER_SETTINGS = [VIEWER_DIR / 'user.ini', VIEWER_DIR / 'imgui.ini']
 MODEL_VIEWER_SOURCE = VIEWER_DIR / 'ModelViewer.cpp'
 # repo 가 갖는 scene file 의 폴더. 그 glTF 는 scripts/fetch-assets.ps1 이 받거나 만든다.
@@ -485,6 +487,16 @@ def default_scene():
     return match.group(1)
 
 
+def baseline_scene(name):
+    """BASELINE_SCENES_DIR 의 scene file name 의 MiniEngine/ModelViewer 기준 경로"""
+    return Path(os.path.relpath(BASELINE_SCENES_DIR / name, VIEWER_DIR)).as_posix()
+
+
+def default_baseline_scene():
+    """scene 을 주지 않은 start_instance 가 여는 측정용 scene file. default_scene() 과 이름이 같다."""
+    return baseline_scene(posixpath.basename(default_scene()))
+
+
 def read_scene_file(scene):
     """scene file (MiniEngine/ModelViewer 기준 경로) 의 section. 형식은 ModelViewer.cpp 의 SceneFile 주석에 있다."""
     import configparser
@@ -513,15 +525,17 @@ def write_scene_file(gltf):
     return scene.relative_to(VIEWER_DIR).as_posix()
 
 
-def start_instance(config, scene=None, build_first=True, gpu_validation=False, baseline=BASELINE_DIR):
-    """scene (MiniEngine/ModelViewer 기준 scene file 경로) 을 -scene 으로 연 app 을 띄운다. None 이면 -scene 없이 default_scene() 을 연다.
+def start_instance(config, scene=None, build_first=True, gpu_validation=False, baseline=BASELINE_DIR, app_default_scene=False):
+    """scene (MiniEngine/ModelViewer 기준 scene file 경로) 을 -scene 으로 연 app 을 띄운다. None 이면 default_baseline_scene() 을 연다.
+    app_default_scene 이면 scene 을 무시하고 -scene 없이 띄워, app 이 스스로 고르는 default_scene() 을 연다.
     baseline 은 run 폴더에 복사해 app 이 처음 읽게 할 user.ini 와 imgui.ini 의 폴더다."""
-    opened = scene or default_scene()
+    opened = default_scene() if app_default_scene else scene or default_baseline_scene()
     if not (VIEWER_DIR / opened).exists():
         raise HarnessError(f'missing the scene file {VIEWER_DIR / opened}')
     gltf = VIEWER_DIR / scene_gltf(opened)
     if not gltf.exists():
-        hint = ' Run .\\scripts\\fetch-assets.ps1.' if (VIEWER_DIR / opened).resolve().is_relative_to(SCENES_DIR) else ''
+        repo_scene = any((VIEWER_DIR / opened).resolve().is_relative_to(folder) for folder in [SCENES_DIR, BASELINE_SCENES_DIR])
+        hint = ' Run .\\scripts\\fetch-assets.ps1.' if repo_scene else ''
         raise HarnessError(f'missing {gltf}, which {opened} opens.{hint}')
 
     stop_running_instance()
@@ -548,8 +562,8 @@ def start_instance(config, scene=None, build_first=True, gpu_validation=False, b
     log = run_dir / 'app.log'
     pipe = f'ModelViewerHarness-{run_dir.name}'
     command = [str(exe), '-settings_dir', str(run_dir), '-log', str(log), '-unattended', '1', '-control', pipe, '-hdr_output', '0']
-    if scene is not None:
-        command += ['-scene', scene]
+    if not app_default_scene:
+        command += ['-scene', opened]
     if gpu_validation:
         command += ['-gpu_debug', '1']
     process = launch(command, VIEWER_DIR)
@@ -854,9 +868,9 @@ SNAPSHOT_PT_SAMPLES = 64
 SNAPSHOT_PT_RUN_ULPS = {'glTF': 0, 'Lambert': 12, 'DDGI Probe Hit': 8}
 
 
-def default_scene_pose():
-    """harness 가 -scene 없이 띄운 app 의 처음 시점 (default_scene() 의 [Camera]) 을 pose 명령의 인자로."""
-    camera = read_scene_file(default_scene())['Camera']
+def baseline_scene_pose():
+    """scene 을 주지 않고 띄운 app 의 처음 시점 (default_baseline_scene() 의 [Camera]) 을 pose 명령의 인자로."""
+    camera = read_scene_file(default_baseline_scene())['Camera']
     return ' '.join(camera['Position'].split(',') + [camera['Heading'], camera['Pitch']])
 
 
@@ -869,7 +883,7 @@ def code_revision():
 
 def path_tracer_snapshot():
     """snapshot.json 에 남기는 PT shot 의 조건. JSON 으로 오간 값과 비교하도록 list 로 둔다."""
-    return {'pose': SNAPSHOT_POSES[SNAPSHOT_PT_POSE] or default_scene_pose(), 'settings': SNAPSHOT_PT_SETTINGS,
+    return {'pose': SNAPSHOT_POSES[SNAPSHOT_PT_POSE] or baseline_scene_pose(), 'settings': SNAPSHOT_PT_SETTINGS,
             'runs': [list(run) for run in SNAPSHOT_PT_RUNS], 'samples': SNAPSHOT_PT_SAMPLES}
 
 
@@ -906,7 +920,7 @@ def capture_snapshot(config, build_first, folder):
                 if settings:
                     session.ask_ok('settings set Engine Tuning: ' + '; '.join(f'{key}={value}' for key, value in settings.items()))
                 for pose_name, pose in SNAPSHOT_POSES.items():
-                    session.ask_ok(f'pose {pose or default_scene_pose()}')
+                    session.ask_ok(f'pose {pose or baseline_scene_pose()}')
                     session.ask_ok(f'frames {SNAPSHOT_SETTLE_FRAMES[settings_name]}')
                     name = f'{settings_name}-{pose_name}'
                     for target in ['scene', 'display']:
@@ -1038,7 +1052,7 @@ def command_snapshot_save(args):
     same_code = {name: change_counts(shot_change(folder, same_code_folder, name)) for name in shots}
     path_tracer_same_code = {name: path_tracer_counts(path_tracer_change(folder, same_code_folder, name)) for name in path_tracer_shots}
     manifest = {'code': code_revision(), 'config': args.config, 'created': time.strftime('%Y-%m-%d %H:%M:%S'), 'shots': shots,
-                'poses': {name: pose or default_scene_pose() for name, pose in SNAPSHOT_POSES.items()}, 'settings': SNAPSHOT_SETTINGS,
+                'poses': {name: pose or baseline_scene_pose() for name, pose in SNAPSHOT_POSES.items()}, 'settings': SNAPSHOT_SETTINGS,
                 'same_code': same_code, 'path_tracer': path_tracer_snapshot(), 'path_tracer_same_code': path_tracer_same_code}
     (folder / 'snapshot.json').write_text(json.dumps(manifest, indent=2), encoding='utf-8')
     for name in shots:
@@ -1058,7 +1072,7 @@ def command_snapshot_compare(args):
     if not manifest_path.exists():
         raise HarnessError(f'no snapshot {before_folder}. Take it with snapshot save {args.name} before changing the code')
     manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
-    poses = {name: pose or default_scene_pose() for name, pose in SNAPSHOT_POSES.items()}
+    poses = {name: pose or baseline_scene_pose() for name, pose in SNAPSHOT_POSES.items()}
     if (manifest['poses'] != poses or manifest['settings'] != SNAPSHOT_SETTINGS or manifest.get('path_tracer') != path_tracer_snapshot()
             or manifest['config'] != args.config):
         raise HarnessError(f'{args.name} was taken with other poses, settings or config. Take a new snapshot with this viewer.py')
@@ -2252,8 +2266,9 @@ def main():
                                    "with a copy of scripts/harness-baseline as -settings_dir, so the user's user.ini and imgui.ini "
                                    f'stay untouched. Deletes all but the newest {KEPT_RUNS} run folders, keeping the running one', command_start)
     add_config(command)
-    command.add_argument('--scene', help='scene file path relative to MiniEngine/ModelViewer, passed as -scene. '
-                                          'Without it the app opens the scene that kDefaultScene in ModelViewer.cpp names')
+    command.add_argument('--scene', help='scene file path relative to MiniEngine/ModelViewer, passed as -scene. Without it the app '
+                                          'opens the scene file of scripts/harness-baseline/scenes named as the one kDefaultScene in '
+                                          'ModelViewer.cpp names, so the scene files the user saves do not change the measurements')
     command.add_argument('--no-build', action='store_true')
     command.add_argument('--gpu-validation', action='store_true',
                          help='pass -gpu_debug 1 for GPU-based validation, which checks on the GPU the state and descriptor of each '

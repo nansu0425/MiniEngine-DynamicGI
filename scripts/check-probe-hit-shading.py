@@ -76,7 +76,7 @@ from gltfwriter import GLTF_FLOAT, GLTF_UNSIGNED_SHORT, BufferBuilder, flatten
 from imagefiles import DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, ImageFileError, read_dds_rgba32f, read_dds_rgba8
 from imagemasks import column_groups, eroded
 from pathtracerchecks import BASE, FURNACE_SAMPLES, SECTION, SKY_LIGHT_OBJECT, SKY_RADIANCE, path_tracer_state, set_path_tracer
-from viewer import (HARNESS_DIR, REPO_ROOT, SETTLE_FRAMES, SNAPSHOT_POSES, HarnessError, Session, default_scene_pose,
+from viewer import (HARNESS_DIR, REPO_ROOT, SETTLE_FRAMES, SNAPSHOT_POSES, HarnessError, Session, baseline_scene_pose,
                     capture, start_instance, stop_instance, write_scene_file)
 
 SCENE_DIR = HARNESS_DIR / 'probe-hit-shading'
@@ -455,7 +455,7 @@ def compare_lambert_bits(now, reference):
 def check_first_point(session, check, default_light):
     details, passed = [], True
     for pose_name in FIRST_POINT_POSES:
-        session.ask_ok(f'pose {SNAPSHOT_POSES[pose_name] or default_scene_pose()}')
+        session.ask_ok(f'pose {SNAPSHOT_POSES[pose_name] or baseline_scene_pose()}')
         set_light(session, default_light)
         images = {}
         for shading in (PROBE_HIT, LAMBERT):
@@ -543,7 +543,7 @@ def run_sponza(check, build_first):
         try:
             session.ask_ok('ui hide')
             default_light = session.ask_ok(f'editor get {LIGHT_OBJECT}')['values']
-            start_pose = default_scene_pose()
+            start_pose = baseline_scene_pose()
             session.ask_ok(f'pose {start_pose}')
             set_light(session, default_light)
             check_furnace(session, check, start_pose)

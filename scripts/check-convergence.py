@@ -60,8 +60,8 @@ from checks import Checks
 from imagecompare import bias
 from imagefiles import ImageFileError, read_dds_rgba32f
 from pathtracerchecks import BASE, append_record_row, code_version, describe_machine, set_path_tracer
-from viewer import (ENGINE_DIR, HARNESS_DIR, PREVIEW_EXPOSURE, HarnessError, Session, default_scene, default_scene_pose, make_view,
-                    read_scene_file, shots_dir, start_instance, stop_instance)
+from viewer import (ENGINE_DIR, HARNESS_DIR, PREVIEW_EXPOSURE, HarnessError, Session, baseline_scene_pose, default_baseline_scene,
+                    make_view, read_scene_file, shots_dir, start_instance, stop_instance)
 
 KEPT_DIR = HARNESS_DIR / 'kept' / 'convergence'
 MANIFEST = KEPT_DIR / 'manifest.json'
@@ -105,14 +105,14 @@ WAIT_TIMEOUT = 3 * 3600
 Run = namedtuple('Run', 'group name pose settings exports')
 
 
-def default_scene_light():
-    """default_scene() 의 Directional Light 를 light set 의 인자로."""
-    light = read_scene_file(default_scene())['Directional Light']
+def baseline_scene_light():
+    """default_baseline_scene() 의 Directional Light 를 light set 의 인자로."""
+    light = read_scene_file(default_baseline_scene())['Directional Light']
     return f'direction={light["Direction"]} intensity={light["Intensity"]}'
 
 
 def poses():
-    return {'start': (default_scene_pose(), default_scene_light()), 'corridor': (CORRIDOR_POSE, CORRIDOR_LIGHT)}
+    return {'start': (baseline_scene_pose(), baseline_scene_light()), 'corridor': (CORRIDOR_POSE, CORRIDOR_LIGHT)}
 
 
 def powers_of_two(last):

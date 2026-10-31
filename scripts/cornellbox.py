@@ -208,7 +208,7 @@ def world_faces(scene, scale):
 
 def written_gltf(scene_file):
     """scene file (경로) 이 여는 glTF 의 경로"""
-    return VIEWER_DIR / scene_gltf(Path(scene_file).resolve().relative_to(VIEWER_DIR).as_posix())
+    return VIEWER_DIR / scene_gltf(Path(os.path.relpath(Path(scene_file).resolve(), VIEWER_DIR)).as_posix())
 
 
 def written_source(gltf_path):

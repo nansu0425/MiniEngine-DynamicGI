@@ -328,7 +328,7 @@ def check_saved_scene(check, run_dir):
     baseline.mkdir(parents=True)
     for settings in run_dir.glob('*.ini'):
         shutil.copy2(settings, baseline / settings.name)
-    instance = start_instance('Debug', build_first=False, baseline=baseline)
+    instance = start_instance('Debug', build_first=False, baseline=baseline, app_default_scene=True)
     try:
         session = Session(instance)
         try:

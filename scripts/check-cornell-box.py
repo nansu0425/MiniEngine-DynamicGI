@@ -2,7 +2,7 @@
 
   python -I scripts/check-cornell-box.py check   # Debug 로 네 번 띄워 아래 기준을 모두 판정한다
 
-scripts/fetch-assets.ps1 이 받아 바꾼 Cornell box (SCENE) 를 연다. 정답은 SCENE 의 glTF 를 만든 Mitsuba scene (glTF 에
+scripts/fetch-assets.ps1 이 받아 바꾼 Cornell box 를 측정용 scene file (SCENE) 로 연다. 정답은 SCENE 의 glTF 를 만든 Mitsuba scene (glTF 에
 scripts/cornellbox.py 가 남긴 경로) 을 cornellbox.py 로 읽어 해석적으로 구하므로 python -I 로 돌린다. 번호는 작업 13 (a) 의 완료 기준 번호다. app 을 직접 띄우고 끝내며, 이미 띄운 harness
 instance 는 먼저 끝낸다. 하나라도 실패하면 exit 1 이다. 실행마다 끝낼 때 실행 중의 D3D12 CORRUPTION, ERROR, WARNING 이 0 이고
 종료 때 LIVE_DEVICE 하나만 남는지도 본다.
@@ -48,10 +48,10 @@ from checks import Checks, stop_and_check
 from imagefiles import ImageFileError, read_dds_rgba32f
 from pathtracerchecks import BASE, SKY_LIGHT_OBJECT, SKY_RADIANCE, set_path_tracer
 from pickanswers import PIXEL_CORNER_OFFSETS, PIXEL_EDGE_OFFSETS, camera_ray, grid_cells, is_unambiguous, nearest_face, vector_of
-from viewer import (BASELINE_DIR, HARNESS_DIR, SETTLE_FRAMES, VIEWER_DIR, HarnessError, Session, default_scene, read_scene_file, shots_dir,
-                    start_instance, stop_instance)
+from viewer import (BASELINE_DIR, HARNESS_DIR, SETTLE_FRAMES, VIEWER_DIR, HarnessError, Session, baseline_scene, default_scene,
+                    read_scene_file, shots_dir, start_instance, stop_instance)
 
-SCENE = 'Scenes/CornellBox.ini'
+SCENE = baseline_scene('CornellBox.ini')
 NO_STRENGTH_DIR = HARNESS_DIR / 'cornell-box-no-strength'
 OLD_BASELINE_DIR = HARNESS_DIR / 'cornell-box-old-user-ini'
 # 행이 light 를 지나는 grid. light 는 처음 화면에서 세로로 약 10 pixel 이므로 행의 간격과 위치를 보고 골랐다.

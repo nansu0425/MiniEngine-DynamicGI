@@ -41,8 +41,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from checks import Checks, stop_and_check
 from imagefiles import ImageFileError, read_dds_rgba32f
 from pathtracerchecks import SKY_LIGHT_OBJECT
-from viewer import (HARNESS_DIR, PREVIEW_EXPOSURE, VALIDATION_VIEW_SETTLE_FRAMES, HarnessError, Session, make_view, shots_dir, start_instance,
-                    stop_instance, without_time_varying)
+from viewer import (HARNESS_DIR, PREVIEW_EXPOSURE, VALIDATION_VIEW_SETTLE_FRAMES, HarnessError, Session, default_scene, make_view, shots_dir,
+                    start_instance, stop_instance, without_time_varying)
 
 KEPT_DIR = HARNESS_DIR / 'kept' / 'log-restore'
 
@@ -209,7 +209,9 @@ def check_line_without_scene(session, check, line_a):
     session.ask_ok('pose 0 300 0 1.5708 1.2')
     reply = session.ask(f'restore {format_line(without(parse(line_a), "scene"))}')
     now = parse(session.ask_ok('describe')['line'])
-    differing = [key for key in parse(line_a) if key != 'pt samples' and now.get(key) != parse(line_a)[key]]
+    # harness 는 측정용 scene 으로 띄우므로 A 의 scene 은 -scene 없이 연 scene 이 아니다.
+    expected = parse(line_a) | {'scene': default_scene()}
+    differing = [key for key in expected if key != 'pt samples' and now.get(key) != expected[key]]
     check('[G4] restore of A without scene, as a line from before scene files, restores it in the scene opened without -scene',
           reply['ok'] and not differing, reply.get('error') or ', '.join(differing) or 'same')
 
