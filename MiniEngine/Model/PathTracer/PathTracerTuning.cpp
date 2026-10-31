@@ -61,6 +61,7 @@ namespace
     {
         ImGui::Checkbox("Show", &s_Show);
         ImGui::SetItemTooltip("Draws the path tracer over the raster scene before post effects. Off, it stops accumulating and keeps what it has.");
+        TuningSection::MakeItemResettable("Show");
 
         int output = (int)s_Settings.output;
         if (ImGui::Combo("Output", &output, kOutputNames, IM_ARRAYSIZE(kOutputNames)))
@@ -69,6 +70,7 @@ namespace
             "at the surface seen through the pixel center, without its own emission and the directional light it gets directly. It shows "
             "irradiance / pi. With DDGI Probe Hit it differs from DDGI only in how the irradiance is found, so their difference is the error "
             "of the DDGI irradiance, and its difference from glTF is the error of the probe hit shading against the answer.");
+        TuningSection::MakeItemResettable("Output");
 
         int shading = (int)s_Settings.shading;
         if (ImGui::Combo("Shading", &shading, kShadingNames, IM_ARRAYSIZE(kShadingNames)))
@@ -77,30 +79,40 @@ namespace
             "with albedo base color x (1 - metallic), so the furnaces have answers to the bit. DDGI Probe Hit shades the points a path hits, "
             "but the first one in Indirect Irradiance, as DDGI shades its probe ray hits: textures at a fixed mip, a diffuse albedo with the "
             "glossy part added, the raster's shadow map and an indirect scale.");
+        TuningSection::MakeItemResettable("Shading");
 
         const uint32_t step = 1;
         ImGui::InputScalar("Samples per Frame", ImGuiDataType_U32, &s_Settings.samplesPerFrame, &step);
+        TuningSection::MakeItemResettable("Samples per Frame");
         ImGui::InputScalar("Target Samples", ImGuiDataType_U32, &s_Settings.targetSamples);
         ImGui::SetItemTooltip("Stops tracing at this many samples per pixel and keeps showing the average.");
+        TuningSection::MakeItemResettable("Target Samples");
         ImGui::InputScalar("Seed", ImGuiDataType_U32, &s_Settings.seed, &step);
         ImGui::SetItemTooltip("Accumulations that differ only in the seed are independent estimates of the same image.");
+        TuningSection::MakeItemResettable("Seed");
         ImGui::InputScalar("Max Bounces", ImGuiDataType_U32, &s_Settings.maxBounces, &step);
         ImGui::SetItemTooltip("Most reflections a path makes. 0 sees only the emission of the first hit and the sky seen directly, "
             "and 1 adds the directional light reflected there.");
+        TuningSection::MakeItemResettable("Max Bounces");
         ImGui::Checkbox("Russian Roulette", &s_Settings.russianRoulette);
         ImGui::SetItemTooltip("After the first few reflections, ends paths at random by their throughput and weights the survivors up. Unbiased.");
+        TuningSection::MakeItemResettable("Russian Roulette");
 
         ImGui::SeparatorText("Validation");
         ImGui::Checkbox("Geometric Normals", &s_Settings.geometricNormals);
         ImGui::SetItemTooltip("Reflects about the geometric normal instead of the shading normal, "
             "so no energy is lost to directions below the geometric normal.");
+        TuningSection::MakeItemResettable("Geometric Normals");
         ImGui::Checkbox("Furnace", &s_Settings.furnace);
         ImGui::SetItemTooltip("Gives every surface the albedo and emission below and turns off the directional light. "
             "As the Sky Light is the same in every direction, the answer is known. With glTF the albedo scales the BRDF of base color 1, "
             "metallic 0 and the material's roughness, which reflects all light from every direction.");
+        TuningSection::MakeItemResettable("Furnace");
         ImGui::InputFloat("Furnace Albedo", &s_Settings.furnaceAlbedo);
+        TuningSection::MakeItemResettable("Furnace Albedo");
         ImGui::InputFloat("Furnace Emission", &s_Settings.furnaceEmission);
         ImGui::SetItemTooltip("In cd/m2. With albedo a < 1 and the Sky Light at emission / (1 - a), every pixel is the Sky Light's radiance.");
+        TuningSection::MakeItemResettable("Furnace Emission");
         ClampSettings();
 
         if (ImGui::Button("Reset"))

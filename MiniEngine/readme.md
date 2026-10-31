@@ -13,6 +13,7 @@
 * pan: drag with the middle mouse button
 * toggle ImGui: F1
 * engine tuning, profiler, scene overlay, scene hierarchy, details: ImGui View menu
+* default of an engine tuning setting: right-click the setting and pick Reset to Default, or right-click a group and pick Reset to Defaults to reset every setting under it. Reset All at the top of Engine Tuning resets them all. The default is the value the setting has when user.ini does not have it
 * scene: the Scene menu lists the scene files of the Scenes folder by name and marks the one open. Picking one opens it while running: the model changes, the camera moves to the scene file's starting pose, the objects in the Scene Hierarchy take their settings in the scene file, such as the lights, and the path tracer starts over. Changes to the objects not saved are lost. The settings, camera movement speed and UI stay. Save at the top of the menu writes the settings of the objects to the open scene file and leaves its other lines
 * ray tracing debug view: pick one as View under Ray Tracing in Engine Tuning. Off shows the raster image
 * ray query validation: pick a Validation view as View and what its Heatmap paints under Ray Tracing in Engine Tuning, then press Capture under its Validation to read the last frame's counts and p50, p99, max. Fit to Capture sets a metric heatmap's range from the capture

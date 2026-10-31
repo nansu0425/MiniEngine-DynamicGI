@@ -33,7 +33,7 @@ public:
 
     // Edit과 SetFromString의 구현은 값을 바꿨으면 Increment, Decrement, Bang 중 하나를 거쳐 action callback을 불러야 한다.
     virtual void Edit( const char* /*label*/ ) {}
-    // ToString이 만든 문자열을 SetFromString이 읽어 user.ini에 저장한 값을 되돌린다.
+    // ToString이 만든 문자열을 SetFromString이 읽어 user.ini에 저장한 값이나 기본값으로 되돌린다.
     virtual std::string ToString( void ) const { return ""; }
     virtual void SetFromString( const std::string& text ) = 0;
 
@@ -208,6 +208,8 @@ private:
 // EngineVar의 widget 하나로 담을 수 없는 engine 설정과 그 설정을 쓰는 도구를 path의 group에 그린다. group을 펼치면 show가 그린 것이
 // group 아래의 변수보다 먼저 보인다. save가 채운 값은 key 앞에 path를 붙여 다른 변수와 함께 저장하고, load는 그중 이 section의 값만 받는다.
 // key에는 '/'를 쓰지 않고 group 아래의 변수와 같은 이름을 쓰지 않는다.
+// 기본값으로 되돌릴 때 load는 되돌릴 key를 기본값으로 바꾼 값을 받는다. 기본값에 없는 key는 다른 값에 따라 기본값이 달라지는 key이고
+// (예: Ray Tracing의 Heatmap은 고른 view에 따라 다르다), 빠진 채로 load에 넘어가므로 load가 남은 값에 맞춰 정한다.
 class TuningSection : public EngineVar
 {
 public:
@@ -219,6 +221,9 @@ public:
     void Show( void ) const { m_Show(); }
     void Save( Values& values ) const;
     void Load( const Values& values ) const;
+
+    // show가 마지막으로 그린 widget에 우클릭 menu를 붙여, widget이 바꾸는 key의 값을 기본값으로 되돌리게 한다. show 안에서만 부른다.
+    static void MakeItemResettable( const std::string& key );
 
     // 값은 Save와 Load로 저장한다.
     virtual void SetFromString( const std::string& ) override {}
@@ -233,5 +238,9 @@ namespace EngineTuning
 {
     void Initialize( void );
     void Update( void );
+
+    // path의 설정을, path가 group이면 group 아래 설정을 모두 기본값으로 되돌리고 되돌린 설정의 수를 돌려준다. path가 비면 모두 되돌린다.
+    // 기본값은 user.ini를 적용하기 전의 값이다 (UserSettings::ReadDefaults).
+    int ResetToDefaults( const std::string& path );
 
 } // namespace EngineTuning

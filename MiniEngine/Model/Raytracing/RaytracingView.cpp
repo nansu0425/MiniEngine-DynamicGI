@@ -76,24 +76,25 @@ namespace
     // 그룹마다 제목 아래에 view를 나열하고, 전체에서 하나만 고르게 한다.
     void ShowViewCombo(void)
     {
-        if (!ImGui::BeginCombo("View", GetSelectionLabel(s_Selection).c_str()))
-            return;
+        if (ImGui::BeginCombo("View", GetSelectionLabel(s_Selection).c_str()))
+        {
+            SelectableView("Off", { kOff, 0 });
 
-        SelectableView("Off", { kOff, 0 });
+            ImGui::SeparatorText("Debug");
+            ImGui::PushID("Debug");
+            for (int view = 0; view < RaytracingDebugView::kNumViews; ++view)
+                SelectableView(RaytracingDebugView::GetViewLabel((RaytracingDebugView::View)view), { kDebug, view });
+            ImGui::PopID();
 
-        ImGui::SeparatorText("Debug");
-        ImGui::PushID("Debug");
-        for (int view = 0; view < RaytracingDebugView::kNumViews; ++view)
-            SelectableView(RaytracingDebugView::GetViewLabel((RaytracingDebugView::View)view), { kDebug, view });
-        ImGui::PopID();
+            ImGui::SeparatorText("Validation");
+            ImGui::PushID("Validation");
+            for (int mode = 0; mode < RayQueryValidation::kNumModes; ++mode)
+                SelectableView(RayQueryValidation::GetModeLabel((RayQueryValidation::Mode)mode), { kValidation, mode });
+            ImGui::PopID();
 
-        ImGui::SeparatorText("Validation");
-        ImGui::PushID("Validation");
-        for (int mode = 0; mode < RayQueryValidation::kNumModes; ++mode)
-            SelectableView(RayQueryValidation::GetModeLabel((RayQueryValidation::Mode)mode), { kValidation, mode });
-        ImGui::PopID();
-
-        ImGui::EndCombo();
+            ImGui::EndCombo();
+        }
+        TuningSection::MakeItemResettable("View");
     }
 
     // 모든 ray가 따르는 culling 규칙은 그대로 두고, debug view의 ray만 그 규칙이 cull하는 뒷면에 맞게 한다.
@@ -103,6 +104,7 @@ namespace
         ImGui::Checkbox("Show Single-Sided Back Faces", &s_ShowSingleSidedBackFaces);
         ImGui::EndDisabled();
         ImGui::SetItemTooltip("All rays cull the back faces of single-sided materials. When on, only debug view rays hit them.");
+        TuningSection::MakeItemResettable("Show Single-Sided Back Faces");
     }
 
     // Fit to Capture가 맞출 수 있으면 맞춘 heatmap을, 맞출 수 없으면 그 이유를 준다. 버튼이 disabled인 조건과 validation fit이 거절하는 조건이 같다.
@@ -162,12 +164,14 @@ namespace
             ImGui::EndCombo();
         }
         ImGui::SetItemTooltip("Validation views only. Pixels in a category are orange over the scene. Metric values are opaque blue, darker for larger values.");
+        TuningSection::MakeItemResettable("Heatmap");
 
         const bool metric = validation && RayQueryValidation::IsMetricItem(mode, s_Heatmap.item);
         ImGui::BeginDisabled(!metric);
         ImGui::DragIntRange2("Range (log2)", &s_Heatmap.minExponent, &s_Heatmap.maxExponent, 0.1f,
             RayQueryValidation::kMinHeatmapExponent, RayQueryValidation::kMaxHeatmapExponent, "2^%d", "2^%d");
         ImGui::SetItemTooltip("Metric values at the lower end are light blue and at the upper end dark blue.");
+        TuningSection::MakeItemResettable("Heatmap Range");
 
         RayQueryValidation::Heatmap fitted;
         std::string reason;
@@ -208,9 +212,12 @@ namespace
         if (selection.group != kValidation)
             return;
 
-        const RayQueryValidation::Mode mode = GetValidationMode();
+        // Heatmap Range는 Heatmap이 고른 metric의 범위이므로 Heatmap과 함께 받는다. Heatmap이 없으면 Select가 고른 기본 heatmap과 heatmap의 기본 범위를 둔다.
         const auto heatmap = values.find("Heatmap");
-        for (int item = 0; heatmap != values.end() && item < RayQueryValidation::GetNumHeatmapItems(mode); ++item)
+        if (heatmap == values.end())
+            return;
+        const RayQueryValidation::Mode mode = GetValidationMode();
+        for (int item = 0; item < RayQueryValidation::GetNumHeatmapItems(mode); ++item)
         {
             if (heatmap->second == RayQueryValidation::GetHeatmapItemLabel(mode, item))
                 s_Heatmap = RayQueryValidation::GetDefaultHeatmap(mode, item);

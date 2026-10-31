@@ -42,6 +42,9 @@ namespace
     // Window section을 적용하면 창을 숨긴 채로 배치만 바꾸므로 읽기만 한다. 창의 크기는 window 명령으로 바꾼다.
     const char* kReadOnlySection = "Window";
 
+    // 기본값으로 되돌리는 명령은 Engine Tuning panel의 Reset to Default와 같은 code를 쓰므로 Engine Tuning만 받는다.
+    const char* kResettableSection = "Engine Tuning";
+
     bool StartsWith(const std::string& text, const std::string& prefix)
     {
         return text.compare(0, prefix.size(), prefix) == 0;
@@ -240,6 +243,30 @@ namespace
         reply.Ok(Fields().Object("values", applied).Object("state", GetState("settings." + section)));
     }
 
+    void ResetSettings(const std::string& arguments, const Reply& reply)
+    {
+        std::string section, path;
+        if (!SettingsAssignment::Split(arguments, section, path))
+        {
+            reply.Error("usage: settings reset Engine Tuning: <path>");
+            return;
+        }
+        if (section != kResettableSection)
+        {
+            reply.Error("only the Engine Tuning section can be reset");
+            return;
+        }
+
+        path = Utility::Trim(path);
+        const int resetCount = EngineTuning::ResetToDefaults(path);
+        if (resetCount == 0)
+        {
+            reply.Error("no setting of Engine Tuning is '" + path + "' or under it");
+            return;
+        }
+        reply.Ok(Fields().Integer("reset", resetCount).Object("state", GetState("settings." + section)));
+    }
+
     void GetSettings(const std::string& section, const Reply& reply)
     {
         UserSettings::Values values;
@@ -288,10 +315,12 @@ namespace
     {
         if (StartsWith(arguments, "set "))
             SetSettings(arguments.substr(4), reply);
+        else if (StartsWith(arguments, "reset "))
+            ResetSettings(arguments.substr(6), reply);
         else if (arguments == "get" || StartsWith(arguments, "get "))
             GetSettings(arguments.size() > 4 ? Utility::Trim(arguments.substr(4)) : std::string(), reply);
         else
-            reply.Error("usage: settings get <section> | settings set <section>: <key>=<value>; <key>=<value>");
+            reply.Error("usage: settings get <section> | settings set <section>: <key>=<value>; <key>=<value> | settings reset Engine Tuning: <path>");
     }
 
     void SetUIVisible(const std::string& arguments, const Reply& reply)
@@ -525,8 +554,10 @@ namespace ControlChannel
         Register("status", "status", ReplyStatus);
         Register("frames", "frames <n>: replies after n more frames", WaitFrames);
         Register("quit", "quit: exits as if the window were closed, saving user.ini", Quit);
-        Register("settings", "settings get <section> | settings set <section>: <key>=<value>; <key>=<value>  (sections and values as in user.ini). "
-            "set changes nothing and fails if a value does not read back as given", HandleSettings);
+        Register("settings", "settings get <section> | settings set <section>: <key>=<value>; <key>=<value> | settings reset Engine Tuning: <path>  "
+            "(sections and values as in user.ini). set changes nothing and fails if a value does not read back as given. "
+            "reset sets the setting at path, or every setting under the group at path, to its default as Reset to Default in Engine Tuning does, "
+            "and an empty path resets all as Reset All does. The default is what the app has when user.ini does not have the setting", HandleSettings);
         Register("describe", "describe: the conditions the scene and the path tracer are drawn in now, as a line that restore takes. "
             "It has the scene file, camera, resolution, TAA, directional light, Sky Light, path tracer settings and the samples the path tracer has added", DescribeConditions);
         Register("restore", "restore <line>: sets every condition in a line printed by Log, left beside a capture or given by describe, as Restore does. "

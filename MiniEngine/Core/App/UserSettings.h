@@ -31,4 +31,8 @@ namespace UserSettings
     std::vector<std::string> GetSectionNames(void);
     bool ReadSection(const std::string& section, Values& values);
     bool ApplySection(const std::string& section, const Values& values);
+
+    // section의 기본값을 읽는다. 기본값은 Load가 user.ini의 값을 적용하기 전에 save가 채운 값, 곧 app이 정한 값이다.
+    // Load 뒤에 등록한 section은 등록할 때의 값이다. Load 전이거나 등록되지 않은 section이면 false를 돌려준다.
+    bool ReadDefaults(const std::string& section, Values& values);
 }

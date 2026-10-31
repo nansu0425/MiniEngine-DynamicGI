@@ -32,7 +32,13 @@ namespace EngineTuning
     void AddToVariableGraph( const string& path, EngineVar& var );
     void RegisterVariable( const string& path, EngineVar& var );
 
+    const char* kSettingsSection = "Engine Tuning";
+
     bool s_ShowPanel = false;
+
+    // TuningSection::MakeItemResettable이 key의 path를 만들 때 key 앞에 붙인다. section의 show를 부르는 동안에만 있고, section이 붙은
+    // group의 path 뒤에 '/'를 붙인 문자열이다.
+    const string* s_ShownSectionPrefix = nullptr;
 }
 
 // Not open to the public.  Groups are auto-created when a tweaker's path includes the group name.
@@ -57,18 +63,20 @@ public:
         m_Section = &section;
     }
 
-    void ShowChildren( void );
+    void ShowChildren( const string& pathPrefix );
 
     // 변수의 key는 root group부터의 경로다. 그래서 변수가 더해지거나 빠져도 나머지 변수의 값은 그대로 되돌린다.
     void SaveValues( UserSettings::Values& values, const string& pathPrefix ) const;
     void LoadValues( const UserSettings::Values& values, const string& pathPrefix );
+    // path에 있거나 path 아래에 있는 값만 defaults로 되돌리고 되돌린 key의 수를 돌려준다.
+    int ResetValues( const UserSettings::Values& defaults, const string& pathPrefix, const string& path );
 
     virtual void SetFromString( const std::string& ) override {}
 
     static VariableGroup sm_RootGroup;
 
 private:
-    void ShowContent( void );
+    void ShowContent( const string& pathPrefix );
 
     std::map<string, EngineVar*> m_Children;
     const TuningSection* m_Section = nullptr;
@@ -90,45 +98,69 @@ namespace
         }
         return sectionValues;
     }
+
+    // key가 path 자신이거나 path라는 group 아래에 있는지 본다. path가 비면 root group이다.
+    bool IsUnder( const string& key, const string& path )
+    {
+        return path.empty() || key == path ||
+            (key.size() > path.size() && key.compare(0, path.size(), path) == 0 && key[path.size()] == '/');
+    }
+
+    // 마지막 item을 우클릭하면 path의 설정을 기본값으로 되돌리는 menu를 연다. id가 nullptr이면 마지막 item의 ID를 menu의 ID로 쓴다.
+    void ShowResetMenu( const char* id, const string& path, const char* label )
+    {
+        if (!ImGui::BeginPopupContextItem(id))
+            return;
+        if (ImGui::MenuItem(label))
+            EngineTuning::ResetToDefaults(path);
+        ImGui::EndPopup();
+    }
 }
 
 //=====================================================================================================================
 // VariableGroup implementation
 
-void VariableGroup::ShowChildren( void )
+void VariableGroup::ShowChildren( const string& pathPrefix )
 {
     for (auto iter = m_Children.begin(); iter != m_Children.end(); ++iter)
     {
         ImGui::PushID(iter->second);
 
+        const string path = pathPrefix + iter->first;
         VariableGroup* subGroup = dynamic_cast<VariableGroup*>(iter->second);
         if (subGroup != nullptr)
         {
-            if (ImGui::TreeNode(iter->first.c_str()))
+            const bool open = ImGui::TreeNode(iter->first.c_str());
+            ShowResetMenu(nullptr, path, "Reset to Defaults");
+            if (open)
             {
-                subGroup->ShowContent();
+                subGroup->ShowContent(path + "/");
                 ImGui::TreePop();
             }
         }
         else
         {
             iter->second->Edit(iter->first.c_str());
+            if (dynamic_cast<CallbackTrigger*>(iter->second) == nullptr)
+                ShowResetMenu(nullptr, path, "Reset to Default");
         }
 
         ImGui::PopID();
     }
 }
 
-void VariableGroup::ShowContent( void )
+void VariableGroup::ShowContent( const string& pathPrefix )
 {
     if (m_Section != nullptr)
     {
         // section의 widget이 group 아래 변수의 widget과 label이 같아도 부딪히지 않게 한다.
         ImGui::PushID(m_Section);
+        EngineTuning::s_ShownSectionPrefix = &pathPrefix;
         m_Section->Show();
+        EngineTuning::s_ShownSectionPrefix = nullptr;
         ImGui::PopID();
     }
-    ShowChildren();
+    ShowChildren(pathPrefix);
 }
 
 void VariableGroup::SaveValues( UserSettings::Values& values, const string& pathPrefix ) const
@@ -175,6 +207,60 @@ void VariableGroup::LoadValues( const UserSettings::Values& values, const string
         if (value != values.end())
             child.second->SetFromString(value->second);
     }
+}
+
+int VariableGroup::ResetValues( const UserSettings::Values& defaults, const string& pathPrefix, const string& path )
+{
+    int resetCount = 0;
+    if (m_Section != nullptr)
+    {
+        TuningSection::Values sectionValues;
+        m_Section->Save(sectionValues);
+        const TuningSection::Values sectionDefaults = SelectSectionValues(defaults, pathPrefix);
+
+        std::set<string> keys;
+        for (const auto& value : sectionValues)
+        {
+            if (IsUnder(pathPrefix + value.first, path))
+                keys.insert(value.first);
+        }
+        for (const auto& value : sectionDefaults)
+        {
+            if (IsUnder(pathPrefix + value.first, path))
+                keys.insert(value.first);
+        }
+
+        for (const string& key : keys)
+        {
+            const auto value = sectionDefaults.find(key);
+            if (value != sectionDefaults.end())
+                sectionValues[key] = value->second;
+            else
+                sectionValues.erase(key);
+        }
+        if (!keys.empty())
+            m_Section->Load(sectionValues);
+        resetCount += (int)keys.size();
+    }
+
+    for (const auto& child : m_Children)
+    {
+        const string childPath = pathPrefix + child.first;
+        VariableGroup* subGroup = dynamic_cast<VariableGroup*>(child.second);
+        if (subGroup != nullptr)
+        {
+            resetCount += subGroup->ResetValues(defaults, childPath + "/", path);
+            continue;
+        }
+
+        const auto value = defaults.find(childPath);
+        if (value != defaults.end() && IsUnder(childPath, path))
+        {
+            child.second->SetFromString(value->second);
+            ++resetCount;
+        }
+    }
+    return resetCount;
 }
 
 //=====================================================================================================================
@@ -503,6 +589,13 @@ void TuningSection::Load( const Values& values ) const
         m_Load(values);
 }
 
+void TuningSection::MakeItemResettable( const std::string& key )
+{
+    ASSERT(EngineTuning::s_ShownSectionPrefix != nullptr, "MakeItemResettable is called outside the show of a section");
+    // InputScalar의 step 버튼처럼 마지막 item이 group이면 ID가 없을 수 있으므로 key로 menu를 구별한다.
+    ShowResetMenu(key.c_str(), *EngineTuning::s_ShownSectionPrefix + key, "Reset to Default");
+}
+
 //=====================================================================================================================
 // EngineTuning namespace methods
 
@@ -517,7 +610,7 @@ void EngineTuning::Initialize( void )
     }
     s_UnregisteredCount = -1;
 
-    UserSettings::Register("Engine Tuning",
+    UserSettings::Register(kSettingsSection,
         [](UserSettings::Values& values) { VariableGroup::sm_RootGroup.SaveValues(values, ""); },
         [](const UserSettings::Values& values) { VariableGroup::sm_RootGroup.LoadValues(values, ""); });
 }
@@ -526,8 +619,20 @@ void EngineTuning::Update( void )
 {
     ImGuiLayer::ShowPanel("Engine Tuning", s_ShowPanel, []
     {
-        VariableGroup::sm_RootGroup.ShowChildren();
+        if (ImGui::Button("Reset All"))
+            ResetToDefaults("");
+        ImGui::SetItemTooltip("Sets every setting below to its default, the value it has when user.ini does not have it. "
+            "Right-click a setting or a group to reset only that.");
+        VariableGroup::sm_RootGroup.ShowChildren("");
     });
+}
+
+int EngineTuning::ResetToDefaults( const std::string& path )
+{
+    UserSettings::Values defaults;
+    const bool loaded = UserSettings::ReadDefaults(kSettingsSection, defaults);
+    ASSERT(loaded, "Engine Tuning has no defaults before UserSettings::Load");
+    return VariableGroup::sm_RootGroup.ResetValues(defaults, "", path);
 }
 
 void EngineTuning::AddToVariableGraph( const string& path, EngineVar& var )

@@ -17,7 +17,15 @@ namespace
     std::map<std::string, Section> s_Sections;
     // user.ini에서 읽은 값. 등록되지 않은 section도 Save가 다시 쓸 수 있게 남겨 둔다.
     std::map<std::string, UserSettings::Values> s_LoadedValues;
+    std::map<std::string, UserSettings::Values> s_DefaultValues;
     bool s_Loaded = false;
+
+    void RecordDefaults(const std::string& name, const Section& section)
+    {
+        UserSettings::Values& defaults = s_DefaultValues[name];
+        defaults.clear();
+        section.save(defaults);
+    }
 
     void ApplyLoadedValues(const std::string& name, const Section& section)
     {
@@ -41,12 +49,16 @@ void UserSettings::Register(const std::string& section, const std::function<void
 {
     s_Sections[section] = { save, load };
     if (s_Loaded)
+    {
+        RecordDefaults(section, s_Sections[section]);
         ApplyLoadedValues(section, s_Sections[section]);
+    }
 }
 
 void UserSettings::Unregister(const std::string& section)
 {
     s_Sections.erase(section);
+    s_DefaultValues.erase(section);
 }
 
 void UserSettings::Load(void)
@@ -55,7 +67,10 @@ void UserSettings::Load(void)
 
     s_Loaded = true;
     for (const auto& section : s_Sections)
+    {
+        RecordDefaults(section.first, section.second);
         ApplyLoadedValues(section.first, section.second);
+    }
 }
 
 void UserSettings::Save(void)
@@ -104,5 +119,15 @@ bool UserSettings::ApplySection(const std::string& section, const Values& values
         return false;
 
     found->second.load(values);
+    return true;
+}
+
+bool UserSettings::ReadDefaults(const std::string& section, Values& values)
+{
+    const auto found = s_DefaultValues.find(section);
+    if (found == s_DefaultValues.end())
+        return false;
+
+    values = found->second;
     return true;
 }
