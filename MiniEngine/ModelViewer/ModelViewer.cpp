@@ -967,6 +967,13 @@ void DirectionalLight::ShowDetails()
     ImGui::TextDisabled("Rotate the light with the gizmo (E). The toolbar on the scene picks local or world rings.");
 }
 
+// scene file의 [Camera] section 을 읽은 것. fitModel이면 pose를 쓰지 않는다.
+struct CameraSection
+{
+    bool fitModel = false;
+    EditorCamera::Pose pose = { Vector3(kZero), 0.0f, 0.0f };
+};
+
 // scene 은 scene file 하나로 연다. 형식은 IniFile이고 key는 아래와 같다. 실행 중에는 Scene menu와 scene open 명령으로 다른 scene 을 연다.
 //   [Model]  glTF: scene file이 있는 폴더 기준의 glTF 경로
 //            Scale: glTF 좌표에 곱해 world 좌표로 바꾸는 배율. 다음의 Radius와 둘 중 하나만 둔다.
@@ -984,8 +991,7 @@ struct SceneFile
     std::wstring gltfPath;
     float scale = 0.0f;
     float radius = 0.0f;
-    bool fitModel = false;
-    EditorCamera::Pose pose = { Vector3(kZero), 0.0f, 0.0f };
+    CameraSection camera;
     IniFile::Sections sections;
 };
 
@@ -1002,20 +1008,33 @@ std::wstring ResolveFromSceneFolder(const std::wstring& scenePath, std::wstring 
     return folder + path;
 }
 
+const std::string* FindValue(const IniFile::Values& values, const char* key)
+{
+    const auto value = values.find(key);
+    return value == values.end() ? nullptr : &value->second;
+}
+
+// values가 Fit=Model과 Position, Heading, Pitch 중 한 형식만 가질 때 true를 돌려준다. Fit가 Model이 아니면 false다.
+bool ReadCameraSection(const IniFile::Values& values, CameraSection& camera)
+{
+    const std::string* fit = FindValue(values, "Fit");
+    const std::string* position = FindValue(values, "Position");
+    const std::string* heading = FindValue(values, "Heading");
+    const std::string* pitch = FindValue(values, "Pitch");
+    camera.fitModel = fit != nullptr && *fit == "Model";
+    const bool hasPose = position != nullptr && heading != nullptr && pitch != nullptr && ReadVector(*position, camera.pose.position) &&
+        ReadNumbers(*heading, &camera.pose.heading, 1) && ReadNumbers(*pitch, &camera.pose.pitch, 1);
+    return camera.fitModel != hasPose && (fit == nullptr || camera.fitModel);
+}
+
 // 받을 수 없는 값이 있으면 error에 이유를 쓰고 false를 돌려준다.
 bool ReadSceneFile(const std::wstring& path, SceneFile& scene, std::string& error)
 {
     IniFile::Sections& sections = scene.sections;
     sections = IniFile::Read(path);
     const IniFile::Values& model = sections["Model"];
-    const IniFile::Values& camera = sections["Camera"];
-    const auto find = [](const IniFile::Values& values, const char* key) -> const std::string*
-    {
-        const auto value = values.find(key);
-        return value == values.end() ? nullptr : &value->second;
-    };
 
-    const std::string* gltf = find(model, "glTF");
+    const std::string* gltf = FindValue(model, "glTF");
     if (gltf == nullptr)
     {
         error = "has no [Model] glTF, or cannot be read";
@@ -1023,8 +1042,8 @@ bool ReadSceneFile(const std::wstring& path, SceneFile& scene, std::string& erro
     }
     scene.gltfPath = ResolveFromSceneFolder(path, Utility::UTF8ToWideString(*gltf));
 
-    const std::string* scale = find(model, "Scale");
-    const std::string* radius = find(model, "Radius");
+    const std::string* scale = FindValue(model, "Scale");
+    const std::string* radius = FindValue(model, "Radius");
     if ((scale == nullptr) == (radius == nullptr) || !ReadNumbers(scale != nullptr ? *scale : *radius, scale != nullptr ? &scene.scale : &scene.radius, 1) ||
         scene.scale < 0.0f || scene.radius < 0.0f || scene.scale + scene.radius == 0.0f)
     {
@@ -1032,14 +1051,7 @@ bool ReadSceneFile(const std::wstring& path, SceneFile& scene, std::string& erro
         return false;
     }
 
-    const std::string* fit = find(camera, "Fit");
-    const std::string* position = find(camera, "Position");
-    const std::string* heading = find(camera, "Heading");
-    const std::string* pitch = find(camera, "Pitch");
-    scene.fitModel = fit != nullptr && *fit == "Model";
-    const bool hasPose = position != nullptr && heading != nullptr && pitch != nullptr && ReadVector(*position, scene.pose.position) &&
-        ReadNumbers(*heading, &scene.pose.heading, 1) && ReadNumbers(*pitch, &scene.pose.pitch, 1);
-    if (scene.fitModel == hasPose || (fit != nullptr && !scene.fitModel))
+    if (!ReadCameraSection(sections["Camera"], scene.camera))
     {
         error = "needs either [Camera] Fit=Model or Position=<x>,<y>,<z> with Heading and Pitch";
         return false;
@@ -1055,10 +1067,10 @@ void ScaleModel(ModelInstance& model, const SceneFile& scene)
         model.Resize(scene.radius);
 }
 
-EditorCamera::Pose GetStartPose(const SceneFile& scene, const ModelInstance& model, float nearClip)
+EditorCamera::Pose GetStartPose(const CameraSection& camera, const ModelInstance& model, float nearClip)
 {
-    if (!scene.fitModel)
-        return scene.pose;
+    if (!camera.fitModel)
+        return camera.pose;
     const BoundingSphere sphere = model.GetBoundingSphere();
     return { sphere.GetCenter() + Vector3(0.0f, 0.0f, sphere.GetRadius() * 2.0f + nearClip), 0.0f, 0.0f };
 }
@@ -1112,7 +1124,7 @@ void ModelViewer::ShowScene(const PreparedScene& scene, bool moveCamera)
     m_ModelInst = scene.model;
     ScaleModel(m_ModelInst, scene.file);
     if (moveCamera)
-        m_CameraController->SetPose(GetStartPose(scene.file, m_ModelInst, m_Camera.GetNearClip()));
+        m_CameraController->SetPose(GetStartPose(scene.file.camera, m_ModelInst, m_Camera.GetNearClip()));
     m_SceneModel.SetPath(Utility::ToUTF8(scene.file.gltfPath));
     m_SceneName = scene.name;
     SceneEditor::LoadObjectSettings(scene.file.sections);
