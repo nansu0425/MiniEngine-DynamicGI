@@ -48,6 +48,7 @@
 #include "Core/Editor/MeasurementConditions.h"
 #include "Core/UI/ImGuiLayer.h"
 #include "Core/Utility/IniFile.h"
+#include "Core/Math/Rotation.h"
 
 #include <algorithm>
 #include <map>
@@ -789,14 +790,11 @@ Vector3 GetDirectionAt(float elevation, float azimuth)
     return Normalize(Vector3(cosf(e) * cosf(a), sinf(e), cosf(e) * sinf(a)));
 }
 
-// state의 light. rotation은 glTF node의 rotation처럼 x, y, z, w 순서의 quaternion이고, w가 0 이상이 되는 쪽으로 쓴다.
-// 고도와 방위는 조명이 쓰는 방향에서 계산한다.
+// state의 light. rotation은 GetCanonicalQuaternion의 형태로 적은 quaternion이다. 고도와 방위는 조명이 쓰는 방향에서 계산한다.
 ControlChannel::Fields DescribeLight(const LightComponent& light)
 {
     const LightComponent::Properties& properties = light.GetProperties();
-    Quaternion rotation((XMMATRIX)properties.rotation);
-    if (XMVectorGetW(rotation) < 0.0f)
-        rotation = -rotation;
+    const Quaternion rotation = GetCanonicalQuaternion(Quaternion((XMMATRIX)properties.rotation));
     const Vector3 direction = light.GetDirection();
     return ControlChannel::Fields()
         .Object("rotation", ControlChannel::Fields()
@@ -860,13 +858,13 @@ void SetLight(LightComponent& light, const std::string& arguments, const Control
     if (values.count("rotation") != 0)
     {
         const std::vector<float>& xyzw = values["rotation"];
-        const Quaternion requested(XMVectorSet(xyzw[0], xyzw[1], xyzw[2], xyzw[3]));
-        if (XMVectorGetX(XMQuaternionLengthSq(requested)) == 0.0f)
+        Quaternion rotation;
+        if (!MakeQuaternionRotation(xyzw[0], xyzw[1], xyzw[2], xyzw[3], rotation))
         {
             reply.Error("rotation has no length. Nothing was set.");
             return;
         }
-        properties.rotation = Matrix3(Normalize(requested));
+        properties.rotation = Matrix3(rotation);
     }
     if (values.count("direction") != 0)
     {

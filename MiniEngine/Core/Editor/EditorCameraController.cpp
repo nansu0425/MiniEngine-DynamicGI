@@ -3,6 +3,7 @@
 #include "Core/App/UserSettings.h"
 #include "Core/Camera/Camera.h"
 #include "Core/App/GameInput.h"
+#include "Core/Math/Rotation.h"
 
 using namespace Math;
 
@@ -96,9 +97,7 @@ float EditorCameraController::GetCameraNearClip() const
 
 Matrix3 EditorCameraController::GetOrientation() const
 {
-    return Matrix3(m_WorldEast, m_WorldUp, -m_WorldNorth) *
-        Matrix3::MakeYRotation(m_Heading) *
-        Matrix3::MakeXRotation(m_Pitch);
+    return MakeEulerRotation(Matrix3(m_WorldEast, m_WorldUp, -m_WorldNorth), m_Pitch, m_Heading);
 }
 
 void EditorCameraController::Update(float deltaTime)

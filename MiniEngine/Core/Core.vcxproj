@@ -116,6 +116,7 @@
     <ClInclude Include="Math\Matrix4.h" />
     <ClInclude Include="Math\Quaternion.h" />
     <ClInclude Include="Math\Random.h" />
+    <ClInclude Include="Math\Rotation.h" />
     <ClInclude Include="Math\Scalar.h" />
     <ClInclude Include="Math\Transform.h" />
     <ClInclude Include="Math\Vector.h" />
