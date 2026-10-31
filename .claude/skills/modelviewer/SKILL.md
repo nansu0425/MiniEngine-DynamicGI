@@ -12,9 +12,8 @@ harness 로 할 수 없는 일을 만나면 그 일이 계획되어 있는지와
 ## 쓰는 범위
 
 - app 을 직접 실행하지 않고 언제나 `start` 로 띄운다. 그래야 사용자의 설정 파일이 남는다 (`start --help`).
-- OS 를 거쳐야만 보이는 것은 computer use 로 본다 (아래 computer use 절). computer use 를 쓸 수 없는 session 에서는 그것을 사용자에게 확인해 달라고 부탁한다.
+- harness 로 볼 수 없는 것 (OS 를 거쳐야만 보이는 것과 DXGI message) 은 사용자 확인 목록에 넣어 보고한다 (아래 사용자 확인 목록 절).
 - D3D12 debug layer 의 message 를 봐야 하면 Debug 로 띄운다. `start` 는 다른 config 에 `-debug 1` 을 주지 않으므로 debug layer 가 꺼져 message 자체가 생기지 않는다 (`start` 가 상태를 알린다).
-- DXGI message 는 harness 로도 computer use 로도 볼 수 없으므로 사용자에게 확인을 부탁한다.
 - UI 와 mouse 로 바꾸는 상태는 같은 상태를 바꾸는 명령으로 바꾼다. gizmo 가 바꾸는 directional light 의 rotation 과 위치, icon click, Scene Hierarchy panel, W, E 와 scene 위의 gizmo toolbar 가 바꾸는 editor 의 선택, gizmo mode, rotate 의 축, Details panel 이 바꾸는 물체의 설정 (`editor get`, `editor set`), Scene menu 가 바꾸는 scene 과 Save (`scene save`), Engine Tuning 의 Reset to Default, Reset to Defaults, Reset All 이 바꾸는 설정 (`settings reset`) 도 그렇다. 명령은 `do help` 에 있다. gizmo 를 화면으로 보고 판단하거나 끌지 않는다 (근거는 `docs/harness-roadmap.md` 의 보류한 결정).
 
 ## 실행 loop
@@ -56,13 +55,12 @@ harness 로 할 수 없는 일을 만나면 그 일이 계획되어 있는지와
 ## 판정
 
 - 판정의 SSOT 는 `state` 다. 상태 확인과 PASS/FAIL 판정은 `state` 와, 상태를 바꾼 명령이 응답에 담는 그 일부로 한다. 같은 값을 예전 형식으로 주는 `status`, `pose`, `describe`, `settings get` 은 `state` 와 같다 (selftest 가 확인한다). 수치는 image diff 와 비교 script 의 결과다.
-- screenshot (computer use 의 screenshot 과 `shot` 의 view PNG) 은 수치만으로 상황이 잡히지 않을 때 대략 파악하는 참고로 본다. screenshot 을 해석해 판정하지 않는다.
+- screenshot (`shot` 의 view PNG) 은 수치만으로 상황이 잡히지 않을 때 대략 파악하는 참고로 본다. screenshot 을 해석해 판정하지 않는다.
 - image 와 `state` 가 다르면 `state` 를 믿고 차이의 원인을 찾는다. `state` 에 없는 항목이거나 rendering 의 bug 다. `shot` 이 image 옆에 남기는 state 파일이 그 image 를 그린 frame 의 `state` 이므로, image 에 보이는 것의 상태 (예: gizmo 가 translate 인지 rotate 인지) 는 image 가 아니라 그 파일에서 읽는다.
 - 지금 무엇이 보이는지는 `pick grid` 의 칸마다 instance, material, 거리, 위치로 본다. 응답은 지도처럼 읽히게 행마다 그 넷이 각각 칸을 공백으로 이은 text 한 줄이고, miss 인 칸은 `-` 다. 한 pixel 은 `pick <x> <y>` 로 본다. mesh 와 material 은 이름 없이 index 만 있다 (.mini 에 이름이 없다).
 - pick 의 좌표는 client pixel 이고 scene 영역 안이어야 한다. UI 가 보이면 dock 이 덮은 곳은 error 다. `state editor` 의 icon 화면 위치에 무엇이 있는지는 그 좌표를 반올림한 pixel 로 pick 한다. icon 위치는 ImGui 좌표라서 TAA 를 끄면 pick 의 pixel 격자와 반 pixel 어긋난다 (코드에서 추론했고 실행으로 확인하지 않았다).
 - pick 의 `alpha_test` 가 true 면 raster 는 다른 것을 볼 수 있다. raster 의 cutout 은 mip chain 을, ray 는 mip 0 을 읽는다. 같은 pixel 의 raster depth 는 응답의 `raster` 에 있다.
 - `validation fit` 은 그 view 의 `validation capture` 가 먼저 있어야 한다.
-- computer use 로 UI 를 조작했으면 그 결과도 조작 전과 뒤의 `state` 를 비교해 확인한다.
 - D3D12 message 는 `stop` 의 요약과 `do status` 의 `d3d12_messages` 로 센다. 실행 중의 CORRUPTION, ERROR, WARNING 중 하나라도 0 이 아니면 FAIL 이다 (selftest 가 baseline 에서 셋 다 0 인 것을 확인한다). 종료 때는 `#274 LIVE_DEVICE` 하나만 나와야 하고, 그 밖의 message 는 device 보다 오래 남은 object 다 (selftest 가 baseline 에서 확인한다).
 - 어느 명령이 message 를 냈는지는 그 명령 앞뒤에서 `do status` 의 `d3d12_messages` 를 비교해 찾는다. `status` 는 제한 없이 세지만 log 는 같은 ID 를 정해진 횟수까지만 줄로 남기므로 (`D3D12MessageLog.h`) `log mark` 로 나눈 구간에는 줄이 없을 수 있다.
 - `start --gpu-validation` 이 무엇을 더 검사하는지는 `start --help` 에 있다.
@@ -78,19 +76,14 @@ harness 로 할 수 없는 일을 만나면 그 일이 계획되어 있는지와
 - `compare` 는 app 이 정상으로 끝나지 않거나 D3D12 CORRUPTION, ERROR, WARNING 이 있거나 NaN, Inf 를 그리면 exit 1 이다.
 - camera 가 멈춘 shot 만 찍으므로 camera 가 움직일 때의 TAA 와 motion blur 는 보지 못한다.
 
-## computer use
+## 사용자 확인 목록
 
-- Windows 에서는 Claude desktop app 의 Code tab session 에서만 쓸 수 있고, CLI 에서는 쓸 수 없다. 도구는 `mcp__computer-use__*` 다.
-- OS 를 거쳐야만 보이는 것을 확인할 때만 쓴다: 실제로 present 된 화면, HDR, DPI, 실제 입력 경로 (WM message, DirectInput 의 foreground 검사). 그 밖의 확인은 harness 명령으로 한다. harness 가 frame 단위로 결정적이고 비용도 싸다.
-- app 은 이때도 `start` 로 띄운다. `open_application` 은 flag 없이 새 instance 를 띄워 사용자의 `user.ini`, `imgui.ini` 를 덮어쓸 수 있으므로 쓰지 않는다.
-- `request_access` 에는 이름 `ModelViewer` 가 아니라 `do status` 가 돌려주는 `exe` 경로를 준다. 이름으로는 찾지 못하고, 경로로는 full tier 로 승인된다. config 마다 exe 경로가 다르므로 config 를 바꾸면 다시 승인받아야 할 수 있다 (확인하지 않았다).
-- screenshot 에는 D3D 영역도 그려지고 `shot display` 와 구도가 같다. `scale` 을 0.6 정도로 줄여 찍는다. click 좌표는 응답이 알려 주는 coordinate frame 기준이다. 허용하지 않은 app 은 가려지지만 File Explorer 창은 그대로 보인다.
-- 조작 (결과는 판정 절에 따라 `state` 로 확인한다)
-  - ImGui menu 와 panel 은 left click 으로 다룬다. F1 로 UI 를 숨겼다 되돌려도 dock 배치는 남는다.
-  - 키를 누른 채 두려면 `hold_key` 를 쓴다.
-  - gizmo 는 끌지 않는다. gizmo 가 바꾸는 상태는 `light set` 과 `editor` 로 바꾼다 (쓰는 범위 절).
-  - computer use 는 오른쪽과 가운데 button 을 누른 채 둘 수 없어서 camera 를 움직이지 못한다 (camera 조작법은 `MiniEngine/readme.md` 의 Controls). camera 는 `pose` 와 `pose look-at` 으로 옮긴다.
-- Esc 로 끝내면 정상 종료된다. Esc 는 DirectInput 으로 읽으므로 ModelViewer 창이 foreground 여야 한다. 끝난 뒤에는 `stop` 으로 instance 를 정리하고 log 요약을 본다.
+harness 로 확인할 수 없는 것은 사용자가 직접 확인하도록 완료 보고에 목록으로 남긴다.
+
+- 목록에 넣는 것은 실제로 present 된 화면, HDR, DPI, 실제 입력 경로 (WM message, DirectInput 의 foreground 검사, ImGui widget 을 mouse 로 다뤄야만 지나는 code. 예: 우클릭 menu), DXGI message 다. harness 로 확인할 수 있는 것은 harness 로 확인하고 목록에 넣지 않는다.
+- 항목마다 띄우는 방법 (config, scene), 조작 순서, 통과의 기준 (무엇이 보이거나 바뀌면 통과인지) 을 적는다.
+- 목록의 항목은 완료 보고에 다루지 않은 조건으로도 적는다 (CLAUDE.md 의 완료 판정 기준).
+- computer use 는 쓰지 않는다. computer use 는 session 마다 사용자가 권한 요청을 승인해야 쓸 수 있다. 사용자는 작업 중에 권한 요청을 지켜보지 않는다. 그래서 권한 요청을 보내면 작업이 승인을 기다리며 멈추고, 끝내 승인받지 못한 것으로 처리된다.
 
 ## 예
 

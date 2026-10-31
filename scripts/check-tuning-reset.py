@@ -3,9 +3,9 @@
   python scripts/check-tuning-reset.py check   # Debug 로 세 번 띄워 아래 기준을 모두 판정한다
 
 설정은 `settings reset Engine Tuning: <path>` 명령으로 되돌린다. 이 명령과 Engine Tuning panel 의 Reset to Default, Reset to Defaults,
-Reset All 은 EngineTuning::ResetToDefaults 를 함께 쓴다. panel 의 우클릭 menu 와 button 은 computer use 로 본다. app 을 직접 띄우고
-끝내며, 이미 띄운 harness instance 는 먼저 끝낸다. 하나라도 실패하면 exit 1 이다. 실행마다 끝낼 때 실행 중의 D3D12 CORRUPTION,
-ERROR, WARNING 이 0 이고 종료 때 LIVE_DEVICE 하나만 남는지도 본다.
+Reset All 은 EngineTuning::ResetToDefaults 를 함께 쓴다. panel 의 우클릭 menu 와 button 은 사용자가 직접 본다 (modelviewer skill 의
+사용자 확인 목록). app 을 직접 띄우고 끝내며, 이미 띄운 harness instance 는 먼저 끝낸다. 하나라도 실패하면 exit 1 이다. 실행마다
+끝낼 때 실행 중의 D3D12 CORRUPTION, ERROR, WARNING 이 0 이고 종료 때 LIVE_DEVICE 하나만 남는지도 본다.
 
 기본값 D 는 harness baseline 의 user.ini 에서 [Engine Tuning] 을 뺀 user.ini 로 띄운 app 의 state settings.Engine Tuning 이다.
 HM 은 [Engine Tuning] 을 뺀 user.ini 에 Ray Tracing/View=VALIDATION_VIEW 와 Ray Tracing/Heatmap=HEATMAP_METRIC 만 넣어 띄운 app 의

@@ -7,7 +7,7 @@ BRDF 를 쓰는지 판정한다.
 먼저 끝낸다. 하나라도 실패하면 exit 1 이다. 실행마다 끝낼 때 실행 중의 D3D12 CORRUPTION, ERROR, WARNING 이 0 이고 종료 때 LIVE_DEVICE
 하나만 남는지도 본다. PT 의 값은 capture pt 의 float export 로 본다. 이 script 밖에서 보는 기준:
   [R5] raster 의 나머지: check-raster-lighting.py check 와, check-directional-light.py check 의 [P5] 와 [R1]
-  [M1] 의 panel: Engine Tuning 의 Path Tracer 에서 Shading 을 사람이나 computer use 로 바꾸고 그 전후의 state 로 본다.
+  [M1] 의 panel: Engine Tuning 의 Path Tracer 에서 Shading 을 사용자가 바꾸고 그 전후의 state 로 본다.
 
 BRDF 단위 test: path tracer 와 raster 가 include 하는 바로 그 HLSL 함수 (MakeGltfBrdfInput, EvaluateGltfBrdf, SampleGltfBrdfDirection 과 그
 안의 table 조회) 를 app 의 brdf 명령으로 GPU 에서 돌리고 (MiniEngine/Model/PathTracer/BrdfTest.cpp), 결과를 Python 이 판정한다. 참조는

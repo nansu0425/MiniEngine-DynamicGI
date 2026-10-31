@@ -2,7 +2,8 @@
 
   python scripts/check-log-restore.py check   # Debug 로 두 번 띄워 아래 기준을 모두 판정한다
 
-번호는 작업 10 의 목표 번호다. G3 의 사람 쪽 (Engine Tuning 의 Path Tracer 에 있는 Log 와 Restore 칸) 은 computer use 로 본다.
+번호는 작업 10 의 목표 번호다. G3 의 사람 쪽 (Engine Tuning 의 Path Tracer 에 있는 Log 와 Restore 칸) 은 사용자가 직접 본다
+(modelviewer skill 의 사용자 확인 목록).
 
 app 을 직접 띄우고 끝내며, 이미 띄운 harness instance 는 먼저 끝낸다. 하나라도 실패하면 exit 1 이다. 실행마다 끝낼 때 실행 중의
 D3D12 CORRUPTION, ERROR, WARNING 이 0 이고 종료 때 LIVE_DEVICE 하나만 남는지도 본다.

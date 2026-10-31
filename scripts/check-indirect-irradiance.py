@@ -6,7 +6,7 @@
 번호는 작업 11 의 완료 기준의 번호다. Indirect Irradiance 의 정의와 단위는 PathTracer.h 의 Output 에 있다. 이 script 밖에서 보는 기준:
   [U1] 의 저장과 reset: check-lambert-path.py check 의 [8], [9]
   [U2], [U3] 측정 조건의 줄: check-log-restore.py check 의 [G1], [G2b], [G4]
-  [U4] Engine Tuning 의 Path Tracer 에 있는 Output combo: 사람이나 computer use 로 바꾸고 그 전후의 state 로 본다
+  [U4] Engine Tuning 의 Path Tracer 에 있는 Output combo: 사용자가 바꾸고 그 전후의 state 로 본다
 
 app 을 직접 띄우고 끝내며, 이미 띄운 harness instance 는 먼저 끝낸다. 하나라도 실패하면 exit 1 이다. 실행마다 끝낼 때 실행 중의 D3D12
 CORRUPTION, ERROR, WARNING 이 0 이고 종료 때 LIVE_DEVICE 하나만 남는지도 본다. PT 의 값은 capture pt 의 export 로 본다. export 의
