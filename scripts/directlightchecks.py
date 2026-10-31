@@ -16,7 +16,7 @@ from imagemasks import eroded
 from pathtracerchecks import BASE, SKY_RADIANCE, set_path_tracer
 from viewer import SETTLE_FRAMES, capture
 
-LIGHT_SECTION = 'Directional Light'
+LIGHT_OBJECT = 'Directional Light'
 EDGE_PIXELS = 2
 # low 는 harness baseline 의 시점에 보이는 곳과 가려진 곳이 둘 다 있는 낮은 방향이다. 고도 20 에서는 모든 방위에서 보이는 곳이 없었다.
 SPONZA_LIGHTS = {'default': None, 'low': 'elevation=30 azimuth=180'}
@@ -49,8 +49,8 @@ def accumulate_export(session, settings, name):
 
 
 def set_light(session, values):
-    """user.ini 의 key 와 value 로 light 를 정한다."""
-    session.ask_ok(f'settings set {LIGHT_SECTION}: ' + '; '.join(f'{key}={value}' for key, value in values.items()))
+    """editor get 이 주는 key 와 value (scene file 의 Directional Light section) 로 light 를 정한다."""
+    session.ask_ok(f'editor set {LIGHT_OBJECT}: ' + '; '.join(f'{key}={value}' for key, value in values.items()))
 
 
 def largest_cluster(mask):

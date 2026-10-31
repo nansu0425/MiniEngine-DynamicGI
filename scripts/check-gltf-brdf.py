@@ -105,7 +105,7 @@ from PIL import Image
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import gltfbrdf
 from checks import Checks, stop_and_check
-from directlightchecks import (EDGE_PIXELS, LIGHT_SECTION, SPONZA_LIGHTS, WAIT_TIMEOUT, accumulate_export, check_bounces, check_sponza_direct,
+from directlightchecks import (EDGE_PIXELS, LIGHT_OBJECT, SPONZA_LIGHTS, WAIT_TIMEOUT, accumulate_export, check_bounces, check_sponza_direct,
                                overlay, set_light)
 from gltfwriter import GLTF_FLOAT, GLTF_UNSIGNED_SHORT, BufferBuilder, flatten
 from imagecompare import agreement, rmse
@@ -803,7 +803,7 @@ def run_sponza(check):
             session.ask_ok('ui hide')
             camera = session.ask_ok('state camera')['state']['camera']
             start_pose = ' '.join(str(camera[key]) for key in ['x', 'y', 'z', 'heading', 'pitch'])
-            default_light = session.ask_ok(f'settings get {LIGHT_SECTION}')['values']
+            default_light = session.ask_ok(f'editor get {LIGHT_OBJECT}')['values']
             check_default_shading(session, check)
             check_exposure(session, check, start_pose)
             check_emission_furnace(session, check)

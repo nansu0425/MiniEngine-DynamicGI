@@ -20,10 +20,10 @@ LIVE_DEVICE 하나만 남는지도 본다.
       와 bit 가 같고, scene capture 가 [2] 의 PT 를 끈 capture 와 sky pixel 에서 bit 가 같다. ROUNDED_SKY_LIGHT 처럼 R11G11B10 이
       정확히 담지 못하는 값에서도 PT 의 UAV 쓰기와 raster 의 render target 쓰기가 같은 값으로 반올림하는지 본다.
   [4] PT 를 쌓는 동안 Color 나 Intensity 를 바꾸면 pt 의 resets 가 1 늘고 samples 를 처음부터 센다. Intensity 의 inf 는 받고
-      (check-path-tracer-export.py 가 쓴다) NaN 과 음수는 받지 않는다. 끝내기 전에 둔 SAVED_SKY_LIGHT 가 user.ini 의 Sky Light
-      section 에 남는다.
-  [5] state sky 의 color 와 intensity 가 settings 의 Sky Light 와 같은 값이고, Scene Hierarchy panel 의 목록 (state editor 의 objects)
-      에 Sky Light 가 있어 Details panel 에서 그 값을 바꿀 수 있다.
+      (check-path-tracer-export.py 가 쓴다) NaN 과 음수는 받지 않아 editor set 이 error 이고 값이 그대로다. scene file 에 쓰고 다시 읽는 것은 check-scene-open.py 의
+      [O11] 이 본다.
+  [5] state sky 의 color 와 intensity 가 editor get 의 Sky Light 와 같은 값이고, Scene Hierarchy panel 의 목록 (state editor 의
+      objects) 에 Sky Light 가 있어 Details panel 에서 그 값을 바꿀 수 있다.
 
 keep 은 기본 시점 (harness baseline 의 pose) 과 SKY_POSE 에서 PT 를 끈 display 와 PT 를 Shading glTF 로 KEEP_SAMPLES 만큼 쌓은
 display 를 찍는다. harness baseline 이라 Adaptation 이 꺼져 있고 Exposure 가 같다.
@@ -41,26 +41,23 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from checks import Checks, stop_and_check
 from imagefiles import ImageFileError, read_dds_rgba32f
 from imagemasks import eroded
-from pathtracerchecks import (BASE, KEY_PREFIX, SECTION, SKY_COLOR, SKY_LIGHT_SECTION, SKY_RADIANCE, path_tracer_settings, path_tracer_state,
+from pathtracerchecks import (BASE, KEY_PREFIX, SECTION, SKY_COLOR, SKY_LIGHT_OBJECT, SKY_RADIANCE, path_tracer_settings, path_tracer_state,
                               set_path_tracer)
 from viewer import HARNESS_DIR, SETTLE_FRAMES, HarnessError, Session, default_scene_pose, capture, start_instance, stop_instance
 
 KEPT_DIR = HARNESS_DIR / 'kept' / 'sky-light'
-
-# Scene Hierarchy panel 과 editor 명령이 Sky Light 를 가리키는 이름
-SKY_LIGHT_OBJECT = 'Sky Light'
 
 # check-raster-lighting.py 가 sky 를 보던 시점이다. courtyard 가운데에서 위를 본다.
 SKY_POSE = '0 300 0 1.5708 1.2'
 EDGE_PIXELS = 2
 MIN_SKY_FRACTION = 0.1
 
-# (color, intensity). 첫 값은 harness baseline 의 값이다. 성분과 곱이 모두 R11G11B10 이 정확히 담는 값이다.
+# (color, intensity). 성분과 곱이 모두 R11G11B10 이 정확히 담는 값이다.
 SKY_LIGHTS = [((1.0, 1.0, 1.0), 1.0), ((1.0, 1.0, 1.0), 0.25), ((1.0, 1.0, 1.0), 2.0), ((0.5, 0.75, 1.0), 1.0)]
 # 0.6 은 R11G11B10 의 어느 channel 도 정확히 담지 못한다.
 ROUNDED_SKY_LIGHT = ((1.0, 1.0, 1.0), 0.6)
-# [4] 에서 끝내기 전에 두는 값. SKY_LIGHTS 의 어느 것과도 달라서 user.ini 에서 이 run 이 쓴 값인지 알 수 있다.
-SAVED_SKY_LIGHT = ((0.25, 0.5, 1.0), 0.75)
+# [5] 에서 두는 값. 기본값과도 SKY_LIGHTS 의 어느 것과도 달라서 state 가 이 값을 따랐는지 알 수 있다.
+STATE_SKY_LIGHT = ((0.25, 0.5, 1.0), 0.75)
 
 # miss 한 sample 은 모두 같은 값이라 sample 수와 상관없이 평균이 그 값이다. 수를 줄여 시간을 아낀다.
 PT_SAMPLES = 4
@@ -79,7 +76,7 @@ def format_color(color):
 
 
 def set_sky_light(session, color, intensity):
-    return session.ask_ok(f'settings set {SKY_LIGHT_SECTION}: Color={format_color(color)}; Intensity={intensity:.9g}')
+    return session.ask_ok(f'editor set {SKY_LIGHT_OBJECT}: Color={format_color(color)}; Intensity={intensity:.9g}')
 
 
 def radiance(color, intensity):
@@ -156,7 +153,7 @@ def check_resets(session, check):
     for key, value in [('Intensity', '0.5'), ('Color', '1,0.5,1')]:
         session.ask_ok(f'pt wait samples={SAMPLES_BEFORE_CHANGE}', timeout=WAIT_TIMEOUT)
         before = path_tracer_state(session)
-        session.ask_ok(f'settings set {SKY_LIGHT_SECTION}: {key}={value}')
+        session.ask_ok(f'editor set {SKY_LIGHT_OBJECT}: {key}={value}')
         session.ask_ok('frames 2')
         after = path_tracer_state(session)
         check(f'[4] changing the Sky Light {key} starts the path tracer over',
@@ -166,19 +163,18 @@ def check_resets(session, check):
 
 
 def read_intensity(session):
-    return session.ask_ok(f'state settings.{SKY_LIGHT_SECTION}')['state']['settings'][SKY_LIGHT_SECTION]['Intensity']
+    return session.ask_ok(f'editor get {SKY_LIGHT_OBJECT}')['values']['Intensity']
 
 
 def check_values_taken(session, check):
-    # 받지 않는 값은 settings set 의 응답이 아니라 다시 읽은 값으로 본다. 응답은 요청한 값과 다시 읽은 값을 숫자로 견주는데, 지금 값이
-    # inf 면 어떤 값과의 차도 허용 범위 안이 된다.
     color, intensity = SKY_LIGHTS[0]
     for value in ['nan', '-1']:
         set_sky_light(session, color, intensity)
-        session.ask(f'settings set {SKY_LIGHT_SECTION}: Intensity={value}')
+        reply = session.ask(f'editor set {SKY_LIGHT_OBJECT}: Intensity={value}')
         kept = read_intensity(session)
-        check(f'[4] the Sky Light does not take the intensity {value}', kept == f'{intensity:.9g}', f'Intensity reads {kept}')
-    session.ask(f'settings set {SKY_LIGHT_SECTION}: Intensity=inf')
+        check(f'[4] the Sky Light does not take the intensity {value}', not reply['ok'] and kept == f'{intensity:.9g}',
+              f'editor set replied {"ok" if reply["ok"] else "an error"}; Intensity reads {kept}')
+    session.ask(f'editor set {SKY_LIGHT_OBJECT}: Intensity=inf')
     session.ask_ok(f'frames {SETTLE_FRAMES}')
     taken = read_intensity(session)
     check('[4] the Sky Light takes an infinite intensity', taken == 'inf', f'Intensity reads {taken}')
@@ -186,35 +182,16 @@ def check_values_taken(session, check):
 
 
 def check_state(session, check):
-    color, intensity = SAVED_SKY_LIGHT
+    color, intensity = STATE_SKY_LIGHT
     set_sky_light(session, color, intensity)
     state = session.ask_ok('state sky')['state']['sky']
-    settings = session.ask_ok(f'state settings.{SKY_LIGHT_SECTION}')['state']['settings'][SKY_LIGHT_SECTION]
+    settings = session.ask_ok(f'editor get {SKY_LIGHT_OBJECT}')['values']
     shown = {'Color': format_color([float(state['color'][channel]) for channel in 'rgb']), 'Intensity': f'{float(state["intensity"]):.9g}'}
     expected = {'Color': format_color(color), 'Intensity': f'{intensity:.9g}'}
     check('[5] state sky has the values of the Sky Light settings', shown == settings == expected,
           f'state sky {shown}, settings {settings}')
     objects = session.ask_ok('state editor')['state']['editor']['objects']
     check('[5] the Scene Hierarchy lists the Sky Light', SKY_LIGHT_OBJECT in objects, f'objects {list(objects)}')
-
-
-def read_ini_section(path, section):
-    values, current = {}, None
-    for line in path.read_text(encoding='utf-8').splitlines():
-        line = line.strip()
-        if line.startswith('[') and line.endswith(']'):
-            current = line[1:-1]
-        elif current == section and '=' in line and not line.startswith(';'):
-            key, value = line.split('=', 1)
-            values[key.strip()] = value.strip()
-    return values
-
-
-def check_saved(instance, check):
-    saved = read_ini_section(Path(instance['run_dir']) / 'user.ini', SKY_LIGHT_SECTION)
-    color, intensity = SAVED_SKY_LIGHT
-    expected = {'Color': format_color(color), 'Intensity': f'{intensity:.9g}'}
-    check('[4] user.ini keeps the Sky Light', saved == expected, f'{saved}, expected {expected}')
 
 
 def command_check(args):
@@ -239,7 +216,6 @@ def command_check(args):
         finally:
             session.close()
         stop_and_check(instance, check)
-        check_saved(instance, check)
     except (HarnessError, ImageFileError) as error:
         check('the app ran to the end', False, str(error))
         stop_instance(instance, kill_now=True)

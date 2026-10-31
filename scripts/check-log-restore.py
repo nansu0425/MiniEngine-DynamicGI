@@ -40,7 +40,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from checks import Checks, stop_and_check
 from imagefiles import ImageFileError, read_dds_rgba32f
-from pathtracerchecks import SKY_LIGHT_SECTION
+from pathtracerchecks import SKY_LIGHT_OBJECT
 from viewer import (HARNESS_DIR, PREVIEW_EXPOSURE, VALIDATION_VIEW_SETTLE_FRAMES, HarnessError, Session, make_view, shots_dir, start_instance,
                     stop_instance, without_time_varying)
 
@@ -109,7 +109,7 @@ def read_conditions_state(session):
 def set_conditions(session, line):
     session.ask_ok(f'pose {line["pose"]}')
     session.ask_ok(f'light set {line["light"]}')
-    session.ask_ok(f'settings set {SKY_LIGHT_SECTION}: {line["sky"]}')
+    session.ask_ok(f'editor set {SKY_LIGHT_OBJECT}: {line["sky"]}')
     session.ask_ok(f'settings set Engine Tuning: {TAA}={line["taa"]}')
     settings = line['path tracer'] | {'Show': 1, 'Samples per Frame': 1, 'Target Samples': line['samples']}
     session.ask_ok('settings set Engine Tuning: ' + '; '.join(f'Path Tracer/{key}={value}' for key, value in settings.items()))

@@ -44,7 +44,6 @@ check --record 는 모두 통과하면 수렴과 bias 를 RECORD 에 덧붙인�
 """
 
 import argparse
-import configparser
 import json
 import math
 import re
@@ -61,8 +60,8 @@ from checks import Checks
 from imagecompare import bias
 from imagefiles import ImageFileError, read_dds_rgba32f
 from pathtracerchecks import BASE, append_record_row, code_version, describe_machine, set_path_tracer
-from viewer import (BASELINE_DIR, ENGINE_DIR, HARNESS_DIR, PREVIEW_EXPOSURE, HarnessError, Session, default_scene_pose, make_view, shots_dir,
-                    start_instance, stop_instance)
+from viewer import (ENGINE_DIR, HARNESS_DIR, PREVIEW_EXPOSURE, HarnessError, Session, default_scene, default_scene_pose, make_view,
+                    read_scene_file, shots_dir, start_instance, stop_instance)
 
 KEPT_DIR = HARNESS_DIR / 'kept' / 'convergence'
 MANIFEST = KEPT_DIR / 'manifest.json'
@@ -106,16 +105,14 @@ WAIT_TIMEOUT = 3 * 3600
 Run = namedtuple('Run', 'group name pose settings exports')
 
 
-def baseline_light():
-    ini = configparser.ConfigParser(delimiters=('=',), comment_prefixes=(';',), interpolation=None)
-    ini.optionxform = str
-    ini.read(BASELINE_DIR / 'user.ini', encoding='utf-8')
-    light = ini['Directional Light']
+def default_scene_light():
+    """default_scene() 의 Directional Light 를 light set 의 인자로."""
+    light = read_scene_file(default_scene())['Directional Light']
     return f'direction={light["Direction"]} intensity={light["Intensity"]}'
 
 
 def poses():
-    return {'start': (default_scene_pose(), baseline_light()), 'corridor': (CORRIDOR_POSE, CORRIDOR_LIGHT)}
+    return {'start': (default_scene_pose(), default_scene_light()), 'corridor': (CORRIDOR_POSE, CORRIDOR_LIGHT)}
 
 
 def powers_of_two(last):

@@ -505,7 +505,8 @@ def scene_gltf(scene):
 
 def write_scene_file(gltf):
     """확인 script 가 만든 test scene 의 glTF 옆에 scene file 을 쓰고 그 MiniEngine/ModelViewer 기준 경로를 돌려준다.
-    model 은 bounding sphere 반지름이 10 이 되게 늘리고, camera 는 그 sphere 를 화면에 담는다 (ModelViewer.cpp 의 SceneFile)."""
+    model 은 bounding sphere 반지름이 10 이 되게 늘리고, camera 는 그 sphere 를 화면에 담는다 (ModelViewer.cpp 의 SceneFile).
+    light 와 sky 의 section 은 없으므로 기본값이다."""
     gltf = Path(gltf)
     scene = gltf.with_suffix('.ini')
     scene.write_text(f'[Model]\nglTF={gltf.name}\nRadius=10\n\n[Camera]\nFit=Model\n', encoding='utf-8')
@@ -1291,7 +1292,6 @@ def check_state(session, check):
 
 
 LIGHT_OBJECT = 'Directional Light'
-LIGHT_SECTION = 'Directional Light'
 
 
 def numbers_of(text):
@@ -1324,7 +1324,8 @@ def quaternion_of(fields):
 
 
 def check_light(session, check, changes):
-    """light set 이 gizmo 와 panel 이 바꾸는 값을 바꾸고, state light 가 조명이 쓰는 방향과 user.ini 에 남는 값에 맞는지 본다.
+    """light set 이 gizmo 와 panel 이 바꾸는 값을 바꾸고, state light 가 조명이 쓰는 방향과 editor get 의 값 (scene save 가 쓰는 값) 에
+    맞는지 본다.
     UI 를 숨기고 TAA 를 끈 상태에서 부르고, light 를 처음 상태로 되돌려 놓는다."""
     import numpy as np
 
@@ -1332,10 +1333,10 @@ def check_light(session, check, changes):
         return session.ask_ok('state light')['state']['light']
 
     def saved():
-        return session.ask_ok(f'settings get {LIGHT_SECTION}')['values']
+        return session.ask_ok(f'editor get {LIGHT_OBJECT}')['values']
 
     def restore_saved(values):
-        session.ask_ok(f'settings set {LIGHT_SECTION}: ' + '; '.join(f'{key}={value}' for key, value in values.items()))
+        session.ask_ok(f'editor set {LIGHT_OBJECT}: ' + '; '.join(f'{key}={value}' for key, value in values.items()))
 
     usage = session.ask_ok('help')['commands']['light']
     check('light usage gives the units and axes', all(term in usage for term in ['degrees', '+x', '+z', '+y', '-Z', 'world units', 'lux', 'reset']), usage)
@@ -1343,7 +1344,7 @@ def check_light(session, check, changes):
     original, original_saved = light_state(), saved()
     direction = vector_of(original['direction'])
     elevation, azimuth = elevation_and_azimuth_of(direction)
-    check('state light direction is the +Z of its rotation and the Direction saved in user.ini, and elevation, azimuth are of that direction',
+    check('state light direction is the +Z of its rotation and the Direction editor get gives, and elevation, azimuth are of that direction',
           np.abs(rotate(quaternion_of(original['rotation']), [0, 0, 1]) - direction).max() <= 1e-6
           and np.array_equal(numbers_of(original_saved['Direction']).astype(np.float32), direction.astype(np.float32))
           and abs(float(original['elevation']) - elevation) <= 1e-4 and degrees_between(float(original['azimuth']), azimuth) <= 1e-4,
@@ -1418,7 +1419,7 @@ def check_light(session, check, changes):
 
     record_change(session, changes, 'light set color, intensity', 'light set color=0.5,0.25,1 intensity=2.5', 'light')
     light, values = light_state(), saved()
-    check('light set color and intensity read back as given and are what user.ini keeps',
+    check('light set color and intensity read back as given and are what editor get gives',
           light['color'] == {'r': '0.5', 'g': '0.25', 'b': 1} and light['intensity'] == '2.5'
           and values['Color'] == '0.5,0.25,1' and values['Intensity'] == '2.5',
           f'{light["color"]}, {light["intensity"]}; saved {values["Color"]}, {values["Intensity"]}')
@@ -1815,8 +1816,8 @@ def check_acceptance(session, check):
 
         requested = dict(item.split('=') for item in argument_of('light set ').split())
         lit = responses['lit']['state']
-        light, saved = lit['light'], numbers_of(lit['settings'][LIGHT_SECTION]['Direction'])
-        check('acceptance 1: state light is at the elevation and azimuth light set asked for, and user.ini keeps that direction',
+        light, saved = lit['light'], numbers_of(responses['lit_settings']['values']['Direction'])
+        check('acceptance 1: state light is at the elevation and azimuth light set asked for, and editor get gives that direction',
               abs(float(light['elevation']) - float(requested['elevation'])) <= 1e-4
               and degrees_between(float(light['azimuth']), float(requested['azimuth'])) <= 1e-4
               and np.array_equal(saved.astype(np.float32), vector_of(light['direction']).astype(np.float32))

@@ -46,7 +46,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cornellbox
 from checks import Checks, stop_and_check
 from imagefiles import ImageFileError, read_dds_rgba32f
-from pathtracerchecks import BASE, SKY_LIGHT_SECTION, SKY_RADIANCE, set_path_tracer
+from pathtracerchecks import BASE, SKY_LIGHT_OBJECT, SKY_RADIANCE, set_path_tracer
 from pickanswers import PIXEL_CORNER_OFFSETS, PIXEL_EDGE_OFFSETS, camera_ray, grid_cells, is_unambiguous, nearest_face, vector_of
 from viewer import (BASELINE_DIR, HARNESS_DIR, SETTLE_FRAMES, VIEWER_DIR, HarnessError, Session, default_scene, read_scene_file, shots_dir,
                     start_instance, stop_instance)
@@ -302,7 +302,7 @@ def light_winding_problems(gltf, material, shape):
 def set_line_conditions(session):
     session.ask_ok(f'pose {LINE["pose"]}')
     session.ask_ok(f'light set {LINE["light"]}')
-    session.ask_ok(f'settings set {SKY_LIGHT_SECTION}: {LINE["sky"]}')
+    session.ask_ok(f'editor set {SKY_LIGHT_OBJECT}: {LINE["sky"]}')
     settings = LINE['path tracer'] | {'Show': 1, 'Samples per Frame': 1, 'Target Samples': LINE['samples']}
     session.ask_ok('settings set Engine Tuning: ' + '; '.join(f'Path Tracer/{key}={value}' for key, value in settings.items()))
     session.ask_ok('pt reset')

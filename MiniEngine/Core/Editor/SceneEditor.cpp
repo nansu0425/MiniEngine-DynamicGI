@@ -2,6 +2,7 @@
 #include "Core/Editor/SceneEditor.h"
 #include "Core/App/GameInput.h"
 #include "Core/Automation/ControlChannel.h"
+#include "Core/Automation/SettingsAssignment.h"
 #include "Core/UI/ImGuiLayer.h"
 
 #include <algorithm>
@@ -162,6 +163,19 @@ namespace
             .Object("objects", objects);
     }
 
+    SceneEditor::Object* FindObject(const std::string& name, std::string& error)
+    {
+        std::string names;
+        for (SceneEditor::Object* object : s_Objects)
+        {
+            if (name == object->GetName())
+                return object;
+            names += std::string(names.empty() ? "" : ", ") + object->GetName();
+        }
+        error = "no object '" + name + "'. Objects: " + names;
+        return nullptr;
+    }
+
     bool SelectByName(const std::string& name, std::string& error)
     {
         if (name == "none")
@@ -170,18 +184,14 @@ namespace
             return true;
         }
 
-        std::string names;
-        for (SceneEditor::Object* object : s_Objects)
+        SceneEditor::Object* object = FindObject(name, error);
+        if (object == nullptr)
         {
-            if (name == object->GetName())
-            {
-                s_Selected = object;
-                return true;
-            }
-            names += std::string(names.empty() ? "" : ", ") + object->GetName();
+            error += ", none";
+            return false;
         }
-        error = "no object '" + name + "'. Objects: " + names + ", none";
-        return false;
+        s_Selected = object;
+        return true;
     }
 
     bool SetGizmoMode(const std::string& name, std::string& error)
@@ -212,12 +222,62 @@ namespace
         return false;
     }
 
+    void GetObjectSettings(const std::string& name, const ControlChannel::Reply& reply)
+    {
+        std::string error;
+        const SceneEditor::Object* object = FindObject(name, error);
+        if (object == nullptr)
+        {
+            reply.Error(error);
+            return;
+        }
+        IniFile::Values values;
+        object->SaveSettings(values);
+        reply.Ok(ControlChannel::Fields().Object("values", SettingsAssignment::Describe(values)));
+    }
+
+    void SetObjectSettings(const std::string& arguments, const ControlChannel::Reply& reply)
+    {
+        std::string name, assignments, error;
+        if (!SettingsAssignment::Split(arguments, name, assignments))
+        {
+            reply.Error("usage: editor set <name>: <key>=<value>; <key>=<value>");
+            return;
+        }
+        SceneEditor::Object* object = FindObject(name, error);
+        if (object == nullptr)
+        {
+            reply.Error(error);
+            return;
+        }
+        ControlChannel::Fields applied;
+        if (!SettingsAssignment::Assign(name, assignments,
+            [object](SettingsAssignment::Values& values) { object->SaveSettings(values); },
+            [object](const SettingsAssignment::Values& values) { object->LoadSettings(values); },
+            applied, reply))
+        {
+            return;
+        }
+        reply.Ok(ControlChannel::Fields().Object("values", applied));
+    }
+
     void HandleEditorCommand(const std::string& arguments, const ControlChannel::Reply& reply)
     {
         const size_t actionEnd = arguments.find(' ');
         const std::string action = arguments.substr(0, actionEnd);
         const std::string value = actionEnd == std::string::npos ? std::string() : arguments.substr(actionEnd + 1);
-        std::string error = "usage: editor select <name>|none | editor mode translate|rotate | editor axes local|world";
+        if (action == "get")
+        {
+            GetObjectSettings(value, reply);
+            return;
+        }
+        if (action == "set")
+        {
+            SetObjectSettings(value, reply);
+            return;
+        }
+        std::string error = "usage: editor select <name>|none | editor mode translate|rotate | editor axes local|world | editor get <name> | "
+            "editor set <name>: <key>=<value>; <key>=<value>";
         const bool done =
             action == "select" ? SelectByName(value, error) :
             action == "mode" ? SetGizmoMode(value, error) :
@@ -242,6 +302,28 @@ void SceneEditor::RemoveObject(Object& object)
     s_Objects.erase(std::remove(s_Objects.begin(), s_Objects.end(), &object), s_Objects.end());
     if (s_Selected == &object)
         s_Selected = nullptr;
+}
+
+void SceneEditor::LoadObjectSettings(const IniFile::Sections& sections)
+{
+    for (Object* object : s_Objects)
+    {
+        const auto section = sections.find(object->GetName());
+        object->LoadSettings(section != sections.end() ? section->second : IniFile::Values());
+    }
+}
+
+IniFile::Sections SceneEditor::SaveObjectSettings(void)
+{
+    IniFile::Sections sections;
+    for (const Object* object : s_Objects)
+    {
+        IniFile::Values values;
+        object->SaveSettings(values);
+        if (!values.empty())
+            sections[object->GetName()] = values;
+    }
+    return sections;
 }
 
 void SceneEditor::Update(const Camera& camera)
@@ -284,13 +366,17 @@ void SceneEditor::RegisterCommands(const Camera& camera)
 {
     const Camera* projection = &camera;
     ControlChannel::RegisterState("editor", [projection] { return DescribeEditor(*projection); });
-    ControlChannel::Register("editor", "editor select <name>|none | editor mode translate|rotate | editor axes local|world: the selected object, "
+    ControlChannel::Register("editor", "editor select <name>|none | editor mode translate|rotate | editor axes local|world | editor get <name> | "
+        "editor set <name>: <key>=<value>; <key>=<value>: the selected object, "
         "whose settings the Details panel shows and which the gizmo edits, the gizmo mode and the axes the rotate rings follow, "
         "as clicking an object in the Scene Hierarchy panel or its icon, pressing W or E and the toolbar at the top right of the scene do. "
         "local turns the object about its own axes and world about the world axes. translate always follows the world axes. "
         "state editor has them, and the objects in the order of the Scene Hierarchy panel, each with its world position and, in front of the camera, "
         "its icon's center in client pixels. on_screen is whether that center is in the scene. An object without an icon, "
-        "such as the Sky Light or the model, has neither and no gizmo. Icons and the gizmo are drawn only while the UI is shown",
+        "such as the Sky Light or the model, has neither and no gizmo. Icons and the gizmo are drawn only while the UI is shown. "
+        "get gives the settings of an object as its Details panel changes them, which the scene file keeps in the section of the object's name. "
+        "set changes them as the Details panel does, and changes nothing and fails if a value does not read back as given. "
+        "scene save writes them to the scene file. An object without settings, such as the model, gives none",
         HandleEditorCommand);
 }
 

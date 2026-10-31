@@ -71,11 +71,11 @@ from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from checks import Checks, stop_and_check
-from directlightchecks import EDGE_PIXELS, LIGHT_SECTION, accumulate_export, overlay, set_light
+from directlightchecks import EDGE_PIXELS, LIGHT_OBJECT, accumulate_export, overlay, set_light
 from gltfwriter import GLTF_FLOAT, GLTF_UNSIGNED_SHORT, BufferBuilder, flatten
 from imagefiles import DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, ImageFileError, read_dds_rgba32f, read_dds_rgba8
 from imagemasks import column_groups, eroded
-from pathtracerchecks import BASE, FURNACE_SAMPLES, SECTION, SKY_LIGHT_SECTION, SKY_RADIANCE, path_tracer_state, set_path_tracer
+from pathtracerchecks import BASE, FURNACE_SAMPLES, SECTION, SKY_LIGHT_OBJECT, SKY_RADIANCE, path_tracer_state, set_path_tracer
 from viewer import (HARNESS_DIR, REPO_ROOT, SETTLE_FRAMES, SNAPSHOT_POSES, HarnessError, Session, default_scene_pose,
                     capture, start_instance, stop_instance, write_scene_file)
 
@@ -507,7 +507,7 @@ def take_restore_line(session):
     line = RESTORE_LINE
     session.ask_ok(f'pose {line["pose"]}')
     session.ask_ok(f'light set {line["light"]}')
-    session.ask_ok(f'settings set {SKY_LIGHT_SECTION}: {line["sky"]}')
+    session.ask_ok(f'editor set {SKY_LIGHT_OBJECT}: {line["sky"]}')
     set_path_tracer(session, line['path tracer'] | {'Show': 1, 'Samples per Frame': 1, 'Target Samples': line['samples']})
     session.ask_ok('pt reset')
     session.ask_ok(f'pt wait samples={line["samples"]}', timeout=900)
@@ -542,7 +542,7 @@ def run_sponza(check, build_first):
         session = Session(instance)
         try:
             session.ask_ok('ui hide')
-            default_light = session.ask_ok(f'settings get {LIGHT_SECTION}')['values']
+            default_light = session.ask_ok(f'editor get {LIGHT_OBJECT}')['values']
             start_pose = default_scene_pose()
             session.ask_ok(f'pose {start_pose}')
             set_light(session, default_light)

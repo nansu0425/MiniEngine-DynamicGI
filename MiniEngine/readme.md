@@ -13,7 +13,7 @@
 * pan: drag with the middle mouse button
 * toggle ImGui: F1
 * engine tuning, profiler, scene overlay, scene hierarchy, details: ImGui View menu
-* scene: the Scene menu lists the scene files of the Scenes folder by name and marks the one open. Picking one opens it while running: the model changes, the camera moves to the scene file's starting pose and the path tracer starts over. The lights, settings, camera movement speed and UI stay
+* scene: the Scene menu lists the scene files of the Scenes folder by name and marks the one open. Picking one opens it while running: the model changes, the camera moves to the scene file's starting pose, the objects in the Scene Hierarchy take their settings in the scene file, such as the lights, and the path tracer starts over. Changes to the objects not saved are lost. The settings, camera movement speed and UI stay. Save at the top of the menu writes the settings of the objects to the open scene file and leaves its other lines
 * ray tracing debug view: pick one as View under Ray Tracing in Engine Tuning. Off shows the raster image
 * ray query validation: pick a Validation view as View and what its Heatmap paints under Ray Tracing in Engine Tuning, then press Capture under its Validation to read the last frame's counts and p50, p99, max. Fit to Capture sets a metric heatmap's range from the capture
 * path tracer: Show and the other settings are under Path Tracer in Engine Tuning
@@ -41,7 +41,7 @@ scripts/viewer.py starts ModelViewer with these options. They change nothing whe
 Get sample assets from https://github.com/KhronosGroup/glTF-Sample-Models or make your own.
 
 * Place asset folder underneath the ModelViewer folder
-* Write a scene file for it: the glTF path, the model's scale and the camera's starting pose. The keys are described above SceneFile in ModelViewer/ModelViewer.cpp, and Scenes/Sponza.ini is an example
+* Write a scene file for it: the glTF path, the model's scale and the camera's starting pose, and the lights if not the defaults. Scene > Save writes the lights you set. The keys are described above SceneFile in ModelViewer/ModelViewer.cpp, and Scenes/Sponza.ini is an example
 * Add to command line "-scene [scene file path relative to the ModelViewer folder]". Without it ModelViewer opens Scenes/Sponza.ini
 * Example:  ModelViewer.exe -scene Scenes/Sponza.ini
 * Scenes/CornellBox.ini opens the Cornell box that scripts/fetch-assets.ps1 fetches and converts to glTF

@@ -44,7 +44,6 @@
 #include "Core/Editor/EditorCamera.h"
 #include "Core/Editor/SceneEditor.h"
 #include "Core/Automation/ControlChannel.h"
-#include "Core/App/UserSettings.h"
 #include "Core/Editor/MeasurementConditions.h"
 #include "Core/UI/ImGuiLayer.h"
 #include "Core/Utility/IniFile.h"
@@ -71,7 +70,7 @@ using Renderer::MeshSorter;
 class DirectionalLight : public SceneEditor::IconObject
 {
 public:
-    // gizmo, light set 명령, Details panel, user.ini가 바꾸는 값
+    // gizmo, light set 명령, Details panel, scene file이 바꾸는 값
     struct Properties
     {
         // GetX, GetY, GetZ가 local의 +X, +Y, +Z를 world에서 본 방향이다. 조명이 쓰는 +Z를 계산 없이 그대로 읽도록
@@ -99,12 +98,16 @@ public:
     virtual const char* GetName() const override { return "Directional Light"; }
     // color와 intensity를 바꾸고 transform을 되돌린다.
     virtual void ShowDetails() override;
+    virtual void SaveSettings(IniFile::Values& values) const override;
+    virtual void LoadSettings(const IniFile::Values& values) override;
     virtual Vector3 GetPosition() const override { return m_Properties.position; }
     virtual void SetPosition(Vector3 position) override { m_Properties.position = position; }
     virtual void Draw(const Camera& camera, bool selected) const override;
     virtual void Rotate(const Camera& camera, ImGuizmo::MODE axes) override;
 
 private:
+    static Properties GetDefaultProperties();
+
     Properties m_Properties;
 };
 
@@ -115,7 +118,7 @@ private:
 class SkyLight : public SceneEditor::Object
 {
 public:
-    // Details panel, user.ini, settings 명령이 바꾸는 값
+    // Details panel, scene file, editor set 명령이 바꾸는 값
     struct Properties
     {
         // directional light처럼 color는 linear RGB이고 성분마다 0 ~ 1이며, intensity와 곱한 것이 빛이다. intensity는 lux가 아니라
@@ -135,8 +138,12 @@ public:
     // 무한히 멀어 icon을 둘 자리가 없으므로 Scene Hierarchy로만 고른다.
     virtual const char* GetName() const override { return "Sky Light"; }
     virtual void ShowDetails() override;
+    virtual void SaveSettings(IniFile::Values& values) const override;
+    virtual void LoadSettings(const IniFile::Values& values) override;
 
 private:
+    static Properties GetDefaultProperties();
+
     Properties m_Properties;
 };
 
@@ -152,6 +159,8 @@ public:
 
     virtual const char* GetName() const override { return m_Name.c_str(); }
     virtual void ShowDetails() override;
+    virtual void SaveSettings(IniFile::Values&) const override {}
+    virtual void LoadSettings(const IniFile::Values&) override {}
 
 private:
     const ModelInstance& m_Instance;
@@ -183,7 +192,10 @@ private:
     // scene 을 바꾸지 않고 path의 scene file을 열 수 있는지 본다. 그 model을 처음 열면 load해서 m_Models에 남긴다.
     bool PrepareScene(const std::wstring& path, PreparedScene& scene, std::string& error);
     // PrepareScene이 준비한 scene 으로 바꾼다. moveCamera면 camera를 scene file의 처음 pose로 옮긴다. path tracer는 처음부터 다시 쌓는다.
+    // 물체의 설정은 scene file의 값으로 바꾼다.
     void ShowScene(const PreparedScene& scene, bool moveCamera);
+    // 물체의 설정을 지금 scene file에 쓴다. 쓸 수 없으면 error에 이유를 쓰고 false를 돌려준다.
+    bool SaveScene(std::string& error);
     void ShowSceneMenu(void);
     void RegisterSceneCommand(void);
     // 측정 조건의 줄에 지금 scene 을 담고, 다른 scene 의 줄을 Restore하면 그 scene 을 연다.
@@ -214,15 +226,11 @@ private:
 
 CREATE_APPLICATION( ModelViewer )
 
-const char kLightSettingsSection[] = "Directional Light";
-
 // 예전에 방위 -0.5 rad와 고도 0.75 x 90°로 정하던 기본 방향을 bit 단위로 옮겨서, 기본 화면이 그때와 같다.
 const Vector3 kDefaultLightDirection(0.335837096f, 0.923879147f, -0.18346864f);
 // spec의 기본 intensity는 1 lux이지만, 기본 화면과 harness baseline의 Exposure가 맞춰 둔 밝기를 지키도록 4π로 둔다. 그 Exposure를
 // 맞출 때의 raster는 diffuse에 1/π가 없어 intensity 4로 지금의 4π만큼 밝았다.
 constexpr float kDefaultLightIntensity = 4.0f * XM_PI;
-
-const char kSkyLightSettingsSection[] = "Sky Light";
 
 // scripts/viewer.py가 이 이름과 형식으로 -scene이 없을 때 여는 scene file의 경로를 읽는다.
 const wchar_t kDefaultScene[] = L"Scenes/Sponza.ini";
@@ -255,12 +263,18 @@ bool MakeRotation(Vector3 direction, Vector3 up, Matrix3& rotation)
     return true;
 }
 
-DirectionalLight::DirectionalLight()
+DirectionalLight::Properties DirectionalLight::GetDefaultProperties()
 {
-    m_Properties.rotation = MakeRotationToward(kDefaultLightDirection);
-    m_Properties.position = Vector3(kZero);
-    m_Properties.color = Vector3(1.0f, 1.0f, 1.0f);
-    m_Properties.intensity = kDefaultLightIntensity;
+    Properties properties;
+    properties.rotation = MakeRotationToward(kDefaultLightDirection);
+    properties.position = Vector3(kZero);
+    properties.color = Vector3(1.0f, 1.0f, 1.0f);
+    properties.intensity = kDefaultLightIntensity;
+    return properties;
+}
+
+DirectionalLight::DirectionalLight() : m_Properties(GetDefaultProperties())
+{
 }
 
 void DirectionalLight::ResetTransform()
@@ -306,20 +320,18 @@ std::string FormatVector(Vector3 vector)
     return text;
 }
 
-void SaveLightSettings(const DirectionalLight& light, UserSettings::Values& values)
+void DirectionalLight::SaveSettings(IniFile::Values& values) const
 {
-    const DirectionalLight::Properties& properties = light.GetProperties();
-    values["Direction"] = FormatVector(properties.rotation.GetZ());
-    values["Up"] = FormatVector(properties.rotation.GetY());
-    values["Position"] = FormatVector(properties.position);
-    values["Color"] = FormatVector(properties.color);
+    values["Direction"] = FormatVector(m_Properties.rotation.GetZ());
+    values["Up"] = FormatVector(m_Properties.rotation.GetY());
+    values["Position"] = FormatVector(m_Properties.position);
+    values["Color"] = FormatVector(m_Properties.color);
     char text[32];
-    sprintf_s(text, "%.9g", properties.intensity);
+    sprintf_s(text, "%.9g", m_Properties.intensity);
     values["Intensity"] = text;
 }
 
-// 받을 수 없는 값은 건너뛰고 그 값은 그대로 둔다.
-void LoadLightSettings(DirectionalLight& light, const UserSettings::Values& values)
+void DirectionalLight::LoadSettings(const IniFile::Values& values)
 {
     const auto read = [&values](const char* key, Vector3& vector)
     {
@@ -327,7 +339,7 @@ void LoadLightSettings(DirectionalLight& light, const UserSettings::Values& valu
         return text != values.end() && ReadVector(text->second, vector);
     };
 
-    DirectionalLight::Properties properties = light.GetProperties();
+    Properties properties = GetDefaultProperties();
     Vector3 direction, up, position, color;
     if (read("Direction", direction) && read("Up", up))
         MakeRotation(direction, up, properties.rotation);
@@ -339,29 +351,34 @@ void LoadLightSettings(DirectionalLight& light, const UserSettings::Values& valu
     float number = 0.0f;
     if (intensity != values.end() && ReadNumbers(intensity->second, &number, 1) && number >= 0.0f)
         properties.intensity = number;
-    light.SetProperties(properties);
+    m_Properties = properties;
 }
 
-SkyLight::SkyLight()
+SkyLight::Properties SkyLight::GetDefaultProperties()
 {
-    m_Properties.color = Vector3(1.0f, 1.0f, 1.0f);
-    m_Properties.intensity = kDefaultSkyLightIntensity;
+    Properties properties;
+    properties.color = Vector3(1.0f, 1.0f, 1.0f);
+    properties.intensity = kDefaultSkyLightIntensity;
+    return properties;
 }
 
-void SaveSkyLightSettings(const SkyLight& sky, UserSettings::Values& values)
+SkyLight::SkyLight() : m_Properties(GetDefaultProperties())
 {
-    const SkyLight::Properties& properties = sky.GetProperties();
-    values["Color"] = FormatVector(properties.color);
+}
+
+void SkyLight::SaveSettings(IniFile::Values& values) const
+{
+    values["Color"] = FormatVector(m_Properties.color);
     char text[32];
-    sprintf_s(text, "%.9g", properties.intensity);
+    sprintf_s(text, "%.9g", m_Properties.intensity);
     values["Intensity"] = text;
 }
 
-// 받을 수 없는 값은 건너뛰고 그 값은 그대로 둔다. directional light와 달리 intensity의 inf는 받는다.
-// scripts/check-path-tracer-export.py가 inf로 두어 path tracer에 NaN과 Inf인 sample을 만든다.
-void LoadSkyLightSettings(SkyLight& sky, const UserSettings::Values& values)
+// directional light와 달리 intensity의 inf는 받는다. scripts/check-path-tracer-export.py가 inf로 두어 path tracer에 NaN과 Inf인
+// sample을 만든다.
+void SkyLight::LoadSettings(const IniFile::Values& values)
 {
-    SkyLight::Properties properties = sky.GetProperties();
+    Properties properties = GetDefaultProperties();
     const auto color = values.find("Color");
     Vector3 readColor;
     if (color != values.end() && ReadVector(color->second, readColor) && IsColor(readColor))
@@ -370,7 +387,7 @@ void LoadSkyLightSettings(SkyLight& sky, const UserSettings::Values& values)
     float number = 0.0f;
     if (intensity != values.end() && sscanf_s(intensity->second.c_str(), "%f", &number) == 1 && !std::isnan(number) && number >= 0.0f)
         properties.intensity = number;
-    sky.SetProperties(properties);
+    m_Properties = properties;
 }
 
 // state의 sky
@@ -383,12 +400,9 @@ ControlChannel::Fields DescribeSkyLight(const SkyLight& sky)
         .Float("intensity", properties.intensity);
 }
 
-// sky light를 user.ini의 section과 harness의 settings 명령, state로 읽고 바꾸게 한다.
+// sky light를 harness의 state로 읽게 한다. 값은 Details panel처럼 editor 명령으로 바꾼다.
 void RegisterSkyLight(SkyLight& sky)
 {
-    UserSettings::Register(kSkyLightSettingsSection,
-        [&sky](UserSettings::Values& values) { SaveSkyLightSettings(sky, values); },
-        [&sky](const UserSettings::Values& values) { LoadSkyLightSettings(sky, values); });
     ControlChannel::RegisterState("sky", [&sky] { return DescribeSkyLight(sky); });
 }
 
@@ -842,12 +856,9 @@ void SetLight(DirectionalLight& light, const std::string& arguments, const Contr
     reply.Ok(fields.Object("state", ControlChannel::GetState("light")));
 }
 
-// light를 user.ini의 section, harness의 light 명령과 state로 읽고 바꾸게 한다.
+// light를 harness의 light 명령과 state로 읽고 바꾸게 한다.
 void RegisterLight(DirectionalLight& light)
 {
-    UserSettings::Register(kLightSettingsSection,
-        [&light](UserSettings::Values& values) { SaveLightSettings(light, values); },
-        [&light](const UserSettings::Values& values) { LoadLightSettings(light, values); });
     ControlChannel::RegisterState("light", [&light] { return DescribeLight(light); });
     ControlChannel::Register("light", "light set <key>=<value> ... | light reset: the directional light, as its rotate and translate gizmos and its "
         "Details panel change it. reset sets the transform to no rotation at the origin, so the light goes along world -Z, "
@@ -963,6 +974,8 @@ void DirectionalLight::ShowDetails()
 //   [Camera] Position=<x>,<y>,<z>, Heading, Pitch: 처음 pose. 단위는 state camera와 pose 명령과 같다.
 //            Fit=Model: 위 셋 대신 둔다. bounding sphere 중심의 +z 쪽 반지름의 2배와 near clip을 더한 거리에서 -z를 본다.
 //            예전 -model의 OrbitCamera가 처음 그린 화면과 bit 단위로 같다.
+//   [<물체 이름>] Scene Hierarchy의 물체 (Directional Light, Sky Light) 의 설정. key는 그 물체의 SaveSettings가 쓰는 것이고, section이나
+//            key가 없으면 기본값이다. Scene menu의 Save와 scene save 명령이 지금 값을 쓴다. 그래서 물체 이름은 Model, Camera가 아니다.
 // scene 을 열면 camera는 scene file의 pose로 시작한다. 다른 scene 의 줄을 Restore하면 줄의 camera를 쓴다. user.ini는 camera의 이동 속도만
 // 남긴다.
 struct SceneFile
@@ -973,6 +986,7 @@ struct SceneFile
     float radius = 0.0f;
     bool fitModel = false;
     EditorCamera::Pose pose = { Vector3(kZero), 0.0f, 0.0f };
+    IniFile::Sections sections;
 };
 
 // scene file 폴더 기준의 경로를 working directory 기준으로 바꾼다. 앞에 붙은 "../"마다 폴더를 한 단계 올라간다.
@@ -991,7 +1005,8 @@ std::wstring ResolveFromSceneFolder(const std::wstring& scenePath, std::wstring 
 // 받을 수 없는 값이 있으면 error에 이유를 쓰고 false를 돌려준다.
 bool ReadSceneFile(const std::wstring& path, SceneFile& scene, std::string& error)
 {
-    IniFile::Sections sections = IniFile::Read(path);
+    IniFile::Sections& sections = scene.sections;
+    sections = IniFile::Read(path);
     const IniFile::Values& model = sections["Model"];
     const IniFile::Values& camera = sections["Camera"];
     const auto find = [](const IniFile::Values& values, const char* key) -> const std::string*
@@ -1100,7 +1115,23 @@ void ModelViewer::ShowScene(const PreparedScene& scene, bool moveCamera)
         m_CameraController->SetPose(GetStartPose(scene.file, m_ModelInst, m_Camera.GetNearClip()));
     m_SceneModel.SetPath(Utility::ToUTF8(scene.file.gltfPath));
     m_SceneName = scene.name;
+    SceneEditor::LoadObjectSettings(scene.file.sections);
     PathTracer::Reset();
+}
+
+bool ModelViewer::SaveScene(std::string& error)
+{
+    if (m_ModelInst.IsNull())
+    {
+        error = "is not open";
+        return false;
+    }
+    if (!IniFile::WriteSections(Utility::UTF8ToWideString(m_SceneName), SceneEditor::SaveObjectSettings()))
+    {
+        error = "cannot be written";
+        return false;
+    }
+    return true;
 }
 
 bool ModelViewer::OpenScene(const std::wstring& path, std::string& error)
@@ -1131,7 +1162,8 @@ void ModelViewer::ReadSceneConditions(const MeasurementConditions::Values& value
             reading.notes.push_back("the scene file " + lineScene + " " + error + ".");
             return;
         }
-        reading.applies.push_back([this, prepared] { ShowScene(*prepared, false); });
+        // scene 을 열면 물체가 scene file의 설정을 받으므로, 줄의 light와 sky가 그 뒤에 들어가도록 다른 group보다 먼저 연다.
+        reading.applies.insert(reading.applies.begin(), [this, prepared] { ShowScene(*prepared, false); });
     });
 }
 
@@ -1161,9 +1193,20 @@ std::vector<std::wstring> ListSceneFiles(void)
     return files;
 }
 
-// 지금 scene 에 표시를 둔다. 항목을 누르면 scene open 명령처럼 그 scene 을 연다.
+// Save는 scene save 명령처럼 물체의 설정을 지금 scene file에 쓴다. scene file 항목은 지금 scene 에 표시를 두고, 누르면 scene open
+// 명령처럼 그 scene 을 연다.
 void ModelViewer::ShowSceneMenu(void)
 {
+    if (ImGui::MenuItem("Save", nullptr, false, !m_ModelInst.IsNull()))
+    {
+        std::string error;
+        if (!SaveScene(error))
+            Utility::Printf("Error: the scene file %s %s\n", m_SceneName.c_str(), error.c_str());
+    }
+    ImGui::SetItemTooltip("Writes the settings of the objects in the Scene Hierarchy to %s and leaves its other lines.\n"
+        "Changes not saved are lost when another scene opens or the app ends.", m_SceneName.c_str());
+    ImGui::Separator();
+
     for (const std::wstring& path : ListSceneFiles())
     {
         const std::string name = GetSceneName(path);
@@ -1179,12 +1222,25 @@ void ModelViewer::ShowSceneMenu(void)
 
 void ModelViewer::RegisterSceneCommand(void)
 {
-    ControlChannel::Register("scene", "scene open <scene file>: opens the scene file, relative to the ModelViewer folder as -scene takes it, "
-        "as the Scene menu does. The model changes, the camera moves to the starting pose of the scene file and the path tracer starts over. "
-        "The lights, settings, camera move speed, window and UI stay. Fails and changes nothing if the scene file cannot be opened. "
+    ControlChannel::Register("scene", "scene open <scene file> | scene save: open opens the scene file, relative to the ModelViewer folder "
+        "as -scene takes it, as the Scene menu does. The model changes, the camera moves to the starting pose of the scene file, the objects "
+        "take their settings in the scene file, such as the lights, and the path tracer starts over. Changes to the objects not saved are lost. "
+        "The settings, camera move speed, window and UI stay. Fails and changes nothing if the scene file cannot be opened. "
+        "save writes the settings of the objects to the scene file open, as Save in the Scene menu does, and leaves its other lines. "
         "state scene has the scene file open", [this](const std::string& arguments, const ControlChannel::Reply& reply)
     {
-        const std::string usage = "usage: scene open <scene file>";
+        if (arguments == "save")
+        {
+            std::string error;
+            if (!SaveScene(error))
+            {
+                reply.Error("the scene file " + m_SceneName + " " + error + ".");
+                return;
+            }
+            reply.Ok(ControlChannel::Fields().Text("path", m_SceneName));
+            return;
+        }
+        const std::string usage = "usage: scene open <scene file> | scene save";
         if (arguments.compare(0, 5, "open ") != 0 || arguments.size() == 5)
         {
             reply.Error(usage);
@@ -1198,7 +1254,7 @@ void ModelViewer::RegisterSceneCommand(void)
             return;
         }
         ControlChannel::Fields state;
-        for (const char* group : { "scene", "model", "camera" })
+        for (const char* group : { "scene", "model", "camera", "light", "sky" })
             state.Merge(ControlChannel::GetState(group));
         reply.Ok(ControlChannel::Fields().Object("state", state));
     });
@@ -1238,6 +1294,10 @@ void ModelViewer::Startup( void )
 #endif
     m_Camera.SetZRange(1.0f, 10000.0f);
     m_CameraController.reset(new EditorCamera(m_Camera, Vector3(kYUnitVector)));
+    // scene 을 열 때 물체가 scene file의 설정을 받도록 먼저 등록한다.
+    SceneEditor::AddObject(m_SceneModel);
+    SceneEditor::AddObject(m_Light);
+    SceneEditor::AddObject(m_SkyLight);
 #ifdef LEGACY_RENDERER
     // LEGACY_RENDERER는 scene file을 읽지 않으므로 Sponza::Startup이 정한 camera를 그대로 둔다.
     m_SceneName = GetSceneName(scenePath);
@@ -1259,9 +1319,6 @@ void ModelViewer::Startup( void )
     ControlChannel::RegisterState("renderer", DescribeRenderer);
     RegisterSceneCommand();
 
-    SceneEditor::AddObject(m_SceneModel);
-    SceneEditor::AddObject(m_Light);
-    SceneEditor::AddObject(m_SkyLight);
     SceneEditor::RegisterCommands(m_Camera);
     RegisterLight(m_Light);
     RegisterSkyLight(m_SkyLight);
@@ -1272,8 +1329,6 @@ void ModelViewer::Startup( void )
 void ModelViewer::Cleanup( void )
 {
     UnregisterMeasurementConditions();
-    UserSettings::Unregister(kSkyLightSettingsSection);
-    UserSettings::Unregister(kLightSettingsSection);
     SceneEditor::RemoveObject(m_SkyLight);
     SceneEditor::RemoveObject(m_Light);
     SceneEditor::RemoveObject(m_SceneModel);

@@ -22,11 +22,12 @@ FURNACE_SAMPLES = 16
 # 4096 번에서 12 개, 16384 번에서 1 개였다.
 WHITE_FURNACE_BOUNCES = 65536
 
-SKY_LIGHT_SECTION = 'Sky Light'
-# PT 가 miss 에서 받는 radiance 는 PT 의 설정이 아니라 Sky Light 의 color 와 intensity 다. 이 둘도 PT 의 image 를 정하므로 PT 의 설정과
-# 같은 dict 에 '<section>: <key>' 로 적고, set_path_tracer 가 그 section 에 넘긴다. 확인들은 흰 Sky Light 의 intensity 를 radiance 로 쓴다.
-SKY_COLOR = f'{SKY_LIGHT_SECTION}: Color'
-SKY_RADIANCE = f'{SKY_LIGHT_SECTION}: Intensity'
+# Scene Hierarchy panel 과 editor 명령이 Sky Light 를 가리키는 이름
+SKY_LIGHT_OBJECT = 'Sky Light'
+# PT 가 miss 에서 받는 radiance 는 PT 의 설정이 아니라 scene 물체인 Sky Light 의 color 와 intensity 다. 이 둘도 PT 의 image 를 정하므로
+# PT 의 설정과 같은 dict 에 '<물체>: <key>' 로 적고, set_path_tracer 가 그 물체에 넘긴다. 확인들은 흰 Sky Light 의 intensity 를 radiance 로 쓴다.
+SKY_COLOR = f'{SKY_LIGHT_OBJECT}: Color'
+SKY_RADIANCE = f'{SKY_LIGHT_OBJECT}: Intensity'
 
 # 작업 5 ~ 7 의 기준과 측정 기록은 Lambert 로 정했으므로 Shading 을 Lambert 로 둔다. glTF BRDF 의 확인은 check-gltf-brdf.py 가 한다.
 # 작업 5 ~ 10 의 기준은 Radiance 로 정했으므로 Output 을 Radiance 로 둔다. Indirect Irradiance 의 확인은 check-indirect-irradiance.py 가 한다.
@@ -45,14 +46,15 @@ def path_tracer_settings(values):
 
 
 def set_path_tracer(session, settings):
-    """settings 의 '<section>: <key>' 는 그 section 에, 나머지는 PT 의 설정에 넣고, PT 의 설정을 넣었으면 넣은 뒤의 PT 의 설정을 돌려준다."""
+    """settings 의 '<물체>: <key>' 는 scene 의 그 물체에, 나머지는 PT 의 설정에 넣고, PT 의 설정을 넣었으면 넣은 뒤의 PT 의 설정을 돌려준다."""
     sections = {}
     for key, value in settings.items():
         section, separator, name = key.partition(': ')
         if not separator:
             section, name = SECTION, KEY_PREFIX + key
         sections.setdefault(section, {})[name] = value
-    replies = {section: session.ask_ok(f'settings set {section}: ' + '; '.join(f'{key}={value}' for key, value in values.items()))
+    replies = {section: session.ask_ok(f'{"settings" if section == SECTION else "editor"} set {section}: '
+                                       + '; '.join(f'{key}={value}' for key, value in values.items()))
                for section, values in sections.items()}
     return path_tracer_settings(replies[SECTION]['state']['settings'][SECTION]) if SECTION in replies else None
 
