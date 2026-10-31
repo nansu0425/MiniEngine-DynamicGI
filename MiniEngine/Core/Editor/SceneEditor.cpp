@@ -373,7 +373,7 @@ void SceneEditor::RegisterCommands(const Camera& camera)
         "local turns the object about its own axes and world about the world axes. translate always follows the world axes. "
         "state editor has them, and the objects in the order of the Scene Hierarchy panel, each with its world position and, in front of the camera, "
         "its icon's center in client pixels. on_screen is whether that center is in the scene. An object without an icon, "
-        "such as the Sky Light or the model, has neither and no gizmo. Icons and the gizmo are drawn only while the UI is shown. "
+        "such as the Camera, the Sky Light or the model, has neither and no gizmo. Icons and the gizmo are drawn only while the UI is shown. "
         "get gives the settings of an object as its Details panel changes them, which the scene file keeps in the section of the object's name. "
         "set changes them as the Details panel does, and changes nothing and fails if a value does not read back as given. "
         "scene save writes them to the scene file. An object without settings, such as the model, gives none",

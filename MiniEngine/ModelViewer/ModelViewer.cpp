@@ -168,6 +168,33 @@ private:
     std::string m_Name;
 };
 
+// Scene Hierarchy와 editor 명령이 camera를 가리키는 이름이자 scene file의 section 이름
+const char kCameraName[] = "Camera";
+
+// scene 을 보는 editor camera. 사용자가 이 camera로 보므로 icon과 gizmo가 없고, mouse와 keyboard나 Details panel로 옮긴다.
+// pose는 scene 마다 다르므로 scene file에 저장하고, scene 과 무관한 이동 속도는 EditorCamera가 user.ini에 남긴다.
+class SceneCamera : public SceneEditor::Object
+{
+public:
+    // model은 scene file의 Fit=Model이 화면에 담는 model이고, camera는 controller가 옮기는 camera다.
+    SceneCamera(EditorCamera& controller, const Camera& camera, const ModelInstance& model)
+        : m_Controller(controller), m_Camera(camera), m_Model(model) {}
+
+    // 원점에서 -z를 본다.
+    static EditorCamera::Pose GetDefaultPose();
+
+    virtual const char* GetName() const override { return kCameraName; }
+    virtual void ShowDetails() override;
+    virtual void SaveSettings(IniFile::Values& values) const override;
+    // scene file의 두 형식을 모두 읽는다. Fit=Model이면 지금 model을 담는 pose로 옮긴다.
+    virtual void LoadSettings(const IniFile::Values& values) override;
+
+private:
+    EditorCamera& m_Controller;
+    const Camera& m_Camera;
+    const ModelInstance& m_Model;
+};
+
 class ModelViewer : public GameCore::IGameApp
 {
 public:
@@ -191,10 +218,10 @@ private:
     bool OpenScene(const std::wstring& path, std::string& error);
     // scene 을 바꾸지 않고 path의 scene file을 열 수 있는지 본다. 그 model을 처음 열면 load해서 m_Models에 남긴다.
     bool PrepareScene(const std::wstring& path, PreparedScene& scene, std::string& error);
-    // PrepareScene이 준비한 scene 으로 바꾼다. moveCamera면 camera를 scene file의 처음 pose로 옮긴다. path tracer는 처음부터 다시 쌓는다.
-    // 물체의 설정은 scene file의 값으로 바꾼다.
-    void ShowScene(const PreparedScene& scene, bool moveCamera);
-    // 물체의 설정을 지금 scene file에 쓴다. 쓸 수 없으면 error에 이유를 쓰고 false를 돌려준다.
+    // PrepareScene이 준비한 scene 으로 바꾼다. camera와 light 같은 물체는 scene file의 설정을 받고, path tracer는 처음부터 다시 쌓는다.
+    void ShowScene(const PreparedScene& scene);
+    // 물체의 설정을 지금 scene file에 쓴다. camera도 물체이므로 지금 pose를 함께 쓴다. 쓸 수 없으면 error에 이유를 쓰고 false를
+    // 돌려준다.
     bool SaveScene(std::string& error);
     void ShowSceneMenu(void);
     void RegisterSceneCommand(void);
@@ -208,6 +235,8 @@ private:
 
     Camera m_Camera;
     unique_ptr<EditorCamera> m_CameraController;
+    // m_CameraController보다 먼저 없어지도록 뒤에 둔다.
+    unique_ptr<SceneCamera> m_SceneCamera;
     // -rebuild 1이면 처음 load하는 model의 .mini를 다시 만든다.
     bool m_ForceRebuild = false;
     // 연 scene. state와 측정 조건의 줄이 scene 을 가리키는 이름이다.
@@ -622,7 +651,8 @@ void RegisterPoseCommand(EditorCamera& editorCamera)
     ControlChannel::SetStatus("camera", "editor");
     ControlChannel::Register("pose", "pose | pose <x> <y> <z> <heading> <pitch> | pose look-at <x> <y> <z>: the editor camera, "
         "in world units and radians as in state camera. look-at keeps the position and turns the camera toward the point. "
-        "Looking straight up or down keeps the heading", [&editorCamera](const std::string& arguments, const ControlChannel::Reply& reply)
+        "Looking straight up or down keeps the heading. The camera is the Camera of the Scene Hierarchy, so scene save writes this pose "
+        "to the scene file", [&editorCamera](const std::string& arguments, const ControlChannel::Reply& reply)
     {
         float x, y, z, heading, pitch;
         const std::string usage = "usage: pose <x> <y> <z> <heading> <pitch> | pose look-at <x> <y> <z>";
@@ -978,11 +1008,13 @@ struct CameraSection
 //   [Model]  glTF: scene file이 있는 폴더 기준의 glTF 경로
 //            Scale: glTF 좌표에 곱해 world 좌표로 바꾸는 배율. 다음의 Radius와 둘 중 하나만 둔다.
 //            Radius: model의 bounding sphere 반지름이 이 world 길이가 되는 배율 (ModelInstance::Resize)
-//   [Camera] Position=<x>,<y>,<z>, Heading, Pitch: 처음 pose. 단위는 state camera와 pose 명령과 같다.
-//            Fit=Model: 위 셋 대신 둔다. bounding sphere 중심의 +z 쪽 반지름의 2배와 near clip을 더한 거리에서 -z를 본다.
-//            예전 -model의 OrbitCamera가 처음 그린 화면과 bit 단위로 같다.
-//   [<물체 이름>] Scene Hierarchy의 물체 (Directional Light, Sky Light) 의 설정. key는 그 물체의 SaveSettings가 쓰는 것이고, section이나
-//            key가 없으면 기본값이다. Scene menu의 Save와 scene save 명령이 지금 값을 쓴다. 그래서 물체 이름은 Model, Camera가 아니다.
+//   [<물체 이름>] Scene Hierarchy의 물체 (Camera, Directional Light, Sky Light) 의 설정. key는 그 물체의 SaveSettings가 쓰는 것이다.
+//            Scene menu의 Save와 scene save 명령이 모든 물체의 지금 값을 쓴다. 그래서 물체 이름은 Model이 아니다. light의 section이나
+//            key가 없으면 기본값이다.
+//   [Camera] Position=<x>,<y>,<z>, Heading, Pitch: camera의 pose. 단위는 state camera와 pose 명령과 같다.
+//            Fit=Model: 위 셋 대신 둘 수 있다. bounding sphere 중심의 +z 쪽 반지름의 2배와 near clip을 더한 거리에서 -z를 본다.
+//            예전 -model의 OrbitCamera가 처음 그린 화면과 bit 단위로 같다. Save는 Fit=Model 줄을 지우고 지금 pose를 위 셋으로 쓴다.
+//            두 형식 중 하나가 없으면 scene file을 열지 않는다.
 // scene 을 열면 camera는 scene file의 pose로 시작한다. 다른 scene 의 줄을 Restore하면 줄의 camera를 쓴다. user.ini는 camera의 이동 속도만
 // 남긴다.
 struct SceneFile
@@ -991,7 +1023,6 @@ struct SceneFile
     std::wstring gltfPath;
     float scale = 0.0f;
     float radius = 0.0f;
-    CameraSection camera;
     IniFile::Sections sections;
 };
 
@@ -1051,7 +1082,9 @@ bool ReadSceneFile(const std::wstring& path, SceneFile& scene, std::string& erro
         return false;
     }
 
-    if (!ReadCameraSection(sections["Camera"], scene.camera))
+    // [Camera] section 은 scene 을 열 때 SceneCamera::LoadSettings가 받는다. 여기서는 열기 전에 받을 수 있는지만 본다.
+    CameraSection camera;
+    if (!ReadCameraSection(sections[kCameraName], camera))
     {
         error = "needs either [Camera] Fit=Model or Position=<x>,<y>,<z> with Heading and Pitch";
         return false;
@@ -1067,12 +1100,53 @@ void ScaleModel(ModelInstance& model, const SceneFile& scene)
         model.Resize(scene.radius);
 }
 
-EditorCamera::Pose GetStartPose(const CameraSection& camera, const ModelInstance& model, float nearClip)
+EditorCamera::Pose SceneCamera::GetDefaultPose()
 {
+    return { Vector3(kZero), 0.0f, 0.0f };
+}
+
+void SceneCamera::SaveSettings(IniFile::Values& values) const
+{
+    const EditorCamera::Pose pose = m_Controller.GetPose();
+    values["Position"] = FormatVector(pose.position);
+    values["Heading"] = FormatFloat(pose.heading);
+    values["Pitch"] = FormatFloat(pose.pitch);
+}
+
+void SceneCamera::LoadSettings(const IniFile::Values& values)
+{
+    CameraSection camera;
+    if (!ReadCameraSection(values, camera))
+    {
+        m_Controller.SetPose(GetDefaultPose());
+        return;
+    }
     if (!camera.fitModel)
-        return camera.pose;
-    const BoundingSphere sphere = model.GetBoundingSphere();
-    return { sphere.GetCenter() + Vector3(0.0f, 0.0f, sphere.GetRadius() * 2.0f + nearClip), 0.0f, 0.0f };
+    {
+        m_Controller.SetPose(camera.pose);
+        return;
+    }
+    const BoundingSphere sphere = m_Model.GetBoundingSphere();
+    m_Controller.SetPose({ sphere.GetCenter() + Vector3(0.0f, 0.0f, sphere.GetRadius() * 2.0f + m_Camera.GetNearClip()), 0.0f, 0.0f });
+}
+
+void SceneCamera::ShowDetails()
+{
+    EditorCamera::Pose pose = m_Controller.GetPose();
+    float position[3] = { pose.position.GetX(), pose.position.GetY(), pose.position.GetZ() };
+    bool changed = ImGui::DragFloat3("Position", position, 1.0f, 0.0f, 0.0f, "%.1f");
+    ImGui::SetItemTooltip("World units, as state camera and the pose command give it.");
+    changed |= ImGui::SliderAngle("Heading", &pose.heading, -180.0f, 180.0f, "%.2f deg");
+    ImGui::SetItemTooltip("Turn about world +y. 0 looks along -z, and a larger angle turns toward -x. The scene file keeps it in radians.");
+    changed |= ImGui::SliderAngle("Pitch", &pose.pitch, -90.0f, 90.0f, "%.2f deg");
+    ImGui::SetItemTooltip("Up from the horizon. The scene file keeps it in radians.");
+    if (changed)
+    {
+        pose.position = Vector3(position[0], position[1], position[2]);
+        m_Controller.SetPose(pose);
+    }
+    ImGui::TextDisabled("You look through the camera, so it has no icon or gizmo. Move it with the mouse and keys.");
+    ImGui::TextDisabled("Scene > Save writes this pose. The move speed is not part of the scene and stays in user.ini.");
 }
 
 ControlChannel::Fields DescribeScene(const std::string& path)
@@ -1115,16 +1189,15 @@ bool ModelViewer::PrepareScene(const std::wstring& path, PreparedScene& scene, s
     return true;
 }
 
-void ModelViewer::ShowScene(const PreparedScene& scene, bool moveCamera)
+void ModelViewer::ShowScene(const PreparedScene& scene)
 {
     // 지난 frame의 command가 아직 지금 model instance의 buffer와 TLAS를 읽을 수 있으므로 GPU가 끝내기를 기다린 뒤에 바꾼다.
     g_CommandManager.IdleGPU();
     // TLAS의 buffer는 처음 Build한 scene 의 instance 수에 맞춰 만들므로 새 scene 에 맞게 다시 만들게 한다.
     m_RaytracingScene.Destroy();
     m_ModelInst = scene.model;
+    // camera의 Fit=Model이 새 model을 담도록 물체의 설정보다 먼저 크기를 정한다.
     ScaleModel(m_ModelInst, scene.file);
-    if (moveCamera)
-        m_CameraController->SetPose(GetStartPose(scene.file.camera, m_ModelInst, m_Camera.GetNearClip()));
     m_SceneModel.SetPath(Utility::ToUTF8(scene.file.gltfPath));
     m_SceneName = scene.name;
     SceneEditor::LoadObjectSettings(scene.file.sections);
@@ -1151,13 +1224,12 @@ bool ModelViewer::OpenScene(const std::wstring& path, std::string& error)
     PreparedScene scene;
     if (!PrepareScene(path, scene, error))
         return false;
-    ShowScene(scene, true);
+    ShowScene(scene);
     return true;
 }
 
 // scene이 없는 줄은 scene file을 쓰기 전의 줄이고, 그때는 -model로 연 scene 을 Restore할 수 없었으므로 kDefaultScene의 줄로 읽는다.
 // 줄의 scene 이 지금 scene 과 다르면 줄의 나머지를 받을 수 있을 때만 그 scene 을 준비해 보고, 열 수 없으면 아무것도 되돌리지 않는다.
-// 연 scene 의 camera는 줄의 camera이므로 scene file의 처음 pose로 옮기지 않는다.
 void ModelViewer::ReadSceneConditions(const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading)
 {
     const auto scene = values.find("scene");
@@ -1174,8 +1246,9 @@ void ModelViewer::ReadSceneConditions(const MeasurementConditions::Values& value
             reading.notes.push_back("the scene file " + lineScene + " " + error + ".");
             return;
         }
-        // scene 을 열면 물체가 scene file의 설정을 받으므로, 줄의 light와 sky가 그 뒤에 들어가도록 다른 group보다 먼저 연다.
-        reading.applies.insert(reading.applies.begin(), [this, prepared] { ShowScene(*prepared, false); });
+        // scene 을 열면 camera와 light 같은 물체가 scene file의 설정을 받으므로, 줄의 camera, light, sky가 그 뒤에 들어가도록 다른
+        // group보다 먼저 연다.
+        reading.applies.insert(reading.applies.begin(), [this, prepared] { ShowScene(*prepared); });
     });
 }
 
@@ -1205,8 +1278,8 @@ std::vector<std::wstring> ListSceneFiles(void)
     return files;
 }
 
-// Save는 scene save 명령처럼 물체의 설정을 지금 scene file에 쓴다. scene file 항목은 지금 scene 에 표시를 두고, 누르면 scene open
-// 명령처럼 그 scene 을 연다.
+// Save는 scene save 명령처럼 camera의 pose와 다른 물체의 설정을 지금 scene file에 쓴다. scene file 항목은 지금 scene 에 표시를 두고,
+// 누르면 scene open 명령처럼 그 scene 을 연다.
 void ModelViewer::ShowSceneMenu(void)
 {
     if (ImGui::MenuItem("Save", nullptr, false, !m_ModelInst.IsNull()))
@@ -1215,8 +1288,8 @@ void ModelViewer::ShowSceneMenu(void)
         if (!SaveScene(error))
             Utility::Printf("Error: the scene file %s %s\n", m_SceneName.c_str(), error.c_str());
     }
-    ImGui::SetItemTooltip("Writes the settings of the objects in the Scene Hierarchy to %s and leaves its other lines.\n"
-        "Changes not saved are lost when another scene opens or the app ends.", m_SceneName.c_str());
+    ImGui::SetItemTooltip("Writes the settings of the objects in the Scene Hierarchy, the pose of the camera among them, to %s and leaves its "
+        "other lines.\nChanges not saved are lost when another scene opens or the app ends.", m_SceneName.c_str());
     ImGui::Separator();
 
     for (const std::wstring& path : ListSceneFiles())
@@ -1235,11 +1308,13 @@ void ModelViewer::ShowSceneMenu(void)
 void ModelViewer::RegisterSceneCommand(void)
 {
     ControlChannel::Register("scene", "scene open <scene file> | scene save: open opens the scene file, relative to the ModelViewer folder "
-        "as -scene takes it, as the Scene menu does. The model changes, the camera moves to the starting pose of the scene file, the objects "
-        "take their settings in the scene file, such as the lights, and the path tracer starts over. Changes to the objects not saved are lost. "
-        "The settings, camera move speed, window and UI stay. Fails and changes nothing if the scene file cannot be opened. "
+        "as -scene takes it, as the Scene menu does. The model changes, the objects take their settings in the scene file, so the camera "
+        "moves to the pose of the scene file and the lights change, and the path tracer starts over. Changes to the objects not saved, "
+        "such as a camera moved since, are lost. The settings, camera move speed, window and UI stay. "
+        "Fails and changes nothing if the scene file cannot be opened. "
         "save writes the settings of the objects to the scene file open, as Save in the Scene menu does, and leaves its other lines. "
-        "state scene has the scene file open", [this](const std::string& arguments, const ControlChannel::Reply& reply)
+        "The camera is one of the objects, so save writes its current pose as Position, Heading and Pitch, as editor get Camera gives them, "
+        "and drops a [Camera] Fit=Model. state scene has the scene file open", [this](const std::string& arguments, const ControlChannel::Reply& reply)
     {
         if (arguments == "save")
         {
@@ -1306,8 +1381,10 @@ void ModelViewer::Startup( void )
 #endif
     m_Camera.SetZRange(1.0f, 10000.0f);
     m_CameraController.reset(new EditorCamera(m_Camera, Vector3(kYUnitVector)));
+    m_SceneCamera.reset(new SceneCamera(*m_CameraController, m_Camera, m_ModelInst));
     // scene 을 열 때 물체가 scene file의 설정을 받도록 먼저 등록한다.
     SceneEditor::AddObject(m_SceneModel);
+    SceneEditor::AddObject(*m_SceneCamera);
     SceneEditor::AddObject(m_Light);
     SceneEditor::AddObject(m_SkyLight);
 #ifdef LEGACY_RENDERER
@@ -1318,8 +1395,7 @@ void ModelViewer::Startup( void )
     if (!OpenScene(scenePath, error))
     {
         Utility::Printf("Error: the scene file %ws %s\n", scenePath.c_str(), error.c_str());
-        // 열지 못하면 원점에서 -z를 본다.
-        m_CameraController->SetPose({ Vector3(kZero), 0.0f, 0.0f });
+        m_CameraController->SetPose(SceneCamera::GetDefaultPose());
         m_SceneName = GetSceneName(scenePath);
     }
 #endif
@@ -1343,6 +1419,7 @@ void ModelViewer::Cleanup( void )
     UnregisterMeasurementConditions();
     SceneEditor::RemoveObject(m_SkyLight);
     SceneEditor::RemoveObject(m_Light);
+    SceneEditor::RemoveObject(*m_SceneCamera);
     SceneEditor::RemoveObject(m_SceneModel);
     PathTracerTuning::Shutdown();
     RayPick::Shutdown();
