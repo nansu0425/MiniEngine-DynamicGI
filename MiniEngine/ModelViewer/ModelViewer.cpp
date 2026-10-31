@@ -161,6 +161,9 @@ private:
     Properties m_Properties;
 };
 
+// Scene Hierarchy와 editor 명령이 model을 가리키는 이름이자 scene file의 section 이름
+const char kModelName[] = "Model";
+
 // scene에 놓인 glTF model. 스스로 보이므로 icon이 없다. 아직 바꿀 수 있는 설정이 없다.
 class ModelComponent : public Scene::Component
 {
@@ -254,8 +257,7 @@ private:
     D3D12_RECT m_MainScissor;
 
     ModelInstance m_ModelInst;
-    // 이름은 scene 을 열 때 glTF file 이름으로 정한다.
-    Scene::Object m_ModelObject{ "" };
+    Scene::Object m_ModelObject{ kModelName };
     ModelComponent& m_ModelComponent = m_ModelObject.AddComponent<ModelComponent>(m_ModelInst);
     RaytracingScene m_RaytracingScene;
     ShadowCamera m_ShadowCamera;
@@ -1028,12 +1030,13 @@ struct CameraSection
 };
 
 // scene 은 scene file 하나로 연다. 형식은 IniFile이고 key는 아래와 같다. 실행 중에는 Scene menu와 scene open 명령으로 다른 scene 을 연다.
-//   [Model]  glTF: scene file이 있는 폴더 기준의 glTF 경로
+// section은 이름이 같은 Scene Hierarchy의 object (Model, Camera, Directional Light, Sky Light) 의 것이다. Scene menu의 Save와 scene save
+// 명령은 모든 object의 지금 설정을 object의 section에 쓴다. 설정의 key는 object의 component가 가진 setting key다 (Scene::Component).
+//   [Model]  아래 key는 scene 을 열 때 model을 load하고 크기를 정하는 데 읽는다. Model object의 설정이 아니므로 Save가 쓰지 않는다.
+//            glTF: scene file이 있는 폴더 기준의 glTF 경로
 //            Scale: glTF 좌표에 곱해 world 좌표로 바꾸는 배율. 다음의 Radius와 둘 중 하나만 둔다.
 //            Radius: model의 bounding sphere 반지름이 이 world 길이가 되는 배율 (ModelInstance::Resize)
-//   [<object 이름>] Scene Hierarchy의 object (Camera, Directional Light, Sky Light) 의 설정. key는 그 object의 component가 가진
-//            setting key다 (Scene::Component). Scene menu의 Save와 scene save 명령이 모든 object의 지금 값을 쓴다. 그래서 object 이름은
-//            Model이 아니다. light의 section이나 key가 없으면 기본값이다.
+//   [Directional Light], [Sky Light] light의 section이나 key가 없으면 기본값이다.
 //   [Camera] Position=<x>,<y>,<z>, Heading, Pitch: camera의 pose. 단위는 state camera와 pose 명령과 같다.
 //            Fit=Model: 위 셋 대신 둘 수 있다. bounding sphere 중심의 +z 쪽 반지름의 2배와 near clip을 더한 거리에서 -z를 본다.
 //            예전 -model의 OrbitCamera가 처음 그린 화면과 bit 단위로 같다. Save는 Fit=Model 줄을 지우고 지금 pose를 위 셋으로 쓴다.
@@ -1086,7 +1089,7 @@ bool ReadSceneFile(const std::wstring& path, SceneFile& scene, std::string& erro
 {
     IniFile::Sections& sections = scene.sections;
     sections = IniFile::Read(path);
-    const IniFile::Values& model = sections["Model"];
+    const IniFile::Values& model = sections[kModelName];
 
     const std::string* gltf = FindValue(model, "glTF");
     if (gltf == nullptr)
@@ -1221,9 +1224,7 @@ void ModelViewer::ShowScene(const PreparedScene& scene)
     m_ModelInst = scene.model;
     // camera의 Fit=Model이 새 model을 담도록 object의 설정보다 먼저 크기를 정한다.
     ScaleModel(m_ModelInst, scene.file);
-    const std::string gltfPath = Utility::ToUTF8(scene.file.gltfPath);
-    m_ModelComponent.SetPath(gltfPath);
-    m_ModelObject.SetName(Utility::RemoveExtension(Utility::RemoveBasePath(gltfPath)));
+    m_ModelComponent.SetPath(Utility::ToUTF8(scene.file.gltfPath));
     m_SceneName = scene.name;
     Scene::LoadObjectSettings(scene.file.sections);
     PathTracer::Reset();

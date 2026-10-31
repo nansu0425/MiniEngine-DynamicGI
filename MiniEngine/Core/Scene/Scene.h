@@ -42,7 +42,6 @@ namespace Scene
         Object& operator=(const Object&) = delete;
 
         const std::string& GetName() const { return m_Name; }
-        void SetName(std::string name) { m_Name = std::move(name); }
 
         // args로 만든 T를 component 순서의 끝에 둔다. 이미 있는 component와 같은 setting key를 가지면 ASSERT로 멈춘다.
         template<class T, class... Args> T& AddComponent(Args&&... args)
