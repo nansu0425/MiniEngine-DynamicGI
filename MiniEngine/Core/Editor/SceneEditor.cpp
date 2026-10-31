@@ -6,6 +6,8 @@
 #include "Core/UI/ImGuiLayer.h"
 
 #include <algorithm>
+#include <typeindex>
+#include <unordered_map>
 
 using namespace Math;
 
@@ -13,13 +15,23 @@ namespace
 {
     enum class GizmoMode { Translate, Rotate };
 
-    std::vector<SceneEditor::Object*> s_Objects;
-    SceneEditor::Object* s_Selected = nullptr;
+    // 고른 object는 GetSelected로 읽는다.
+    Scene::Object* s_Selected = nullptr;
     GizmoMode s_GizmoMode = GizmoMode::Translate;
     // rotate gizmo의 ring이 따르는 축. translate는 늘 world의 축이다.
     ImGuizmo::MODE s_RotateAxes = ImGuizmo::LOCAL;
     bool s_ShowHierarchy = false;
     bool s_ShowDetails = false;
+    std::unordered_map<std::type_index, std::function<void(Scene::Component&)>> s_ComponentDetails;
+
+    // Scene에서 뺀 object는 고른 것으로 두지 않는다.
+    Scene::Object* GetSelected(void)
+    {
+        const std::vector<Scene::Object*>& objects = Scene::GetObjects();
+        if (std::find(objects.begin(), objects.end(), s_Selected) == objects.end())
+            s_Selected = nullptr;
+        return s_Selected;
+    }
 
     // Unreal, Unity와 같은 key를 쓴다. camera를 조작하는 동안에는 이 key가 이동 key다.
     void UpdateGizmoMode(void)
@@ -33,7 +45,7 @@ namespace
             s_GizmoMode = GizmoMode::Rotate;
     }
 
-    void EditSelected(const Camera& camera, SceneEditor::IconObject& selected)
+    void EditSelected(const Camera& camera, SceneEditor::IconComponent& selected)
     {
         if (s_GizmoMode == GizmoMode::Rotate)
         {
@@ -46,18 +58,18 @@ namespace
             selected.SetPosition(Vector3(transform.GetW()));
     }
 
-    // icon이 cursor 아래에 있는 물체 중 icon 중심이 cursor에 가장 가까운 것
-    SceneEditor::Object* FindObjectUnderCursor(const Camera& camera)
+    // icon이 cursor 아래에 있는 object 중 icon 중심이 cursor에 가장 가까운 것
+    Scene::Object* FindObjectUnderCursor(const Camera& camera)
     {
         const ImVec2 cursor = ImGui::GetMousePos();
         const float radius = SceneEditor::GetIconRadius();
-        SceneEditor::Object* nearest = nullptr;
+        Scene::Object* nearest = nullptr;
         float nearestDistanceSq = radius * radius;
-        for (SceneEditor::Object* object : s_Objects)
+        for (Scene::Object* object : Scene::GetObjects())
         {
             ImVec2 icon;
-            const SceneEditor::IconObject* iconObject = object->AsIconObject();
-            if (iconObject == nullptr || !SceneEditor::ProjectToScene(camera, iconObject->GetPosition(), icon))
+            const SceneEditor::IconComponent* iconComponent = object->FindComponent<SceneEditor::IconComponent>();
+            if (iconComponent == nullptr || !SceneEditor::ProjectToScene(camera, iconComponent->GetPosition(), icon))
                 continue;
 
             const float dx = icon.x - cursor.x;
@@ -105,31 +117,42 @@ namespace
 
     void ShowHierarchyContent(void)
     {
-        for (SceneEditor::Object* object : s_Objects)
+        const Scene::Object* selected = GetSelected();
+        for (Scene::Object* object : Scene::GetObjects())
         {
-            if (ImGui::Selectable(object->GetName(), object == s_Selected))
+            if (ImGui::Selectable(object->GetName().c_str(), object == selected))
                 s_Selected = object;
         }
     }
 
     void ShowDetailsContent(void)
     {
-        if (s_Selected == nullptr)
+        Scene::Object* selected = GetSelected();
+        if (selected == nullptr)
         {
             ImGui::TextDisabled("Select an object in the Scene Hierarchy or click its icon in the scene.");
             return;
         }
 
-        ImGui::SeparatorText(s_Selected->GetName());
-        // 물체마다 Color처럼 같은 label의 widget이 있으므로, 고른 물체가 바뀌면 ImGui가 다른 widget으로 보게 한다.
-        ImGui::PushID(s_Selected);
-        s_Selected->ShowDetails();
+        ImGui::SeparatorText(selected->GetName().c_str());
+        // object마다, 그리고 한 object의 component마다 Color처럼 같은 label의 widget이 있을 수 있으므로, ImGui가 서로 다른 widget으로
+        // 보게 한다.
+        ImGui::PushID(selected);
+        for (const std::unique_ptr<Scene::Component>& component : selected->GetComponents())
+        {
+            const auto show = s_ComponentDetails.find(typeid(*component));
+            if (show == s_ComponentDetails.end())
+                continue;
+            ImGui::PushID(component.get());
+            show->second(*component);
+            ImGui::PopID();
+        }
         ImGui::PopID();
     }
 
-    ControlChannel::Fields DescribeIcon(const Camera& camera, const SceneEditor::IconObject& object)
+    ControlChannel::Fields DescribeIcon(const Camera& camera, const SceneEditor::IconComponent& icon)
     {
-        const Vector3 position = object.GetPosition();
+        const Vector3 position = icon.GetPosition();
         ControlChannel::Fields fields;
         fields.Object("position", ControlChannel::Fields()
             .Float("x", position.GetX())
@@ -151,22 +174,23 @@ namespace
     ControlChannel::Fields DescribeEditor(const Camera& camera)
     {
         ControlChannel::Fields objects;
-        for (SceneEditor::Object* object : s_Objects)
+        for (const Scene::Object* object : Scene::GetObjects())
         {
-            const SceneEditor::IconObject* iconObject = object->AsIconObject();
-            objects.Object(object->GetName(), iconObject != nullptr ? DescribeIcon(camera, *iconObject) : ControlChannel::Fields());
+            const SceneEditor::IconComponent* icon = object->FindComponent<SceneEditor::IconComponent>();
+            objects.Object(object->GetName(), icon != nullptr ? DescribeIcon(camera, *icon) : ControlChannel::Fields());
         }
+        const Scene::Object* selected = GetSelected();
         return ControlChannel::Fields()
-            .Text("selected", s_Selected != nullptr ? s_Selected->GetName() : "none")
+            .Text("selected", selected != nullptr ? selected->GetName() : "none")
             .Text("gizmo_mode", GetGizmoModeName(s_GizmoMode))
             .Text("rotate_axes", GetAxesName(s_RotateAxes))
             .Object("objects", objects);
     }
 
-    SceneEditor::Object* FindObject(const std::string& name, std::string& error)
+    Scene::Object* FindObject(const std::string& name, std::string& error)
     {
         std::string names;
-        for (SceneEditor::Object* object : s_Objects)
+        for (Scene::Object* object : Scene::GetObjects())
         {
             if (name == object->GetName())
                 return object;
@@ -184,7 +208,7 @@ namespace
             return true;
         }
 
-        SceneEditor::Object* object = FindObject(name, error);
+        Scene::Object* object = FindObject(name, error);
         if (object == nullptr)
         {
             error += ", none";
@@ -225,7 +249,7 @@ namespace
     void GetObjectSettings(const std::string& name, const ControlChannel::Reply& reply)
     {
         std::string error;
-        const SceneEditor::Object* object = FindObject(name, error);
+        const Scene::Object* object = FindObject(name, error);
         if (object == nullptr)
         {
             reply.Error(error);
@@ -244,7 +268,7 @@ namespace
             reply.Error("usage: editor set <name>: <key>=<value>; <key>=<value>");
             return;
         }
-        SceneEditor::Object* object = FindObject(name, error);
+        Scene::Object* object = FindObject(name, error);
         if (object == nullptr)
         {
             reply.Error(error);
@@ -292,38 +316,9 @@ namespace
     }
 }
 
-void SceneEditor::AddObject(Object& object)
+void SceneEditor::RegisterComponentDetails(const std::type_info& componentType, std::function<void(Scene::Component&)> show)
 {
-    s_Objects.push_back(&object);
-}
-
-void SceneEditor::RemoveObject(Object& object)
-{
-    s_Objects.erase(std::remove(s_Objects.begin(), s_Objects.end(), &object), s_Objects.end());
-    if (s_Selected == &object)
-        s_Selected = nullptr;
-}
-
-void SceneEditor::LoadObjectSettings(const IniFile::Sections& sections)
-{
-    for (Object* object : s_Objects)
-    {
-        const auto section = sections.find(object->GetName());
-        object->LoadSettings(section != sections.end() ? section->second : IniFile::Values());
-    }
-}
-
-IniFile::Sections SceneEditor::SaveObjectSettings(void)
-{
-    IniFile::Sections sections;
-    for (const Object* object : s_Objects)
-    {
-        IniFile::Values values;
-        object->SaveSettings(values);
-        if (!values.empty())
-            sections[object->GetName()] = values;
-    }
-    return sections;
+    s_ComponentDetails[componentType] = std::move(show);
 }
 
 void SceneEditor::Update(const Camera& camera)
@@ -336,16 +331,17 @@ void SceneEditor::Update(const Camera& camera)
 
     UpdateGizmoMode();
 
-    for (Object* object : s_Objects)
+    Scene::Object* selected = GetSelected();
+    for (const Scene::Object* object : Scene::GetObjects())
     {
-        if (const IconObject* iconObject = object->AsIconObject())
-            iconObject->Draw(camera, object == s_Selected);
+        if (const IconComponent* icon = object->FindComponent<IconComponent>())
+            icon->Draw(camera, object == selected);
     }
 
-    if (s_Selected != nullptr && s_Selected->AsIconObject() != nullptr)
-        EditSelected(camera, *s_Selected->AsIconObject());
+    if (IconComponent* selectedIcon = selected != nullptr ? selected->FindComponent<IconComponent>() : nullptr)
+        EditSelected(camera, *selectedIcon);
 
-    // gizmo나 다른 창 위의 click은 ImGui가 mouse를 가져가므로 물체를 고르는 데 쓰지 않는다.
+    // gizmo나 다른 창 위의 click은 ImGui가 mouse를 가져가므로 object를 고르는 데 쓰지 않는다.
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::GetIO().WantCaptureMouse &&
         !ImGuizmo::IsUsingAny() && !GameInput::IsMouseCapturedByCamera())
     {

@@ -136,6 +136,7 @@
     <ClInclude Include="Editor\EditorCameraController.h" />
     <ClInclude Include="Editor\MeasurementConditions.h" />
     <ClInclude Include="Editor\SceneEditor.h" />
+    <ClInclude Include="Scene\Scene.h" />
     <ClInclude Include="Utility\IniFile.h" />
     <ClInclude Include="UI\EngineTuning.h" />
     <ClInclude Include="UI\ImGuiLayer.h" />
@@ -183,6 +184,7 @@
     <ClCompile Include="Editor\EditorCameraController.cpp" />
     <ClCompile Include="Editor\MeasurementConditions.cpp" />
     <ClCompile Include="Editor\SceneEditor.cpp" />
+    <ClCompile Include="Scene\Scene.cpp" />
     <ClCompile Include="Utility\IniFile.cpp" />
     <ClCompile Include="UI\EngineTuning.cpp" />
     <ClCompile Include="UI\ImGuiLayer.cpp" />

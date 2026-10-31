@@ -43,6 +43,7 @@
 #include "Core/Graphics/GraphicsCore.h"
 #include "Core/Editor/EditorCameraController.h"
 #include "Core/Editor/SceneEditor.h"
+#include "Core/Scene/Scene.h"
 #include "Core/Automation/ControlChannel.h"
 #include "Core/Editor/MeasurementConditions.h"
 #include "Core/UI/ImGuiLayer.h"
@@ -64,10 +65,10 @@ using namespace std;
 
 using Renderer::MeshSorter;
 
-// KHR_lights_punctual의 directional light (references/glTF/extensions/2.0/Khronos/KHR_lights_punctual/README.md:110).
+// KHR_lights_punctual의 light. 지금은 directional light (references/glTF/extensions/2.0/Khronos/KHR_lights_punctual/README.md:110)만 있다.
 // 무한히 멀어서 감쇠하지 않고, 자기 transform의 local -Z 방향으로 빛을 낸다. transform의 위치는 조명에 영향을 주지 않고,
 // scene editor에서 light를 보고 고르는 자리다.
-class DirectionalLight : public SceneEditor::IconObject
+class LightComponent : public Scene::Component
 {
 public:
     // gizmo, light set 명령, Details panel, scene file이 바꾸는 값
@@ -82,7 +83,7 @@ public:
         float intensity;
     };
 
-    DirectionalLight();
+    LightComponent();
 
     const Properties& GetProperties() const { return m_Properties; }
     void SetProperties(const Properties& properties) { m_Properties = properties; }
@@ -95,15 +96,8 @@ public:
     // 회전이 없는 transform으로 둔다. 빛은 world의 -Z로 가고 icon은 원점에 놓인다. color와 intensity는 그대로다.
     void ResetTransform();
 
-    virtual const char* GetName() const override { return "Directional Light"; }
-    // color와 intensity를 바꾸고 transform을 되돌린다.
-    virtual void ShowDetails() override;
     virtual void SaveSettings(IniFile::Values& values) const override;
     virtual void LoadSettings(const IniFile::Values& values) override;
-    virtual Vector3 GetPosition() const override { return m_Properties.position; }
-    virtual void SetPosition(Vector3 position) override { m_Properties.position = position; }
-    virtual void Draw(const Camera& camera, bool selected) const override;
-    virtual void Rotate(const Camera& camera, ImGuizmo::MODE axes) override;
 
 private:
     static Properties GetDefaultProperties();
@@ -111,11 +105,34 @@ private:
     Properties m_Properties;
 };
 
+// light의 transform 위치에 icon을 두고 빛이 나아가는 방향을 화살표로 표시한다. gizmo로 transform을 옮기고 돌린다.
+class LightIconComponent : public SceneEditor::IconComponent
+{
+public:
+    explicit LightIconComponent(LightComponent& light) : m_Light(light) {}
+
+    virtual Vector3 GetPosition() const override { return m_Light.GetProperties().position; }
+    virtual void SetPosition(Vector3 position) override;
+    virtual void Draw(const Camera& camera, bool selected) const override;
+    virtual void Rotate(const Camera& camera, ImGuizmo::MODE axes) override;
+
+private:
+    LightComponent& m_Light;
+};
+
+// light object를 이루는 component를 붙이고, 조명이 쓰는 component를 돌려준다.
+LightComponent& AssembleLight(Scene::Object& object)
+{
+    LightComponent& light = object.AddComponent<LightComponent>();
+    object.AddComponent<LightIconComponent>(light);
+    return light;
+}
+
 // ray가 아무 면도 만나지 않을 때 받는 빛. 무한히 먼 sky가 모든 방향에서 같은 radiance를 낸다.
 // ray tracing으로 간접광을 구하는 곳 (path tracer, 앞으로의 DDGI)이 miss에서 이 radiance를 쓴다. raster는 이 빛으로 surface를 비추지
 // 않고 camera에서 바로 보이는 배경으로만 그린다. raster에는 sky의 visibility가 없어서 surface에 더하면 sky가 가려진 실내까지 밝아지고,
-// 그 빛은 DDGI가 구한다.
-class SkyLight : public SceneEditor::Object
+// 그 빛은 DDGI가 구한다. 무한히 멀어 icon을 둘 자리가 없으므로 Scene Hierarchy로만 고른다.
+class SkyLightComponent : public Scene::Component
 {
 public:
     // Details panel, scene file, editor set 명령이 바꾸는 값
@@ -127,7 +144,7 @@ public:
         float intensity;
     };
 
-    SkyLight();
+    SkyLightComponent();
 
     const Properties& GetProperties() const { return m_Properties; }
     void SetProperties(const Properties& properties) { m_Properties = properties; }
@@ -135,9 +152,6 @@ public:
     // 모든 방향에서 같은 radiance (cd/m²)
     Vector3 GetRadiance() const { return m_Properties.color * Scalar(m_Properties.intensity); }
 
-    // 무한히 멀어 icon을 둘 자리가 없으므로 Scene Hierarchy로만 고른다.
-    virtual const char* GetName() const override { return "Sky Light"; }
-    virtual void ShowDetails() override;
     virtual void SaveSettings(IniFile::Values& values) const override;
     virtual void LoadSettings(const IniFile::Values& values) override;
 
@@ -147,25 +161,19 @@ private:
     Properties m_Properties;
 };
 
-// scene에 놓인 glTF model. 스스로 보이므로 icon이 없다. 아직 바꿀 수 있는 설정이 없어 Details panel에 model의 정보만 보인다.
-class SceneModel : public SceneEditor::Object
+// scene에 놓인 glTF model. 스스로 보이므로 icon이 없다. 아직 바꿀 수 있는 설정이 없다.
+class ModelComponent : public Scene::Component
 {
 public:
-    explicit SceneModel(const ModelInstance& instance) : m_Instance(instance) {}
+    explicit ModelComponent(const ModelInstance& instance) : m_Instance(instance) {}
 
-    // 이름은 file 이름에서 확장자를 뺀 것이다.
-    void SetPath(const std::string& path);
+    const ModelInstance& GetInstance() const { return m_Instance; }
+    void SetPath(const std::string& path) { m_Path = path; }
     const std::string& GetPath() const { return m_Path; }
-
-    virtual const char* GetName() const override { return m_Name.c_str(); }
-    virtual void ShowDetails() override;
-    virtual void SaveSettings(IniFile::Values&) const override {}
-    virtual void LoadSettings(const IniFile::Values&) override {}
 
 private:
     const ModelInstance& m_Instance;
     std::string m_Path;
-    std::string m_Name;
 };
 
 // Scene Hierarchy와 editor 명령이 camera를 가리키는 이름이자 scene file의 section 이름
@@ -173,18 +181,19 @@ const char kCameraName[] = "Camera";
 
 // scene 을 보는 editor camera. 사용자가 이 camera로 보므로 icon과 gizmo가 없고, mouse와 keyboard나 Details panel로 옮긴다.
 // pose는 scene 마다 다르므로 scene file에 저장하고, scene 과 무관한 이동 속도는 EditorCameraController가 user.ini에 남긴다.
-class SceneCamera : public SceneEditor::Object
+class CameraComponent : public Scene::Component
 {
 public:
     // model은 scene file의 Fit=Model이 화면에 담는 model이다.
-    SceneCamera(EditorCameraController& controller, const ModelInstance& model)
-        : m_Controller(controller), m_Model(model) {}
+    CameraComponent(EditorCameraController& controller, const ModelInstance& model)
+        : Component({ "Fit", "Position", "Heading", "Pitch" }), m_Controller(controller), m_Model(model) {}
 
     // 원점에서 -z를 본다.
     static EditorCameraController::Pose GetDefaultPose();
 
-    virtual const char* GetName() const override { return kCameraName; }
-    virtual void ShowDetails() override;
+    EditorCameraController::Pose GetPose() const { return m_Controller.GetPose(); }
+    void SetPose(const EditorCameraController::Pose& pose) { m_Controller.SetPose(pose); }
+
     virtual void SaveSettings(IniFile::Values& values) const override;
     // scene file의 두 형식을 모두 읽는다. Fit=Model이면 지금 model을 담는 pose로 옮긴다.
     virtual void LoadSettings(const IniFile::Values& values) override;
@@ -217,9 +226,9 @@ private:
     bool OpenScene(const std::wstring& path, std::string& error);
     // scene 을 바꾸지 않고 path의 scene file을 열 수 있는지 본다. 그 model을 처음 열면 load해서 m_Models에 남긴다.
     bool PrepareScene(const std::wstring& path, PreparedScene& scene, std::string& error);
-    // PrepareScene이 준비한 scene 으로 바꾼다. camera와 light 같은 물체는 scene file의 설정을 받고, path tracer는 처음부터 다시 쌓는다.
+    // PrepareScene이 준비한 scene 으로 바꾼다. camera와 light 같은 object는 scene file의 설정을 받고, path tracer는 처음부터 다시 쌓는다.
     void ShowScene(const PreparedScene& scene);
-    // 물체의 설정을 지금 scene file에 쓴다. camera도 물체이므로 지금 pose를 함께 쓴다. 쓸 수 없으면 error에 이유를 쓰고 false를
+    // object의 설정을 지금 scene file에 쓴다. camera도 object이므로 지금 pose를 함께 쓴다. 쓸 수 없으면 error에 이유를 쓰고 false를
     // 돌려준다.
     bool SaveScene(std::string& error);
     void ShowSceneMenu(void);
@@ -234,8 +243,8 @@ private:
 
     Camera m_Camera;
     unique_ptr<EditorCameraController> m_CameraController;
-    // m_CameraController보다 먼저 없어지도록 뒤에 둔다.
-    unique_ptr<SceneCamera> m_SceneCamera;
+    // component는 Startup이 m_CameraController를 만든 뒤 붙인다. m_CameraController보다 먼저 없어지도록 뒤에 둔다.
+    Scene::Object m_CameraObject{ kCameraName };
     // -rebuild 1이면 처음 load하는 model의 .mini를 다시 만든다.
     bool m_ForceRebuild = false;
     // 연 scene. state와 측정 조건의 줄이 scene 을 가리키는 이름이다.
@@ -245,11 +254,15 @@ private:
     D3D12_RECT m_MainScissor;
 
     ModelInstance m_ModelInst;
-    SceneModel m_SceneModel{ m_ModelInst };
+    // 이름은 scene 을 열 때 glTF file 이름으로 정한다.
+    Scene::Object m_ModelObject{ "" };
+    ModelComponent& m_ModelComponent = m_ModelObject.AddComponent<ModelComponent>(m_ModelInst);
     RaytracingScene m_RaytracingScene;
     ShadowCamera m_ShadowCamera;
-    DirectionalLight m_Light;
-    SkyLight m_SkyLight;
+    Scene::Object m_LightObject{ "Directional Light" };
+    LightComponent& m_Light = AssembleLight(m_LightObject);
+    Scene::Object m_SkyLightObject{ "Sky Light" };
+    SkyLightComponent& m_SkyLight = m_SkyLightObject.AddComponent<SkyLightComponent>();
 };
 
 CREATE_APPLICATION( ModelViewer )
@@ -291,7 +304,7 @@ bool MakeRotation(Vector3 direction, Vector3 up, Matrix3& rotation)
     return true;
 }
 
-DirectionalLight::Properties DirectionalLight::GetDefaultProperties()
+LightComponent::Properties LightComponent::GetDefaultProperties()
 {
     Properties properties;
     properties.rotation = MakeRotationToward(kDefaultLightDirection);
@@ -301,11 +314,11 @@ DirectionalLight::Properties DirectionalLight::GetDefaultProperties()
     return properties;
 }
 
-DirectionalLight::DirectionalLight() : m_Properties(GetDefaultProperties())
+LightComponent::LightComponent() : Component({ "Direction", "Up", "Position", "Color", "Intensity" }), m_Properties(GetDefaultProperties())
 {
 }
 
-void DirectionalLight::ResetTransform()
+void LightComponent::ResetTransform()
 {
     m_Properties.rotation = Matrix3(kIdentity);
     m_Properties.position = Vector3(kZero);
@@ -348,7 +361,7 @@ std::string FormatVector(Vector3 vector)
     return text;
 }
 
-void DirectionalLight::SaveSettings(IniFile::Values& values) const
+void LightComponent::SaveSettings(IniFile::Values& values) const
 {
     values["Direction"] = FormatVector(m_Properties.rotation.GetZ());
     values["Up"] = FormatVector(m_Properties.rotation.GetY());
@@ -359,7 +372,7 @@ void DirectionalLight::SaveSettings(IniFile::Values& values) const
     values["Intensity"] = text;
 }
 
-void DirectionalLight::LoadSettings(const IniFile::Values& values)
+void LightComponent::LoadSettings(const IniFile::Values& values)
 {
     const auto read = [&values](const char* key, Vector3& vector)
     {
@@ -382,7 +395,7 @@ void DirectionalLight::LoadSettings(const IniFile::Values& values)
     m_Properties = properties;
 }
 
-SkyLight::Properties SkyLight::GetDefaultProperties()
+SkyLightComponent::Properties SkyLightComponent::GetDefaultProperties()
 {
     Properties properties;
     properties.color = Vector3(1.0f, 1.0f, 1.0f);
@@ -390,11 +403,11 @@ SkyLight::Properties SkyLight::GetDefaultProperties()
     return properties;
 }
 
-SkyLight::SkyLight() : m_Properties(GetDefaultProperties())
+SkyLightComponent::SkyLightComponent() : Component({ "Color", "Intensity" }), m_Properties(GetDefaultProperties())
 {
 }
 
-void SkyLight::SaveSettings(IniFile::Values& values) const
+void SkyLightComponent::SaveSettings(IniFile::Values& values) const
 {
     values["Color"] = FormatVector(m_Properties.color);
     char text[32];
@@ -404,7 +417,7 @@ void SkyLight::SaveSettings(IniFile::Values& values) const
 
 // directional light와 달리 intensity의 inf는 받는다. scripts/check-path-tracer-export.py가 inf로 두어 path tracer에 NaN과 Inf인
 // sample을 만든다.
-void SkyLight::LoadSettings(const IniFile::Values& values)
+void SkyLightComponent::LoadSettings(const IniFile::Values& values)
 {
     Properties properties = GetDefaultProperties();
     const auto color = values.find("Color");
@@ -419,9 +432,9 @@ void SkyLight::LoadSettings(const IniFile::Values& values)
 }
 
 // state의 sky
-ControlChannel::Fields DescribeSkyLight(const SkyLight& sky)
+ControlChannel::Fields DescribeSkyLight(const SkyLightComponent& sky)
 {
-    const SkyLight::Properties& properties = sky.GetProperties();
+    const SkyLightComponent::Properties& properties = sky.GetProperties();
     return ControlChannel::Fields()
         .Object("color", ControlChannel::Fields()
             .Float("r", properties.color.GetX()).Float("g", properties.color.GetY()).Float("b", properties.color.GetZ()))
@@ -429,37 +442,35 @@ ControlChannel::Fields DescribeSkyLight(const SkyLight& sky)
 }
 
 // sky light를 harness의 state로 읽게 한다. 값은 Details panel처럼 editor 명령으로 바꾼다.
-void RegisterSkyLight(SkyLight& sky)
+void RegisterSkyLight(SkyLightComponent& sky)
 {
     ControlChannel::RegisterState("sky", [&sky] { return DescribeSkyLight(sky); });
 }
 
-void SkyLight::ShowDetails()
+void ShowSkyLightDetails(SkyLightComponent& sky)
 {
-    float color[3] = { m_Properties.color.GetX(), m_Properties.color.GetY(), m_Properties.color.GetZ() };
+    SkyLightComponent::Properties properties = sky.GetProperties();
+    float color[3] = { properties.color.GetX(), properties.color.GetY(), properties.color.GetZ() };
     if (ImGui::ColorEdit3("Color", color, ImGuiColorEditFlags_Float))
-        m_Properties.color = Min(Max(Vector3(color[0], color[1], color[2]), Vector3(kZero)), Vector3(1.0f, 1.0f, 1.0f));
+        properties.color = Min(Max(Vector3(color[0], color[1], color[2]), Vector3(kZero)), Vector3(1.0f, 1.0f, 1.0f));
     ImGui::SetItemTooltip("Linear RGB, each 0 to 1.");
-    if (ImGui::DragFloat("Intensity", &m_Properties.intensity, 0.01f, 0.0f, FLT_MAX, "%.3f cd/m2"))
-        m_Properties.intensity = std::max(0.0f, m_Properties.intensity);
+    if (ImGui::DragFloat("Intensity", &properties.intensity, 0.01f, 0.0f, FLT_MAX, "%.3f cd/m2"))
+        properties.intensity = std::max(0.0f, properties.intensity);
     ImGui::SetItemTooltip("Radiance of the sky in every direction, in cd/m2. An upward surface open to the whole sky receives "
         "pi times this in lux.");
+    sky.SetProperties(properties);
     ImGui::TextDisabled("Rays that hit nothing see this light. The raster does not light surfaces with it and draws it only as the background.");
 }
 
-void SceneModel::SetPath(const std::string& path)
+// 아직 바꿀 수 있는 설정이 없어 model의 정보만 표시한다.
+void ShowModelDetails(ModelComponent& component)
 {
-    m_Path = path;
-    m_Name = Utility::RemoveExtension(Utility::RemoveBasePath(path));
-}
-
-void SceneModel::ShowDetails()
-{
-    const Model& model = m_Instance.GetModel();
-    const AxisAlignedBox bounds = m_Instance.GetAxisAlignedBox();
+    const ModelInstance& instance = component.GetInstance();
+    const Model& model = instance.GetModel();
+    const AxisAlignedBox bounds = instance.GetAxisAlignedBox();
     const Vector3 min = bounds.GetMin();
     const Vector3 max = bounds.GetMax();
-    ImGui::TextWrapped("glTF: %s", m_Path.c_str());
+    ImGui::TextWrapped("glTF: %s", component.GetPath().c_str());
     ImGui::Text("Meshes: %u, nodes: %u", model.m_NumMeshes, model.m_NumNodes);
     ImGui::Text("Bounds min: %.2f, %.2f, %.2f", (float)min.GetX(), (float)min.GetY(), (float)min.GetZ());
     ImGui::Text("Bounds max: %.2f, %.2f, %.2f", (float)max.GetX(), (float)max.GetY(), (float)max.GetZ());
@@ -538,18 +549,18 @@ void ReadTaa(const MeasurementConditions::Values& values, MeasurementConditions:
 }
 
 // light의 rotation은 user.ini처럼 +Z와 +Y로 적어, 다시 읽으면 bit 단위로 같은 rotation이 된다. position은 조명에 영향이 없어 적지 않는다.
-void DescribeLightConditions(const DirectionalLight& light, MeasurementConditions::Values& values)
+void DescribeLightConditions(const LightComponent& light, MeasurementConditions::Values& values)
 {
-    const DirectionalLight::Properties& properties = light.GetProperties();
+    const LightComponent::Properties& properties = light.GetProperties();
     values["light direction"] = FormatVector(properties.rotation.GetZ());
     values["light up"] = FormatVector(properties.rotation.GetY());
     values["light color"] = FormatVector(properties.color);
     values["light intensity"] = FormatFloat(properties.intensity);
 }
 
-void ReadLightConditions(DirectionalLight& light, const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading)
+void ReadLightConditions(LightComponent& light, const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading)
 {
-    DirectionalLight::Properties properties = light.GetProperties();
+    LightComponent::Properties properties = light.GetProperties();
     Vector3 direction, up;
     const bool hasDirection = ReadValue(values, "light direction", reading, [&direction](const std::string& text) { return ReadVector(text, direction); });
     const bool hasUp = ReadValue(values, "light up", reading, [&up](const std::string& text) { return ReadVector(text, up); });
@@ -566,17 +577,17 @@ void ReadLightConditions(DirectionalLight& light, const MeasurementConditions::V
     reading.applies.push_back([&light, properties] { light.SetProperties(properties); });
 }
 
-void DescribeSkyLightConditions(const SkyLight& sky, MeasurementConditions::Values& values)
+void DescribeSkyLightConditions(const SkyLightComponent& sky, MeasurementConditions::Values& values)
 {
-    const SkyLight::Properties& properties = sky.GetProperties();
+    const SkyLightComponent::Properties& properties = sky.GetProperties();
     values["sky color"] = FormatVector(properties.color);
     values["sky intensity"] = FormatFloat(properties.intensity);
 }
 
-// intensity는 Sky Light의 settings처럼 inf도 받는다 (LoadSkyLightSettings). /fp:fast에서는 NaN과의 비교가 참일 수 있어 NaN을 따로 본다.
-void ReadSkyLightConditions(SkyLight& sky, const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading)
+// intensity는 Sky Light의 settings처럼 inf도 받는다 (SkyLightComponent::LoadSettings). /fp:fast에서는 NaN과의 비교가 참일 수 있어 NaN을 따로 본다.
+void ReadSkyLightConditions(SkyLightComponent& sky, const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading)
 {
-    SkyLight::Properties properties = sky.GetProperties();
+    SkyLightComponent::Properties properties = sky.GetProperties();
     ReadValue(values, "sky color", reading, [&properties](const std::string& text) { return ReadVector(text, properties.color) && IsColor(properties.color); });
     ReadValue(values, "sky intensity", reading, [&properties](const std::string& text)
     {
@@ -587,7 +598,7 @@ void ReadSkyLightConditions(SkyLight& sky, const MeasurementConditions::Values& 
 
 // raster와 path tracer가 그리는 조건을 Log와 capture의 줄에 담고 Restore로 되돌리게 한다. scene 은 ModelViewer::RegisterSceneConditions가,
 // path tracer의 설정은 PathTracerTuning이 더한다.
-void RegisterMeasurementConditions(EditorCameraController& cameraController, DirectionalLight& light, SkyLight& sky)
+void RegisterMeasurementConditions(EditorCameraController& cameraController, LightComponent& light, SkyLightComponent& sky)
 {
     MeasurementConditions::Register("camera", {
         [&cameraController](MeasurementConditions::Values& values) { DescribeCameraConditions(cameraController, values); },
@@ -733,9 +744,9 @@ Vector3 GetDirectionAt(float elevation, float azimuth)
 
 // state의 light. rotation은 glTF node의 rotation처럼 x, y, z, w 순서의 quaternion이고, w가 0 이상이 되는 쪽으로 쓴다.
 // 고도와 방위는 조명이 쓰는 방향에서 계산한다.
-ControlChannel::Fields DescribeLight(const DirectionalLight& light)
+ControlChannel::Fields DescribeLight(const LightComponent& light)
 {
-    const DirectionalLight::Properties& properties = light.GetProperties();
+    const LightComponent::Properties& properties = light.GetProperties();
     Quaternion rotation((XMMATRIX)properties.rotation);
     if (XMVectorGetW(rotation) < 0.0f)
         rotation = -rotation;
@@ -757,7 +768,7 @@ constexpr float kLightDegreesTolerance = 1e-4f;
 
 // gizmo와 Details panel이 바꾸는 값을 같은 방식으로 바꾼다.
 // 받지 않는 값이 하나라도 있으면 아무것도 바꾸지 않도록, 값의 사본에 먼저 적용해 읽어 본다.
-void SetLight(DirectionalLight& light, const std::string& arguments, const ControlChannel::Reply& reply)
+void SetLight(LightComponent& light, const std::string& arguments, const ControlChannel::Reply& reply)
 {
     const std::string usage = "usage: light set rotation=<x>,<y>,<z>,<w> | direction=<x>,<y>,<z> | elevation=<degrees> azimuth=<degrees> | "
         "position=<x>,<y>,<z> | color=<r>,<g>,<b> | intensity=<lux>";
@@ -796,7 +807,7 @@ void SetLight(DirectionalLight& light, const std::string& arguments, const Contr
         return;
     }
 
-    DirectionalLight::Properties properties = light.GetProperties();
+    LightComponent::Properties properties = light.GetProperties();
     ControlChannel::Fields rejected;
     bool anyRejected = false;
     if (values.count("rotation") != 0)
@@ -886,7 +897,7 @@ void SetLight(DirectionalLight& light, const std::string& arguments, const Contr
 }
 
 // light를 harness의 light 명령과 state로 읽고 바꾸게 한다.
-void RegisterLight(DirectionalLight& light)
+void RegisterLight(LightComponent& light)
 {
     ControlChannel::RegisterState("light", [&light] { return DescribeLight(light); });
     ControlChannel::Register("light", "light set <key>=<value> ... | light reset: the directional light, as its rotate and translate gizmos and its "
@@ -933,10 +944,18 @@ void DrawArrow(ImDrawList& drawList, ImVec2 from, ImVec2 to, ImU32 color, float 
     drawList.AddTriangleFilled(to, ImVec2(headBase.x + side.x, headBase.y + side.y), ImVec2(headBase.x - side.x, headBase.y - side.y), color);
 }
 
-void DirectionalLight::Draw(const Camera& camera, bool selected) const
+void LightIconComponent::SetPosition(Vector3 position)
 {
+    LightComponent::Properties properties = m_Light.GetProperties();
+    properties.position = position;
+    m_Light.SetProperties(properties);
+}
+
+void LightIconComponent::Draw(const Camera& camera, bool selected) const
+{
+    const Vector3 position = GetPosition();
     ImVec2 icon;
-    if (!SceneEditor::ProjectToScene(camera, m_Properties.position, icon))
+    if (!SceneEditor::ProjectToScene(camera, position, icon))
         return;
 
     const ImU32 lightColor = IM_COL32(255, 200, 0, 255);
@@ -946,9 +965,9 @@ void DirectionalLight::Draw(const Camera& camera, bool selected) const
     ImDrawList* drawList = ImGui::GetWindowDrawList();
 
     // 화살표는 빛이 나아가는 방향, 곧 local -Z다.
-    const float arrowLength = radius * 4.0f * SceneEditor::GetWorldLengthPerPixel(camera, m_Properties.position);
+    const float arrowLength = radius * 4.0f * SceneEditor::GetWorldLengthPerPixel(camera, position);
     ImVec2 arrowTip;
-    if (SceneEditor::ProjectToScene(camera, m_Properties.position - GetDirection() * arrowLength, arrowTip))
+    if (SceneEditor::ProjectToScene(camera, position - m_Light.GetDirection() * arrowLength, arrowTip))
         DrawArrow(*drawList, icon, arrowTip, lightColor, thickness);
 
     drawList->AddCircleFilled(icon, radius * 0.45f, lightColor);
@@ -967,31 +986,36 @@ void DirectionalLight::Draw(const Camera& camera, bool selected) const
         drawList->AddCircle(icon, radius * 1.2f, selectedColor, 0, thickness);
 }
 
-void DirectionalLight::Rotate(const Camera& camera, ImGuizmo::MODE axes)
+void LightIconComponent::Rotate(const Camera& camera, ImGuizmo::MODE axes)
 {
-    Matrix4 transform(m_Properties.rotation, m_Properties.position);
+    LightComponent::Properties properties = m_Light.GetProperties();
+    Matrix4 transform(properties.rotation, properties.position);
     if (!SceneEditor::Manipulate(camera, ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y | ImGuizmo::ROTATE_Z, axes, transform))
         return;
     // gizmo가 돌린 matrix는 float 오차로 직교에서 조금씩 벗어나므로 quaternion을 거쳐 직교 matrix로 되돌린다.
-    m_Properties.rotation = Matrix3(Normalize(Quaternion((XMMATRIX)transform.Get3x3())));
+    properties.rotation = Matrix3(Normalize(Quaternion((XMMATRIX)transform.Get3x3())));
+    m_Light.SetProperties(properties);
 }
 
-void DirectionalLight::ShowDetails()
+// color와 intensity를 바꾸고 transform을 되돌린다.
+void ShowLightDetails(LightComponent& light)
 {
-    float color[3] = { m_Properties.color.GetX(), m_Properties.color.GetY(), m_Properties.color.GetZ() };
+    LightComponent::Properties properties = light.GetProperties();
+    float color[3] = { properties.color.GetX(), properties.color.GetY(), properties.color.GetZ() };
     if (ImGui::ColorEdit3("Color", color, ImGuiColorEditFlags_Float))
-        m_Properties.color = Min(Max(Vector3(color[0], color[1], color[2]), Vector3(kZero)), Vector3(1.0f, 1.0f, 1.0f));
+        properties.color = Min(Max(Vector3(color[0], color[1], color[2]), Vector3(kZero)), Vector3(1.0f, 1.0f, 1.0f));
     ImGui::SetItemTooltip("Linear RGB, each 0 to 1.");
-    if (ImGui::DragFloat("Intensity", &m_Properties.intensity, 0.05f, 0.0f, FLT_MAX, "%.3f lux"))
-        m_Properties.intensity = std::max(0.0f, m_Properties.intensity);
+    if (ImGui::DragFloat("Intensity", &properties.intensity, 0.05f, 0.0f, FLT_MAX, "%.3f lux"))
+        properties.intensity = std::max(0.0f, properties.intensity);
     ImGui::SetItemTooltip("Illuminance on a surface facing the light, in lux.");
+    light.SetProperties(properties);
 
     ImGui::SeparatorText("Transform");
-    const Vector3 direction = GetDirection();
+    const Vector3 direction = light.GetDirection();
     ImGui::Text("Toward the light: %.3f, %.3f, %.3f", (float)direction.GetX(), (float)direction.GetY(), (float)direction.GetZ());
     ImGui::Text("Elevation %.2f, azimuth %.2f degrees", GetElevation(direction), GetAzimuth(direction));
     if (ImGui::Button("Reset Transform"))
-        ResetTransform();
+        light.ResetTransform();
     ImGui::SetItemTooltip("Sets the transform to no rotation at the origin, so the light goes along world -Z. The color and intensity stay.");
     ImGui::TextDisabled("Rotate the light with the gizmo (E). The toolbar on the scene picks local or world rings.");
 }
@@ -1007,9 +1031,9 @@ struct CameraSection
 //   [Model]  glTF: scene file이 있는 폴더 기준의 glTF 경로
 //            Scale: glTF 좌표에 곱해 world 좌표로 바꾸는 배율. 다음의 Radius와 둘 중 하나만 둔다.
 //            Radius: model의 bounding sphere 반지름이 이 world 길이가 되는 배율 (ModelInstance::Resize)
-//   [<물체 이름>] Scene Hierarchy의 물체 (Camera, Directional Light, Sky Light) 의 설정. key는 그 물체의 SaveSettings가 쓰는 것이다.
-//            Scene menu의 Save와 scene save 명령이 모든 물체의 지금 값을 쓴다. 그래서 물체 이름은 Model이 아니다. light의 section이나
-//            key가 없으면 기본값이다.
+//   [<object 이름>] Scene Hierarchy의 object (Camera, Directional Light, Sky Light) 의 설정. key는 그 object의 component가 가진
+//            setting key다 (Scene::Component). Scene menu의 Save와 scene save 명령이 모든 object의 지금 값을 쓴다. 그래서 object 이름은
+//            Model이 아니다. light의 section이나 key가 없으면 기본값이다.
 //   [Camera] Position=<x>,<y>,<z>, Heading, Pitch: camera의 pose. 단위는 state camera와 pose 명령과 같다.
 //            Fit=Model: 위 셋 대신 둘 수 있다. bounding sphere 중심의 +z 쪽 반지름의 2배와 near clip을 더한 거리에서 -z를 본다.
 //            예전 -model의 OrbitCamera가 처음 그린 화면과 bit 단위로 같다. Save는 Fit=Model 줄을 지우고 지금 pose를 위 셋으로 쓴다.
@@ -1081,7 +1105,7 @@ bool ReadSceneFile(const std::wstring& path, SceneFile& scene, std::string& erro
         return false;
     }
 
-    // [Camera] section 은 scene 을 열 때 SceneCamera::LoadSettings가 받는다. 여기서는 열기 전에 받을 수 있는지만 본다.
+    // [Camera] section 은 scene 을 열 때 CameraComponent::LoadSettings가 받는다. 여기서는 열기 전에 받을 수 있는지만 본다.
     CameraSection camera;
     if (!ReadCameraSection(sections[kCameraName], camera))
     {
@@ -1099,12 +1123,12 @@ void ScaleModel(ModelInstance& model, const SceneFile& scene)
         model.Resize(scene.radius);
 }
 
-EditorCameraController::Pose SceneCamera::GetDefaultPose()
+EditorCameraController::Pose CameraComponent::GetDefaultPose()
 {
     return { Vector3(kZero), 0.0f, 0.0f };
 }
 
-void SceneCamera::SaveSettings(IniFile::Values& values) const
+void CameraComponent::SaveSettings(IniFile::Values& values) const
 {
     const EditorCameraController::Pose pose = m_Controller.GetPose();
     values["Position"] = FormatVector(pose.position);
@@ -1112,7 +1136,7 @@ void SceneCamera::SaveSettings(IniFile::Values& values) const
     values["Pitch"] = FormatFloat(pose.pitch);
 }
 
-void SceneCamera::LoadSettings(const IniFile::Values& values)
+void CameraComponent::LoadSettings(const IniFile::Values& values)
 {
     CameraSection camera;
     if (!ReadCameraSection(values, camera))
@@ -1129,9 +1153,9 @@ void SceneCamera::LoadSettings(const IniFile::Values& values)
     m_Controller.SetPose({ sphere.GetCenter() + Vector3(0.0f, 0.0f, sphere.GetRadius() * 2.0f + m_Controller.GetCameraNearClip()), 0.0f, 0.0f });
 }
 
-void SceneCamera::ShowDetails()
+void ShowCameraDetails(CameraComponent& camera)
 {
-    EditorCameraController::Pose pose = m_Controller.GetPose();
+    EditorCameraController::Pose pose = camera.GetPose();
     float position[3] = { pose.position.GetX(), pose.position.GetY(), pose.position.GetZ() };
     bool changed = ImGui::DragFloat3("Position", position, 1.0f, 0.0f, 0.0f, "%.1f");
     ImGui::SetItemTooltip("World units, as state camera and the pose command give it.");
@@ -1142,7 +1166,7 @@ void SceneCamera::ShowDetails()
     if (changed)
     {
         pose.position = Vector3(position[0], position[1], position[2]);
-        m_Controller.SetPose(pose);
+        camera.SetPose(pose);
     }
     ImGui::TextDisabled("You look through the camera, so it has no icon or gizmo. Move it with the mouse and keys.");
     ImGui::TextDisabled("Scene > Save writes this pose. The move speed is not part of the scene and stays in user.ini.");
@@ -1195,11 +1219,13 @@ void ModelViewer::ShowScene(const PreparedScene& scene)
     // TLAS의 buffer는 처음 Build한 scene 의 instance 수에 맞춰 만들므로 새 scene 에 맞게 다시 만들게 한다.
     m_RaytracingScene.Destroy();
     m_ModelInst = scene.model;
-    // camera의 Fit=Model이 새 model을 담도록 물체의 설정보다 먼저 크기를 정한다.
+    // camera의 Fit=Model이 새 model을 담도록 object의 설정보다 먼저 크기를 정한다.
     ScaleModel(m_ModelInst, scene.file);
-    m_SceneModel.SetPath(Utility::ToUTF8(scene.file.gltfPath));
+    const std::string gltfPath = Utility::ToUTF8(scene.file.gltfPath);
+    m_ModelComponent.SetPath(gltfPath);
+    m_ModelObject.SetName(Utility::RemoveExtension(Utility::RemoveBasePath(gltfPath)));
     m_SceneName = scene.name;
-    SceneEditor::LoadObjectSettings(scene.file.sections);
+    Scene::LoadObjectSettings(scene.file.sections);
     PathTracer::Reset();
 }
 
@@ -1210,7 +1236,7 @@ bool ModelViewer::SaveScene(std::string& error)
         error = "is not open";
         return false;
     }
-    if (!IniFile::WriteSections(Utility::UTF8ToWideString(m_SceneName), SceneEditor::SaveObjectSettings()))
+    if (!IniFile::WriteSections(Utility::UTF8ToWideString(m_SceneName), Scene::SaveObjectSettings()))
     {
         error = "cannot be written";
         return false;
@@ -1245,7 +1271,7 @@ void ModelViewer::ReadSceneConditions(const MeasurementConditions::Values& value
             reading.notes.push_back("the scene file " + lineScene + " " + error + ".");
             return;
         }
-        // scene 을 열면 camera와 light 같은 물체가 scene file의 설정을 받으므로, 줄의 camera, light, sky가 그 뒤에 들어가도록 다른
+        // scene 을 열면 camera와 light 같은 object가 scene file의 설정을 받으므로, 줄의 camera, light, sky가 그 뒤에 들어가도록 다른
         // group보다 먼저 연다.
         reading.applies.insert(reading.applies.begin(), [this, prepared] { ShowScene(*prepared); });
     });
@@ -1277,7 +1303,7 @@ std::vector<std::wstring> ListSceneFiles(void)
     return files;
 }
 
-// Save는 scene save 명령처럼 camera의 pose와 다른 물체의 설정을 지금 scene file에 쓴다. scene file 항목은 지금 scene 에 표시를 두고,
+// Save는 scene save 명령처럼 camera의 pose와 다른 object의 설정을 지금 scene file에 쓴다. scene file 항목은 지금 scene 에 표시를 두고,
 // 누르면 scene open 명령처럼 그 scene 을 연다.
 void ModelViewer::ShowSceneMenu(void)
 {
@@ -1380,12 +1406,12 @@ void ModelViewer::Startup( void )
 #endif
     m_Camera.SetZRange(1.0f, 10000.0f);
     m_CameraController.reset(new EditorCameraController(m_Camera, Vector3(kYUnitVector)));
-    m_SceneCamera.reset(new SceneCamera(*m_CameraController, m_ModelInst));
-    // scene 을 열 때 물체가 scene file의 설정을 받도록 먼저 등록한다.
-    SceneEditor::AddObject(m_SceneModel);
-    SceneEditor::AddObject(*m_SceneCamera);
-    SceneEditor::AddObject(m_Light);
-    SceneEditor::AddObject(m_SkyLight);
+    m_CameraObject.AddComponent<CameraComponent>(*m_CameraController, m_ModelInst);
+    // scene 을 열 때 object가 scene file의 설정을 받도록 먼저 등록한다.
+    Scene::AddObject(m_ModelObject);
+    Scene::AddObject(m_CameraObject);
+    Scene::AddObject(m_LightObject);
+    Scene::AddObject(m_SkyLightObject);
 #ifdef LEGACY_RENDERER
     // LEGACY_RENDERER는 scene file을 읽지 않으므로 Sponza::Startup이 정한 camera를 그대로 둔다.
     m_SceneName = GetSceneName(scenePath);
@@ -1394,7 +1420,7 @@ void ModelViewer::Startup( void )
     if (!OpenScene(scenePath, error))
     {
         Utility::Printf("Error: the scene file %ws %s\n", scenePath.c_str(), error.c_str());
-        m_CameraController->SetPose(SceneCamera::GetDefaultPose());
+        m_CameraController->SetPose(CameraComponent::GetDefaultPose());
         m_SceneName = GetSceneName(scenePath);
     }
 #endif
@@ -1402,10 +1428,14 @@ void ModelViewer::Startup( void )
     RegisterPoseCommand(cameraController);
     ControlChannel::RegisterState("camera", [this] { return DescribeCamera(m_Camera, *m_CameraController); });
     ControlChannel::RegisterState("scene", [this] { return DescribeScene(m_SceneName); });
-    ControlChannel::RegisterState("model", [this] { return DescribeModel(m_SceneModel.GetPath(), m_ModelInst); });
+    ControlChannel::RegisterState("model", [this] { return DescribeModel(m_ModelComponent.GetPath(), m_ModelInst); });
     ControlChannel::RegisterState("renderer", DescribeRenderer);
     RegisterSceneCommand();
 
+    SceneEditor::RegisterComponentDetails<ModelComponent>(ShowModelDetails);
+    SceneEditor::RegisterComponentDetails<CameraComponent>(ShowCameraDetails);
+    SceneEditor::RegisterComponentDetails<LightComponent>(ShowLightDetails);
+    SceneEditor::RegisterComponentDetails<SkyLightComponent>(ShowSkyLightDetails);
     SceneEditor::RegisterCommands(m_Camera);
     RegisterLight(m_Light);
     RegisterSkyLight(m_SkyLight);
@@ -1416,10 +1446,10 @@ void ModelViewer::Startup( void )
 void ModelViewer::Cleanup( void )
 {
     UnregisterMeasurementConditions();
-    SceneEditor::RemoveObject(m_SkyLight);
-    SceneEditor::RemoveObject(m_Light);
-    SceneEditor::RemoveObject(*m_SceneCamera);
-    SceneEditor::RemoveObject(m_SceneModel);
+    Scene::RemoveObject(m_SkyLightObject);
+    Scene::RemoveObject(m_LightObject);
+    Scene::RemoveObject(m_CameraObject);
+    Scene::RemoveObject(m_ModelObject);
     PathTracerTuning::Shutdown();
     RayPick::Shutdown();
     RaytracingView::Shutdown();

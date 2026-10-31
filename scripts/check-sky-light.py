@@ -80,7 +80,7 @@ def set_sky_light(session, color, intensity):
 
 
 def radiance(color, intensity):
-    """SkyLight::GetRadiance 처럼 fp32 로 곱한 값"""
+    """SkyLightComponent::GetRadiance 처럼 fp32 로 곱한 값"""
     return np.asarray(color, dtype=np.float32) * np.float32(intensity)
 
 
