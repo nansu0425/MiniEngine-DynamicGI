@@ -1496,7 +1496,7 @@ def project_to_scene(camera, scene, position):
 
 def check_editor(session, check, changes):
     """editor 명령이 icon click 과 W, E key 가 바꾸는 선택과 gizmo mode 를 바꾸고, state editor 의 icon 위치가 투영과 맞는지 본다.
-    UI 를 숨긴 상태에서 부르고, 선택, mode, UI, camera 를 처음 상태로 되돌려 놓는다."""
+    UI 를 숨긴 상태에서 부르고, 선택, mode, UI, camera, light 를 처음 상태로 되돌려 놓는다."""
     import numpy as np
     from PIL import Image
 
@@ -1543,7 +1543,10 @@ def check_editor(session, check, changes):
           rotate_mode == 'rotate' and translate_mode == 'translate' and np.array_equal(rotate, rotate_again) and not np.array_equal(rotate, translate),
           f'{rotate_mode}, {translate_mode}, rotate twice equal {np.array_equal(rotate, rotate_again)}')
 
-    # 기본 light 의 축은 world 의 축과 다르므로 rotate gizmo 의 ring 이 다르게 놓인다.
+    # Local 의 ring 은 light 의 축을, World 의 ring 은 world 의 축을 따른다. 측정 scene 의 light 는 축이 world 의 축과 나란할 수 있으므로,
+    # 어느 축도 world 의 축과 나란하지 않은 rotation 으로 두 ring 이 다르게 놓이게 하고 판정 뒤에 scene 의 light 로 되돌린다.
+    scene_light = session.ask_ok(f'editor get {LIGHT_OBJECT}')['values']
+    session.ask_ok('light set rotation=0.2,0.3,0.1,0.9')
     session.ask_ok('editor mode rotate')
     session.ask_ok('editor axes local')
     local = gizmo_around_light('selftest-editor-axes-local')
@@ -1559,6 +1562,7 @@ def check_editor(session, check, changes):
           world_axes == 'world' and local_axes == 'local' and np.array_equal(world, world_again) and not np.array_equal(local, world)
           and not unknown['ok'] and editor_state() == before,
           f'{world_axes}, {local_axes}, world twice equal {np.array_equal(world, world_again)}, {unknown.get("error")}')
+    session.ask_ok(f'editor set {LIGHT_OBJECT}: ' + '; '.join(f'{key}={value}' for key, value in scene_light.items()))
     session.ask_ok('editor mode translate')
 
     # pose look-at light 뒤라 light 의 icon 이 scene 가운데에 있고, 다음 pose 에서는 가운데에서 벗어난다.
