@@ -1,4 +1,4 @@
-"""PT 가 고정 시점에서 bias 없이 수렴하는지 판정하고, 정답 (ground truth) 의 spp 를 정한다.
+"""PT 가 측정 scene 에서 bias 없이 수렴하는지 판정하고, 정답 (ground truth) 의 spp 를 정한다.
 
   python scripts/check-convergence.py accumulate [--group G ...]   # Profile 로 띄워 아래 run 을 쌓고 export 를 KEPT_DIR 에 남긴다
   python scripts/check-convergence.py check [--record]            # KEPT_DIR 의 export 로 아래 기준을 판정한다
@@ -8,10 +8,16 @@
 exit 1 이다. 이 script 밖에서 보는 기준:
   [C7] d, b 와 그 상한의 식: imagecompare.py selftest
 
-조건: 시점마다 POSES 의 camera 와 directional light, MEASUREMENT (Output Indirect Irradiance, Sky 1, Max Bounces 64, Russian
-roulette on, Geometric Normals off). Indirect Irradiance 는 DDGI 가 비교할 양이다. 정답을 만들 Profile 에서 1920x1080 으로 쌓는다.
-export 의 rgb 는 E (lux) 의 평균, a 는 더한 sample 수다. X_s(N) 은 Seed s 로 N spp 쌓은 export 다. 한 run 에서 Target Samples 만
-올려 2 의 거듭제곱마다 export 하며, Target Samples 를 올려도 누적은 처음부터 다시 시작하지 않는다 (check-lambert-path.py 의 [9]).
+조건: 측정 scene (viewer.measurement_scenes) 마다 scene file 의 camera, directional light, Sky 와 MEASUREMENT (Output Indirect
+Irradiance, Max Bounces 64, Russian roulette on, Geometric Normals off). Sky 는 pathtracerchecks.BASE 의 값으로 바꾸지 않는다. 사용자가
+측정 scene 의 구도를 잡을 때와 발표용 image 를 만들 때 scene file 의 값을 쓰기 때문이다. Indirect Irradiance 는 DDGI 가 비교할 양이다.
+정답을 만들 Profile 에서 1920x1080 으로 쌓는다. export 의 rgb 는 E (lux) 의 평균, a 는 더한 sample 수다. X_s(N) 은 Seed s 로 N spp
+쌓은 export 다. 한 run 에서 Target Samples 만 올려 2 의 거듭제곱마다 export 하며, Target Samples 를 올려도 누적은 처음부터 다시
+시작하지 않는다 (check-lambert-path.py 의 [9]).
+
+accumulate 는 run 마다 scene 을 다시 열고, 연 뒤의 state 에서 읽은 scene file 의 경로와 camera, light, Sky 를 MANIFEST 의 run 에
+남긴다. check 는 scene file 의 경로와 camera, light, Sky 가 없거나 지금 scene file 의 값과 다른 run 을 쓰지 않고 FAIL 로 알린다. 쓰지
+않은 run 은 다시 accumulate 한다.
 
   e(N) = RMSE(X0(N), X1(N)) / (sqrt(2) rms(Xm(N)))   한 run 의 상대 noise. Xm 은 두 Seed 의 평균이다.
 
@@ -19,26 +25,29 @@ export 의 rgb 는 E (lux) 의 평균, a 는 더한 sample 수다. X_s(N) 은 Se
 로 보고 허용 오차를 그 1/5 로 정했으므로 같은 값을 쓴다. d, b 와 그 상한, floor 는 imagecompare.py 의 bias 다. floor 가 예산보다 크면
 그 spp 로는 차가 예산 아래인지 알 수 없으므로 FAIL 이다.
 
-Shading glTF 는 시간 안에 NOISE_BUDGET 에 이르지 못한다. 작업 12 를 판정할 때 1024 spp 의 e 가 start 26%, corridor 15% 였고, squared
-error 의 88%, 50% 가 상위 0.1% pixel 에 있었다. 로드맵의 뒤로 미룬 일에 적은 흰 점이다. 그래서 판정은 Lambert 로 하고, glTF 는 e(N)
-과 흰 점의 몫만 잰다.
+Shading glTF 는 흰 점이 많은 측정 scene 에서 시간 안에 NOISE_BUDGET 에 이르지 못한다. 측정 scene 에서 16384 spp 의 e 가
+sponza-color-bleeding 2.3%, sponza-fireflies 9.9%, sponza-overhead-light 2.5% 였고, squared error 의 8.5%, 65%, 66% 가 상위 0.1% pixel
+에 있었다. sponza-fireflies 는 e 가 N^-0.5 로 줄어도 1% 에 이르려면 2^21 spp 가 필요하다 (어림). 흰 점은 로드맵의 뒤로 미룬 일에
+있다. 그래서 판정은 Lambert 로 하고, glTF 는 e(N) 과 흰 점의 몫만 잰다.
 
-  [C1] Lambert 의 시점마다 SLOPE_FIT_FROM 부터 끝 spp 까지 log e 대 log N 을 fit 한 기울기가 -0.5 ± SLOPE_TOLERANCE 이고, 끝 spp 의 1/4
-       부터 끝까지의 기울기가 -0.5 ± LAST_SLOPE_TOLERANCE 다. 같은 pixel 의 sample 끼리 상관이 있거나 sample 의 분산이 무한에 가까우면
-       기울기가 완만해진다. 큰 sample 이 드물면 작은 N 의 e 가 작게 나오므로 끝 구간을 따로 본다.
-  [C2] Lambert 의 모든 시점에서 e(N) <= NOISE_BUDGET 인 가장 작은 2 의 거듭제곱이 있고, 그 최대 N_gt 가 PathTracer::Settings 의
-       targetSamples 기본값이다. 외삽하지 않고 잰 e 로 정한다.
-  [C3] Max Bounces: corridor 의 Lambert 를 Max Bounces 64 와 BOUNCES_REFERENCE 로 BIAS_SAMPLES 만큼 쌓은 d, b 의 상한이 BIAS_BUDGET
-       이하다. 두 쪽은 Seed 가 같아서 64 번 안에 끝나는 path 가 같은 sample 을 낸다. 그래서 차에는 64 번을 넘는 path 의 몫만 남고,
-       그런 path 가 없으면 d, b 와 그 상한이 0 이다.
-  [C4] Russian roulette: corridor 의 Lambert 를 Max Bounces ROULETTE_BOUNCES 에서 on 과 off 로 BIAS_SAMPLES 만큼 쌓은 d, b 의 상한이
-       BIAS_BUDGET 이하다. Max Bounces 를 줄이는 것은 off 의 시간을 줄이려는 것이다. roulette 는 PathTracerCS.hlsl 의
+  [C1] Lambert 의 측정 scene 마다 SLOPE_FIT_FROM 부터 끝 spp 까지 log e 대 log N 을 fit 한 기울기가 -0.5 ± SLOPE_TOLERANCE 이고, 끝
+       spp 의 1/4 부터 끝까지의 기울기가 -0.5 ± LAST_SLOPE_TOLERANCE 다. 같은 pixel 의 sample 끼리 상관이 있거나 sample 의 분산이
+       무한에 가까우면 기울기가 완만해진다. 큰 sample 이 드물면 작은 N 의 e 가 작게 나오므로 끝 구간을 따로 본다.
+  [C2] Lambert 의 측정 scene 마다 e(N) <= NOISE_BUDGET 인 가장 작은 2 의 거듭제곱이 있고, scene 들의 거듭제곱 중 최대인 N_gt 가
+       PathTracer::Settings 의 targetSamples 기본값이다. 외삽하지 않고 잰 e 로 정한다.
+  [C3] Max Bounces: 측정 scene 마다 Lambert 를 Max Bounces 64 와 BOUNCES_REFERENCE 로 BIAS_SAMPLES 만큼 쌓은 d, b 의 상한이
+       BIAS_BUDGET 이하다. 두 쪽은 Seed 가 같아서 64 번 안에 끝나는 path 가 같은 sample 을 낸다. 그래서 차에는 64 번을 넘는 path 의
+       몫만 남고, 64 번을 넘는 path 가 없으면 d, b 와 상한이 0 이다. 다만 Shading Lambert 의 export 는 같은 build 에서도 실행마다 몇 ulp
+       다를 수 있으므로 (로드맵의 뒤로 미룬 일) 실행마다 다른 몫이 d, b 에 남는다.
+  [C4] Russian roulette: 측정 scene 마다 Lambert 를 Max Bounces ROULETTE_BOUNCES 에서 on 과 off 로 BIAS_SAMPLES 만큼 쌓은 d, b 의
+       상한이 BIAS_BUDGET 이하다. Max Bounces 를 줄여 off 의 시간을 줄인다. roulette 는 PathTracerCS.hlsl 의
        kFirstRussianRouletteBounce 번째 반사부터 걸리므로 그 뒤의 반사에서 본다.
-  [C5] float32 누적: N_gt 를 정한 시점의 X0(N_gt), X1(N_gt) 와, ACCUMULATION_SEEDS 로 N_gt / ACCUMULATION_RUNS 씩 쌓아 float64 로 평균한
-       B0 의 d, b 상한이 BIAS_BUDGET 이하다. PathTracerCS.hlsl 은 평균을 float32 로 sample 마다 고쳐 쓰므로, N 이 크면 반올림이 한쪽으로
-       쌓일 수 있다. B0 는 sample 수의 합이 같으므로 noise 분산도 같아서, imagecompare 의 B1 이 없는 식을 쓴다.
-  [C6] 모든 export 에서 pixel 의 a 가 0 이나 dispatch 한 sample 수이고, a 가 0 인 pixel 은 rgb 가 0 이며 그 자리가 같은 시점의 모든
-       export 에서 같다. NaN 이나 Inf 라서 버린 sample 이 없다는 뜻이다.
+  [C5] float32 누적: N_gt 를 정한 측정 scene 의 X0(N_gt), X1(N_gt) 와, ACCUMULATION_SEEDS 로 N_gt / ACCUMULATION_RUNS 씩 쌓아 float64
+       로 평균한 B0 의 d, b 상한이 BIAS_BUDGET 이하다. PathTracerCS.hlsl 은 평균을 float32 로 sample 마다 고쳐 쓰므로, N 이 크면
+       반올림이 한쪽으로 쌓일 수 있다. B0 는 sample 수의 합이 같으므로 noise 분산도 같아서, imagecompare 의 B1 이 없는 식을 쓴다.
+       N_gt 가 없으면 판정하지 못하므로 FAIL 이다.
+  [C6] GROUPS 의 run 이 남긴 모든 export 에서 pixel 의 a 가 0 이나 dispatch 한 sample 수이고, a 가 0 인 pixel 은 rgb 가 0 이며
+       a 가 0 인 pixel 의 자리가 같은 측정 scene 의 모든 export 에서 같다. NaN 이나 Inf 라서 버린 sample 이 없다는 뜻이다.
 
 check --record 는 모두 통과하면 수렴과 bias 를 RECORD 에 덧붙인다. accumulate 는 발표에 쓰도록 slope 의 끝 spp 를 보기용 PNG 로도 남긴다.
 """
@@ -46,6 +55,7 @@ check --record 는 모두 통과하면 수렴과 bias 를 RECORD 에 덧붙인�
 import argparse
 import json
 import math
+import os
 import re
 import shutil
 import sys
@@ -59,9 +69,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from checks import Checks
 from imagecompare import bias
 from imagefiles import ImageFileError, read_dds_rgba32f
-from pathtracerchecks import BASE, append_record_row, code_version, describe_machine, set_path_tracer
-from viewer import (ENGINE_DIR, HARNESS_DIR, PREVIEW_EXPOSURE, HarnessError, Session, baseline_scene_pose, default_baseline_scene,
-                    make_view, read_scene_file, shots_dir, start_instance, stop_instance)
+from pathtracerchecks import BASE, SKY_COLOR, SKY_RADIANCE, append_record_row, code_version, describe_machine, set_path_tracer
+from viewer import (ENGINE_DIR, HARNESS_DIR, PREVIEW_EXPOSURE, REPO_ROOT, VIEWER_DIR, HarnessError, Session, make_view, measurement_scenes,
+                    read_scene_file, shots_dir, start_instance, stop_instance)
 
 KEPT_DIR = HARNESS_DIR / 'kept' / 'convergence'
 MANIFEST = KEPT_DIR / 'manifest.json'
@@ -69,24 +79,22 @@ SETTINGS_HEADER = ENGINE_DIR / 'Model' / 'PathTracer' / 'PathTracer.h'
 CONVERGENCE_RECORD_SECTION = '## 작업 12: Indirect Irradiance 의 수렴'
 BIAS_RECORD_SECTION = '## 작업 12: Indirect Irradiance 의 bias'
 
-# corridor 는 작업 8 에서 흰 점을 잰 복도 시점과 light 다 (로드맵의 뒤로 미룬 일).
-CORRIDOR_POSE = '-1479.30859 211.686859 395.723236 -1.53974497 -0.124806166'
-CORRIDOR_LIGHT = 'direction=0,0.970682025,-0.24036777 intensity=4'
-POSE_NAMES = ['start', 'corridor']
-
 # Samples per Frame 는 image 를 바꾸지 않는다 (check-path-tracer-export.py 의 [S1]). 1 spp 씩 쌓으면 VSync 가 frame 을 기다리게 하므로
-# 한 frame 에 여럿을 쌓는다.
-MEASUREMENT = BASE | {'Output': 'Indirect Irradiance', 'Geometric Normals': 0, 'Max Bounces': 64, 'Russian Roulette': 1,
-                      'Samples per Frame': 16}
+# 한 frame 에 여럿을 쌓는다. Sky 는 scene file 의 값을 쓰므로 BASE 에서 뺀다.
+MEASUREMENT = {key: value for key, value in BASE.items() if key not in (SKY_COLOR, SKY_RADIANCE)} | {
+    'Output': 'Indirect Irradiance', 'Geometric Normals': 0, 'Max Bounces': 64, 'Russian Roulette': 1, 'Samples per Frame': 16}
 LAMBERT = {'Shading': 'Lambert'}
 GLTF = {'Shading': 'glTF'}
 
 NOISE_BUDGET = 0.01
 BIAS_BUDGET = 0.002
 FIRST_EXPORT = 16
-# 끝 spp 는 작업 12 를 판정할 때 1024 spp 의 e (start 8.5%, corridor 11.2%) 에서 e 가 1% 아래로 내려갈 2 의 거듭제곱으로 정했다.
-# corridor 는 2^17 에서 1% 와 거의 같아 2^18 까지 쌓는다. glTF 는 1% 에 이르지 못하므로 기울기를 볼 만큼만 쌓는다.
-SLOPE_SAMPLES = {('start', 'Lambert'): 1 << 17, ('corridor', 'Lambert'): 1 << 18, ('start', 'glTF'): 1 << 14, ('corridor', 'glTF'): 1 << 14}
+# Lambert 의 끝 spp 는 1024 spp 의 e (sponza-color-bleeding 8.6%, sponza-fireflies 17.0%, sponza-overhead-light 5.9%) 로 정했다.
+# e(N) ≈ e(1024) sqrt(1024 / N) 이 1% 아래로 내려갈 가장 작은 2 의 거듭제곱 N 을 고르고, 예측한 e(N) 이 1% 의 0.9 배를 넘으면 2N 을
+# 쓰며, 2^18 을 넘지 않는다. sponza-fireflies 는 예측한 e(2^18) 이 1.06% 라서 상한까지만 쌓는다.
+LAMBERT_SLOPE_SAMPLES = {'sponza-color-bleeding': 1 << 17, 'sponza-fireflies': 1 << 18, 'sponza-overhead-light': 1 << 16}
+# glTF 는 1% 에 이르지 못하므로 기울기를 볼 만큼만 쌓는다.
+GLTF_SLOPE_SAMPLES = 1 << 14
 SLOPE_FIT_FROM = 256
 SLOPE_TOLERANCE = 0.05
 LAST_SLOPE_TOLERANCE = 0.1
@@ -99,54 +107,88 @@ ACCUMULATION_SEEDS = list(range(2, 2 + ACCUMULATION_RUNS))
 # 흰 점의 몫을 보는 pixel 의 비율
 TOP_PIXELS = 1e-3
 PROFILE_FRAMES = 8
-# 가장 긴 wait 는 corridor 의 Lambert 를 2^18 spp 까지 쌓는 것으로, 1 spp 가 9.6 ms 면 약 42 분이다.
+# 가장 긴 wait 는 sponza-overhead-light 의 Russian roulette off 를 BIAS_SAMPLES 까지 쌓는 것으로, 측정 scene 으로 처음 판정할 때 약 17 분 걸렸다.
 WAIT_TIMEOUT = 3 * 3600
 
-Run = namedtuple('Run', 'group name pose settings exports')
-
-
-def baseline_scene_light():
-    """default_baseline_scene() 의 Directional Light 를 light set 의 인자로."""
-    light = read_scene_file(default_baseline_scene())['Directional Light']
-    return f'direction={light["Direction"]} intensity={light["Intensity"]}'
-
-
-def poses():
-    return {'start': (baseline_scene_pose(), baseline_scene_light()), 'corridor': (CORRIDOR_POSE, CORRIDOR_LIGHT)}
+Run = namedtuple('Run', 'group name scene settings exports')
 
 
 def powers_of_two(last):
     return [1 << exponent for exponent in range(FIRST_EXPORT.bit_length() - 1, last.bit_length())]
 
 
+def slope_name(scene, shading, seed):
+    return f'{scene}-{shading.lower()}-seed{seed}'
+
+
+def bounces_name(scene, seed):
+    return f'{scene}-lambert-b{BOUNCES_REFERENCE}-seed{seed}'
+
+
+def roulette_name(scene, roulette, seed):
+    return f'{scene}-lambert-b{ROULETTE_BOUNCES}-rr{roulette}-seed{seed}'
+
+
+def accumulation_name(scene, seed):
+    return f'{scene}-lambert-seed{seed}'
+
+
+def slope_samples(scene, shading):
+    if shading == 'glTF':
+        return GLTF_SLOPE_SAMPLES
+    if scene not in LAMBERT_SLOPE_SAMPLES:
+        raise HarnessError(f'LAMBERT_SLOPE_SAMPLES has no end spp for the measurement scene {scene}')
+    return LAMBERT_SLOPE_SAMPLES[scene]
+
+
 def slope_runs():
-    return [Run('slope', f'{pose}-{shading.lower()}-seed{seed}', pose, MEASUREMENT | {'Shading': shading, 'Seed': seed}, powers_of_two(samples))
-            for (pose, shading), samples in SLOPE_SAMPLES.items() for seed in (0, 1)]
+    # glTF 는 끝 spp 가 작아서 Lambert 보다 먼저 쌓는다.
+    return [Run('slope', slope_name(scene, shading, seed), scene, MEASUREMENT | {'Shading': shading, 'Seed': seed},
+                powers_of_two(slope_samples(scene, shading)))
+            for shading in ('glTF', 'Lambert') for scene in measurement_scenes() for seed in (0, 1)]
 
 
 def bounces_runs():
-    return [Run('bounces', f'corridor-lambert-b{BOUNCES_REFERENCE}-seed{seed}', 'corridor',
-                MEASUREMENT | LAMBERT | {'Max Bounces': BOUNCES_REFERENCE, 'Seed': seed}, [BIAS_SAMPLES]) for seed in (0, 1)]
+    return [Run('bounces', bounces_name(scene, seed), scene, MEASUREMENT | LAMBERT | {'Max Bounces': BOUNCES_REFERENCE, 'Seed': seed},
+                [BIAS_SAMPLES]) for scene in measurement_scenes() for seed in (0, 1)]
 
 
 def roulette_runs():
     # off 는 1 spp 가 on 보다 훨씬 길어서 한 frame 의 dispatch 를 줄인다.
-    return [Run('roulette', f'corridor-lambert-b{ROULETTE_BOUNCES}-rr{roulette}-seed{seed}', 'corridor',
+    return [Run('roulette', roulette_name(scene, roulette, seed), scene,
                 MEASUREMENT | LAMBERT | {'Max Bounces': ROULETTE_BOUNCES, 'Russian Roulette': roulette, 'Seed': seed,
                                          'Samples per Frame': 16 if roulette else 4}, [BIAS_SAMPLES])
-            for roulette in (1, 0) for seed in (0, 1)]
+            for scene in measurement_scenes() for roulette in (1, 0) for seed in (0, 1)]
 
 
-def accumulation_runs(manifest):
-    pose, samples = ground_truth(manifest)
-    if samples is None:
-        raise HarnessError(f'the slope runs in {MANIFEST} do not reach e <= {NOISE_BUDGET:g}, so [C5] has no N_gt to accumulate')
-    return [Run('accumulation', f'{pose}-lambert-seed{seed}', pose, MEASUREMENT | LAMBERT | {'Seed': seed}, [samples // ACCUMULATION_RUNS])
+def accumulation_runs(scene, samples):
+    return [Run('accumulation', accumulation_name(scene, seed), scene, MEASUREMENT | LAMBERT | {'Seed': seed}, [samples // ACCUMULATION_RUNS])
             for seed in ACCUMULATION_SEEDS]
 
 
+def accumulation_runs_of_kept_slopes(manifest):
+    """N_gt 를 정한 측정 scene 의 [C5] run. N_gt 와 [C5] 를 쌓을 scene 은 MANIFEST 에 쌓은 Lambert 의 slope run 이 정한다."""
+    kept, stale = usable_runs(manifest)
+    if stale:
+        raise HarnessError(f'{", ".join(stale)} in {MANIFEST} were not accumulated in the scene files as they are now; accumulate them again')
+    try:
+        scene, samples = ground_truth({scene: convergence(kept, scene, 'Lambert')[0] for scene in measurement_scenes()})
+    except KeyError as error:
+        raise HarnessError(f'{MANIFEST} misses {error}; accumulate the slope group first')
+    if samples is None:
+        raise HarnessError(f'the slope runs in {MANIFEST} do not reach e <= {NOISE_BUDGET:g}, so [C5] has no N_gt to accumulate')
+    return accumulation_runs(scene, samples)
+
+
 GROUPS = {'slope': lambda manifest: slope_runs(), 'bounces': lambda manifest: bounces_runs(), 'roulette': lambda manifest: roulette_runs(),
-          'accumulation': accumulation_runs}
+          'accumulation': accumulation_runs_of_kept_slopes}
+
+
+def run_scenes():
+    """GROUPS 의 run 의 이름과 run 을 쌓는 측정 scene. accumulation 은 N_gt 를 정한 scene 에서만 쌓지만, N_gt 를 정하는
+    scene 은 쌓은 slope run 에 따라 달라지므로 모든 scene 의 이름을 둔다."""
+    runs = {run.name: run.scene for run in slope_runs() + bounces_runs() + roulette_runs()}
+    return runs | {accumulation_name(scene, seed): scene for scene in measurement_scenes() for seed in ACCUMULATION_SEEDS}
 
 
 def read_manifest():
@@ -157,13 +199,71 @@ def write_manifest(manifest):
     MANIFEST.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
 
 
+# --- 측정 scene 의 값 -----------------------------------------------------------------------
+
+def repo_path(scene):
+    """MiniEngine/ModelViewer 기준 scene file 경로를 repo 기준 경로로."""
+    return Path(os.path.normpath(VIEWER_DIR / scene)).relative_to(REPO_ROOT).as_posix()
+
+
+def scene_values_in_state(state):
+    """state 의 camera, light, Sky 중 scene file 이 정하고 PT 의 image 를 바꾸는 값. MANIFEST 의 run 에 돌려준 dict 그대로 남긴다."""
+    camera, light, sky = state['camera'], state['light'], state['sky']
+    return {'camera': {key: camera[key] for key in ('x', 'y', 'z', 'heading', 'pitch')},
+            'light': {key: light[key] for key in ('direction', 'color', 'intensity')},
+            'sky': {key: sky[key] for key in ('color', 'intensity')}}
+
+
+def scene_values_in_file(scene):
+    """scene file 의 값을 scene_values_in_state 의 모양으로."""
+    ini = read_scene_file(scene)
+    camera, light, sky = ini['Camera'], ini['Directional Light'], ini['Sky']
+
+    def vector(text, keys):
+        return dict(zip(keys, text.split(',')))
+    return {'camera': vector(camera['Position'], 'xyz') | {'heading': camera['Heading'], 'pitch': camera['Pitch']},
+            'light': {'direction': vector(light['Direction'], 'xyz'), 'color': vector(light['Color'], 'rgb'), 'intensity': light['Intensity']},
+            'sky': {'color': vector(sky['Color'], 'rgb'), 'intensity': sky['Intensity']}}
+
+
+def same_values(a, b):
+    """모양이 같고 숫자가 float32 로 같은지. app 은 camera, light, Sky 의 값을 float32 로 갖고, state 는 float32 로 되돌아오는 자릿수로
+    적는다."""
+    if isinstance(a, dict) or isinstance(b, dict):
+        return isinstance(a, dict) and isinstance(b, dict) and a.keys() == b.keys() and all(same_values(a[key], b[key]) for key in a)
+    try:
+        return bool(np.float32(a) == np.float32(b))
+    except (TypeError, ValueError):
+        return False
+
+
+def accumulated_in_scene_file_as_now(entry, scene):
+    """MANIFEST 의 run 이 지금 measurement_scenes() 의 scene 과 같은 scene file, camera, light, Sky 로 쌓은 것인지"""
+    path = measurement_scenes()[scene]
+    recorded = {key: entry.get(key) for key in ('camera', 'light', 'sky')}
+    return entry.get('scene') == repo_path(path) and same_values(recorded, scene_values_in_file(path))
+
+
+def usable_runs(manifest):
+    """MANIFEST 에서 GROUPS 의 run 중 지금 scene file 의 값으로 쌓은 run 만 담은 manifest 와, 쓰지 않는 run 의 이름.
+    GROUPS 에 없는 run (예전 시점의 run) 은 둘 다에 넣지 않는다."""
+    kept, stale = {}, []
+    for name, scene in run_scenes().items():
+        entry = manifest['runs'].get(name)
+        if entry is None:
+            continue
+        if accumulated_in_scene_file_as_now(entry, scene):
+            kept[name] = entry
+        else:
+            stale.append(name)
+    return {'runs': kept}, stale
+
+
 # --- accumulate ---------------------------------------------------------------------------
 
 def accumulate_run(session, run, machine):
-    """run 을 처음부터 쌓으며 run.exports 의 spp 마다 export 를 KEPT_DIR 로 옮기고 manifest 의 항목을 돌려준다."""
-    pose, light = poses()[run.pose]
-    session.ask_ok(f'pose {pose}')
-    session.ask_ok(f'light set {light}')
+    """run 의 측정 scene 을 열고 처음부터 쌓으며 run.exports 의 spp 마다 export 를 KEPT_DIR 로 옮기고 manifest 의 항목을 돌려준다."""
+    opened = session.ask_ok(f'scene open {measurement_scenes()[run.scene]}')['state']
     set_path_tracer(session, run.settings | {'Target Samples': run.exports[-1]})
     session.ask_ok('pt reset')
     gpu_ms = float(session.ask_ok(f'profile Path Tracer frames={PROFILE_FRAMES}', timeout=WAIT_TIMEOUT)['gpu_ms']['mean'])
@@ -183,13 +283,14 @@ def accumulate_run(session, run, machine):
         exports[str(samples)] = {'file': str(kept.relative_to(KEPT_DIR)), 'dispatched': state['samples'], 'seconds': state['seconds'],
                                  'line': reply['line']}
         print(f'{run.name}: {samples} spp in {state["seconds"]:.1f} s', flush=True)
-    return {'group': run.group, 'pose': run.pose, 'settings': run.settings, 'code': code_version(), 'machine': machine,
-            'gpu_ms_per_frame': gpu_ms, 'exports': exports}
+    return {'group': run.group, 'scene': repo_path(opened['scene']['path']), **scene_values_in_state(opened), 'settings': run.settings,
+            'code': code_version(), 'machine': machine, 'gpu_ms_per_frame': gpu_ms, 'exports': exports}
 
 
 def keep_previews(manifest):
-    for name, entry in manifest['runs'].items():
-        if entry['group'] == 'slope' and name.endswith('seed0'):
+    for run in slope_runs():
+        if run.settings['Seed'] == 0 and run.name in manifest['runs']:
+            entry = manifest['runs'][run.name]
             last = max(entry['exports'], key=int)
             dds = KEPT_DIR / entry['exports'][last]['file']
             make_view(dds, 'pt', dds.with_suffix('.png'), None, 1 << 16, PREVIEW_EXPOSURE / math.pi)
@@ -246,13 +347,9 @@ def top_pixel_share(x0, x1, hits):
     return float(np.sum(squared[:max(1, int(squared.size * TOP_PIXELS))]) / np.sum(squared))
 
 
-def slope_name(pose, shading, seed):
-    return f'{pose}-{shading.lower()}-seed{seed}'
-
-
-def convergence(manifest, pose, shading):
+def convergence(manifest, scene, shading):
     """N 마다의 e 와, 끝 spp 에서 흰 점의 몫"""
-    names = [slope_name(pose, shading, seed) for seed in (0, 1)]
+    names = [slope_name(scene, shading, seed) for seed in (0, 1)]
     samples = sorted(set.intersection(*(set(map(int, manifest['runs'][name]['exports'])) for name in names)))
     errors, share = {}, None
     for n in samples:
@@ -269,17 +366,20 @@ def fitted_slope(errors, first):
     return float(np.polyfit(*zip(*points), 1)[0])
 
 
-def ground_truth(manifest):
-    """Lambert 의 모든 시점에서 e <= NOISE_BUDGET 이 되는 가장 작은 N 들의 최대와 그 시점. N 이 같으면 그 N 에서 e 가 큰 시점이다.
-    못 이르는 시점이 있으면 N 은 None 이다."""
-    needed = {}
-    for pose in POSE_NAMES:
-        errors, _ = convergence(manifest, pose, 'Lambert')
-        needed[pose] = next(((n, e) for n, e in sorted(errors.items()) if e <= NOISE_BUDGET), None)
+def first_within_budget(errors):
+    """e <= NOISE_BUDGET 인 가장 작은 N 과 N 에서의 e. 못 이르면 None 이다."""
+    return next(((n, e) for n, e in sorted(errors.items()) if e <= NOISE_BUDGET), None)
+
+
+def ground_truth(lambert_errors):
+    """N_gt 를 정한 측정 scene 과 N_gt. lambert_errors 는 측정 scene 마다 Lambert 의 convergence 의 e 다. N_gt 는 scene 마다
+    e <= NOISE_BUDGET 이 되는 가장 작은 N 의 최대이고, 최대인 scene 이 여럿이면 N_gt 에서 e 가 큰 scene 을 고른다. 못 이르는 scene 이
+    있으면 둘 다 None 이다."""
+    needed = {scene: first_within_budget(errors) for scene, errors in lambert_errors.items()}
     if any(reached is None for reached in needed.values()):
         return None, None
-    pose = max(needed, key=needed.get)
-    return pose, needed[pose][0]
+    scene = max(needed, key=needed.get)
+    return scene, needed[scene][0]
 
 
 def default_target_samples():
@@ -289,35 +389,39 @@ def default_target_samples():
 
 def check_convergence(manifest, check):
     rows = {}
-    for pose in POSE_NAMES:
+    for scene in measurement_scenes():
         for shading in ('Lambert', 'glTF'):
-            errors, share = convergence(manifest, pose, shading)
+            errors, share = convergence(manifest, scene, shading)
             last = max(errors)
             slope, last_slope = fitted_slope(errors, SLOPE_FIT_FROM), fitted_slope(errors, last // 4)
-            gpu_ms = manifest['runs'][slope_name(pose, shading, 0)]['gpu_ms_per_frame'] / MEASUREMENT['Samples per Frame']
-            rows[pose, shading] = {'errors': errors, 'share': share, 'slope': slope, 'last_slope': last_slope, 'gpu_ms': gpu_ms}
+            gpu_ms = manifest['runs'][slope_name(scene, shading, 0)]['gpu_ms_per_frame'] / MEASUREMENT['Samples per Frame']
+            rows[scene, shading] = {'errors': errors, 'share': share, 'slope': slope, 'last_slope': last_slope, 'gpu_ms': gpu_ms}
             detail = (f'e {", ".join(f"{n}: {e:.4g}" for n, e in errors.items() if n >= SLOPE_FIT_FROM)}; slope {slope:.4f} from '
                       f'{SLOPE_FIT_FROM}, {last_slope:.4f} from {last // 4}; top {TOP_PIXELS:.1%} pixels have {share:.1%} of the squared error')
             if shading == 'Lambert':
-                check(f'[C1] {pose}, {shading}: e falls as N^-0.5 within {SLOPE_TOLERANCE} from {SLOPE_FIT_FROM} spp and within '
+                check(f'[C1] {scene}, {shading}: e falls as N^-0.5 within {SLOPE_TOLERANCE} from {SLOPE_FIT_FROM} spp and within '
                       f'{LAST_SLOPE_TOLERANCE} over the last quarter',
                       abs(slope + 0.5) <= SLOPE_TOLERANCE and abs(last_slope + 0.5) <= LAST_SLOPE_TOLERANCE, detail)
             else:
-                print(f'MEASURED  {pose}, {shading} (not judged): {detail}', flush=True)
+                print(f'MEASURED  {scene}, {shading} (not judged): {detail}', flush=True)
 
-    pose, samples = ground_truth(manifest)
+    scene, samples = ground_truth({scene: rows[scene, 'Lambert']['errors'] for scene in measurement_scenes()})
     default = default_target_samples()
 
-    def noise_at_ground_truth(p):
-        x0, x1 = (read_export(manifest, slope_name(p, 'Lambert', seed), samples) for seed in (0, 1))
-        hits = x0[..., 3] > 0
-        return f'{p}: e({samples}) {relative_noise(x0, x1, hits):.4g} (standard error {relative_noise_standard_error(x0, x1, hits):.2g})'
+    def noise(s):
+        errors = rows[s, 'Lambert']['errors']
+        reached = first_within_budget(errors)
+        text = f'{s}: ' + (f'e({reached[0]}) {reached[1]:.4g}' if reached else f'e({max(errors)}) {errors[max(errors)]:.4g} is above the budget')
+        if samples in errors:
+            x0, x1 = (read_export(manifest, slope_name(s, 'Lambert', seed), samples) for seed in (0, 1))
+            hits = x0[..., 3] > 0
+            text += f', e({samples}) {errors[samples]:.4g} (standard error {relative_noise_standard_error(x0, x1, hits):.2g})'
+        return text
 
-    check(f'[C2] e <= {NOISE_BUDGET:g} for Lambert in every pose at a power of two, and the largest is the default Target Samples',
+    check(f'[C2] e <= {NOISE_BUDGET:g} for Lambert in every measurement scene at a power of two, and the largest is the default Target Samples',
           samples is not None and default == samples,
-          f'N_gt {samples} set by {pose}; default Target Samples {default}' +
-          ('; ' + ', '.join(noise_at_ground_truth(p) for p in POSE_NAMES) if samples is not None else ''))
-    return rows, samples
+          f'N_gt {samples} set by {scene}; default Target Samples {default}; ' + '; '.join(noise(s) for s in measurement_scenes()))
+    return rows, scene, samples
 
 
 def judge_bias(check, label, a, b, hits):
@@ -330,35 +434,39 @@ def judge_bias(check, label, a, b, hits):
     return result
 
 
-def check_bias(manifest, check, ground_truth_pose, ground_truth_samples):
-    results = {}
+def check_bias(manifest, check, ground_truth_scene, ground_truth_samples):
+    """판정한 bias 를 (기준, scene, 비교, spp, imagecompare.bias 의 결과) 의 list 로 돌려준다."""
+    results = []
 
     def exports(names, samples):
         return [read_export(manifest, name, samples) for name in names]
 
-    reference = exports([slope_name('corridor', 'Lambert', seed) for seed in (0, 1)], BIAS_SAMPLES)
-    hits = reference[0][..., 3] > 0
-    truncated = exports([f'corridor-lambert-b{BOUNCES_REFERENCE}-seed{seed}' for seed in (0, 1)], BIAS_SAMPLES)
-    results['C3'] = ('corridor', f'Max Bounces 64 대 {BOUNCES_REFERENCE}', BIAS_SAMPLES,
-                     judge_bias(check, f'[C3] corridor, Lambert, Max Bounces 64 against {BOUNCES_REFERENCE} at {BIAS_SAMPLES} spp', reference,
-                                truncated, hits))
+    for scene in measurement_scenes():
+        reference = exports([slope_name(scene, 'Lambert', seed) for seed in (0, 1)], BIAS_SAMPLES)
+        hits = reference[0][..., 3] > 0
+        truncated = exports([bounces_name(scene, seed) for seed in (0, 1)], BIAS_SAMPLES)
+        results.append(('C3', scene, f'Max Bounces 64 대 {BOUNCES_REFERENCE}', BIAS_SAMPLES,
+                        judge_bias(check, f'[C3] {scene}, Lambert, Max Bounces 64 against {BOUNCES_REFERENCE} at {BIAS_SAMPLES} spp', reference,
+                                   truncated, hits)))
+        on, off = (exports([roulette_name(scene, roulette, seed) for seed in (0, 1)], BIAS_SAMPLES) for roulette in (1, 0))
+        results.append(('C4', scene, f'Max Bounces {ROULETTE_BOUNCES} 의 Russian roulette on 대 off', BIAS_SAMPLES,
+                        judge_bias(check, f'[C4] {scene}, Lambert, Max Bounces {ROULETTE_BOUNCES}, Russian roulette on against off at '
+                                          f'{BIAS_SAMPLES} spp', on, off, hits)))
 
-    on, off = (exports([f'corridor-lambert-b{ROULETTE_BOUNCES}-rr{roulette}-seed{seed}' for seed in (0, 1)], BIAS_SAMPLES) for roulette in (1, 0))
-    results['C4'] = ('corridor', f'Max Bounces {ROULETTE_BOUNCES} 의 Russian roulette on 대 off', BIAS_SAMPLES,
-                     judge_bias(check, f'[C4] corridor, Lambert, Max Bounces {ROULETTE_BOUNCES}, Russian roulette on against off at '
-                                       f'{BIAS_SAMPLES} spp', on, off, hits))
-
-    long_runs = exports([slope_name(ground_truth_pose, 'Lambert', seed) for seed in (0, 1)], ground_truth_samples)
+    if ground_truth_samples is None:
+        check(f'[C5] Lambert, one run of N_gt spp against the float64 mean of {ACCUMULATION_RUNS} runs', False, 'no N_gt; see [C2]')
+        return results
+    long_runs = exports([slope_name(ground_truth_scene, 'Lambert', seed) for seed in (0, 1)], ground_truth_samples)
     hits = long_runs[0][..., 3] > 0
     short = ground_truth_samples // ACCUMULATION_RUNS
     combined = np.zeros(long_runs[0].shape[:2] + (3,))
     for seed in ACCUMULATION_SEEDS:
-        combined += rgb64(read_export(manifest, f'{ground_truth_pose}-lambert-seed{seed}', short))
+        combined += rgb64(read_export(manifest, accumulation_name(ground_truth_scene, seed), short))
     combined /= ACCUMULATION_RUNS
-    results['C5'] = (ground_truth_pose, f'{ground_truth_samples} spp 한 run 대 {short} spp {ACCUMULATION_RUNS} run 의 float64 평균',
-                     ground_truth_samples,
-                     judge_bias(check, f'[C5] {ground_truth_pose}, Lambert, one run of {ground_truth_samples} spp against the float64 mean '
-                                       f'of {ACCUMULATION_RUNS} runs of {short}', long_runs, [combined], hits))
+    results.append(('C5', ground_truth_scene, f'{ground_truth_samples} spp 한 run 대 {short} spp {ACCUMULATION_RUNS} run 의 float64 평균',
+                    ground_truth_samples,
+                    judge_bias(check, f'[C5] {ground_truth_scene}, Lambert, one run of {ground_truth_samples} spp against the float64 mean '
+                                      f'of {ACCUMULATION_RUNS} runs of {short}', long_runs, [combined], hits)))
     return results
 
 
@@ -371,45 +479,46 @@ def check_counts(manifest, check):
             empty = added == 0
             short = int(np.count_nonzero(~empty & (added != export['dispatched'])))
             lit_empty = int(np.count_nonzero(empty & np.any(image[..., :3] != 0, axis=-1)))
-            reference = zero_masks.setdefault(entry['pose'], empty)
+            reference = zero_masks.setdefault(entry['scene'], empty)
             moved = int(np.count_nonzero(reference != empty))
             if short or lit_empty or moved:
                 wrong.append(f'{name} at {samples}: {short} pixels short, {lit_empty} empty pixels lit, {moved} empty pixels moved')
     exports = sum(len(entry['exports']) for entry in manifest['runs'].values())
-    check('[C6] every pixel of every export has a = 0 or the dispatched samples, and the pixels with a = 0 are 0 and the same in a pose',
+    check('[C6] every pixel of every export has a = 0 or the dispatched samples, and the pixels with a = 0 are 0 and the same in a scene',
           exports > 0 and not wrong, f'{exports} exports; ' + ('; '.join(wrong) if wrong else 'all as expected'))
 
 
 def record(manifest, rows, ground_truth_samples, biases):
     today = date.today().isoformat()
-    for (pose, shading), row in rows.items():
-        entry = manifest['runs'][slope_name(pose, shading, 0)]
+    for (scene, shading), row in rows.items():
+        entry = manifest['runs'][slope_name(scene, shading, 0)]
         errors = row['errors']
         last = max(errors)
         at_ground_truth = errors.get(ground_truth_samples)
         seconds = entry['exports'].get(str(ground_truth_samples), {}).get('seconds')
         append_record_row(CONVERGENCE_RECORD_SECTION, [
-            today, entry['code'], *entry['machine'], pose, shading, f'{row["gpu_ms"]:.3f}', f'{errors[1024]:.4g}', str(last),
+            today, entry['code'], *entry['machine'], scene, shading, f'{row["gpu_ms"]:.3f}', f'{errors[1024]:.4g}', str(last),
             f'{errors[last]:.4g}', f'{row["slope"]:.3f}', f'{row["last_slope"]:.3f}', f'{row["share"]:.3f}', str(ground_truth_samples),
             f'{at_ground_truth:.4g}' if at_ground_truth is not None else '-', f'{seconds:.0f}' if seconds is not None else '-'])
-    for criterion, (pose, comparison, samples, result) in biases.items():
-        entry = manifest['runs'][slope_name(pose, 'Lambert', 0)]
+    for criterion, scene, comparison, samples, result in biases:
+        entry = manifest['runs'][slope_name(scene, 'Lambert', 0)]
         append_record_row(BIAS_RECORD_SECTION, [
-            today, entry['code'], *entry['machine'], f'[{criterion}]', pose, comparison, str(samples), f'{result.difference:.2e}',
+            today, entry['code'], *entry['machine'], f'[{criterion}]', scene, comparison, str(samples), f'{result.difference:.2e}',
             f'{result.difference_bound:.2e}', f'{result.rms:.2e}', f'{result.rms_bound:.2e}'])
 
 
 def command_check(args):
     check = Checks()
-    manifest = read_manifest()
+    manifest, stale = usable_runs(read_manifest())
+    check('every run kept for the measurement scenes was accumulated with the scene file, camera, light and Sky as they are now', not stale,
+          f'{len(manifest["runs"])} runs as now' + (f'; not used: {", ".join(stale)}; accumulate them again' if stale else ''))
     try:
-        rows, samples = check_convergence(manifest, check)
-        pose, _ = ground_truth(manifest)
-        biases = check_bias(manifest, check, pose, samples) if samples is not None else {}
+        rows, scene, samples = check_convergence(manifest, check)
+        biases = check_bias(manifest, check, scene, samples)
         check_counts(manifest, check)
     except (KeyError, ImageFileError) as error:
         check('every run of accumulate is kept', False, f'{error!r}; run accumulate for the missing group')
-        rows, samples, biases = {}, None, {}
+        rows, samples, biases = {}, None, []
     print(f'{len(check.failures)} failed' if check.failures else 'all passed')
     if args.record and not check.failures:
         record(manifest, rows, samples, biases)
