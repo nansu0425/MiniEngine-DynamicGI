@@ -34,7 +34,8 @@ sponza-color-bleeding 2.3%, sponza-fireflies 9.9%, sponza-overhead-light 2.5% �
        spp 의 1/4 부터 끝까지의 기울기가 -0.5 ± LAST_SLOPE_TOLERANCE 다. 같은 pixel 의 sample 끼리 상관이 있거나 sample 의 분산이
        무한에 가까우면 기울기가 완만해진다. 큰 sample 이 드물면 작은 N 의 e 가 작게 나오므로 끝 구간을 따로 본다.
   [C2] Lambert 의 측정 scene 마다 e(N) <= NOISE_BUDGET 인 가장 작은 2 의 거듭제곱이 있고, scene 들의 거듭제곱 중 최대인 N_gt 가
-       PathTracer::Settings 의 targetSamples 기본값이다. 외삽하지 않고 잰 e 로 정한다.
+       PathTracer::Settings 의 targetSamples 기본값이다. 외삽하지 않고 잰 e 로 정한다. SCENES_WITHOUT_GROUND_TRUTH 의 scene 은 N_gt 를
+       정하지 않고 e 만 출력한다.
   [C3] Max Bounces: 측정 scene 마다 Lambert 를 Max Bounces 64 와 BOUNCES_REFERENCE 로 BIAS_SAMPLES 만큼 쌓은 d, b 의 상한이
        BIAS_BUDGET 이하다. 두 쪽은 Seed 가 같아서 64 번 안에 끝나는 path 가 같은 sample 을 낸다. 그래서 차에는 64 번을 넘는 path 의
        몫만 남고, 64 번을 넘는 path 가 없으면 d, b 와 상한이 0 이다. 다만 Shading Lambert 의 export 는 같은 build 에서도 실행마다 몇 ulp
@@ -88,6 +89,9 @@ GLTF = {'Shading': 'glTF'}
 
 NOISE_BUDGET = 0.01
 BIAS_BUDGET = 0.002
+# N_gt 를 정하지 않고 e 만 재는 측정 scene. sponza-fireflies 는 noise 가 커서 Lambert 가 NOISE_BUDGET 에 이르려면 약 2^19 spp, 한 Seed 에
+# 약 67 분이 걸린다 (e(1024) 로 한 어림). 사용자가 noise 를 줄인 뒤에 정답의 구도로 쓰기로 했다.
+SCENES_WITHOUT_GROUND_TRUTH = ['sponza-fireflies']
 FIRST_EXPORT = 16
 # Lambert 의 끝 spp 는 1024 spp 의 e (sponza-color-bleeding 8.6%, sponza-fireflies 17.0%, sponza-overhead-light 5.9%) 로 정했다.
 # e(N) ≈ e(1024) sqrt(1024 / N) 이 1% 아래로 내려갈 가장 작은 2 의 거듭제곱 N 을 고르고, 예측한 e(N) 이 1% 의 0.9 배를 넘으면 2N 을
@@ -172,7 +176,7 @@ def accumulation_runs_of_kept_slopes(manifest):
     if stale:
         raise HarnessError(f'{", ".join(stale)} in {MANIFEST} were not accumulated in the scene files as they are now; accumulate them again')
     try:
-        scene, samples = ground_truth({scene: convergence(kept, scene, 'Lambert')[0] for scene in measurement_scenes()})
+        scene, samples = ground_truth({scene: convergence(kept, scene, 'Lambert')[0] for scene in ground_truth_scenes()})
     except KeyError as error:
         raise HarnessError(f'{MANIFEST} misses {error}; accumulate the slope group first')
     if samples is None:
@@ -186,9 +190,9 @@ GROUPS = {'slope': lambda manifest: slope_runs(), 'bounces': lambda manifest: bo
 
 def run_scenes():
     """GROUPS 의 run 의 이름과 run 을 쌓는 측정 scene. accumulation 은 N_gt 를 정한 scene 에서만 쌓지만, N_gt 를 정하는
-    scene 은 쌓은 slope run 에 따라 달라지므로 모든 scene 의 이름을 둔다."""
+    scene 은 쌓은 slope run 에 따라 달라지므로 ground_truth_scenes() 의 모든 scene 의 이름을 둔다."""
     runs = {run.name: run.scene for run in slope_runs() + bounces_runs() + roulette_runs()}
-    return runs | {accumulation_name(scene, seed): scene for scene in measurement_scenes() for seed in ACCUMULATION_SEEDS}
+    return runs | {accumulation_name(scene, seed): scene for scene in ground_truth_scenes() for seed in ACCUMULATION_SEEDS}
 
 
 def read_manifest():
@@ -371,8 +375,13 @@ def first_within_budget(errors):
     return next(((n, e) for n, e in sorted(errors.items()) if e <= NOISE_BUDGET), None)
 
 
+def ground_truth_scenes():
+    """N_gt 를 정하는 측정 scene"""
+    return [scene for scene in measurement_scenes() if scene not in SCENES_WITHOUT_GROUND_TRUTH]
+
+
 def ground_truth(lambert_errors):
-    """N_gt 를 정한 측정 scene 과 N_gt. lambert_errors 는 측정 scene 마다 Lambert 의 convergence 의 e 다. N_gt 는 scene 마다
+    """N_gt 를 정한 측정 scene 과 N_gt. lambert_errors 는 ground_truth_scenes() 의 scene 마다 Lambert 의 convergence 의 e 다. N_gt 는 scene 마다
     e <= NOISE_BUDGET 이 되는 가장 작은 N 의 최대이고, 최대인 scene 이 여럿이면 N_gt 에서 e 가 큰 scene 을 고른다. 못 이르는 scene 이
     있으면 둘 다 None 이다."""
     needed = {scene: first_within_budget(errors) for scene, errors in lambert_errors.items()}
@@ -405,20 +414,21 @@ def check_convergence(manifest, check):
             else:
                 print(f'MEASURED  {scene}, {shading} (not judged): {detail}', flush=True)
 
-    scene, samples = ground_truth({scene: rows[scene, 'Lambert']['errors'] for scene in measurement_scenes()})
+    scene, samples = ground_truth({scene: rows[scene, 'Lambert']['errors'] for scene in ground_truth_scenes()})
     default = default_target_samples()
 
     def noise(s):
         errors = rows[s, 'Lambert']['errors']
         reached = first_within_budget(errors)
-        text = f'{s}: ' + (f'e({reached[0]}) {reached[1]:.4g}' if reached else f'e({max(errors)}) {errors[max(errors)]:.4g} is above the budget')
+        text = (f'{s}{" (does not set N_gt)" if s in SCENES_WITHOUT_GROUND_TRUTH else ""}: ' +
+                (f'e({reached[0]}) {reached[1]:.4g}' if reached else f'e({max(errors)}) {errors[max(errors)]:.4g} is above the budget'))
         if samples in errors:
             x0, x1 = (read_export(manifest, slope_name(s, 'Lambert', seed), samples) for seed in (0, 1))
             hits = x0[..., 3] > 0
             text += f', e({samples}) {errors[samples]:.4g} (standard error {relative_noise_standard_error(x0, x1, hits):.2g})'
         return text
 
-    check(f'[C2] e <= {NOISE_BUDGET:g} for Lambert in every measurement scene at a power of two, and the largest is the default Target Samples',
+    check(f'[C2] e <= {NOISE_BUDGET:g} for Lambert in every ground truth scene at a power of two, and the largest is the default Target Samples',
           samples is not None and default == samples,
           f'N_gt {samples} set by {scene}; default Target Samples {default}; ' + '; '.join(noise(s) for s in measurement_scenes()))
     return rows, scene, samples
