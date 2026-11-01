@@ -25,7 +25,8 @@ export:
 
 furnace:
   [F1] 측정 scene (viewer.measurement_scenes) 마다 scene 의 camera 에서 white furnace 를 Russian roulette off 와 on 으로 쌓으면 모든
-       pixel, channel 이 |X - 1| <= FURNACE_TOLERANCE 다. Front Face view 에서 면을 만난 pixel 이 없는 scene 은 N/A (해당 없음) 이고,
+       pixel, channel 이 white furnace 의 답 (pathtracerchecks.white_furnace_answer) 과 FURNACE_TOLERANCE 안에서 같다. 답은 export 의
+       a 와 capture pt-truncated 의 끊긴 sample 수로 정한다. Front Face view 에서 면을 만난 pixel 이 없는 scene 은 N/A (해당 없음) 이고,
        모든 측정 scene 이 N/A 면 실패다.
   [F2] emission furnace 를 B in EMISSION_FURNACE_BOUNCES 로 쌓은 X 가 모든 pixel 에서 1 - 0.5^(B+1) (1 - X_WF(B)) 와 상대
        FURNACE_TOLERANCE 안에서 맞는다. B 번 반사하기 전에 escape 한 path 는 1, 못한 path 는 1 - 0.5^(B+1) 이다. emission 의 누적,
@@ -79,7 +80,8 @@ from checks import Checks, check_in_measurement_scenes, stop_and_check
 from imagecompare import agreement
 from imagefiles import ImageFileError, read_dds_rgba32f
 from pathtracerchecks import (BASE, EMISSION_FURNACE, FURNACE_SAMPLES, RECORD, light_by_sky_only, WHITE_FURNACE, append_record_row, code_version,
-                              describe_machine, front_face_hits, path_tracer_state, set_path_tracer, SKY_RADIANCE)
+                              describe_machine, front_face_hits, path_tracer_state, set_path_tracer, SKY_RADIANCE, truncated_samples,
+                              white_furnace_answer)
 from viewer import HARNESS_DIR, PREVIEW_EXPOSURE, HarnessError, Session, capture, make_view, shots_dir, start_instance, stop_instance
 
 KEPT_DIR = HARNESS_DIR / 'kept' / 'path-tracer-export'
@@ -153,14 +155,19 @@ def check_white_furnace(session, accumulate, check, scene_name):
     light_by_sky_only(session)
     hits = front_face_hits(session, f'{scene_name}-front-face')
     for russian_roulette in (0, 1):
-        name = f'[F1] {scene_name}: white furnace with Russian roulette {"on" if russian_roulette else "off"} is within {FURNACE_TOLERANCE:g} of 1'
+        name = (f'[F1] {scene_name}: white furnace with Russian roulette {"on" if russian_roulette else "off"} is within '
+                f'{FURNACE_TOLERANCE:g} of the white furnace answer')
         if not hits.any():
             check.premised(name, False, False, 'no hit pixel')
             continue
         image, path = accumulate(f'{scene_name}-white-furnace-rr{russian_roulette}', WHITE_FURNACE | {'Russian Roulette': russian_roulette},
                                  FURNACE_SAMPLES)
-        deviation = float(np.max(np.abs(rgb64(image) - 1.0)))
-        check.premised(name, True, deviation <= FURNACE_TOLERANCE, f'{int(hits.sum())} hit pixels; max |X - 1| {deviation:.3g}')
+        truncated = truncated_samples(session, f'{scene_name}-white-furnace-rr{russian_roulette}-truncated')
+        answer = white_furnace_answer(np.asarray(image[..., 3], dtype=np.float64), truncated)
+        deviation = float(np.max(np.abs(rgb64(image) - answer[..., None])))
+        check.premised(name, True, deviation <= FURNACE_TOLERANCE,
+                       f'{int(hits.sum())} hit pixels, {int(np.count_nonzero(truncated))} pixels with truncated samples; '
+                       f'max |X - answer| {deviation:.3g}')
         if not russian_roulette:
             keep(path)
     return {'[F1]': bool(hits.any())}

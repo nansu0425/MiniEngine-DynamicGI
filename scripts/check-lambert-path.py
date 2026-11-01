@@ -9,7 +9,8 @@
 
 판정은 UI 를 숨기고 찍은 scene capture 로 한다. [6] 은 harness baseline 의 시점에서, [10] 은 측정 scene 에서 찍는다. scene capture 는
 post effects 전의 scene color 이고 format 이 R11G11B10_FLOAT 라서, PT 의 평균은 R11G11B10_FLOAT 로 양자화되어 있다.
-R11G11B10_FLOAT 는 1.0 을 정확히 담으므로 white furnace 의 답을 bit 로 비교한다.
+[10] 의 white furnace 의 답은 FURNACE_AFTER_SCENE_SAMPLES 가 1 이라 0 이나 1 이고, R11G11B10_FLOAT 는 두 값을 정확히 담으므로 답을 bit
+로 비교한다.
 
 PT 의 Shading 은 pathtracerchecks.BASE 의 Lambert 다. Lambert 의 f cos / pdf 는 albedo 이고 PT 는 그 값을 곱하므로
 (PathTracerCS.hlsl), albedo 가 1 이면 throughput 은 fp32 에서 정확하고 white furnace 의 답은 bit 단위로 맞아야 한다. white furnace 는
@@ -26,8 +27,10 @@ SCENE 은 furnace 와 directional light 를 끈 Sponza 다.
   [9] image 를 정하는 설정을 하나씩 바꾸면 pt 의 resets 가 1 늘고 samples 를 처음부터 센다. Samples per Frame 과 Target Samples 를
       바꾸면 늘지 않는다.
   [10] 측정 scene (viewer.measurement_scenes) 마다 scene 의 camera 에서 SCENE 을 쌓다가 white furnace 로 바꾼 뒤 처음 찍은 capture 에서
-       모든 pixel 이 1.0 이다. reset 뒤에 옛 sample 이 남지 않는다. Front Face view 에서 면을 만난 pixel 이 없는 scene 은 N/A (해당
-       없음) 이고, 모든 측정 scene 이 N/A 면 실패다.
+       모든 pixel 이 white furnace 의 답 (pathtracerchecks.white_furnace_answer) 이다. reset 뒤에 옛 sample 이 남지 않는다. 바꿀 때
+       Samples per Frame 과 Target Samples 를 FURNACE_AFTER_SCENE_SAMPLES 로 두어 첫 frame 에 모두 쌓고 누적을 멈춘다. 그 capture 의
+       pt.samples 가 FURNACE_AFTER_SCENE_SAMPLES 인지도 본다. Front Face view 에서 면을 만난 pixel 이 없는 scene 은 N/A (해당 없음)
+       이고, 모든 측정 scene 이 N/A 면 실패다.
 
 check 는 끝낼 때 실행 중의 D3D12 CORRUPTION, ERROR, WARNING 이 0 이고 종료 때 LIVE_DEVICE 하나만 남는지도 본다. [6] 의 Max Bounces 1
 과 64 의 capture 는 발표에 쓰도록 KEPT_DIR 에 DDS 와 보기용 PNG 로 남긴다.
@@ -37,6 +40,7 @@ Russian roulette 를 켠 것과 끈 것을 잰다.
 """
 
 import argparse
+import json
 import shutil
 import sys
 import time
@@ -48,11 +52,18 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from checks import Checks, check_in_measurement_scenes, stop_and_check
 from imagefiles import ImageFileError, read_dds_rgba32f
 from pathtracerchecks import (BASE, FURNACE_SAMPLES, RECORD, light_by_sky_only, SECTION, WHITE_FURNACE, append_record_row, code_version,
-                              describe_machine, front_face_hits, path_tracer_settings, path_tracer_state, set_path_tracer, SKY_RADIANCE)
-from viewer import HARNESS_DIR, PREVIEW_EXPOSURE, HarnessError, Session, capture, make_view, start_instance, stop_instance
+                              describe_machine, front_face_hits, path_tracer_settings, path_tracer_state, set_path_tracer, SKY_RADIANCE,
+                              truncated_samples, white_furnace_answer)
+from viewer import (HARNESS_DIR, PREVIEW_EXPOSURE, HarnessError, Session, capture, capture_with_state, make_view, start_instance,
+                    stop_instance)
 
 KEPT_DIR = HARNESS_DIR / 'kept' / 'lambert-path'
 COST_RECORD_SECTION = '## 작업 5: 1 spp 의 GPU time'
+
+# [10] 이 white furnace 로 바꾼 뒤 쌓는 sample 수. 처음 찍은 scene capture 와 뒤에 찍는 pt-truncated 가 같은 누적을 보도록 첫 frame 에
+# 모두 쌓는다. white furnace 는 sponza-fireflies 에서 1 spp 의 frame 이 GPU 로 약 0.77 초 걸렸고, 한 frame 에 FURNACE_SAMPLES 를 쌓으면
+# TDR 로 device 가 제거되었다.
+FURNACE_AFTER_SCENE_SAMPLES = 1
 
 BOUNCE_STEPS = [1, 2, 4, 16, 64]
 # Max Bounces 16 과 64 의 capture 는 bit 까지 같았다. 16 번 뒤의 반사가 더하는 빛이 SCENE 의 pixel 값 (평균 0.004) 에서
@@ -142,15 +153,19 @@ def check_resets(session, check):
 def check_white_furnace_after_scene(session, check, scene_name):
     light_by_sky_only(session)
     hits = front_face_hits(session, f'{scene_name}-front-face')
-    name = f'[10] {scene_name}: the first capture after switching from the scene to the white furnace is 1.0 everywhere'
+    name = f'[10] {scene_name}: the first capture after switching from the scene to the white furnace is the white furnace answer everywhere'
     if not hits.any():
         return {'[10]': check.premised(name, False, False, 'no hit pixel')}
     accumulate(session, f'{scene_name}-scene-before-furnace', SCENE, FURNACE_SAMPLES)
-    set_path_tracer(session, WHITE_FURNACE | {'Target Samples': FURNACE_SAMPLES})
-    rgb = read_dds_rgba32f(capture(session, 'scene', f'{scene_name}-white-furnace-after-scene'))[..., :3]
-    samples = path_tracer_state(session)['samples']
-    return {'[10]': check.premised(name, True, count_not(rgb, 1.0) == 0, f'{int(hits.sum())} hit pixels; {count_not(rgb, 1.0)} pixels '
-                                                                         f'are not, {samples} samples by now; {describe_values(rgb)}')}
+    set_path_tracer(session, WHITE_FURNACE | {'Samples per Frame': FURNACE_AFTER_SCENE_SAMPLES, 'Target Samples': FURNACE_AFTER_SCENE_SAMPLES})
+    reply = capture_with_state(session, 'scene', f'{scene_name}-white-furnace-after-scene')
+    rgb = read_dds_rgba32f(reply['path'])[..., :3]
+    samples = json.loads(Path(reply['state']).read_text(encoding='utf-8'))['pt']['samples']
+    truncated = truncated_samples(session, f'{scene_name}-white-furnace-after-scene-truncated')
+    wrong = count_not(rgb, white_furnace_answer(FURNACE_AFTER_SCENE_SAMPLES, truncated)[..., None])
+    return {'[10]': check.premised(name, True, samples == FURNACE_AFTER_SCENE_SAMPLES and wrong == 0,
+                                   f'{int(hits.sum())} hit pixels; {wrong} pixels are not, {samples} samples in that capture, '
+                                   f'{int(np.count_nonzero(truncated))} pixels with truncated samples; {describe_values(rgb)}')}
 
 
 def check_settings_state(session, check):

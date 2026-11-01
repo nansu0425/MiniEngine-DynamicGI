@@ -16,13 +16,10 @@ rgb 는 E (lux) 의 평균이고 a 는 더한 sample 수다. hit pixel 은 Engin
 furnace: Russian roulette 를 끄면 RNG 를 쓰는 양이 albedo, emission, sky 에 따라 달라지지 않으므로, Seed 와 Max Bounces 가 같은 furnace
 들은 같은 path 를 그린다 (check-path-tracer-export.py). 그래서 [I2] 의 예측은 기대값이 아니라 sample 마다 성립한다.
   [I1] 측정 scene (viewer.measurement_scenes) 마다 scene 의 camera 에서 white furnace (pathtracerchecks.WHITE_FURNACE) 를 Russian
-       roulette off 와 on 으로 쌓는다. sample 하나는 Max Bounces 안에 escape 하면 π 이고 못하면 0 이므로, 모든 hit pixel 의 E/π 가 k /
-       FURNACE_SAMPLES (k 는 escape 한 sample 수) 와 FURNACE_TOLERANCE 안에서 맞고, k 가 FURNACE_SAMPLES 보다 작은 pixel 이
-       MAX_TRAPPED_PIXELS 이하다. x₁ 에 곱하는 π 와 cosine sampling 의 정규화를 본다. hit pixel 이 없는 scene 은 N/A (해당 없음) 이고,
-       모든 측정 scene 이 N/A 면 실패다.
-       작업 11 을 판정할 때 Seed 0 에서 off 와 on 각각 한 pixel 이 16 개 중 1 개의 sample 을 escape 하지 못했다. Radiance 의 white
-       furnace 와 달리 한 pixel 의 sample 이 모두 같은 x₁ 에서 출발하므로, x₁ 이 path 가 잘 빠져나가지 못하는 곳이면 그 pixel 의
-       sample 이 갇힐 수 있다 (추측).
+       roulette off 와 on 으로 쌓는다. sample 하나는 Max Bounces 안에 escape 하면 π 이고 Max Bounces 에서 끊기면 0 이므로, 모든 hit
+       pixel 의 E/π 가 white furnace 의 답 (pathtracerchecks.white_furnace_answer) 과 FURNACE_TOLERANCE 안에서 같다. 답은 export 의 a 와
+       capture pt-truncated 의 끊긴 sample 수로 정한다. x₁ 에 곱하는 π 와 cosine sampling 의 정규화를 본다. hit pixel 이 없는 scene 은
+       N/A (해당 없음) 이고, 모든 측정 scene 이 N/A 면 실패다.
   [I2] emission furnace (pathtracerchecks.EMISSION_FURNACE) 를 B in EMISSION_FURNACE_BOUNCES 로 쌓는다. B = 0 이면 모든 hit pixel 이 0
        이다. B >= 1 이면 모든 hit pixel 이 p = π (1 - 0.5^B (1 - E_WF(B)/π)) 와 상대 FURNACE_TOLERANCE 안에서 맞는다. E_WF(B) 는 같은
        B 의 white furnace 다. x₁ 에서 모은 path 는 x₂ 부터 B - 1 번 더 반사하므로, B 번 안에 escape 하지 못한 path 의 E/π 는 1 - 0.5^B
@@ -73,7 +70,7 @@ from directlightchecks import check_bounces
 from imagecompare import agreement, rmse
 from imagefiles import ImageFileError, read_dds_rgba32f
 from pathtracerchecks import (BASE, EMISSION_FURNACE, FURNACE_SAMPLES, SECTION, SKY_RADIANCE, WHITE_FURNACE, front_face_hits,
-                              path_tracer_settings, path_tracer_state, set_path_tracer)
+                              path_tracer_settings, path_tracer_state, set_path_tracer, truncated_samples, white_furnace_answer)
 from viewer import (BASELINE_DIR, HARNESS_DIR, PREVIEW_EXPOSURE, SETTLE_FRAMES, SNAPSHOT_POSES, HarnessError, Session, baseline_scene_pose, capture,
                     make_view, shots_dir, start_instance, stop_instance)
 
@@ -84,9 +81,6 @@ IRRADIANCE = {'Output': 'Indirect Irradiance'}
 GLTF = {'Shading': 'glTF'}
 
 FURNACE_TOLERANCE = 1e-4
-# [I1] 에서 escape 하지 못한 sample 이 있어도 되는 pixel 수. 측정 scene 세 구도의 Russian roulette off 와 on 에서 잰 최댓값 4 개
-# (sponza-fireflies 의 on) 의 두 배다. harness baseline 의 시점에서는 1 개였다.
-MAX_TRAPPED_PIXELS = 8
 EMISSION_FURNACE_BOUNCES = [0, 1, 2, 4, 64]
 # r 은 약 200 만 pixel 의 합이라 bias 가 없으면 1 근처에 모인다. imagecompare.py selftest 가 그 흔들림을 본다.
 AGREEMENT_LIMIT = 1.01
@@ -147,18 +141,18 @@ def check_default_output(session, check):
 def check_white_furnace(session, check, scene_name):
     hits = front_face_hits(session, f'{scene_name}-front-face')
     for russian_roulette in (0, 1):
-        name = (f'[I1] {scene_name}: white furnace with Russian roulette {"on" if russian_roulette else "off"} is pi x (escaped samples) / '
-                f'{FURNACE_SAMPLES} within {FURNACE_TOLERANCE:g}, with samples trapped in {MAX_TRAPPED_PIXELS} pixels or fewer')
+        name = (f'[I1] {scene_name}: E/pi of the white furnace with Russian roulette {"on" if russian_roulette else "off"} is within '
+                f'{FURNACE_TOLERANCE:g} of the white furnace answer on hit pixels')
         if not hits.any():
             check.premised(name, False, False, 'no hit pixel')
             continue
-        image, _, _ = export(session, f'{scene_name}-white-furnace-rr{russian_roulette}',
-                             WHITE_FURNACE | IRRADIANCE | {'Russian Roulette': russian_roulette}, FURNACE_SAMPLES)
-        escaped = irradiance_over_pi(image)[hits] * FURNACE_SAMPLES
-        deviation = float(np.max(np.abs(escaped - np.rint(escaped)))) / FURNACE_SAMPLES
-        trapped = count(np.any(np.rint(escaped) < FURNACE_SAMPLES, axis=-1))
-        check.premised(name, True, deviation <= FURNACE_TOLERANCE and trapped <= MAX_TRAPPED_PIXELS,
-                       f'{count(hits)} hit pixels, max deviation of E/pi {deviation:.3g}, {trapped} pixels with trapped samples')
+        run = f'{scene_name}-white-furnace-rr{russian_roulette}'
+        image, _, _ = export(session, run, WHITE_FURNACE | IRRADIANCE | {'Russian Roulette': russian_roulette}, FURNACE_SAMPLES)
+        truncated = truncated_samples(session, f'{run}-truncated')[hits]
+        answer = white_furnace_answer(np.asarray(image[..., 3], dtype=np.float64)[hits], truncated)
+        deviation = float(np.max(np.abs(irradiance_over_pi(image)[hits] - answer[..., None])))
+        check.premised(name, True, deviation <= FURNACE_TOLERANCE,
+                       f'{count(hits)} hit pixels, {count(truncated)} pixels with truncated samples; max |E/pi - answer| {deviation:.3g}')
     return {'[I1]': bool(hits.any())}
 
 
