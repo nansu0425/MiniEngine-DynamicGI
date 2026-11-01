@@ -30,7 +30,7 @@ direction 이다.
        raster (harness baseline 의 scene capture) 의 lit/unlit 이 SHADOW_RASTER_AGREEMENT 이상, Probe Hit 와 Lambert (shadow ray) 의
        lit/unlit 이 SHADOW_LAMBERT_AGREEMENT 이상 같다. Probe Hit 의 unlit 은 MIN_UNLIT_PIXELS 이상이다.
 
-Sponza (harness baseline 의 시점과 light):
+Sponza (harness baseline 의 시점과 light. [E5] 는 측정 scene 에서도 본다):
   [E4] furnace: Geometric Normals on, Russian roulette off, Max Bounces FURNACE_BOUNCES, Sky S = FURNACE_SKY, Furnace Albedo a =
        FURNACE_ALBEDO, FURNACE_SAMPLES spp. k 는 SHADING_FILE 의 kProbeHitIndirectScale 이다. escape 하기 전에 n 번 맞은 path 의 값은
        e Σ_{i<n} (a k)^i + (a k)^n S 다. Furnace Emission e = S (1 - a k) 이면 이 값이 sample 마다 S 이므로, Radiance 의 모든 pixel 과
@@ -40,10 +40,12 @@ Sponza (harness baseline 의 시점과 light):
        Russian roulette 를 끄면 RNG 를 쓰는 양이 albedo, emission, sky 에 따라 달라지지 않아 세 run 이 같은 path 를 그리므로
        (check-path-tracer-export.py), (a k)^n 의 pixel 평균이 X_C / S 다. k 가 1 이면 X_B 는 S 다. 그래서 X_B / S - 1 의 평균이 0 보다
        FURNACE_TOLERANCE 넘게 작아야 하고, 그 평균과 L / S - 1 (a = 0.9 이면 약 -2.2%) 을 찍는다.
-  [E5] 첫 점: Indirect Irradiance, Max Bounces 1, light 와 Sky 는 그대로, Seed 0, FIRST_POINT_SAMPLES spp 로 FIRST_POINT_POSES 의 시점마다
-       Probe Hit 와 Lambert 를 쌓은 export 가 a 는 bit 까지, rgb 는 LAMBERT_RUN_ULPS 안에서 같다. Lambert 는 같은 build 에서도 실행마다
-       rgb 가 4 ulp 까지 다르다 (docs/reference-path-tracer-roadmap.md 의 뒤로 미룬 일). Sponza 에는 emission 이 없으므로 path 의 값은 첫 점에서 고른 방향의 sky 뿐이다. 첫 점의 normal map 을 다른 mip 으로
-       읽으면 고르는 방향이 달라지고, 첫 점의 shading 을 더하면 값이 커지므로 둘 다 이 판정에 걸린다 (추론).
+  [E5] 첫 점: Indirect Irradiance, Max Bounces 1, light 와 Sky 는 그대로, Seed 0, FIRST_POINT_SAMPLES spp 로 FIRST_POINT_POSE 와 측정 scene
+       (viewer.measurement_scenes) 의 camera 마다 Probe Hit 와 Lambert 를 쌓은 export 가 a 는 bit 까지, rgb 는 LAMBERT_RUN_ULPS 안에서
+       같다. Lambert 는 같은 build 에서도 실행마다 rgb 가 4 ulp 까지 다르다 (docs/reference-path-tracer-roadmap.md 의 뒤로 미룬 일).
+       Sponza 에는 emission 이 없으므로 path 의 값은 첫 점에서 고른 방향의 sky 뿐이다. 첫 점의 normal map 을 다른 mip 으로 읽으면 고르는
+       방향이 달라지고, 첫 점의 shading 을 더하면 값이 커지므로 둘 다 [E5] 에 걸린다 (추론). Lambert 의 export 가 모두 0 인 측정 scene 은
+       N/A (해당 없음) 이고, 모든 측정 scene 이 N/A 면 실패다.
   [E10] RESTORE_LINE 의 조건 (Shading DDGI Probe Hit) 으로 쌓아 capture pt 로 export 한다. app 을 다시 띄워 그 export 의 줄을 restore
        하면 줄 (pt samples 밖) 과 state 의 camera, light, sky, settings.Engine Tuning (Path Tracer/Show 밖) 이 같고, Show 만 켜 같은 sample 수까지
        쌓은 export 의 rgba 가 bit 까지 같다.
@@ -70,7 +72,7 @@ import numpy as np
 from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from checks import Checks, stop_and_check
+from checks import Checks, check_in_measurement_scenes, stop_and_check
 from directlightchecks import EDGE_PIXELS, LIGHT_OBJECT, accumulate_export, overlay, set_light
 from gltfwriter import GLTF_FLOAT, GLTF_UNSIGNED_SHORT, BufferBuilder, flatten
 from imagefiles import DXGI_FORMAT_R8G8B8A8_UNORM_SRGB, ImageFileError, read_dds_rgba32f, read_dds_rgba8
@@ -140,9 +142,11 @@ FIRST_POINT_SAMPLES = 16
 FIRST_POINT = BASE | IRRADIANCE | {'Max Bounces': 1, 'Seed': 0, 'Geometric Normals': 0, 'Russian Roulette': 1,
                                    'Target Samples': FIRST_POINT_SAMPLES}
 # d05ec6f 를 두 번 띄워 쌓은 Lambert 의 export 는 rgb 가 4 ulp 까지 달랐다 (docs/reference-path-tracer-roadmap.md 의 뒤로 미룬 일). 그 두
-# 배를 둔다.
+# 배를 둔다. 측정 scene 세 구도에서 app 을 두 번 띄워 쌓은 FIRST_POINT 의 export 는 Lambert 끼리, Probe Hit 끼리, 둘 사이가 모두 bit
+# 까지 같았다.
 LAMBERT_RUN_ULPS = 8
-FIRST_POINT_POSES = ['start', 'courtyard-up']
+# harness baseline 의 scene 에서 [E5] 를 보는 시점. sky 가 보여 miss pixel 이 있다.
+FIRST_POINT_POSE = 'courtyard-up'
 
 RESET_SAMPLES = 32
 RESET_LIGHT = 'elevation=35 azimuth=150'
@@ -452,21 +456,37 @@ def compare_lambert_bits(now, reference):
         bool(np.array_equal(now[..., 3].view(np.uint32), reference[..., 3].view(np.uint32)))
 
 
+def first_point_difference(session, name):
+    """지금 camera 와 light 에서 FIRST_POINT 로 Probe Hit 와 Lambert 를 쌓아 compare_lambert_bits 의 셋과 Lambert 가 0 이 아닌 pixel 수를
+    돌려준다."""
+    images = {}
+    for shading in (PROBE_HIT, LAMBERT):
+        rgba, _, _ = accumulate_export(session, FIRST_POINT | shading, f'first-point-{name}-{shading["Shading"].lower().replace(" ", "-")}')
+        images[shading['Shading']] = rgba
+    pixels, ulps, counts_same = compare_lambert_bits(images[PROBE_HIT['Shading']], images[LAMBERT['Shading']])
+    return pixels, ulps, counts_same, int(np.count_nonzero(np.any(images[LAMBERT['Shading']][..., :3] != 0.0, axis=2)))
+
+
+def first_point_criterion(name):
+    return f'[E5] {name}: Indirect Irradiance with Max Bounces 1: Probe Hit accumulates the bits of Lambert, rgb within {LAMBERT_RUN_ULPS} ulps'
+
+
+def describe_first_point(pixels, ulps, counts_same, lit):
+    return f'{pixels} pixels differ by up to {ulps} ulps, a {"same" if counts_same else "differs"}, {lit} pixels not 0'
+
+
 def check_first_point(session, check, default_light):
-    details, passed = [], True
-    for pose_name in FIRST_POINT_POSES:
-        session.ask_ok(f'pose {SNAPSHOT_POSES[pose_name] or baseline_scene_pose()}')
-        set_light(session, default_light)
-        images = {}
-        for shading in (PROBE_HIT, LAMBERT):
-            rgba, _, _ = accumulate_export(session, FIRST_POINT | shading, f'first-point-{pose_name}-{shading["Shading"].lower().replace(" ", "-")}')
-            images[shading['Shading']] = rgba
-        pixels, ulps, counts_same = compare_lambert_bits(images[PROBE_HIT['Shading']], images[LAMBERT['Shading']])
-        lit = int(np.count_nonzero(np.any(images[LAMBERT['Shading']][..., :3] != 0.0, axis=2)))
-        passed = passed and counts_same and ulps <= LAMBERT_RUN_ULPS and lit > 0
-        details.append(f'{pose_name}: {pixels} pixels differ by up to {ulps} ulps, a {"same" if counts_same else "differs"}, {lit} pixels not 0')
-    check(f'[E5] Indirect Irradiance with Max Bounces 1: Probe Hit accumulates the bits of Lambert, rgb within {LAMBERT_RUN_ULPS} ulps',
-          passed, '; '.join(details))
+    session.ask_ok(f'pose {SNAPSHOT_POSES[FIRST_POINT_POSE]}')
+    set_light(session, default_light)
+    pixels, ulps, counts_same, lit = first_point_difference(session, FIRST_POINT_POSE)
+    check(first_point_criterion(FIRST_POINT_POSE), counts_same and ulps <= LAMBERT_RUN_ULPS and lit > 0,
+          describe_first_point(pixels, ulps, counts_same, lit))
+
+
+def check_first_point_in_scene(session, check, scene_name):
+    pixels, ulps, counts_same, lit = first_point_difference(session, scene_name)
+    return {'[E5]': check.premised(first_point_criterion(scene_name), lit > 0, counts_same and ulps <= LAMBERT_RUN_ULPS,
+                                   describe_first_point(pixels, ulps, counts_same, lit))}
 
 
 def check_resets(session, check, start_pose, default_light):
@@ -550,6 +570,7 @@ def run_sponza(check, build_first):
             check_first_point(session, check, default_light)
             check_resets(session, check, start_pose, default_light)
             taken = take_restore_line(session)
+            check_in_measurement_scenes(session, check, check_first_point_in_scene)
         finally:
             session.close()
         stop_and_check(instance, check)
