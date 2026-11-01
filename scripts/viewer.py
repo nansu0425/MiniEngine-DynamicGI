@@ -34,6 +34,8 @@ INSTANCE_FILE = HARNESS_DIR / 'instance.json'
 BASELINE_DIR = REPO_ROOT / 'scripts' / 'harness-baseline'
 # harness 가 측정에 여는 scene file 의 폴더. SCENES_DIR 을 측정에 쓰지 않는 이유는 이 폴더의 Sponza.ini 머리말에 있다.
 BASELINE_SCENES_DIR = BASELINE_DIR / 'scenes'
+# 측정 scene 의 폴더. 구도의 목적은 각 scene file 의 머리말에 있다.
+MEASUREMENT_SCENES_DIR = BASELINE_DIR / 'measurement-scenes'
 USER_SETTINGS = [VIEWER_DIR / 'user.ini', VIEWER_DIR / 'imgui.ini']
 MODEL_VIEWER_SOURCE = VIEWER_DIR / 'ModelViewer.cpp'
 # repo 가 갖는 scene file 의 폴더. 그 glTF 는 scripts/fetch-assets.ps1 이 받거나 만든다.
@@ -497,6 +499,15 @@ def default_baseline_scene():
     return baseline_scene(posixpath.basename(default_scene()))
 
 
+def measurement_scenes():
+    """시점에 의존하는 확인과 snapshot 이 차례로 여는 측정 scene 의 이름 (확장자를 뗀 파일 이름) 과 MiniEngine/ModelViewer 기준
+    경로. 파일 이름 순서다. 한 구도에서 보이지 않던 문제를 찾고 허용 오차가 한 구도에 맞춰지지 않도록 구도를 여럿 둔다."""
+    scenes = {path.stem: Path(os.path.relpath(path, VIEWER_DIR)).as_posix() for path in sorted(MEASUREMENT_SCENES_DIR.glob('*.ini'))}
+    if not scenes:
+        raise HarnessError(f'no scene file in {MEASUREMENT_SCENES_DIR}')
+    return scenes
+
+
 def read_scene_file(scene):
     """scene file (MiniEngine/ModelViewer 기준 경로) 의 section. 형식은 ModelViewer.cpp 의 SceneFile 주석에 있다."""
     import configparser
@@ -534,7 +545,8 @@ def start_instance(config, scene=None, build_first=True, gpu_validation=False, b
         raise HarnessError(f'missing the scene file {VIEWER_DIR / opened}')
     gltf = VIEWER_DIR / scene_gltf(opened)
     if not gltf.exists():
-        repo_scene = any((VIEWER_DIR / opened).resolve().is_relative_to(folder) for folder in [SCENES_DIR, BASELINE_SCENES_DIR])
+        repo_scene = any((VIEWER_DIR / opened).resolve().is_relative_to(folder)
+                         for folder in [SCENES_DIR, BASELINE_SCENES_DIR, MEASUREMENT_SCENES_DIR])
         hint = ' Run .\\scripts\\fetch-assets.ps1.' if repo_scene else ''
         raise HarnessError(f'missing {gltf}, which {opened} opens.{hint}')
 
