@@ -21,8 +21,10 @@ KEY_PREFIX = 'Path Tracer/'
 
 # furnace 는 Geometric Normals 를 켜면 분산이 0 이라 적은 sample 로 답을 본다.
 FURNACE_SAMPLES = 16
-# albedo 1 의 Sponza 에서 FURNACE_SAMPLES 의 path 가 모두 escape 하는 반사 횟수. Seed 0 에서 1.0 이 아닌 pixel 이 1024 번에서 5292 개,
-# 4096 번에서 12 개, 16384 번에서 1 개였다.
+# albedo 1 의 Sponza 에서 FURNACE_SAMPLES 의 path 가 escape 하도록 두는 반사 횟수이고, PathTracerTuning.cpp 의 상한 kMaxBounces 다.
+# harness baseline 의 시점, Seed 0 에서 1.0 이 아닌 pixel 이 1024 번에서 5292 개, 4096 번에서 12 개, 16384 번에서 1 개였다. 측정 scene
+# 에서는 65536 번에도 1.0 이 아닌 pixel 이 Russian roulette off 와 on 의 순서로 sponza-color-bleeding 1 개와 0 개, sponza-fireflies 3 개와
+# 1 개, sponza-overhead-light 2 개와 0 개 남는다.
 WHITE_FURNACE_BOUNCES = 65536
 
 # Scene Hierarchy panel 과 editor 명령이 Sky 를 가리키는 이름

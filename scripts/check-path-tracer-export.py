@@ -24,7 +24,9 @@ export:
        flush 하지 않는 것은 작업 5 의 scene capture 에 2^-20 과 2^-19 격자의 값이 있는 것으로 봤다.
 
 furnace:
-  [F1] white furnace 를 Russian roulette off 와 on 으로 쌓으면 모든 pixel, channel 이 |X - 1| <= FURNACE_TOLERANCE 다.
+  [F1] 측정 scene (viewer.measurement_scenes) 마다 scene 의 camera 에서 white furnace 를 Russian roulette off 와 on 으로 쌓으면 모든
+       pixel, channel 이 |X - 1| <= FURNACE_TOLERANCE 다. Front Face view 에서 면을 만난 pixel 이 없는 scene 은 N/A (해당 없음) 이고,
+       모든 측정 scene 이 N/A 면 실패다.
   [F2] emission furnace 를 B in EMISSION_FURNACE_BOUNCES 로 쌓은 X 가 모든 pixel 에서 1 - 0.5^(B+1) (1 - X_WF(B)) 와 상대
        FURNACE_TOLERANCE 안에서 맞는다. B 번 반사하기 전에 escape 한 path 는 1, 못한 path 는 1 - 0.5^(B+1) 이다. emission 의 누적,
        albedo < 1 의 반사, B 의 off-by-one 을 본다.
@@ -73,11 +75,11 @@ import numpy as np
 from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from checks import Checks, stop_and_check
+from checks import Checks, check_in_measurement_scenes, stop_and_check
 from imagecompare import agreement
 from imagefiles import ImageFileError, read_dds_rgba32f
 from pathtracerchecks import (BASE, EMISSION_FURNACE, FURNACE_SAMPLES, RECORD, light_by_sky_only, WHITE_FURNACE, append_record_row, code_version,
-                              describe_machine, path_tracer_state, set_path_tracer, SKY_RADIANCE)
+                              describe_machine, front_face_hits, path_tracer_state, set_path_tracer, SKY_RADIANCE)
 from viewer import HARNESS_DIR, PREVIEW_EXPOSURE, HarnessError, Session, capture, make_view, shots_dir, start_instance, stop_instance
 
 KEPT_DIR = HARNESS_DIR / 'kept' / 'path-tracer-export'
@@ -147,16 +149,25 @@ def keep(path):
     make_view(kept, 'pt', kept.with_suffix('.png'), None, 1 << 16, PREVIEW_EXPOSURE)
 
 
-def check_furnaces(accumulate, check):
-    """X_WF(INVALID_BOUNCES) 를 돌려준다."""
+def check_white_furnace(session, accumulate, check, scene_name):
+    light_by_sky_only(session)
+    hits = front_face_hits(session, f'{scene_name}-front-face')
     for russian_roulette in (0, 1):
-        image, path = accumulate(f'white-furnace-rr{russian_roulette}', WHITE_FURNACE | {'Russian Roulette': russian_roulette}, FURNACE_SAMPLES)
+        name = f'[F1] {scene_name}: white furnace with Russian roulette {"on" if russian_roulette else "off"} is within {FURNACE_TOLERANCE:g} of 1'
+        if not hits.any():
+            check.premised(name, False, False, 'no hit pixel')
+            continue
+        image, path = accumulate(f'{scene_name}-white-furnace-rr{russian_roulette}', WHITE_FURNACE | {'Russian Roulette': russian_roulette},
+                                 FURNACE_SAMPLES)
         deviation = float(np.max(np.abs(rgb64(image) - 1.0)))
-        check(f'[F1] white furnace with Russian roulette {"on" if russian_roulette else "off"} is within {FURNACE_TOLERANCE:g} of 1',
-              deviation <= FURNACE_TOLERANCE, f'max |X - 1| {deviation:.3g}')
+        check.premised(name, True, deviation <= FURNACE_TOLERANCE, f'{int(hits.sum())} hit pixels; max |X - 1| {deviation:.3g}')
         if not russian_roulette:
             keep(path)
+    return {'[F1]': bool(hits.any())}
 
+
+def check_furnaces(accumulate, check):
+    """[F2] 를 판정하고 X_WF(INVALID_BOUNCES) 를 돌려준다."""
     escaped, deviations = {}, {}
     for bounces in EMISSION_FURNACE_BOUNCES:
         white, _ = accumulate(f'white-furnace-b{bounces}', WHITE_FURNACE | {'Max Bounces': bounces}, FURNACE_SAMPLES)
@@ -314,6 +325,8 @@ def command_check(args):
             shading_normals = check_shading_normals(accumulate, check, args.record)
             russian_roulette = check_russian_roulette(session, accumulate, check)
             check_reproduction(session, accumulate, check)
+            check_in_measurement_scenes(session, check, lambda session, check, scene_name:
+                                        check_white_furnace(session, accumulate, check, scene_name))
             check_counts(session, accumulate, check, escaped.shape)
             measured = (machine, shading_normals, russian_roulette)
         finally:

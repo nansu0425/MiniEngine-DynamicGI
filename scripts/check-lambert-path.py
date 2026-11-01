@@ -7,9 +7,9 @@
 둘 다 app 을 직접 띄우고 끝내며, 이미 띄운 harness instance 는 먼저 끝낸다. 하나라도 실패하면 exit 1 이다. furnace 의 답, SCENE 의 값의
 범위, Russian roulette 의 bias 는 같은 run 을 쌓는 check-path-tracer-export.py 가 export 로 판정한다.
 
-판정은 harness baseline 의 시점에서 UI 를 숨기고 찍은 scene capture 로 한다. scene capture 는 post effects 전의 scene color 이고 그
-format 이 R11G11B10_FLOAT 라서, PT 의 평균은 이 format 으로 양자화되어 있다. 이 format 은 1.0 을 정확히 담으므로 white furnace 의 답을
-bit 로 비교한다.
+판정은 UI 를 숨기고 찍은 scene capture 로 한다. [6] 은 harness baseline 의 시점에서, [10] 은 측정 scene 에서 찍는다. scene capture 는
+post effects 전의 scene color 이고 format 이 R11G11B10_FLOAT 라서, PT 의 평균은 R11G11B10_FLOAT 로 양자화되어 있다.
+R11G11B10_FLOAT 는 1.0 을 정확히 담으므로 white furnace 의 답을 bit 로 비교한다.
 
 PT 의 Shading 은 pathtracerchecks.BASE 의 Lambert 다. Lambert 의 f cos / pdf 는 albedo 이고 PT 는 그 값을 곱하므로
 (PathTracerCS.hlsl), albedo 가 1 이면 throughput 은 fp32 에서 정확하고 white furnace 의 답은 bit 단위로 맞아야 한다. white furnace 는
@@ -25,7 +25,9 @@ SCENE 은 furnace 와 directional light 를 끈 Sponza 다.
   [8] PT 의 설정이 state 에 보이고 settings set 으로 바뀌며, 끝낼 때 user.ini 에 남는다.
   [9] image 를 정하는 설정을 하나씩 바꾸면 pt 의 resets 가 1 늘고 samples 를 처음부터 센다. Samples per Frame 과 Target Samples 를
       바꾸면 늘지 않는다.
-  [10] SCENE 을 쌓다가 white furnace 로 바꾼 뒤 처음 찍은 capture 에서 모든 pixel 이 1.0 이다. reset 뒤에 옛 sample 이 남지 않는다.
+  [10] 측정 scene (viewer.measurement_scenes) 마다 scene 의 camera 에서 SCENE 을 쌓다가 white furnace 로 바꾼 뒤 처음 찍은 capture 에서
+       모든 pixel 이 1.0 이다. reset 뒤에 옛 sample 이 남지 않는다. Front Face view 에서 면을 만난 pixel 이 없는 scene 은 N/A (해당
+       없음) 이고, 모든 측정 scene 이 N/A 면 실패다.
 
 check 는 끝낼 때 실행 중의 D3D12 CORRUPTION, ERROR, WARNING 이 0 이고 종료 때 LIVE_DEVICE 하나만 남는지도 본다. [6] 의 Max Bounces 1
 과 64 의 capture 는 발표에 쓰도록 KEPT_DIR 에 DDS 와 보기용 PNG 로 남긴다.
@@ -43,10 +45,10 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from checks import Checks, stop_and_check
+from checks import Checks, check_in_measurement_scenes, stop_and_check
 from imagefiles import ImageFileError, read_dds_rgba32f
 from pathtracerchecks import (BASE, FURNACE_SAMPLES, RECORD, light_by_sky_only, SECTION, WHITE_FURNACE, append_record_row, code_version,
-                              describe_machine, path_tracer_settings, path_tracer_state, set_path_tracer, SKY_RADIANCE)
+                              describe_machine, front_face_hits, path_tracer_settings, path_tracer_state, set_path_tracer, SKY_RADIANCE)
 from viewer import HARNESS_DIR, PREVIEW_EXPOSURE, HarnessError, Session, capture, make_view, start_instance, stop_instance
 
 KEPT_DIR = HARNESS_DIR / 'kept' / 'lambert-path'
@@ -136,12 +138,19 @@ def check_resets(session, check):
             check(f'[9] changing {key} keeps accumulating', kept_on, detail)
         set_path_tracer(session, {key: (SCENE | {'Target Samples': 4096})[key]})
 
-    accumulate(session, 'scene-before-furnace', SCENE, FURNACE_SAMPLES)
+
+def check_white_furnace_after_scene(session, check, scene_name):
+    light_by_sky_only(session)
+    hits = front_face_hits(session, f'{scene_name}-front-face')
+    name = f'[10] {scene_name}: the first capture after switching from the scene to the white furnace is 1.0 everywhere'
+    if not hits.any():
+        return {'[10]': check.premised(name, False, False, 'no hit pixel')}
+    accumulate(session, f'{scene_name}-scene-before-furnace', SCENE, FURNACE_SAMPLES)
     set_path_tracer(session, WHITE_FURNACE | {'Target Samples': FURNACE_SAMPLES})
-    rgb = read_dds_rgba32f(capture(session, 'scene', 'white-furnace-after-scene'))[..., :3]
+    rgb = read_dds_rgba32f(capture(session, 'scene', f'{scene_name}-white-furnace-after-scene'))[..., :3]
     samples = path_tracer_state(session)['samples']
-    check('[10] the first capture after switching from the scene to the white furnace is 1.0 everywhere', count_not(rgb, 1.0) == 0,
-          f'{count_not(rgb, 1.0)} pixels are not, {samples} samples by now; {describe_values(rgb)}')
+    return {'[10]': check.premised(name, True, count_not(rgb, 1.0) == 0, f'{int(hits.sum())} hit pixels; {count_not(rgb, 1.0)} pixels '
+                                                                         f'are not, {samples} samples by now; {describe_values(rgb)}')}
 
 
 def check_settings_state(session, check):
@@ -181,6 +190,7 @@ def command_check(args):
             light_by_sky_only(session)
             check_bounces(session, check)
             check_resets(session, check)
+            check_in_measurement_scenes(session, check, check_white_furnace_after_scene)
             check_settings_state(session, check)
         finally:
             session.close()
