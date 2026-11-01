@@ -47,7 +47,7 @@ import cornellbox
 from checks import Checks, stop_and_check
 from imagefiles import ImageFileError, read_dds_rgba32f
 from pathtracerchecks import BASE, SKY_OBJECT, SKY_RADIANCE, set_path_tracer
-from pickanswers import PIXEL_CORNER_OFFSETS, PIXEL_EDGE_OFFSETS, camera_ray, grid_cells, is_unambiguous, nearest_face, vector_of
+from pickanswers import PIXEL_CORNER_OFFSETS, PIXEL_EDGE_OFFSETS, CameraAnswers, grid_cells, pick_matches, vector_of
 from viewer import (BASELINE_DIR, HARNESS_DIR, SETTLE_FRAMES, VIEWER_DIR, HarnessError, Session, baseline_scene, default_scene,
                     read_scene_file, shots_dir, start_instance, stop_instance)
 
@@ -81,39 +81,9 @@ def format_line(values):
     return '; '.join(f'{key}={value}' for key, value in values.items())
 
 
-class Answers:
-    """Mitsuba scene 으로 구한, 지금의 camera 에서 sample 이 맞는 면"""
-
-    def __init__(self, mitsuba, scale, state):
-        self.faces = cornellbox.world_faces(mitsuba, scale)
-        self.camera, self.scene = state['camera'], state['ui']['scene']
-        self.forward = vector_of(self.camera['forward'])
-
-    def expect(self, sample):
-        origin, direction = camera_ray(self.camera, self.scene, sample)
-        cosine = direction @ self.forward
-        return origin, direction, nearest_face(origin, direction, self.faces, float(self.camera['near']) / cosine,
-                                               float(self.camera['far']) / cosine)
-
-    def seen_at(self, sample):
-        found = self.expect(sample)[2]
-        return None if found is None else (found[1].material, tuple(found[1].normal))
-
-    def unambiguous(self, pixel, offsets=PIXEL_EDGE_OFFSETS):
-        return is_unambiguous(self.seen_at, pixel, offsets)
-
-    def to_pixel(self, point):
-        """world 의 점이 보이는 client pixel 좌표 (camera_ray 의 반대)"""
-        origin = vector_of(self.camera)
-        right = np.cross(self.forward, [0.0, 1.0, 0.0])
-        right /= np.linalg.norm(right)
-        up = np.cross(right, self.forward)
-        half_height = math.tan(float(self.camera['vertical_fov']) / 2)
-        half_width = half_height * self.scene['width'] / self.scene['height']
-        offset = np.asarray(point) - origin
-        depth = offset @ self.forward
-        x, y = offset @ right / (depth * half_width), offset @ up / (depth * half_height)
-        return (self.scene['left'] + 0.5 + (x + 1) * self.scene['width'] / 2, self.scene['top'] + 0.5 + (1 - y) * self.scene['height'] / 2)
+def answers_of(mitsuba, scale, state):
+    """Mitsuba scene 의 면을 state 의 camera 로 볼 때 sample 이 맞는 면"""
+    return CameraAnswers(cornellbox.world_faces(mitsuba, scale), state)
 
 
 def scene_scale():
@@ -151,18 +121,14 @@ def check_grid(session, check, answers):
         if not answers.unambiguous((x, y)):
             continue
         origin, direction, found = answers.expect(np.array([x, y]) + 0.5)
+        seen = 'sky' if found is None else found[1].shape
+        judged[seen] = judged.get(seen, 0) + 1
+        if not pick_matches(values, origin, direction, found):
+            wrong.append(f'{x},{y}: {values} where ' + ('nothing is' if found is None else f'{seen} is at {found[0]}'))
+            continue
         if found is None:
-            judged['sky'] = judged.get('sky', 0) + 1
-            if values['material'] is not None:
-                wrong.append(f'{x},{y}: {values} where nothing is')
             continue
         t, face = found
-        judged[face.shape] = judged.get(face.shape, 0) + 1
-        position = None if values['position'] is None else np.array([float(value) for value in values['position'].split(',')])
-        if values['material'] != str(face.material) or position is None or abs(float(values['distance']) - t) > 1e-5 * t or \
-                np.linalg.norm(position - (origin + t * direction)) > 1e-5 * t:
-            wrong.append(f'{x},{y}: {values} where {face.shape} is at {t}')
-            continue
         pick = session.ask_ok(f'pick {x} {y}')['pick']
         toward_camera = face.normal if direction @ face.normal < 0 else -face.normal
         if np.abs(vector_of(pick['normal']) - toward_camera).max() > 1e-3:
@@ -343,7 +309,7 @@ def first_run(check, no_build, mitsuba, scale):
         try:
             session.ask_ok('ui hide')
             session.ask_ok(f'frames {SETTLE_FRAMES}')
-            answers = Answers(mitsuba, scale, session.ask_ok('state')['state'])
+            answers = answers_of(mitsuba, scale, session.ask_ok('state')['state'])
             check_scene_camera(check, mitsuba, scale, answers.camera)
             check_grid(session, check, answers)
             light = next(shape for shape in mitsuba.shapes if shape.radiance is not None)
@@ -465,7 +431,7 @@ def no_strength_run(check, mitsuba, scale):
         try:
             session.ask_ok('ui hide')
             session.ask_ok(f'frames {SETTLE_FRAMES}')
-            answers = Answers(mitsuba, scale, session.ask_ok('state')['state'])
+            answers = answers_of(mitsuba, scale, session.ask_ok('state')['state'])
             factor = gltf['materials'][light_material(answers)]['emissiveFactor']
             check_emission(session, check, answers, np.float32(factor), 'E2')
         finally:

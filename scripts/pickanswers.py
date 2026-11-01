@@ -3,6 +3,7 @@
 camera ray 는 app 의 CameraRays 처럼 구하고, 정답은 그 ray 와 world 의 평행사변형 면들의 교차로 구한다.
 """
 
+import math
 from types import SimpleNamespace
 
 # pixel 의 가운데와 네 변의 가운데. 이 sample 들이 모두 같은 것을 보는 pixel 만 판정한다. 그 밖의 pixel 은 정답이 sample
@@ -79,3 +80,54 @@ def is_unambiguous(seen_at, pixel, offsets=PIXEL_EDGE_OFFSETS):
     import numpy as np
     center = np.array(pixel, dtype=float) + 0.5
     return len({seen_at(center + np.array(offset)) for offset in offsets}) == 1
+
+
+def pick_matches(values, origin, direction, found):
+    """pick grid 의 칸 값 (grid_cells) 이 ray (origin, direction) 의 정답 found (nearest_face 의 결과) 와 같은가. miss 인 칸은 found 가
+    None 일 때만 맞다. 맞은 칸은 material 이 같고, 거리와 위치가 거리의 상대 1e-5 안이어야 한다."""
+    import numpy as np
+    if found is None:
+        return values['material'] is None
+    t, face = found
+    if values['position'] is None:
+        return False
+    position = np.array([float(value) for value in values['position'].split(',')])
+    return values['material'] == str(face.material) and abs(float(values['distance']) - t) <= 1e-5 * t and \
+        np.linalg.norm(position - (origin + t * direction)) <= 1e-5 * t
+
+
+class CameraAnswers:
+    """world 의 면 faces (parallelogram 의 목록, 면마다 material 이 있다) 를 state 의 camera 로 볼 때 sample 이 맞는 면"""
+
+    def __init__(self, faces, state):
+        self.faces = faces
+        self.camera, self.scene = state['camera'], state['ui']['scene']
+        self.forward = vector_of(self.camera['forward'])
+
+    def expect(self, sample):
+        """(sample 을 지나는 ray 의 origin, 방향, 그 ray 가 near 와 far 사이에서 처음 맞는 (t, face) 또는 None)"""
+        origin, direction = camera_ray(self.camera, self.scene, sample)
+        cosine = direction @ self.forward
+        return origin, direction, nearest_face(origin, direction, self.faces, float(self.camera['near']) / cosine,
+                                               float(self.camera['far']) / cosine)
+
+    def seen_at(self, sample):
+        found = self.expect(sample)[2]
+        return None if found is None else (found[1].material, tuple(found[1].normal))
+
+    def unambiguous(self, pixel, offsets=PIXEL_EDGE_OFFSETS):
+        return is_unambiguous(self.seen_at, pixel, offsets)
+
+    def to_pixel(self, point):
+        """world 의 점이 보이는 client pixel 좌표 (camera_ray 의 반대)"""
+        import numpy as np
+        origin = vector_of(self.camera)
+        right = np.cross(self.forward, [0.0, 1.0, 0.0])
+        right /= np.linalg.norm(right)
+        up = np.cross(right, self.forward)
+        half_height = math.tan(float(self.camera['vertical_fov']) / 2)
+        half_width = half_height * self.scene['width'] / self.scene['height']
+        offset = np.asarray(point) - origin
+        depth = offset @ self.forward
+        x, y = offset @ right / (depth * half_width), offset @ up / (depth * half_height)
+        return (self.scene['left'] + 0.5 + (x + 1) * self.scene['width'] / 2, self.scene['top'] + 0.5 + (1 - y) * self.scene['height'] / 2)
