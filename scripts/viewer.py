@@ -919,8 +919,44 @@ def capture_path_tracer(session, folder):
     return shots
 
 
+def measurement_scenes_snapshot():
+    """snapshot.json 에 남기는 측정 scene 의 shot 의 조건. scene 마다 scene file 의 section 이다."""
+    return {name: {section: dict(values) for section, values in read_scene_file(scene).items() if section != 'DEFAULT'}
+            for name, scene in measurement_scenes().items()}
+
+
+def harness_baseline_settings():
+    """harness baseline 의 user.ini 가 정한 Engine Tuning 의 값"""
+    import configparser
+    ini = configparser.ConfigParser(delimiters=('=',), comment_prefixes=(';',), interpolation=None)
+    ini.optionxform = str
+    ini.read(BASELINE_DIR / 'user.ini', encoding='utf-8')
+    return dict(ini['Engine Tuning'])
+
+
+def capture_measurement_scenes(session, folder):
+    """SNAPSHOT_SETTINGS 마다 measurement_scenes() 를 차례로 열어 scene 과 display 를 folder 에 찍고 찍은 shot 을 돌려준다. 앞의 shot 이
+    바꿔 둔 설정은 harness baseline 의 값으로 되돌린 뒤에 SNAPSHOT_SETTINGS 의 값을 넣는다."""
+    baseline = harness_baseline_settings()
+    changed_keys = sorted({key for settings in SNAPSHOT_SETTINGS.values() for key in settings})
+    shots = []
+    for settings_name, settings in SNAPSHOT_SETTINGS.items():
+        values = {key: baseline[key] for key in changed_keys} | settings
+        session.ask_ok('settings set Engine Tuning: ' + '; '.join(f'{key}={value}' for key, value in values.items()))
+        for scene_name, scene in measurement_scenes().items():
+            session.ask_ok(f'scene open {scene}')
+            session.ask_ok(f'frames {SNAPSHOT_SETTLE_FRAMES[settings_name]}')
+            name = f'{settings_name}-{scene_name}'
+            for target in ['scene', 'display']:
+                session.ask_ok(f'capture {target} {folder / f"{name}-{target}"}')
+            shots.append(name)
+    return shots
+
+
 def capture_snapshot(config, build_first, folder):
-    """SNAPSHOT_SETTINGS x SNAPSHOT_POSES 의 scene 과 display, PT 의 shot 을 folder 에 찍고, 찍은 shot, PT 의 shot, app 의 끝을 돌려준다."""
+    """SNAPSHOT_SETTINGS x SNAPSHOT_POSES 의 scene 과 display, PT 의 shot, SNAPSHOT_SETTINGS x measurement_scenes() 의 scene 과 display 를
+    folder 에 찍고, 찍은 raster 의 shot, PT 의 shot, app 의 끝을 돌려준다. 측정 scene 의 shot 은 다른 shot 을 모두 찍은 뒤에 찍어서, 다른
+    shot 을 찍는 순서가 측정 scene 의 shot 을 넣기 전과 같다."""
     folder.mkdir(parents=True)
     instance = start_instance(config, build_first=build_first)
     shots = []
@@ -939,6 +975,7 @@ def capture_snapshot(config, build_first, folder):
                         session.ask_ok(f'capture {target} {folder / f"{name}-{target}"}')
                     shots.append(name)
             path_tracer_shots = capture_path_tracer(session, folder)
+            shots += capture_measurement_scenes(session, folder)
         finally:
             session.close()
     except HarnessError:
@@ -1065,7 +1102,8 @@ def command_snapshot_save(args):
     path_tracer_same_code = {name: path_tracer_counts(path_tracer_change(folder, same_code_folder, name)) for name in path_tracer_shots}
     manifest = {'code': code_revision(), 'config': args.config, 'created': time.strftime('%Y-%m-%d %H:%M:%S'), 'shots': shots,
                 'poses': {name: pose or baseline_scene_pose() for name, pose in SNAPSHOT_POSES.items()}, 'settings': SNAPSHOT_SETTINGS,
-                'same_code': same_code, 'path_tracer': path_tracer_snapshot(), 'path_tracer_same_code': path_tracer_same_code}
+                'measurement_scenes': measurement_scenes_snapshot(), 'same_code': same_code, 'path_tracer': path_tracer_snapshot(),
+                'path_tracer_same_code': path_tracer_same_code}
     (folder / 'snapshot.json').write_text(json.dumps(manifest, indent=2), encoding='utf-8')
     for name in shots:
         counts = same_code[name]
@@ -1086,8 +1124,9 @@ def command_snapshot_compare(args):
     manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
     poses = {name: pose or baseline_scene_pose() for name, pose in SNAPSHOT_POSES.items()}
     if (manifest['poses'] != poses or manifest['settings'] != SNAPSHOT_SETTINGS or manifest.get('path_tracer') != path_tracer_snapshot()
-            or manifest['config'] != args.config):
-        raise HarnessError(f'{args.name} was taken with other poses, settings or config. Take a new snapshot with this viewer.py')
+            or manifest.get('measurement_scenes') != measurement_scenes_snapshot() or manifest['config'] != args.config):
+        raise HarnessError(f'{args.name} was taken with other poses, settings, measurement scenes or config. '
+                           'Take a new snapshot with this viewer.py')
 
     after_folder = before_folder / f'compare-{time.strftime("%Y%m%d-%H%M%S")}'
     shots, _, stopped = capture_snapshot(args.config, not args.no_build, after_folder)
@@ -2313,9 +2352,9 @@ def main():
                                   'Exits with 1 unless the app ended normally, whatever the messages', command_stop)
     command.add_argument('--kill', action='store_true', help='kill without sending quit')
 
-    command = add_command('snapshot', 'take the scene and display of fixed poses with the harness baseline and with the app defaults '
-                                      '(TAA, motion blur, adaptive exposure), and the path tracer export of each Shading and Output, '
-                                      'before changing the code, then compare the same shots after it',
+    command = add_command('snapshot', 'take the scene and display of fixed poses and of each measurement scene with the harness baseline '
+                                      'and with the app defaults (TAA, motion blur, adaptive exposure), and the path tracer export of each '
+                                      'Shading and Output, before changing the code, then compare the same shots after it',
                           None)
     actions = command.add_subparsers(dest='action', required=True)
     action = actions.add_parser('save', help=f'start a new instance and keep the shots in {SNAPSHOT_DIR}/<name>',
