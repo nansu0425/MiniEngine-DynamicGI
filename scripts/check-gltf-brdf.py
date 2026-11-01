@@ -46,8 +46,9 @@ test scene: +z 를 보는 flat quad 를 roughness QUAD_ROUGHNESS x metallic QUAD
        export v 가 깎은 앞면 pixel 모두에서 |q - v| ≤ 2^-m max(v, 2^-14) + 1e-3 v 다 (m 은 R11G11B10 의 mantissa bit 수
        R11G11B10_MANTISSA). shadow map 이 원인인 차이는 shadow map 을 고치지 않고 근거를 보고한다.
 
-Sponza: harness baseline 의 시점과 light 에서 Shading glTF 로 쌓는다. glTF 의 furnace 는 baseColor 1, metallic 0, material 의 roughness
-인 BRDF 에 Furnace Albedo 를 곱하므로 모든 view 방향에서 directional albedo 가 Furnace Albedo 다 (PathTracerCS.hlsl).
+Sponza: [S4] 의 [P6] 은 측정 scene 에서, 나머지는 harness baseline 의 시점과 light 에서 Shading glTF 로 쌓는다. glTF 의 furnace 는
+baseColor 1, metallic 0, material 의 roughness 인 BRDF 에 Furnace Albedo 를 곱하므로 모든 view 방향에서 directional albedo 가 Furnace
+Albedo 다 (PathTracerCS.hlsl).
   [S1] 여러 번 반사하는 emission furnace (EMISSION_FURNACE_GLTF: Albedo 0.875, Emission 0.125, Sky 1, Geometric Normals on, Max Bounces
        256, FURNACE_SAMPLES spp): 해는 어디서나 Emission / (1 - Albedo) = 1 이다. Russian roulette off 와 on 각각에서 Seed 0, 1 의 export
        에 대해, Seed 0 을 A0 로 둔 r 과 Seed 1 을 A0 로 둔 r 이 둘 다 r = RMSE(A0, 1) / sqrt(RMSE(A0, A1)^2 / 2) ≤ AGREEMENT_LIMIT (상수 1
@@ -61,7 +62,7 @@ Sponza: harness baseline 의 시점과 light 에서 Shading glTF 로 쌓는다. 
        pixel 의 기대값은 1 + A = 2 이고, hit pixel 에서 상수 2 대비 r ≤ AGREEMENT_LIMIT 이며 두 Seed 를 평균한 pixel 값의 평균 m 이
        |m - 2| ≤ ONE_REFLECTION_TOLERANCE + 4 SE 다 (SE 는 그 pixel 값의 표준편차 / sqrt(pixel 수)). invalid sample 0. hit 과 miss 는 같은
        Seed 의 camera ray 로 Max Bounces 0, Emission 0 을 쌓아 정확히 0 인 pixel 과 1 인 pixel 이다.
-  [S4] 유한성과 visibility: viewer.SNAPSHOT_POSES 의 네 시점과 directlightchecks.SPONZA_LIGHTS 의 두 방향에서 SPONZA_SCENE (Geometric
+  [S4] 유한성과 visibility: viewer.SNAPSHOT_POSES 의 네 시점과 FINITE_LIGHTS 의 두 방향에서 SPONZA_SCENE (Geometric
        Normals off, Max Bounces 64, Russian roulette on, 256 spp) 을 쌓아 invalid sample 이 0 이다. 그리고 check-directional-light.py 의
        [P6], [P7] 을 Shading glTF 로 통과한다. [P6] 의 보이는데 어두움은 glTF 의 f 가 0 이 아닌 pixel (Metallic 이 1 이고 Base Color 가
        0 인 곳 밖) 에서 세고 임계값은 그대로다.
@@ -105,8 +106,8 @@ from PIL import Image
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import gltfbrdf
 from checks import Checks, stop_and_check
-from directlightchecks import (EDGE_PIXELS, LIGHT_OBJECT, SPONZA_LIGHTS, WAIT_TIMEOUT, accumulate_export, check_bounces, check_sponza_direct,
-                               overlay, set_light)
+from directlightchecks import (EDGE_PIXELS, LIGHT_OBJECT, WAIT_TIMEOUT, accumulate_export, check_bounces, check_sponza_direct, overlay,
+                               set_light)
 from gltfwriter import GLTF_FLOAT, GLTF_UNSIGNED_SHORT, BufferBuilder, flatten
 from imagecompare import agreement, rmse
 from imagefiles import ImageFileError, read_dds_rgba32f
@@ -175,6 +176,8 @@ ONE_REFLECTION_POSES = ['start', 'courtyard-up']
 EMISSION_FURNACE_GLTF = BASE | GLTF | {'Furnace': 1, 'Furnace Albedo': 0.875, 'Furnace Emission': 0.125, SKY_RADIANCE: 1, 'Max Bounces': 256,
                                        'Geometric Normals': 1, 'Target Samples': FURNACE_SAMPLES}
 SPONZA_SCENE = BASE | GLTF | {'Geometric Normals': 0, 'Max Bounces': 64, 'Russian Roulette': 1, 'Target Samples': 256}
+# default 는 scene 의 light 이고, low 는 [P6] 이 harness baseline 의 시점에서 쓰던 낮은 방향이다 (directlightchecks.LOW_LIGHT_ELEVATIONS).
+FINITE_LIGHTS = {'default': None, 'low': 'elevation=30 azimuth=180'}
 EXPOSURE_STOPS = [-2, -1, 0, 1, 2]
 # adaptive exposure 를 켜고 기다리는 frame 수. 둘째 뒤의 밝기가 첫째 뒤와 ADAPTATION_SETTLED 안이면 수렴했다고 본다.
 ADAPTATION_FRAMES = [600, 300]
@@ -777,7 +780,7 @@ def check_one_reflection_furnace(session, check, start_pose):
 def check_sponza_finite(session, check, default_light):
     counts = {}
     for pose_name, pose in SNAPSHOT_POSES.items():
-        for light_name, request in SPONZA_LIGHTS.items():
+        for light_name, request in FINITE_LIGHTS.items():
             session.ask_ok(f'pose {pose or baseline_scene_pose()}')
             set_light(session, default_light)
             if request:
@@ -809,9 +812,8 @@ def run_sponza(check):
             check_emission_furnace(session, check)
             check_one_reflection_furnace(session, check, start_pose)
             check_sponza_finite(session, check, default_light)
-            check_sponza_direct(session, check, start_pose, default_light, '[S4] [P6] glTF', GLTF, gltf_reflects_nothing,
-                                lambda path: keep(path, 'pt'))
             check_bounces(session, check, start_pose, '[S4] [P7] glTF', GLTF)
+            check_sponza_direct(session, check, '[S4] [P6] glTF', GLTF, gltf_reflects_nothing, lambda path: keep(path, 'pt'))
             check_shading_resets(session, check)
         finally:
             session.close()

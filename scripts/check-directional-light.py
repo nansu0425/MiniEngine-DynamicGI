@@ -37,12 +37,15 @@ PT 의 직접광 (test scene): Max Bounces 1, Sky 0, Russian roulette off 다. s
        capture 도 앞면 pixel 에서 그렇다. 2 의 거듭제곱 배는 float 의 반올림 없이 곱해진다.
   [R1] intensity 0 이면 raster 의 앞면 pixel 이 모두 0 이다. test scene 에는 emission 이 없다.
 
-PT 의 직접광 (Sponza): harness baseline 의 시점, Russian roulette off, Sky 0, PT_SAMPLES spp 다. 판정은 check-gltf-brdf.py 도
-쓰도록 directlightchecks.py 에 있고, 아래의 대문자 이름도 거기 있다.
-  [P6] Max Bounces 1 과 Geometric Normals on 으로 SPONZA_LIGHTS 의 방향마다 쌓는다. Light Visibility 의 검정을 깎은 pixel 에서 PT 가 0 이
-       아닌 것 (가려졌는데 밝음) 과, 흰색을 깎은 pixel 에서 Base Color 가 0 이 아니고 Metallic 이 1 이 아닌데 (Lambert 의 albedo 가 있는데)
-       PT 가 0 인 것 (보이는데 어두움) 이 각각 그 region 의 MISMATCH_FRACTION 이하이고, 4 방향으로 이어진 가장 큰 덩어리가
-       MAX_MISMATCH_CLUSTER pixel 이하다. 깎은 흰색과 검정이 각각 MIN_REGION_PIXELS 이상이고 NaN 이나 Inf 인 sample 이 없다.
+PT 의 직접광 (Sponza): Russian roulette off, Sky 0, PT_SAMPLES spp 다. [P7] 은 harness baseline 의 시점에서 쌓는다. 판정은
+check-gltf-brdf.py 도 쓰도록 directlightchecks.py 에 있고, 아래의 대문자 이름도 거기 있다.
+  [P6] 측정 scene (viewer.measurement_scenes) 마다 scene 의 light (default) 와 낮은 light (low) 에서 Max Bounces 1 과 Geometric Normals
+       on 으로 쌓는다. low 는 LOW_LIGHT_ELEVATIONS 의 고도마다 LOW_LIGHT_AZIMUTHS 의 방위를 차례로 보며 찾는다. Light Visibility 의
+       흰색과 검정을 깎은 pixel 이 각각 MIN_REGION_PIXELS 이상인 첫 방향이다. 검정을 깎은 pixel 에서 PT 가 0 이 아닌 것 (가려졌는데
+       밝음) 과, 흰색을 깎은 pixel 에서 Base Color 가 0 이 아니고 Metallic 이 1 이 아닌데 (Lambert 의 albedo 가 있는데) PT 가 0 인 것
+       (보이는데 어두움) 이 각각 깎은 검정과 흰색의 pixel 수에 대해 MISMATCH_FRACTION 이하이고, 4 방향으로 이어진 가장 큰 덩어리가
+       MAX_MISMATCH_CLUSTER pixel 이하다. NaN 이나 Inf 인 sample 이 없다. 깎은 흰색이나 검정이 MIN_REGION_PIXELS 보다 적은 scene 과
+       light 는 N/A (해당 없음) 이고, 모든 측정 scene 에서 N/A 인 light 는 실패다.
        Light Visibility 는 pixel 가운데의 ray 하나로, PT 는 pixel 안을 고르게 쏜 ray 로 정하므로 sub-pixel 의 틈에서 갈린다. 작업 7 을
        판정할 때 그런 pixel 은 alpha test 하는 잎과 그 잎의 그림자에 흩어져 있었다 (pick 으로 66 개 중 47 개가 alpha test). 그림자 ray 의
        출발점이나 culling 이 틀리면 면을 따라 이어진 덩어리로 어긋난다.
@@ -243,14 +246,13 @@ def run_sponza(build_first, check):
             session.ask_ok('ui hide')
             camera = session.ask_ok('state camera')['state']['camera']
             start_pose = ' '.join(str(camera[key]) for key in ['x', 'y', 'z', 'heading', 'pitch'])
-            default_light = session.ask_ok(f'editor get {LIGHT_OBJECT}')['values']
             check_saved_direction(session, check)
-            check_sponza_direct(session, check, start_pose, default_light, '[P6]', {}, reflects_nothing, lambda path: keep(path, 'pt'))
             check_bounces(session, check, start_pose, '[P7]', {})
             check_resets(session, check)
             session.ask_ok('light set direction=0.2,0.9,-0.3 color=0.75,0.5,0.25 intensity=2.5 position=10,20,30')
             stored = light_state(session)
             saved = session.ask_ok(f'editor get {LIGHT_OBJECT}')['values']
+            check_sponza_direct(session, check, '[P6]', {}, reflects_nothing, lambda path: keep(path, 'pt'))
         finally:
             session.close()
         stop_and_check(instance, check)
