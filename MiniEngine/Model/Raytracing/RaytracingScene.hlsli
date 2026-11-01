@@ -99,11 +99,6 @@ uint3 LoadTriangleIndices(ByteAddressBuffer data, BLASGeometry geometry, uint pr
     return uint3(words.x >> 16, words.y & 0xFFFF, words.y >> 16);
 }
 
-uint3 LoadPackedAttribute(ByteAddressBuffer data, uint3 vertexAddresses, uint offset)
-{
-    return uint3(data.Load(vertexAddresses.x + offset), data.Load(vertexAddresses.y + offset), data.Load(vertexAddresses.z + offset));
-}
-
 float2 InterpolateUV(ByteAddressBuffer data, uint3 vertexAddresses, uint offset, float3 weights)
 {
     return data.Load<float2>(vertexAddresses.x + offset) * weights.x

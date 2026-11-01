@@ -14,8 +14,8 @@ float 의 π 라서 E⊥ / π 가 1 이다. PT 는 Output Radiance, Max Bounces 
 EDGE_PIXELS 깎고 column 으로 나눈 것이다. 비는 export / (E⊥ max(0, n·l) / π) 이고 n 은 quad 의 normal (0, 0, 1), l 은 state light 의
 direction 이다.
   [E1] ALBEDO_SCENE 의 왼쪽 두 quad 는 texture 없는 baseColor factor BASE_COLOR 이고 metallic 이 0 과 1 이다. Geometric Normals 를 켠다.
-       vertex normal 은 R10G10B10A2 로 담겨 성분마다 1/1023 까지 달라서 (로드맵의 뒤로 미룬 일) n·l 이 1e-3 넘게 어긋날 수 있기
-       때문이다. Shading DDGI Probe Hit 의 비가 channel 마다 ρ' = (1 - metallic) (0.96 baseColor + 0.04) + metallic baseColor 와 상대
+       vertex normal 을 R10G10B10A2 로 담던 때 성분마다 1/1023 까지 달라 n·l 이 1e-3 넘게 어긋날 수 있어서 켰고, float32 로 담은 뒤에도
+       그대로 둔다. Shading DDGI Probe Hit 의 비가 channel 마다 ρ' = (1 - metallic) (0.96 baseColor + 0.04) + metallic baseColor 와 상대
        오차의 중앙값이 ALBEDO_TOLERANCE 이하이고, pixel 의 ALBEDO_FRACTION 이상이 모든 channel 에서 ALBEDO_TOLERANCE 안이다. 벗어난 pixel
        의 수와 위치를 찍는다. Shading Lambert 의 비는 baseColor (1 - metallic) 와 같은 기준으로 맞고, ρ' 와는 상대 오차의 중앙값이
        ALBEDO_TOLERANCE 보다 큰 channel 이 있다. 두 식이 다르다는 것을 본다.

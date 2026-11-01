@@ -341,10 +341,11 @@ void OptimizeMesh( Renderer::Primitive& outPrim, const glTF::Primitive& inPrim, 
 
     outPrim.psoFlags = PSOFlags::kHasPosition | PSOFlags::kHasNormal;
     OutputElements.push_back({"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT});
-    OutputElements.push_back({"NORMAL", 0, DXGI_FORMAT_R10G10B10A2_UNORM, 0, D3D12_APPEND_ALIGNED_ELEMENT});
+    // normal과 tangent를 10 bit로 담으면 0인 성분도 1/1023쯤 어긋나 shading이 바뀌므로 accessor 값을 float32로 담는다.
+    OutputElements.push_back({"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT});
     if (tangent.get())
     {
-        OutputElements.push_back({"TANGENT", 0, DXGI_FORMAT_R10G10B10A2_UNORM, 0, D3D12_APPEND_ALIGNED_ELEMENT});
+        OutputElements.push_back({"TANGENT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT});
         outPrim.psoFlags |= PSOFlags::kHasTangent;
     }
     // UV를 half로 담으면 texture를 여러 번 반복하는 면처럼 UV가 큰 곳에서 texel이 어긋나므로 accessor 값을 float32로 담는다.
@@ -385,9 +386,9 @@ void OptimizeMesh( Renderer::Primitive& outPrim, const glTF::Primitive& inPrim, 
     ASSERT_SUCCEEDED(vbw.AddStream(outPrim.VB->data(), vertexCount, 0, stride));
 
     vbw.Write( position.get(), "POSITION", 0, vertexCount );
-    vbw.Write( normal.get(), "NORMAL", 0, vertexCount, true );
+    vbw.Write( normal.get(), "NORMAL", 0, vertexCount );
     if (tangent.get())
-        vbw.Write( tangent.get(), "TANGENT", 0, vertexCount, true );
+        vbw.Write( tangent.get(), "TANGENT", 0, vertexCount );
     if (texcoord0.get())
         vbw.Write( texcoord0.get(), "TEXCOORD", 0, vertexCount );
     if (texcoord1.get())

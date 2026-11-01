@@ -21,17 +21,19 @@ struct HitSurface
     float3 emissive;
 };
 
-// R10G10B10A2_UNORM에 [0, 1]로 담은 [-1, 1] 값을 되돌린다.
-float4 UnpackSignedR10G10B10A2(uint packed)
+float3 InterpolateNormal(ByteAddressBuffer data, uint3 vertexAddresses, uint offset, float3 weights)
 {
-    const float4 stored = float4(packed & 0x3FF, (packed >> 10) & 0x3FF, (packed >> 20) & 0x3FF, packed >> 30) / float4(1023.0, 1023.0, 1023.0, 3.0);
-    return stored * 2.0 - 1.0;
+    return data.Load<float3>(vertexAddresses.x + offset) * weights.x
+        + data.Load<float3>(vertexAddresses.y + offset) * weights.y
+        + data.Load<float3>(vertexAddresses.z + offset) * weights.z;
 }
 
-float4 InterpolateSignedR10G10B10A2(ByteAddressBuffer data, uint3 vertexAddresses, uint offset, float3 weights)
+// w는 bitangent의 부호 (glTF의 TANGENT)이고 xyz처럼 보간한다.
+float4 InterpolateTangent(ByteAddressBuffer data, uint3 vertexAddresses, uint offset, float3 weights)
 {
-    const uint3 packed = LoadPackedAttribute(data, vertexAddresses, offset);
-    return UnpackSignedR10G10B10A2(packed.x) * weights.x + UnpackSignedR10G10B10A2(packed.y) * weights.y + UnpackSignedR10G10B10A2(packed.z) * weights.z;
+    return data.Load<float4>(vertexAddresses.x + offset) * weights.x
+        + data.Load<float4>(vertexAddresses.y + offset) * weights.y
+        + data.Load<float4>(vertexAddresses.z + offset) * weights.z;
 }
 
 // normal은 objectToWorld의 inverse transpose로 옮긴다.
@@ -64,12 +66,12 @@ HitSurface GetHitSurface(RayHit hit, float textureLod)
     surface.roughness = metallicRoughness.y;
     surface.emissive = material.emissiveFactor * SampleMaterialTexture(hitTriangle, kEmissiveTexture, textureLod).rgb;
 
-    const float3 vertexNormal = ObjectToWorldNormal(hit, InterpolateSignedR10G10B10A2(data, vertexAddresses, geometry.normalOffset, weights).xyz);
+    const float3 vertexNormal = ObjectToWorldNormal(hit, InterpolateNormal(data, vertexAddresses, geometry.normalOffset, weights));
     float3 normal = vertexNormal;
     // normal texture가 없는 material은 surface normal을 그대로 쓴다 (ConstantBuffers.h의 normalTexture).
     if (geometry.tangentOffset != 0 && (material.flags & kNormalTextureFlag) != 0)
     {
-        const float4 tangent = InterpolateSignedR10G10B10A2(data, vertexAddresses, geometry.tangentOffset, weights);
+        const float4 tangent = InterpolateTangent(data, vertexAddresses, geometry.tangentOffset, weights);
         // tangent는 면 위의 방향이므로 normal과 달리 objectToWorld로 옮긴다.
         const float3 worldTangent = normalize(mul((float3x3)hit.objectToWorld, tangent.xyz));
         const float3 worldBitangent = normalize(cross(normal, worldTangent)) * tangent.w;

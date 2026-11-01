@@ -31,8 +31,7 @@ PT 의 직접광 (test scene): Max Bounces 1, Sky 0, Russian roulette off 다. s
        그림자를 만들지 않고 (single 의 검정 pixel 0 개), doubleSided occluder 는 MIN_SHADOW_PIXELS 이상의 그림자를 만든다.
   [P4] Geometric Normals 를 끄면 보이는 pixel 의 cos 가 vertex NORMAL 로 구한 cos 와 SHADING_COSINE_TOLERANCE 안에서 같다. shading normal
        이 geometric normal 과 다른 quad (tilted, away) 에서 두 cos 는 그보다 훨씬 다르고, away 는 shading normal 이 light 를 등져 0 이다.
-       허용 오차는 PT 가 받는 shading normal 의 오차다. normal map 이 없는 material 은 vertex normal 을 그대로 쓰고 (HitSurface.hlsli),
-       vertex normal 은 R10G10B10A2 로 저장해 성분마다 1/1023 까지 다르다.
+       허용 오차는 PT 가 받는 shading normal 의 오차다. normal map 이 없는 material 은 vertex normal 을 그대로 쓴다 (HitSurface.hlsli).
   [P5] color COLOR 와 intensity 2 배의 PT export 가 흰색, 원래 intensity 의 export 의 channel 별 배수와 rgb 의 bit 까지 같다. raster scene
        capture 도 앞면 pixel 에서 그렇다. 2 의 거듭제곱 배는 float 의 반올림 없이 곱해진다.
   [R1] intensity 0 이면 raster 의 앞면 pixel 이 모두 0 이다. test scene 에는 emission 이 없다.
@@ -94,7 +93,7 @@ INTENSITY = float(np.float32(math.pi))
 ALBEDO = 0.5
 COLOR = (1.0, 0.5, 0.25)
 PT_TOLERANCE = 1e-5
-# R10G10B10A2 normal 의 성분마다 1/1023 인 |Δn| 의 상한 0.0017 보다 조금 크게 잡았다.
+# vertex normal 을 R10G10B10A2 로 담던 때, 성분마다 1/1023 인 |Δn| 의 상한 0.0017 보다 조금 크게 잡았다. float32 로 담은 뒤에도 그대로 둔다.
 SHADING_COSINE_TOLERANCE = 0.002
 MIN_PIXELS = 300
 MIN_SHADOW_PIXELS = 300

@@ -68,15 +68,14 @@ namespace
         geometry.textures = mesh.srvTable;
         geometry.samplers = mesh.samplerTable;
 
-        // attribute는 Renderer::GetPSO가 psoFlags로 만드는 input layout의 순서로 놓인다.
-        const uint32_t kPackedAttributeSize = 4;
+        // attribute는 Renderer::GetPSO가 psoFlags로 만드는 input layout의 순서와 format으로 놓인다.
         uint32_t offset = sizeof(XMFLOAT3);
         geometry.normalOffset = offset;
-        offset += kPackedAttributeSize;
+        offset += sizeof(XMFLOAT3);
         if (mesh.psoFlags & PSOFlags::kHasTangent)
         {
             geometry.tangentOffset = offset;
-            offset += kPackedAttributeSize;
+            offset += sizeof(XMFLOAT4);
         }
         if (mesh.psoFlags & PSOFlags::kHasUV0)
         {

@@ -33,9 +33,9 @@ primitive 와 짝짓는다. 판정은 아래와 같고, 하나라도 실패하�
   [8] VB 의 UV0, UV1 이 짝 primitive 의 TEXCOORD_0, TEXCOORD_1 과 float32 bit 로 같고, VB 에 UV 가 있는지가 glTF 에
       TEXCOORD 가 있는지와 같다. OptimizeMesh 는 vertex 순서를 바꾸지 않으므로 draw 의 k 번째 vertex 를 짝 primitive 의 k 번째
       vertex 와 비교한다. float 가 아닌 TEXCOORD 는 bit 로 비교할 수 없으므로 틀린 것으로 센다.
-  [9] VB 의 tangent 가 짝 primitive 의 TANGENT 를 R10G10B10A2_UNORM 에 [0, 1] 로 옮겨 담은 값이다. xyz 는 10 bit 한 단계
-      안에서, w 는 그대로 같다. vertex 는 [8] 처럼 짝짓는다. glTF 에 TANGENT 가 있는데 VB 에 tangent 가 없으면 틀린 것이다.
-      TANGENT 가 없는 primitive 의 tangent 는 loader 가 만든 것이라 비교하지 않는다.
+  [9] VB 의 normal 과 tangent 가 짝 primitive 의 NORMAL 과 TANGENT 와 float32 bit 로 같다. vertex 는 [8] 처럼 짝짓는다. glTF 에
+      TANGENT 가 있는데 VB 에 tangent 가 없으면 틀린 것이다. NORMAL 이나 TANGENT 가 없는 primitive 의 그 값은 loader 가 만든 것이라
+      비교하지 않는다.
   [10] 판정 없이 수치만: normal texture 를 쓰는 primitive 가운데 TANGENT 가 없어 loader 가 tangent 를 만든 것 (MikkTSpace
       가 아니다, OptimizeMesh), 세 vertex 의 TANGENT w 가 같지 않아 spec 이 tangent space 를 undefined 로 두는 triangle
       (Specification.adoc 의 TANGENT 절), w 가 -1 이나 +1 이 아닌 vertex 의 수.
@@ -114,11 +114,10 @@ PSO_ALPHA_TEST = 0x040
 DXGI_FORMAT_R32_UINT = 42
 
 POSITION_SIZE = 12
-PACKED_ATTRIBUTE_SIZE = 4
+NORMAL_SIZE = 12
+TANGENT_SIZE = 16
 UV_SIZE = 8
 SKIN_SIZE = 16
-# [-1, 1] 을 10 bit 에 담을 때 한 단계의 폭. 담을 때 반올림하는지 버리는지는 DirectXMesh 가 정하므로 한 단계까지 허용한다.
-PACKED_XYZ_STEP = 2.0 / 1023.0
 
 GLTF_FLOAT = 5126
 GLTF_INDEX_DTYPES = {5121: '<u1', 5123: '<u2', 5125: '<u4'}
@@ -382,9 +381,9 @@ def depth_stride(mesh):
 
 def uv_offsets(mesh):
     """UV set 마다 VB 의 vertex 안에서 그 UV 의 offset. VB 에 없는 UV 는 None"""
-    offset = POSITION_SIZE + PACKED_ATTRIBUTE_SIZE
+    offset = POSITION_SIZE + NORMAL_SIZE
     if mesh.psoFlags & PSO_HAS_TANGENT:
-        offset += PACKED_ATTRIBUTE_SIZE
+        offset += TANGENT_SIZE
     uv0 = offset if mesh.psoFlags & PSO_HAS_UV0 else None
     if uv0 is not None:
         offset += UV_SIZE
@@ -646,51 +645,58 @@ def uv_problems(case, gltf, buffers, totals):
 
 def tangent_offset(mesh):
     """VB 의 vertex 안에서 tangent 의 offset. VB 에 tangent 가 없으면 None"""
-    return POSITION_SIZE + PACKED_ATTRIBUTE_SIZE if mesh.psoFlags & PSO_HAS_TANGENT else None
+    return POSITION_SIZE + NORMAL_SIZE if mesh.psoFlags & PSO_HAS_TANGENT else None
 
 
-def unpack_signed_r10g10b10a2(packed):
-    """HitSurface.hlsli 의 UnpackSignedR10G10B10A2 처럼 [0, 1] 로 담은 [-1, 1] 값을 되돌린다."""
-    stored = np.stack([packed & 0x3FF, packed >> 10 & 0x3FF, packed >> 20 & 0x3FF, packed >> 30], axis=1)
-    return stored / np.array([1023.0, 1023.0, 1023.0, 3.0]) * 2.0 - 1.0
+def gltf_float_attribute(gltf, buffers, primitive, semantic, vector_type):
+    """짝 primitive 의 float accessor semantic 의 (vertex, 성분) 과, 읽지 못했으면 그 이유. 그 accessor 가 없으면 둘 다 None"""
+    accessor_index = primitive['attributes'].get(semantic)
+    if accessor_index is None:
+        return None, None
+    accessor = element(gltf, 'accessors', accessor_index)
+    if accessor['componentType'] != GLTF_FLOAT or accessor['type'] != vector_type:
+        return None, f'{semantic} accessor {accessor_index} is not a float {vector_type}'
+    return accessor_rows(gltf, buffers, accessor_index, '<f4'), None
 
 
 def gltf_tangents(gltf, buffers, primitive):
     """짝 primitive 의 TANGENT (vertex, 4) 와, 읽지 못했으면 그 이유. TANGENT 가 없으면 둘 다 None"""
-    accessor_index = primitive['attributes'].get('TANGENT')
-    if accessor_index is None:
-        return None, None
-    accessor = element(gltf, 'accessors', accessor_index)
-    if accessor['componentType'] != GLTF_FLOAT or accessor['type'] != 'VEC4':
-        return None, f'TANGENT accessor {accessor_index} is not a float VEC4'
-    return accessor_rows(gltf, buffers, accessor_index, '<f4').astype(np.float64), None
+    tangents, unreadable = gltf_float_attribute(gltf, buffers, primitive, 'TANGENT', 'VEC4')
+    return (None if tangents is None else tangents.astype(np.float64)), unreadable
 
 
-def tangent_problems(case, gltf, buffers, totals):
+def frame_problems(case, gltf, buffers, totals):
+    """[9]: VB 의 normal 과 tangent 를 glTF 의 NORMAL, TANGENT 와 float32 bit 로 비교한다."""
     if case.primitive is None:
         return ['no glTF primitive to compare with']
-    expected, unreadable = gltf_tangents(gltf, buffers, case.primitive)
-    if unreadable:
-        return [unreadable]
-    if expected is None:
-        totals.update(without_tangent=1)
-        return []
-    offset = tangent_offset(case.mesh)
-    if offset is None:
-        return ['the glTF primitive has TANGENT, but the VB has no tangent']
     view = case.view
     rows = slice(case.draw.baseVertex, case.draw.baseVertex + max(case.vertex_count, 0))
     if view.vertex_rows is None or rows.stop > len(view.vertex_rows):
         return [f'vertices [{rows.start}, {rows.stop}) are beyond the VB']
     vertices = view.vertex_rows[rows]
-    if len(expected) != len(vertices):
-        return [f'TANGENT has {len(expected)} values for {len(vertices)} vertices']
-
-    actual = unpack_signed_r10g10b10a2(np.ascontiguousarray(vertices[:, offset:offset + PACKED_ATTRIBUTE_SIZE]).view('<u4').ravel())
-    differs = np.any(np.abs(actual[:, :3] - expected[:, :3]) > PACKED_XYZ_STEP, axis=1) | (actual[:, 3] != expected[:, 3])
-    mismatches = int(np.count_nonzero(differs))
-    totals.update(tangents=len(expected), mismatches=mismatches)
-    return [f'{mismatches} of {len(expected)} tangents differ from TANGENT'] if mismatches else []
+    problems = []
+    for semantic, vector_type, offset, size in [('NORMAL', 'VEC3', POSITION_SIZE, NORMAL_SIZE),
+                                                 ('TANGENT', 'VEC4', tangent_offset(case.mesh), TANGENT_SIZE)]:
+        name = semantic.lower()
+        expected, unreadable = gltf_float_attribute(gltf, buffers, case.primitive, semantic, vector_type)
+        if unreadable:
+            problems.append(unreadable)
+            continue
+        if expected is None:
+            totals.update({f'without_{name}': 1})
+            continue
+        if offset is None:
+            problems.append(f'the glTF primitive has {semantic}, but the VB has no {name}')
+            continue
+        if len(expected) != len(vertices):
+            problems.append(f'{semantic} has {len(expected)} values for {len(vertices)} vertices')
+            continue
+        actual = np.ascontiguousarray(vertices[:, offset:offset + size]).view('<u4')
+        mismatches = int(np.count_nonzero(np.any(actual != expected.view('<u4'), axis=1)))
+        totals.update({name: len(expected), f'{name}_mismatches': mismatches})
+        if mismatches:
+            problems.append(f'{mismatches} of {len(expected)} {name}s differ from {semantic}')
+    return problems
 
 
 def count_normal_mapped_tangents(case, gltf, buffers, material, counts):
@@ -790,7 +796,7 @@ def main():
                 [(None, f'version {header.version}, not CURRENT_MINI_FILE_VERSION {expected_version}')])
     triangle_totals = Counter()
     uv_totals = Counter()
-    tangent_totals = Counter()
+    frame_totals = Counter()
     normal_mapped = Counter()
     largest_world_difference = [0.0]
     beyond_blas_vertex_count = 0
@@ -805,7 +811,7 @@ def main():
         material = materials[case.mesh.materialCBV] if case.mesh.materialCBV < len(materials) else {}
         tally.judge(6, subject, [(k, text) for text in depth_problems(case, material)])
         tally.judge(8, subject, [(k, text) for text in uv_problems(case, gltf, buffers, uv_totals)])
-        tally.judge(9, subject, [(k, text) for text in tangent_problems(case, gltf, buffers, tangent_totals)])
+        tally.judge(9, subject, [(k, text) for text in frame_problems(case, gltf, buffers, frame_totals)])
         count_normal_mapped_tangents(case, gltf, buffers, material, normal_mapped)
     for mesh_index, (view, problems) in enumerate(zip(views, range_problems(views, header.geometrySize))):
         subject = label_of(mesh_index, view.mesh)
@@ -849,9 +855,10 @@ def main():
     print(f'[8] VB UV == glTF TEXCOORD (float32 bit, same vertex order): {tally.summary(8, "draws")}, '
           f'{uv_totals["mismatches"]} of {uv_totals["uvs"]} UVs differ')
     tally.report(8)
-    print(f'[9] VB tangent == glTF TANGENT (xyz within one 10 bit step, w exact): {tally.summary(9, "draws")}, '
-          f'{tangent_totals["mismatches"]} of {tangent_totals["tangents"]} tangents differ, '
-          f'{tangent_totals["without_tangent"]} draws without TANGENT')
+    print(f'[9] VB normal and tangent == glTF NORMAL and TANGENT (float32 bit): {tally.summary(9, "draws")}, '
+          f'{frame_totals["normal_mismatches"]} of {frame_totals["normal"]} normals and '
+          f'{frame_totals["tangent_mismatches"]} of {frame_totals["tangent"]} tangents differ, '
+          f'{frame_totals["without_normal"]} draws without NORMAL, {frame_totals["without_tangent"]} without TANGENT')
     tally.report(9)
     print(f'[10] normal texture primitives: {normal_mapped["primitives"]}, '
           f'{normal_mapped["made_by_loader"]} without TANGENT so the loader makes the tangent, '

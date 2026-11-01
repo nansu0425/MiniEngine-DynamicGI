@@ -34,10 +34,9 @@ ray 는 pixel 안의 임의 위치로 나가므로 가장자리는 capture 마�
   [2] Geometry Normal 이 모두 (0, 0, 1) 과 성분마다 TOLERANCE 안이다. camera 가 +z 쪽에서 보는지 확인한다.
   [3] Shading Normal 이 정답과 성분마다 TOLERANCE 안이다.
 
-정답은 normal map 의 texel 을 8 bit 에서 decode 한 값으로 구하므로 texel 의 양자화는 오차가 아니다. 남는 오차는 overlay 의
-R8G8B8A8_UNORM (NormalColor 가 normal 을 [0, 1] 로 옮겨 담으므로 normal 로 약 1/255) 과 vertex normal, tangent 의
-R10G10B10A2_UNORM (약 1/1023) 이다. TOLERANCE 는 그 합의 몇 배다. 규약이 하나라도 틀리면 한 성분의 부호가 바뀌어 0.9 이상
-다르다.
+정답은 normal map 의 texel 을 8 bit 에서 decode 한 값으로 구하므로 texel 의 양자화는 오차가 아니다. vertex normal 과 tangent 는
+float32 로 담는다. 남는 오차는 overlay 의 R8G8B8A8_UNORM (NormalColor 가 normal 을 [0, 1] 로 옮겨 담으므로 normal 로 약 1/255)
+이다. TOLERANCE 는 그 몇 배다. 규약이 하나라도 틀리면 한 성분의 부호가 바뀌어 0.9 이상 다르다.
 """
 
 import argparse

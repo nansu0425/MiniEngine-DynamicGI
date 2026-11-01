@@ -20,6 +20,8 @@ scene file 의 Scale 로 바꾼다.
        맞는 sample 이 자기와 이웃 pixel 에 하나도 없는 pixel 은 0 이다.
   [E2] KHR_materials_emissive_strength 를 뺀 glTF 에서 [E1] 의 light pixel 은 emissiveFactor 와 상대 1e-6 안이다.
   [N1] [W2] 의 칸에서 shading normal 과 vertex normal 의 각도가 0.1° 이하다.
+  [N2] [W2] 의 칸에서 pick 의 vertex normal 이 Mitsuba scene 의 면의 normal (camera 쪽) 과 성분마다 VERTEX_NORMAL_TOLERANCE 안이다.
+       세로 면 (면의 normal 의 y 가 0) 에서는 vertex normal 의 y 도 그 안이다.
   [V3] pose, pose look-at, describe, restore 가 error 없이 동작하고 state camera 의 controller 가 editor, state scene 이 SCENE 이다.
   [V4] 처음과 다른 pose, 세로 FOV, light, sky, PT 설정의 export E1 과 그 줄 L 을 얻는다. app 을 다시 띄워 L 을 restore 하면 state camera
        가 L 의 camera, heading, pitch, vertical fov 와 문자열로 같고, 같은 sample 수의 export E2 는 E1 과 rgba 가 bit 단위로 같다.
@@ -61,6 +63,9 @@ OLD_BASELINE_DIR = HARNESS_DIR / 'cornell-box-old-user-ini'
 GRID = (81, 50)
 SHAPES = ['Light', 'ShortBox', 'TallBox', 'Floor', 'Ceiling', 'BackWall', 'LeftWall', 'RightWall']
 MIN_LIGHT_PIXELS = 100
+# vertex normal 은 glTF 의 NORMAL 을 float32 로 담고, 보간하고 world 로 옮겨 정규화한다. 그 반올림이 몇 float32 ulp 를 넘지 않는다고 본
+# 어림이다. 예전처럼 10 bit 로 담으면 0 인 성분이 약 1e-3 어긋나 실패한다.
+VERTEX_NORMAL_TOLERANCE = 1e-6
 EMISSION_SAMPLES = 16
 EMISSION = BASE | {'Shading': 'Lambert', 'Output': 'Radiance', 'Max Bounces': 0, SKY_RADIANCE: 0, 'Target Samples': EMISSION_SAMPLES}
 # light 와 천장 사이에서 light 를 내려다보는 pose. camera_ray 가 쓰는 오른쪽 방향이 정해지도록 수직에서 조금 기울인다.
@@ -119,7 +124,7 @@ def check_scene_camera(check, mitsuba, scale, camera):
 
 
 def check_grid(session, check, answers):
-    """[V7], [W2], [N1]"""
+    """[V7], [W2], [N1], [N2]"""
     grid = grid_cells(session.ask_ok(f'pick grid {GRID[0]}x{GRID[1]}')['grid'])
     shape_of = {face.material: face.shape for face in answers.faces}
     seen = {shape_of.get(int(values['material'])) for _, _, values in grid if values['material'] is not None}
@@ -127,7 +132,7 @@ def check_grid(session, check, answers):
     check('[V7] the first view shows the light, two boxes, floor, ceiling and three walls in pick grid cells', not missing,
           f'missing {missing}' if missing else ', '.join(SHAPES))
 
-    wrong, judged, angles = [], {}, {}
+    wrong, judged, angles, vertex_errors, vertical_y = [], {}, {}, {}, 0.0
     for x, y, values in grid:
         if not answers.unambiguous((x, y)):
             continue
@@ -148,12 +153,20 @@ def check_grid(session, check, answers):
         # acos 는 1 에 가까운 cos 에서 float 의 길이 오차를 각도로 키우므로 sin 과 cos 로 구한다.
         angle = math.degrees(math.atan2(np.linalg.norm(np.cross(shading, vertex)), shading @ vertex))
         angles[face.shape] = max(angles.get(face.shape, 0.0), angle)
+        vertex_errors[face.shape] = max(vertex_errors.get(face.shape, 0.0), float(np.abs(vertex - toward_camera).max()))
+        if abs(face.normal[1]) < 1e-12:
+            vertical_y = max(vertical_y, abs(float(vertex[1])))
     lacking = [shape for shape in SHAPES if judged.get(shape, 0) == 0]
     check('[W2] pick grid finds the material, distance and position of the Mitsuba scene in each judged cell, and pick its normal',
           not wrong and not lacking, '; '.join(wrong[:3]) + (f'; no judged cell on {lacking}' if lacking else '') or f'judged cells {judged}')
     largest = max(angles.values(), default=None)
     check('[N1] the shading normal is within 0.1 degrees of the vertex normal in the judged cells', largest is not None and largest <= 0.1,
           ', '.join(f'{shape} {angle:.2e}' for shape, angle in sorted(angles.items())) + ' degrees at most')
+    largest_vertex = max(vertex_errors.values(), default=None)
+    check(f'[N2] the vertex normal is within {VERTEX_NORMAL_TOLERANCE:g} of the face normal in each component in the judged cells, and '
+          'its y is within it on the vertical faces',
+          largest_vertex is not None and largest_vertex <= VERTEX_NORMAL_TOLERANCE and vertical_y <= VERTEX_NORMAL_TOLERANCE,
+          ', '.join(f'{shape} {error:.2e}' for shape, error in sorted(vertex_errors.items())) + f' at most; largest |y| on vertical faces {vertical_y:.2e}')
 
 
 def light_pixels(answers, light):

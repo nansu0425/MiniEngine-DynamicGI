@@ -80,9 +80,9 @@ VSOutput main(VSInput vsInput)
     VSOutput vsOutput;
 
     float4 position = float4(vsInput.position, 1.0);
-    float3 normal = vsInput.normal * 2 - 1;
+    float3 normal = vsInput.normal;
 #ifndef NO_TANGENT_FRAME
-    float4 tangent = vsInput.tangent * 2 - 1;
+    float4 tangent = vsInput.tangent;
 #endif
 
 #ifdef ENABLE_SKINNING
