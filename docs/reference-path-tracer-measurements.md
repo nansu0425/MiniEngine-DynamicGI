@@ -42,6 +42,12 @@
 | 2026-10-28 | 668b4f0+ | Profile | NVIDIA GeForce RTX 4060 Laptop GPU | 1920x1080 | start | glTF | 9.658 | 0.2612 | 16384 | 0.3126 | -0.316 | 0.734 | 0.992 | 131072 | - | - |
 | 2026-10-28 | 668b4f0+ | Profile | NVIDIA GeForce RTX 4060 Laptop GPU | 1920x1080 | corridor | Lambert | 9.605 | 0.1124 | 262144 | 0.007066 | -0.498 | -0.499 | 0.092 | 131072 | 0.00998 | 1266 |
 | 2026-10-28 | 668b4f0+ | Profile | NVIDIA GeForce RTX 4060 Laptop GPU | 1920x1080 | corridor | glTF | 9.585 | 0.1532 | 16384 | 0.04733 | -0.432 | -0.437 | 0.613 | 131072 | - | - |
+| 2026-11-01 | 926c737+ | Profile | NVIDIA GeForce RTX 4060 Laptop GPU | 1920x1080 | sponza-color-bleeding | Lambert | 5.982 | 0.08642 | 131072 | 0.007666 | -0.499 | -0.500 | 0.035 | 131072 | 0.007666 | 793 |
+| 2026-11-01 | 926c737+ | Profile | NVIDIA GeForce RTX 4060 Laptop GPU | 1920x1080 | sponza-color-bleeding | glTF | 6.063 | 0.0906 | 16384 | 0.02279 | -0.495 | -0.511 | 0.085 | 131072 | - | - |
+| 2026-11-01 | 926c737+ | Profile | NVIDIA GeForce RTX 4060 Laptop GPU | 1920x1080 | sponza-fireflies | Lambert | 7.707 | 0.1698 | 262144 | 0.0107 | -0.497 | -0.499 | 0.113 | 131072 | 0.01513 | 1018 |
+| 2026-11-01 | 926c737+ | Profile | NVIDIA GeForce RTX 4060 Laptop GPU | 1920x1080 | sponza-fireflies | glTF | 7.745 | 0.4214 | 16384 | 0.09901 | -0.546 | -0.508 | 0.651 | 131072 | - | - |
+| 2026-11-01 | 926c737+ | Profile | NVIDIA GeForce RTX 4060 Laptop GPU | 1920x1080 | sponza-overhead-light | Lambert | 17.327 | 0.05869 | 65536 | 0.007344 | -0.500 | -0.499 | 0.017 | 131072 | - | - |
+| 2026-11-01 | 926c737+ | Profile | NVIDIA GeForce RTX 4060 Laptop GPU | 1920x1080 | sponza-overhead-light | glTF | 17.141 | 0.1302 | 16384 | 0.025 | -0.391 | -0.547 | 0.664 | 131072 | - | - |
 
 ## 작업 12: Indirect Irradiance 의 bias
 
@@ -52,3 +58,10 @@
 | 2026-10-28 | 668b4f0+ | Profile | NVIDIA GeForce RTX 4060 Laptop GPU | 1920x1080 | [C3] | corridor | Max Bounces 64 대 4096 | 16384 | 0.00e+00 | 0.00e+00 | 0.00e+00 | 0.00e+00 |
 | 2026-10-28 | 668b4f0+ | Profile | NVIDIA GeForce RTX 4060 Laptop GPU | 1920x1080 | [C4] | corridor | Max Bounces 8 의 Russian roulette on 대 off | 16384 | -5.14e-06 | 1.62e-05 | 0.00e+00 | 4.52e-04 |
 | 2026-10-28 | 668b4f0+ | Profile | NVIDIA GeForce RTX 4060 Laptop GPU | 1920x1080 | [C5] | corridor | 131072 spp 한 run 대 8192 spp 16 run 의 float64 평균 | 131072 | 1.27e-05 | 5.83e-05 | 0.00e+00 | 1.18e-03 |
+| 2026-11-01 | 926c737+ | Profile | NVIDIA GeForce RTX 4060 Laptop GPU | 1920x1080 | [C3] | sponza-color-bleeding | Max Bounces 64 대 4096 | 16384 | -1.36e-09 | 1.39e-09 | 0.00e+00 | 1.30e-06 |
+| 2026-11-01 | 926c737+ | Profile | NVIDIA GeForce RTX 4060 Laptop GPU | 1920x1080 | [C4] | sponza-color-bleeding | Max Bounces 8 의 Russian roulette on 대 off | 16384 | -4.82e-06 | 1.14e-05 | 0.00e+00 | 2.55e-04 |
+| 2026-11-01 | 926c737+ | Profile | NVIDIA GeForce RTX 4060 Laptop GPU | 1920x1080 | [C3] | sponza-fireflies | Max Bounces 64 대 4096 | 16384 | -8.42e-10 | 8.80e-10 | 0.00e+00 | 3.07e-06 |
+| 2026-11-01 | 926c737+ | Profile | NVIDIA GeForce RTX 4060 Laptop GPU | 1920x1080 | [C4] | sponza-fireflies | Max Bounces 8 의 Russian roulette on 대 off | 16384 | 3.34e-06 | 3.68e-05 | 0.00e+00 | 1.35e-03 |
+| 2026-11-01 | 926c737+ | Profile | NVIDIA GeForce RTX 4060 Laptop GPU | 1920x1080 | [C3] | sponza-overhead-light | Max Bounces 64 대 4096 | 16384 | -6.16e-11 | 8.85e-11 | 0.00e+00 | 4.27e-07 |
+| 2026-11-01 | 926c737+ | Profile | NVIDIA GeForce RTX 4060 Laptop GPU | 1920x1080 | [C4] | sponza-overhead-light | Max Bounces 8 의 Russian roulette on 대 off | 16384 | 2.69e-08 | 1.45e-06 | 0.00e+00 | 2.12e-04 |
+| 2026-11-01 | 926c737+ | Profile | NVIDIA GeForce RTX 4060 Laptop GPU | 1920x1080 | [C5] | sponza-color-bleeding | 131072 spp 한 run 대 8192 spp 16 run 의 float64 평균 | 131072 | -1.51e-05 | 3.76e-05 | 0.00e+00 | 4.95e-04 |
