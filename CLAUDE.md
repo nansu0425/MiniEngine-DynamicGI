@@ -18,11 +18,14 @@
 
 ### 회귀 확인
 
-"그대로인 것" 은 그대로여야 하는 동작을 판정하는 check 로만 확인한다. 영향 범위는 바꾼 파일이 아니라, 바꾼 code 의 출력을 쓰는 code 로 정한다. 바꾼 code 의 출력이 닿지 않는 동작의 check 는 돌리지 않는다. 기존 check 전체를 회귀 기준으로 두지 않는다.
+check 가 많고 path tracer 의 check 가 오래 걸려서, 작업마다 회귀를 확인하면 확인 시간이 작업의 병목이 된다. 그래서 그대로여야 하는 동작은 사용자가 자는 밤에 몰아서 확인한다.
 
-- check 가 무엇을 판정하는지는 check script 의 docstring 에 있다. 찾은 code 에 닿는지 판단할 수 없는 check 는 돌린다.
-- 바꾼 code 의 출력을 변경 전 build 의 출력과 직접 비교해 bit 단위로 같으면, 바꾼 code 의 출력을 쓰는 code 의 check 는 돌리지 않는다. 비교하는 입력에는 바꾼 code 의 경계값을 넣는다.
-- code 를 고치는 동안에는 고친 동작의 check 만 돌린다. 고른 check 는 마지막 code 에서 모두 한 번 돌린다. 모두 돌린 뒤에 code 를 고치면, 새로 고친 code 가 닿는 check 만 다시 돌린다.
+- 평소 작업에서는 "바뀌는 것" 과, "그대로인 것" 중 함께 바뀌어야 하는 동작만 check 로 확인한다. 그대로여야 하는 동작은 정의만 하고 확인하지 않는다. modelviewer skill 의 "변경 전후 비교" 도 하지 않는다.
+- check 가 무엇을 판정하는지는 check script 의 docstring 에 있다.
+- code 를 고치는 동안에는 고친 동작의 check 만 돌린다. 확인할 check 는 마지막 code 에서 모두 한 번 돌린다. 모두 돌린 뒤에 code 를 고치면, 새로 고친 code 가 닿는 check 만 다시 돌린다.
+- 완료 보고에는 밤으로 미룬 확인을 다루지 않은 조건으로 적는다. commit 의 `Test:` footer 에는 실제로 확인한 것만 적는다.
+
+밤의 회귀 확인은 사용자가 요청할 때 한다. 마지막으로 밤의 회귀 확인을 통과한 commit 부터 HEAD 까지를 한 번에 확인한다. 모든 check script 를 돌리고, 통과한 commit 을 변경 전으로 두고 "변경 전후 비교" 를 한다. 실패한 check 가 있으면 어느 commit 에서 실패하기 시작했는지 찾아 보고한다. 통과한 commit 은 `MiniEngine/ModelViewer/Harness/kept/nightly/passed-commit.txt` 에 남기고, 이 파일이 없으면 기준 commit 을 사용자에게 묻는다.
 
 ## Reference 검색
 
