@@ -41,7 +41,7 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 10. Log 와 Restore (끝남: 773ada1, 39d9b61)
 11. Indirect Irradiance (끝남: a93d5bb)
 12. 수렴과 측정 (끝남: d1ad157, 60be7ec)
-13. Cornell box 와 외부 renderer: (a) asset 을 scene 에 load 하고 (끝남: e01816c, 5fa770f, 42806bf, 7b10dcf, d51340b, bf625bb, ca6ea88, 9c39388, e678d9c), (b) 외부 renderer 로 그린 image 와 비교한다. furnace 가 잡지 못하는 오류를 여기서 본다.
+13. Cornell box 와 외부 renderer: (a) asset 을 scene 에 load 하고 (끝남: e01816c, 5fa770f, 42806bf, 7b10dcf, d51340b, bf625bb, ca6ea88, 9c39388, e678d9c), (b) 외부 renderer 로 그린 image 와 비교한다 (끝남: bae2af6, 5b9b27d, 34e7ad6, 458561c, 98adf57, 5af1c78, 4ed607d, 8b330ac, c443ce5, a760d7a, 36d8ea1, 963930c). furnace 가 잡지 못하는 오류를 여기서 본다.
 
 ## 일정
 
@@ -56,8 +56,8 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 | 10/28 | 끝남: 11, 12 |
 | 10/29 | 끝남: 발표 자료 |
 | 10/30 | 끝남: 13 (a) |
-| 10/31 | 13 (b) |
-| 11/1 | 13 (b) 가 찾은 차이의 원인을 찾는다. 고쳤으면 발표에 쓴 image 와 수치를 다시 잰다. |
+| 10/31 | 13 (b) (11/1 에 끝남) |
+| 11/1 | 끝남: 13 (b), 13 (b) 가 찾은 차이의 원인 (ray offset, vertex normal 의 양자화) 수정. 작업 12 의 image 와 수치는 다시 재지 않았다 (밀릴 때의 마지막 항목). |
 | 11/2 | 발표 자료에 13 의 결과를 반영한다. |
 
 - 발표가 10/30 에서 11/3 으로 미뤄져, 발표 뒤로 옮겼던 작업 13 을 발표 앞에 둔다.
