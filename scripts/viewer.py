@@ -1360,6 +1360,8 @@ def check_state(session, check):
 
 
 LIGHT_OBJECT = 'Directional Light'
+# Scene Hierarchy 와 editor 명령이 camera 를 가리키는 이름이자 scene file 의 section 이름
+CAMERA_OBJECT = 'Camera'
 
 
 def numbers_of(text):

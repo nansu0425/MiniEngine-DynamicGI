@@ -48,8 +48,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from checks import Checks, stop_and_check
 from imagefiles import ImageFileError, read_dds_rgba32f
 from pathtracerchecks import BASE, SECTION, SKY_OBJECT, set_path_tracer
-from viewer import (HARNESS_DIR, SETTLE_FRAMES, VIEWER_DIR, HarnessError, Session, capture, default_scene, read_scene_file, start_instance,
-                    stop_instance, without_time_varying)
+from viewer import (CAMERA_OBJECT, HARNESS_DIR, SETTLE_FRAMES, VIEWER_DIR, HarnessError, Session, capture, default_scene, read_scene_file,
+                    start_instance, stop_instance, without_time_varying)
 
 SPONZA = 'Scenes/Sponza.ini'
 CORNELL_BOX = 'Scenes/CornellBox.ini'
@@ -71,8 +71,6 @@ OBJECTS_SCENE = WORK_DIR / 'objects.ini'
 NO_OBJECTS_SCENE = WORK_DIR / 'no-objects.ini'
 # [O12] 의 scene file. [Camera] 가 Fit=Model 이다.
 FIT_MODEL_SCENE = WORK_DIR / 'fit-model.ini'
-# Scene Hierarchy 와 editor 명령이 camera 를 가리키는 이름이자 scene file 의 section 이름
-CAMERA_OBJECT = 'Camera'
 # OBJECTS_SCENE 의 object 의 설정. editor get 이 글자 그대로 다시 주는 값이다. light 의 Type 은 받는 값이 기본값 하나뿐이라 기본값이고,
 # 나머지는 기본값과 다르다.
 OBJECT_SETTINGS = {
