@@ -8,8 +8,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+import numpy as np
+from PIL import Image
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from viewer import REPO_ROOT, HarnessError
+from viewer import REPO_ROOT, SETTLE_FRAMES, HarnessError, capture
 
 RECORD = REPO_ROOT / 'docs' / 'reference-path-tracer-measurements.md'
 # PT 의 설정은 Engine Tuning 의 Path Tracer 에 있다. settings 의 key 는 PT 의 설정 이름 앞에 KEY_PREFIX 를 붙인 것이다.
@@ -66,6 +69,15 @@ def light_by_sky_only(session):
 
 def path_tracer_state(session):
     return session.ask_ok('state pt')['state']['pt']
+
+
+def front_face_hits(session, name):
+    """Front Face view 는 miss 를 검정으로 그린다."""
+    session.ask_ok('settings set Engine Tuning: Ray Tracing/View=Debug: Front Face')
+    session.ask_ok(f'frames {SETTLE_FRAMES}')
+    image = np.asarray(Image.open(capture(session, 'overlay', name)).convert('RGB'))
+    session.ask_ok('settings set Engine Tuning: Ray Tracing/View=Off')
+    return np.any(image != 0, axis=2)
 
 
 def code_version():

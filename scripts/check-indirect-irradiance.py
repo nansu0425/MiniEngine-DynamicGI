@@ -64,15 +64,14 @@ import sys
 from pathlib import Path
 
 import numpy as np
-from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from checks import Checks, stop_and_check
 from directlightchecks import check_bounces
 from imagecompare import agreement, rmse
 from imagefiles import ImageFileError, read_dds_rgba32f
-from pathtracerchecks import (BASE, EMISSION_FURNACE, FURNACE_SAMPLES, SECTION, SKY_RADIANCE, WHITE_FURNACE, path_tracer_settings,
-                              path_tracer_state, set_path_tracer)
+from pathtracerchecks import (BASE, EMISSION_FURNACE, FURNACE_SAMPLES, SECTION, SKY_RADIANCE, WHITE_FURNACE, front_face_hits,
+                              path_tracer_settings, path_tracer_state, set_path_tracer)
 from viewer import (BASELINE_DIR, HARNESS_DIR, PREVIEW_EXPOSURE, SETTLE_FRAMES, SNAPSHOT_POSES, HarnessError, Session, baseline_scene_pose, capture,
                     make_view, shots_dir, start_instance, stop_instance)
 
@@ -118,15 +117,6 @@ def export(session, name, settings, samples):
     reply = session.ask_ok(f'capture pt {shots_dir(session.instance) / name}')
     state = json.loads(Path(reply['state']).read_text(encoding='utf-8'))
     return read_dds_rgba32f(reply['path']), state['pt']['samples'], Path(reply['path'])
-
-
-def front_face_hits(session, name):
-    """Front Face view 는 miss 를 검정으로 그린다."""
-    session.ask_ok('settings set Engine Tuning: Ray Tracing/View=Debug: Front Face')
-    session.ask_ok(f'frames {SETTLE_FRAMES}')
-    image = np.asarray(Image.open(capture(session, 'overlay', name)).convert('RGB'))
-    session.ask_ok('settings set Engine Tuning: Ray Tracing/View=Off')
-    return np.any(image != 0, axis=2)
 
 
 def irradiance_over_pi(image):
