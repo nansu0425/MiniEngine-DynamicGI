@@ -18,6 +18,9 @@ namespace FrameCapture
         kDisplay,
         // path tracer의 누적 buffer. scene에 쓰기 전의 값을 그대로 남기려고 R32G32B32A32_FLOAT DDS로 쓴다. 채널의 뜻은 PathTracerCS.hlsl에 있다.
         kPathTracer,
+        // pixel마다 path tracer가 누적에 더한 sample 중 Max Bounces에서 끊긴 sample 수. R32_FLOAT DDS로 쓴다. 뜻은 PathTracerCS.hlsl의
+        // TruncatedSamples에 있다.
+        kPathTracerTruncatedSamples,
         kNumTargets
     };
 

@@ -98,6 +98,6 @@ namespace PathTracer
         const RaytracingScene& scene, const Math::Vector3& lightDirection, const Math::Vector3& lightIlluminance, const Math::Vector3& skyRadiance,
         ShadowBuffer& shadowMap, const Math::Matrix4& shadowMatrix, ColorBuffer& sceneColor);
 
-    // harness의 capture pt에 지금까지 누적한 buffer로 답한다. Render를 부르지 않는 frame에도 불러서, 누적을 멈춘 동안에도 답하게 한다.
+    // harness의 capture pt와 pt-truncated에 지금까지 누적한 buffer로 답한다. Render를 부르지 않는 frame에도 불러서, 누적을 멈춘 동안에도 답하게 한다.
     void Capture(ComputeContext& context);
 }

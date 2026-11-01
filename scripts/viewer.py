@@ -22,7 +22,7 @@ import time
 from ctypes import wintypes
 from pathlib import Path
 
-from imagefiles import ImageFileError, read_dds_rgba32f
+from imagefiles import ImageFileError, read_dds_r32f, read_dds_rgba32f
 from pickanswers import camera_ray, grid_cells, is_unambiguous, vector_of
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -672,6 +672,9 @@ def make_view(original, target, view, crop, max_width, exposure):
     from PIL import Image
     if target in ('scene', 'pt'):
         image = Image.fromarray(tone_map_for_view(read_dds_rgba32f(original), exposure))
+    elif target == 'pt-truncated':
+        # 끊긴 sample 이 하나라도 있는 pixel 을 흰색으로 그린다.
+        image = Image.fromarray(((read_dds_r32f(original) > 0) * 255).astype('uint8')).convert('RGB')
     else:
         # overlay 는 premultiplied alpha 라서 RGB 가 곧 검은 바탕에 합성한 색이다. display 에는 alpha 가 없다.
         image = Image.open(original).convert('RGB')
@@ -2343,7 +2346,7 @@ def main():
 
     command = add_command('shot', 'capture a target and write a small PNG to look at, '
                                   'with the state of the captured frame as JSON next to it', command_shot)
-    command.add_argument('target', choices=['scene', 'overlay', 'display', 'pt'])
+    command.add_argument('target', choices=['scene', 'overlay', 'display', 'pt', 'pt-truncated'])
     command.add_argument('--crop', type=parse_crop, metavar='X,Y,W,H', help='in original pixels')
     command.add_argument('--max-width', type=int, default=PREVIEW_MAX_WIDTH)
     command.add_argument('--exposure', type=float, default=PREVIEW_EXPOSURE, help='for the scene and pt views only')

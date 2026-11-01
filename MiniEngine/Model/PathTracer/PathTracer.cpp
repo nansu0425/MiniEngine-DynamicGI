@@ -36,11 +36,13 @@ namespace
     };
 
     // PathTracerCS.hlsl의 u register 순서다.
-    enum UAV { kAccumulationUAV, kSceneColorUAV, kNumUAVs };
+    enum UAV { kAccumulationUAV, kSceneColorUAV, kTruncatedSamplesUAV, kNumUAVs };
     SceneHeapTable s_UAVs;
     // PathTracerCS.hlsl의 ShadowMap
     SceneHeapTable s_ShadowMapSRV;
     ColorBuffer s_Accumulation;
+    // PathTracerCS.hlsl의 TruncatedSamples
+    ColorBuffer s_TruncatedSamples;
 
     // 누적한 image를 정하는 조건
     struct ImageConditions
@@ -113,6 +115,7 @@ namespace
 
         g_CommandManager.IdleGPU();
         s_Accumulation.Create(L"Path Tracer Accumulation", sceneColor.GetWidth(), sceneColor.GetHeight(), 1, DXGI_FORMAT_R32G32B32A32_FLOAT);
+        s_TruncatedSamples.Create(L"Path Tracer Truncated Samples", sceneColor.GetWidth(), sceneColor.GetHeight(), 1, DXGI_FORMAT_R32_FLOAT);
         s_ResetRequested = true;
     }
 }
@@ -152,6 +155,7 @@ void PathTracer::Initialize(void)
 void PathTracer::Shutdown(void)
 {
     s_Accumulation.Destroy();
+    s_TruncatedSamples.Destroy();
 }
 
 void PathTracer::Reset(void)
@@ -202,11 +206,13 @@ void PathTracer::Render(ComputeContext& context, const Settings& settings, const
 
     s_UAVs.PointTo(kAccumulationUAV, s_Accumulation, s_Accumulation.GetUAV());
     s_UAVs.PointTo(kSceneColorUAV, sceneColor, sceneColor.GetUAV());
+    s_UAVs.PointTo(kTruncatedSamplesUAV, s_TruncatedSamples, s_TruncatedSamples.GetUAV());
     s_ShadowMapSRV.PointTo(0, shadowMap, shadowMap.GetSRV());
 
     context.SetRootSignature(s_RootSignature);
     context.SetPipelineState(s_PSOs[(int)settings.output][(int)settings.shading]);
     context.TransitionResource(s_Accumulation, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+    context.TransitionResource(s_TruncatedSamples, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
     context.TransitionResource(sceneColor, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
     context.TransitionResource(shadowMap, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     context.SetDynamicConstantBufferView(kConstants, sizeof(constants), &constants);
@@ -225,4 +231,5 @@ void PathTracer::Render(ComputeContext& context, const Settings& settings, const
 void PathTracer::Capture(ComputeContext& context)
 {
     FrameCapture::Capture(FrameCapture::kPathTracer, context, s_Accumulation);
+    FrameCapture::Capture(FrameCapture::kPathTracerTruncatedSamples, context, s_TruncatedSamples);
 }

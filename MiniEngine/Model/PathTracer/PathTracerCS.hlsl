@@ -56,6 +56,9 @@ cbuffer Constants : register(b0)
 // Indirect Irradiance에서 아무 면도 만나지 않은 pixel은 a가 0이다.
 RWTexture2D<float4> Accumulation : register(u0);
 RWTexture2D<float3> SceneColor : register(u1);
+// Accumulation의 a에 센 sample 중 path가 Max Bounces에서 끊긴 sample 수. 끊긴 path는 Max Bounces 뒤의 빛을 잃으므로, 끊긴 sample 수를 알면
+// furnace의 답이 pixel마다 정확히 정해진다.
+RWTexture2D<float> TruncatedSamples : register(u2);
 
 #if PROBE_HIT_SHADING
 // raster가 같은 frame에 그린 directional light의 shadow map과, raster와 같은 비교 sampler (PathTracer.cpp의 root signature)
@@ -158,9 +161,10 @@ float3 ReflectDirectionalLight(PathVertex vertex)
 }
 #endif
 
-// ray를 따라 ray의 출발점 쪽으로 오는 radiance를 path 하나로 추정한다.
-float3 TraceRadiance(RayDesc ray, uint reflectionsBeforeRay, inout Random random)
+// ray를 따라 ray의 출발점 쪽으로 오는 radiance를 path 하나로 추정한다. truncated는 path가 Max Bounces에서 끊겼는지다.
+float3 TraceRadiance(RayDesc ray, uint reflectionsBeforeRay, inout Random random, out bool truncated)
 {
+    truncated = false;
     float3 radiance = 0.0;
     float3 throughput = 1.0;
     // bounces는 path가 지금까지 반사한 횟수다. 반사 하나는 그 vertex에서 반사한 directional light와, 다음 hit의 emission이나 sky를 더한다.
@@ -174,7 +178,10 @@ float3 TraceRadiance(RayDesc ray, uint reflectionsBeforeRay, inout Random random
 #if PROBE_HIT_SHADING
         // 다른 Shading처럼 마지막 vertex에서는 emission만 본다.
         if (bounces == MaxBounces)
+        {
+            truncated = true;
             return radiance + throughput * vertex.emission;
+        }
         radiance += throughput * GetProbeHitRadianceWithoutIrradiance(vertex);
 
         // SurfaceShading.hlsli의 계약대로 cosine으로 고른 방향의 radiance에 GetProbeHitIndirectWeight를 곱해 path를 잇는다.
@@ -184,7 +191,10 @@ float3 TraceRadiance(RayDesc ray, uint reflectionsBeforeRay, inout Random random
 #else
         radiance += throughput * vertex.emission;
         if (bounces == MaxBounces)
+        {
+            truncated = true;
             return radiance;
+        }
 
         radiance += throughput * ReflectDirectionalLight(vertex);
 
@@ -214,21 +224,25 @@ float3 TraceRadiance(RayDesc ray, uint reflectionsBeforeRay, inout Random random
 }
 
 #if INDIRECT_IRRADIANCE
-bool TraceIndirectIrradiance(RayDesc cameraRay, inout Random random, out float3 irradiance)
+bool TraceIndirectIrradiance(RayDesc cameraRay, inout Random random, out float3 irradiance, out bool truncated)
 {
     irradiance = 0.0;
+    truncated = false;
     RayHit hit;
     if (!TraceClosestHit(cameraRay, kCullSingleSidedBackFaces, hit))
         return false;
     // 처음 맞은 점에서 빛을 모으는 일을 반사 하나로 센다. 그래야 Max Bounces 2가 DDGI의 single bounce와 같은 빛이 된다.
     if (MaxBounces == 0)
+    {
+        truncated = true;
         return true;
+    }
     // 처음 맞은 점은 raster가 shading하므로 Shading과 무관하게 다른 query처럼 mip 0으로 읽고 position과 normal만 쓴다.
     const PathVertex vertex = GetPathVertex(hit, -cameraRay.Direction, kSharpestTextureLod);
     RayDesc ray;
     // cosine으로 고른 방향의 pdf가 cos / π라서 irradiance의 추정은 π L이다.
     if (DescribeSurfaceRay(vertex.position, vertex.geometryNormal, SampleLambertDirection(vertex.normal, random.rand2()), ray))
-        irradiance = kPi * TraceRadiance(ray, 1, random);
+        irradiance = kPi * TraceRadiance(ray, 1, random, truncated);
     return true;
 }
 #endif
@@ -238,25 +252,30 @@ void main(uint2 pixel : SV_DispatchThreadID)
 {
     // reset 뒤 첫 sample은 앞의 내용을 읽지 않고 덮어쓴다.
     float4 accumulated = FirstSample == 0 ? 0.0 : Accumulation[pixel];
+    float truncatedSamples = FirstSample == 0 ? 0.0 : TruncatedSamples[pixel];
     for (uint i = 0; i < NumSamples; ++i)
     {
         Random random = MakeRandom(Seed, pixel, FirstSample + i);
+        bool truncated;
 #if INDIRECT_IRRADIANCE
         float3 estimate;
-        if (!TraceIndirectIrradiance(GetCameraRay(Rays, float2(pixel) + 0.5), random, estimate))
+        if (!TraceIndirectIrradiance(GetCameraRay(Rays, float2(pixel) + 0.5), random, estimate, truncated))
             continue;
 #else
         // pixel 격자의 [x, x + 1) x [y, y + 1)에서 고르게 고른 위치라 평균이 pixel의 box filter가 된다.
         const RayDesc cameraRay = GetCameraRay(Rays, float2(pixel) + random.rand2());
-        const float3 estimate = TraceRadiance(cameraRay, 0, random);
+        const float3 estimate = TraceRadiance(cameraRay, 0, random, truncated);
 #endif
         // 하나라도 더하면 그 뒤로 평균이 NaN이나 Inf에 머문다. 값을 잘라 더하는 것은 bias이므로 버린다.
         if (!all(isfinite(estimate)))
             continue;
         accumulated.a += 1.0;
         accumulated.rgb += (estimate - accumulated.rgb) / accumulated.a;
+        if (truncated)
+            truncatedSamples += 1.0;
     }
     Accumulation[pixel] = accumulated;
+    TruncatedSamples[pixel] = truncatedSamples;
 #if INDIRECT_IRRADIANCE
     // irradiance (lux)를 π로 나눈 값은 albedo 1인 Lambert 면이 그 irradiance를 받아 반사하는 빛의 radiance (cd/m²)다. 그래서 이 값은
     // Output Radiance의 화면과 같은 exposure로 밝기를 비교할 수 있다.
