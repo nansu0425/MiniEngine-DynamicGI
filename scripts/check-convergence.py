@@ -15,9 +15,9 @@ Irradiance, Max Bounces 64, Russian roulette on, Geometric Normals off). Sky 는
 쌓은 export 다. 한 run 에서 Target Samples 만 올려 2 의 거듭제곱마다 export 하며, Target Samples 를 올려도 누적은 처음부터 다시
 시작하지 않는다 (check-lambert-path.py 의 [9]).
 
-accumulate 는 run 마다 scene 을 다시 열고, 연 뒤의 state 에서 읽은 scene file 의 경로와 camera, light, Sky 를 MANIFEST 의 run 에
-남긴다. check 는 scene file 의 경로와 camera, light, Sky 가 없거나 지금 scene file 의 값과 다른 run 을 쓰지 않고 FAIL 로 알린다. 쓰지
-않은 run 은 다시 accumulate 한다.
+accumulate 는 run 마다 scene 을 다시 열고, 연 뒤의 state 에서 읽은 scene file 의 경로와 camera (세로 FOV 를 담는다), light, Sky 를
+MANIFEST 의 run 에 남긴다. check 는 scene file 의 경로와 camera, light, Sky 가 없거나 지금 scene file 의 값과 다른 run 을 쓰지 않고
+FAIL 로 알린다. 쓰지 않은 run 은 다시 accumulate 한다. 세로 FOV 를 남기기 전의 run 은 45° 로 쌓은 것으로 본다 (UNRECORDED_VERTICAL_FOV).
 
   e(N) = RMSE(X0(N), X1(N)) / (sqrt(2) rms(Xm(N)))   한 run 의 상대 noise. Xm 은 두 Seed 의 평균이다.
 
@@ -71,11 +71,13 @@ from checks import Checks
 from imagecompare import bias
 from imagefiles import ImageFileError, read_dds_rgba32f
 from pathtracerchecks import BASE, SKY_COLOR, SKY_RADIANCE, append_record_row, code_version, describe_machine, set_path_tracer
-from viewer import (ENGINE_DIR, HARNESS_DIR, PREVIEW_EXPOSURE, REPO_ROOT, VIEWER_DIR, HarnessError, Session, make_view, measurement_scenes,
-                    read_scene_file, shots_dir, start_instance, stop_instance)
+from viewer import (ENGINE_DIR, HARNESS_DIR, PREVIEW_EXPOSURE, REPO_ROOT, VIEWER_DIR, HarnessError, Session, default_vertical_fov, make_view,
+                    measurement_scenes, read_scene_file, shots_dir, start_instance, stop_instance)
 
 KEPT_DIR = HARNESS_DIR / 'kept' / 'convergence'
 MANIFEST = KEPT_DIR / 'manifest.json'
+# MANIFEST 의 run 이 camera 의 vertical_fov 를 남기기 전에는 scene file 이 세로 FOV 를 정할 수 없었고, app 은 늘 45° 로 그렸다.
+UNRECORDED_VERTICAL_FOV = math.pi / 4
 SETTINGS_HEADER = ENGINE_DIR / 'Model' / 'PathTracer' / 'PathTracer.h'
 CONVERGENCE_RECORD_SECTION = '## 작업 12: Indirect Irradiance 의 수렴'
 BIAS_RECORD_SECTION = '## 작업 12: Indirect Irradiance 의 bias'
@@ -213,7 +215,7 @@ def repo_path(scene):
 def scene_values_in_state(state):
     """state 의 camera, light, Sky 중 scene file 이 정하고 PT 의 image 를 바꾸는 값. MANIFEST 의 run 에 돌려준 dict 그대로 남긴다."""
     camera, light, sky = state['camera'], state['light'], state['sky']
-    return {'camera': {key: camera[key] for key in ('x', 'y', 'z', 'heading', 'pitch')},
+    return {'camera': {key: camera[key] for key in ('x', 'y', 'z', 'heading', 'pitch', 'vertical_fov')},
             'light': {key: light[key] for key in ('direction', 'color', 'intensity')},
             'sky': {key: sky[key] for key in ('color', 'intensity')}}
 
@@ -225,7 +227,8 @@ def scene_values_in_file(scene):
 
     def vector(text, keys):
         return dict(zip(keys, text.split(',')))
-    return {'camera': vector(camera['Position'], 'xyz') | {'heading': camera['Heading'], 'pitch': camera['Pitch']},
+    return {'camera': vector(camera['Position'], 'xyz') | {'heading': camera['Heading'], 'pitch': camera['Pitch'],
+                                                          'vertical_fov': camera.get('Vertical FOV', default_vertical_fov())},
             'light': {'direction': vector(light['Direction'], 'xyz'), 'color': vector(light['Color'], 'rgb'), 'intensity': light['Intensity']},
             'sky': {'color': vector(sky['Color'], 'rgb'), 'intensity': sky['Intensity']}}
 
@@ -245,6 +248,8 @@ def accumulated_in_scene_file_as_now(entry, scene):
     """MANIFEST 의 run 이 지금 measurement_scenes() 의 scene 과 같은 scene file, camera, light, Sky 로 쌓은 것인지"""
     path = measurement_scenes()[scene]
     recorded = {key: entry.get(key) for key in ('camera', 'light', 'sky')}
+    if isinstance(recorded['camera'], dict) and 'vertical_fov' not in recorded['camera']:
+        recorded['camera'] = recorded['camera'] | {'vertical_fov': UNRECORDED_VERTICAL_FOV}
     return entry.get('scene') == repo_path(path) and same_values(recorded, scene_values_in_file(path))
 
 

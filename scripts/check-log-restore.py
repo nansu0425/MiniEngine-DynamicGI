@@ -25,7 +25,8 @@ image 의 줄이다. B 는 Furnace 를 켠 줄이다. Furnace 는 directional li
   [G4] A 의 줄에서 key 하나를 빼거나 값 하나를 받을 수 없는 값으로 바꾼 줄을 restore 하면 error 이고, unread 가 그 key 를 담고,
        state 가 바뀌지 않는다. size 만 다른 줄은 restore 되고, note 가 줄과 지금의 해상도를 알리며 scene 의 크기는 그대로다.
        taa=on 인 B 의 restore 는 note 로 jitter 를 재현할 수 없다고 알린다. scene 이 없는 줄은 scene file 전의 줄이라 -scene 없이 연
-       scene 의 줄로 restore 되고, 열 수 없는 scene file 의 줄 (위의 scene=x) 은 error 다.
+       scene 의 줄로 restore 되고, 열 수 없는 scene file 의 줄 (위의 scene=x) 은 error 다. vertical fov 가 없는 줄은 camera 의 세로
+       FOV 를 정할 수 있기 전의 줄이라 세로 FOV 45° 로 restore 된다.
 
 A 의 두 export 와 보기용 PNG, 줄은 발표에 쓰도록 KEPT_DIR 에 남긴다.
 """
@@ -42,18 +43,19 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from checks import Checks, stop_and_check
 from imagefiles import ImageFileError, read_dds_rgba32f
 from pathtracerchecks import SKY_OBJECT
-from viewer import (HARNESS_DIR, PREVIEW_EXPOSURE, VALIDATION_VIEW_SETTLE_FRAMES, HarnessError, Session, default_scene, make_view, shots_dir,
-                    start_instance, stop_instance, without_time_varying)
+from viewer import (CAMERA_OBJECT, HARNESS_DIR, PREVIEW_EXPOSURE, VALIDATION_VIEW_SETTLE_FRAMES, HarnessError, Session, default_scene, make_view,
+                    shots_dir, start_instance, stop_instance, without_time_varying)
 
 KEPT_DIR = HARNESS_DIR / 'kept' / 'log-restore'
 
 SAMPLES = 16
 WAIT_TIMEOUT = 900
 
-# A 는 작업 8 이 흰 점을 잰 복도의 시점이다. Max Bounces 를 줄이고 Russian roulette 를 꺼, 끈 경우의 path 를 짧게 둔다. Output 은
-# Indirect Irradiance 로 두어 [G2b] 가 그 image 의 재현도 본다.
+# A 는 작업 8 이 흰 점을 잰 복도의 시점이다. 세로 FOV 는 그때의 45° 다. Max Bounces 를 줄이고 Russian roulette 를 꺼, 끈 경우의 path 를
+# 짧게 둔다. Output 은 Indirect Irradiance 로 두어 [G2b] 가 그 image 의 재현도 본다.
 LINE_A = {
     'pose': '-1479.30859 211.686859 395.723236 -1.53974497 -0.124806166',
+    'vertical fov': '0.785398163',
     'light': 'elevation=40 azimuth=200 color=0.5,0.75,1 intensity=3',
     'sky': 'Color=0.75,0.5,1; Intensity=0.5',
     'taa': 'off',
@@ -64,6 +66,7 @@ LINE_A = {
 # A 와 모든 조건이 다르다.
 LINE_B = {
     'pose': '0 300 0 1.5708 1.2',
+    'vertical fov': '1',
     'light': 'elevation=20 azimuth=10 color=1,0.5,0.25 intensity=5',
     'sky': 'Color=1,1,0.5; Intensity=2',
     'taa': 'on',
@@ -80,7 +83,8 @@ OUT_OF_RANGE = [('camera', '1,2'), ('heading', '1.5abc'), ('pitch', '0.1,0'), ('
                 ('light intensity', '-1'), ('light intensity', 'inf'), ('sky color', '1,1'), ('sky intensity', 'nan'), ('sky intensity', '-1'),
                 ('pt output', 'radiance'), ('pt shading', 'gltf'), ('pt seed', '-1'), ('pt max bounces', '65537'), ('pt russian roulette', '2'),
                 ('pt furnace', 'on'), ('pt geometric normals', ''), ('pt furnace albedo', '1.5'), ('pt furnace albedo', 'nan'), ('pt furnace emission', 'inf'), ('pt samples', '1048577'),
-                ('size', '1920x'), ('taa', 'maybe')]
+                ('size', '1920x'), ('taa', 'maybe'), ('vertical fov', '0'), ('vertical fov', '-0.5'), ('vertical fov', '3.14159274'),
+                ('vertical fov', 'nan')]
 
 
 def parse(line):
@@ -109,6 +113,7 @@ def read_conditions_state(session):
 
 def set_conditions(session, line):
     session.ask_ok(f'pose {line["pose"]}')
+    session.ask_ok(f'editor set {CAMERA_OBJECT}: Vertical FOV={line["vertical fov"]}')
     session.ask_ok(f'light set {line["light"]}')
     session.ask_ok(f'editor set {SKY_OBJECT}: {line["sky"]}')
     session.ask_ok(f'settings set Engine Tuning: {TAA}={line["taa"]}')
@@ -191,8 +196,8 @@ def check_coverage(check, start, line_a, line_b):
 
 def check_unreadable(session, check, line_a):
     values = parse(line_a)
-    # scene 이 없는 줄은 받는 줄이라 check_line_without_scene 이 본다.
-    lines = [(f'without {key}', key, format_line(without(values, key))) for key in values if key != 'scene']
+    # scene 이나 vertical fov 가 없는 줄은 받는 줄이라 check_line_without_scene 과 check_line_without_vertical_fov 가 본다.
+    lines = [(f'without {key}', key, format_line(without(values, key))) for key in values if key not in ('scene', 'vertical fov')]
     lines += [(f'{key}=x', key, format_line(values | {key: 'x'})) for key in values]
     lines += [(f'{key}={value!r}', key, format_line(values | {key: value})) for key, value in OUT_OF_RANGE]
     wrong = []
@@ -204,6 +209,19 @@ def check_unreadable(session, check, line_a):
             wrong.append(f'{label} ({"ok" if response["ok"] else response.get("unread")}{", state changed" if after != before else ""})')
     check(f'[G4] restore of a line that lacks a key or cannot set one fails, names the key in unread and changes nothing', not wrong,
           '; '.join(wrong) or f'{len(lines)} lines')
+
+
+def check_line_without_vertical_fov(session, check, line_a):
+    """B 를 restore 해서 세로 FOV 가 45° 와 다를 때 부른다."""
+    before = session.ask_ok('state camera')['state']['camera']['vertical_fov']
+    reply = session.ask(f'restore {format_line(without(parse(line_a), "vertical fov"))}')
+    after = session.ask_ok('state camera')['state']['camera']['vertical_fov']
+    now = parse(session.ask_ok('describe')['line'])
+    differing = [key for key in parse(line_a) if key != 'pt samples' and now.get(key) != parse(line_a)[key]]
+    forty_five = np.float32(np.pi / 4)
+    check('[G4] restore of A without vertical fov, as a line from before the vertical field of view could be set, restores it with 45 degrees',
+          reply['ok'] and np.float32(before) != forty_five and np.float32(after).view(np.uint32) == forty_five.view(np.uint32) and not differing,
+          reply.get('error') or f'vertical_fov {before} -> {after}; differing from A: {", ".join(differing) or "none"}')
 
 
 def check_line_without_scene(session, check, line_a):
@@ -273,6 +291,7 @@ def second_run(check, line_a, image_a, state_a, line_b, state_b):
             restored_b = check_restored(session, check, line_b, state_b, 'B')
             session.ask_ok(f'pt wait samples={LINE_B["samples"]}', timeout=WAIT_TIMEOUT)
             check_unreadable(session, check, line_a)
+            check_line_without_vertical_fov(session, check, line_a)
             check_line_without_scene(session, check, line_a)
             check_notes(session, check, line_a, restored_b)
             check_validation_line(session, check)

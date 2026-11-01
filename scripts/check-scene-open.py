@@ -48,8 +48,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from checks import Checks, stop_and_check
 from imagefiles import ImageFileError, read_dds_rgba32f
 from pathtracerchecks import BASE, SECTION, SKY_OBJECT, set_path_tracer
-from viewer import (CAMERA_OBJECT, HARNESS_DIR, SETTLE_FRAMES, VIEWER_DIR, HarnessError, Session, capture, default_scene, read_scene_file,
-                    start_instance, stop_instance, without_time_varying)
+from viewer import (CAMERA_OBJECT, HARNESS_DIR, SETTLE_FRAMES, VIEWER_DIR, HarnessError, Session, capture, default_scene,
+                    default_vertical_fov, read_scene_file, start_instance, stop_instance, without_time_varying)
 
 SPONZA = 'Scenes/Sponza.ini'
 CORNELL_BOX = 'Scenes/CornellBox.ini'
@@ -356,14 +356,16 @@ def key_lines(values):
 
 def write_object_scenes():
     """[O10], [O11], [O12] 의 scene file 을 Cornell box 의 model 로 쓰고, 그 MiniEngine/ModelViewer 기준 경로를 (OBJECTS_SCENE,
-    NO_OBJECTS_SCENE, FIT_MODEL_SCENE) 로 돌려준다. OBJECTS_SCENE 과 NO_OBJECTS_SCENE 의 camera 는 Cornell box 의 pose 다.
+    NO_OBJECTS_SCENE, FIT_MODEL_SCENE) 로 돌려준다. OBJECTS_SCENE 과 NO_OBJECTS_SCENE 의 camera 는 Cornell box 의 pose 와 세로 FOV 이고,
+    scene save 가 쓰는 key 를 모두 적는다.
     OBJECTS_SCENE 은 OBJECT_SETTINGS 를 주석과 함께 CRLF 로, NO_OBJECTS_SCENE 은 light 의 section 없이 LF 로 쓴다. FIT_MODEL_SCENE 은
     camera 가 Fit=Model 이고 light 의 section 이 없다."""
     WORK_DIR.mkdir(parents=True, exist_ok=True)
     cornell = read_scene_file(CORNELL_BOX)
     gltf = Path(os.path.relpath(VIEWER_DIR / Path(CORNELL_BOX).parent / cornell['Model']['glTF'], WORK_DIR)).as_posix()
     model = f'[Model]\nglTF={gltf}\nScale={cornell["Model"]["Scale"]}\n'
-    common = f'; [O10], [O11] 의 scene file\n{model}\n[{CAMERA_OBJECT}]\n{key_lines(cornell[CAMERA_OBJECT])}'
+    camera = {'Vertical FOV': default_vertical_fov()} | dict(cornell[CAMERA_OBJECT])
+    common = f'; [O10], [O11] 의 scene file\n{model}\n[{CAMERA_OBJECT}]\n{key_lines(camera)}'
     objects = common + ''.join(f'\n[{name}]\n; 기본값과 다른 값\n' + key_lines(values) for name, values in OBJECT_SETTINGS.items())
     OBJECTS_SCENE.write_bytes(objects.replace('\n', '\r\n').encode('utf-8'))
     NO_OBJECTS_SCENE.write_bytes(common.encode('utf-8'))

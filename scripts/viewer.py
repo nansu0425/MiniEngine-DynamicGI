@@ -489,6 +489,14 @@ def default_scene():
     return match.group(1)
 
 
+def default_vertical_fov():
+    """scene file 의 [Camera] 에 Vertical FOV 가 없을 때 app 의 camera 의 세로 FOV (radian) 의 text"""
+    match = re.search(r'^constexpr float kDefaultCameraVerticalFov = ([0-9.]+)f;', MODEL_VIEWER_SOURCE.read_text(encoding='utf-8'), re.M)
+    if match is None:
+        raise HarnessError(f'{MODEL_VIEWER_SOURCE} has no line starting with constexpr float kDefaultCameraVerticalFov = <radians>f;')
+    return match.group(1)
+
+
 def baseline_scene(name):
     """BASELINE_SCENES_DIR 의 scene file name 의 MiniEngine/ModelViewer 기준 경로"""
     return Path(os.path.relpath(BASELINE_SCENES_DIR / name, VIEWER_DIR)).as_posix()

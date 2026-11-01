@@ -14,20 +14,20 @@
 * toggle ImGui: F1
 * engine tuning, profiler, scene overlay, scene hierarchy, details: ImGui View menu
 * default of an engine tuning setting: right-click the setting and pick Reset to Default, or right-click a group and pick Reset to Defaults to reset every setting under it. Reset All at the top of Engine Tuning resets them all. The default is the value the setting has when user.ini does not have it
-* scene: the Scene menu lists the scene files of the Scenes folder by name and marks the one open. Picking one opens it while running: the model changes, the objects in the Scene Hierarchy take their settings in the scene file, so the camera moves to the scene file's pose and the lights change, and the path tracer starts over. Changes to the objects not saved, such as a camera moved since, are lost. The settings, camera movement speed and UI stay. Save at the top of the menu writes the settings of the objects, the camera's pose among them, to the open scene file and leaves its other lines
+* scene: the Scene menu lists the scene files of the Scenes folder by name and marks the one open. Picking one opens it while running: the model changes, the objects in the Scene Hierarchy take their settings in the scene file, so the camera takes the scene file's pose and vertical field of view and the lights change, and the path tracer starts over. Changes to the objects not saved, such as a camera moved since, are lost. The settings, camera movement speed and UI stay. Save at the top of the menu writes the settings of the objects, the camera's pose and field of view among them, to the open scene file and leaves its other lines
 * ray tracing debug view: pick one as View under Ray Tracing in Engine Tuning. Off shows the raster image
 * ray query validation: pick a Validation view as View and what its Heatmap paints under Ray Tracing in Engine Tuning, then press Capture under its Validation to read the last frame's counts and p50, p99, max. Fit to Capture sets a metric heatmap's range from the capture
 * path tracer: Show and the other settings are under Path Tracer in Engine Tuning
 * log and restore of the measurement conditions: Log under Ray Tracing/Validation in Engine Tuning prints the capture, and Log under Path Tracer prints the path tracer's image, with the conditions they were drawn in (scene file, camera, resolution, TAA, directional light, Sky, path tracer settings and samples) as one line to the Output window. The path tracer's Log also copies the line. Paste such a line under Restore to set every condition in it, or nothing if the line lacks one or one cannot be set. A line of another scene file opens that scene file first, as the Scene menu does, and a line without the scene file is of Scenes/Sponza.ini. The path tracer then starts over and stops at the samples of the line, so it draws the same image, after a restart too. A different resolution or mode is shown as a warning
 * select: click an object in the Scene Hierarchy panel, which lists the Model (the glTF model of the scene file), the Camera, the Directional Light and the Sky, or click an icon in the scene. Click empty space in the scene to deselect. The Details panel shows the settings of the selected object
 * gizmo mode of the selected object: W translate, E rotate (without holding the right mouse button). The toolbar at the top right of the scene picks them too, and whether the rotate rings follow the object's own axes (Local) or the world axes (World). Translate always follows the world axes
-* camera: the Camera in the Scene Hierarchy is the camera you look through, so it has no icon or gizmo. Move it with the controls above, or set its position, heading and pitch in its Details panel
+* camera: the Camera in the Scene Hierarchy is the camera you look through, so it has no icon or gizmo. Move it with the controls above, or set its position, heading, pitch and vertical field of view in its Details panel
 * directional light: select its icon and rotate it with the rotate gizmo. It is a KHR_lights_punctual light whose type is Directional, the only type for now, so the light goes along its local -Z, as the arrow shows, and turning it about its local Z (the blue ring with Local axes) leaves the light as it is. Its Details panel shows the type, which the scene file keeps as Type, and has its color and intensity (lux) and Reset Transform, which sets the transform to no rotation at the origin, so the light goes along world -Z
 
 ## User settings:
 On exit, ModelViewer saves these settings in the working directory, or in the folder given by -settings_dir, and restores them on the next start.
 * imgui.ini: panel layout, written by ImGui. Delete it to reset the layout
-* user.ini: window size and position, open panels, engine tuning values (with the ray tracing view and the path tracer settings), editor camera movement speed. Delete it to reset them. The camera's position and direction are not saved here, as they belong to the scene: Scene > Save writes them to the scene file
+* user.ini: window size and position, open panels, engine tuning values (with the ray tracing view and the path tracer settings), editor camera movement speed. Delete it to reset them. The camera's position, direction and field of view are not saved here, as they belong to the scene: Scene > Save writes them to the scene file
 
 ## Command line options for automation:
 scripts/viewer.py starts ModelViewer with these options. They change nothing when omitted.
@@ -43,10 +43,10 @@ scripts/viewer.py starts ModelViewer with these options. They change nothing whe
 Get sample assets from https://github.com/KhronosGroup/glTF-Sample-Models or make your own.
 
 * Place asset folder underneath the ModelViewer folder
-* Write a scene file for it: the glTF path, the model's scale and the camera's starting pose, and the lights if not the defaults. Scene > Save writes the camera's pose and the lights as you set them. The keys are described above SceneFile in ModelViewer/ModelViewer.cpp, and Scenes/Sponza.ini is an example
+* Write a scene file for it: the glTF path, the model's scale and the camera's starting pose, and the camera's vertical field of view and the lights if not the defaults. Scene > Save writes the camera and the lights as you set them. The keys are described above SceneFile in ModelViewer/ModelViewer.cpp, and Scenes/Sponza.ini is an example
 * Add to command line "-scene [scene file path relative to the ModelViewer folder]". Without it ModelViewer opens Scenes/Sponza.ini
 * Example:  ModelViewer.exe -scene Scenes/Sponza.ini
 * Scenes/CornellBox.ini opens the Cornell box that scripts/fetch-assets.ps1 fetches and converts to glTF
-* The camera always starts at the scene file's pose. While running, the Scene menu opens another scene file of the Scenes folder (Controls above)
+* The camera always starts at the scene file's pose and vertical field of view. While running, the Scene menu opens another scene file of the Scenes folder (Controls above)
 
 DirectXMesh and DirectXTex are used for compiling content the first time it is loaded.  For example, image files will have mip maps generated, encoded to a block compressed format, and then saved as a DDS for subsequent loading.  This means that first-time loading takes a little longer.

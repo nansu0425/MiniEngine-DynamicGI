@@ -191,19 +191,23 @@ private:
 const char kCameraName[] = "Camera";
 
 // scene 을 보는 editor camera. 사용자가 이 camera로 보므로 icon과 gizmo가 없고, mouse와 keyboard나 Details panel로 옮긴다.
-// pose는 scene 마다 다르므로 scene file에 저장하고, scene 과 무관한 이동 속도는 EditorCameraController가 user.ini에 남긴다.
+// pose와 세로 FOV는 scene 마다 다르므로 scene file에 저장하고, scene 과 무관한 이동 속도는 EditorCameraController가 user.ini에 남긴다.
 class CameraComponent : public Scene::Component
 {
 public:
     // model은 scene file의 Fit=Model이 화면에 담는 model이다.
-    CameraComponent(EditorCameraController& controller, const ModelInstance& model)
-        : Component({ "Fit", "Position", "Heading", "Pitch" }), m_Controller(controller), m_Model(model) {}
+    CameraComponent(EditorCameraController& controller, Camera& camera, const ModelInstance& model)
+        : Component({ "Fit", "Position", "Heading", "Pitch", "Vertical FOV" }), m_Controller(controller), m_Camera(camera), m_Model(model) {}
 
     // 원점에서 -z를 본다.
     static EditorCameraController::Pose GetDefaultPose();
 
     EditorCameraController::Pose GetPose() const { return m_Controller.GetPose(); }
     void SetPose(const EditorCameraController::Pose& pose) { m_Controller.SetPose(pose); }
+    // radian. IsVerticalFov인 값만 둔다.
+    float GetVerticalFov() const { return m_Camera.GetFOV(); }
+    // SetPose처럼 다음 Update를 기다리지 않고 camera에 바로 적용해, raster와 ray가 같은 frame부터 새 FOV로 그리게 한다.
+    void SetVerticalFov(float verticalFov) { m_Camera.SetFOV(verticalFov); m_Camera.Update(); }
 
     virtual void SaveSettings(IniFile::Values& values) const override;
     // scene file의 두 형식을 모두 읽는다. Fit=Model이면 지금 model을 담는 pose로 옮긴다.
@@ -211,6 +215,7 @@ public:
 
 private:
     EditorCameraController& m_Controller;
+    Camera& m_Camera;
     const ModelInstance& m_Model;
 };
 
@@ -295,6 +300,17 @@ const wchar_t kScenesFolder[] = L"Scenes/";
 // Wikipedia "Daylight"의 illuminance 표는 앞의 것을 111,000 lux로, 뒤의 것을 20,000 lux로 든다. 표에는 출처 표기가 없고 값도
 // 어림이다. sky의 radiance가 L이면 위를 향한 면은 πL lux를 받는다. 그래서 πL : kDefaultLightIntensity = 20,000 : 111,000이다.
 constexpr float kDefaultSkyIntensity = kDefaultLightIntensity / XM_PI * (20000.0f / 111000.0f);
+
+// scene file과 측정 조건의 줄에 세로 FOV가 없을 때의 값 (radian). FOV를 scene 마다 정하기 전의 camera는 늘 upstream Camera가 처음 두는
+// XM_PIDIV4 (45°)로 그렸으므로, 그때의 scene file과 줄이 그때와 같은 화면이 된다. scripts/viewer.py가 이 이름과 형식으로 읽는다.
+constexpr float kDefaultCameraVerticalFov = 0.785398163f;
+static_assert(kDefaultCameraVerticalFov == XM_PIDIV4, "scene files and lines without a vertical FOV must keep the view they had before");
+
+// 0 이하는 보이는 것이 없고, pi 이상은 camera 앞의 반구를 넘어 perspective projection이 정해지지 않는다.
+bool IsVerticalFov(float verticalFov)
+{
+    return verticalFov > 0.0f && verticalFov < XM_PI;
+}
 
 // direction을 그대로 +Z로 두고 +Y를 world의 위쪽에 가깝게 둔 rotation. direction은 단위 vector다.
 Matrix3 MakeRotationToward(Vector3 direction)
@@ -537,21 +553,35 @@ std::string FormatFloat(float value)
 // 글자가 있거나 받을 수 없는 값을 받지 않는다 (MeasurementConditions::Restore).
 using MeasurementConditions::ReadValue;
 
-void DescribeCameraConditions(const EditorCameraController& controller, MeasurementConditions::Values& values)
+void DescribeCameraConditions(const CameraComponent& camera, MeasurementConditions::Values& values)
 {
-    const EditorCameraController::Pose pose = controller.GetPose();
+    const EditorCameraController::Pose pose = camera.GetPose();
     values["camera"] = FormatVector(pose.position);
     values["heading"] = FormatFloat(pose.heading);
     values["pitch"] = FormatFloat(pose.pitch);
+    values["vertical fov"] = FormatFloat(camera.GetVerticalFov());
 }
 
-void ReadCameraConditions(EditorCameraController& controller, const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading)
+// vertical fov가 없는 줄은 FOV를 scene 마다 정하기 전의 줄이고 그때는 늘 kDefaultCameraVerticalFov로 그렸으므로, 그 FOV로 되돌린다.
+void ReadCameraConditions(CameraComponent& camera, const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading)
 {
-    EditorCameraController::Pose pose = controller.GetPose();
+    EditorCameraController::Pose pose = camera.GetPose();
     ReadValue(values, "camera", reading, [&pose](const std::string& text) { return ReadVector(text, pose.position); });
     ReadValue(values, "heading", reading, [&pose](const std::string& text) { return ReadNumbers(text, &pose.heading, 1); });
     ReadValue(values, "pitch", reading, [&pose](const std::string& text) { return ReadNumbers(text, &pose.pitch, 1); });
-    reading.applies.push_back([&controller, pose] { controller.SetPose(pose); });
+    float verticalFov = kDefaultCameraVerticalFov;
+    if (values.count("vertical fov") != 0)
+    {
+        ReadValue(values, "vertical fov", reading, [&verticalFov](const std::string& text)
+        {
+            return ReadNumbers(text, &verticalFov, 1) && IsVerticalFov(verticalFov);
+        });
+    }
+    reading.applies.push_back([&camera, pose, verticalFov]
+    {
+        camera.SetPose(pose);
+        camera.SetVerticalFov(verticalFov);
+    });
 }
 
 // scene의 해상도는 camera ray가 지나는 pixel 격자를 정하지만, UI가 보이면 dock 배치가 정하므로 되돌리지 않고 다르면 알린다.
@@ -646,11 +676,11 @@ void ReadSkyConditions(SkyComponent& sky, const MeasurementConditions::Values& v
 
 // raster와 path tracer가 그리는 조건을 Log와 capture의 줄에 담고 Restore로 되돌리게 한다. scene 은 ModelViewer::RegisterSceneConditions가,
 // path tracer의 설정은 PathTracerTuning이 더한다.
-void RegisterMeasurementConditions(EditorCameraController& cameraController, LightComponent& light, SkyComponent& sky)
+void RegisterMeasurementConditions(CameraComponent& camera, LightComponent& light, SkyComponent& sky)
 {
     MeasurementConditions::Register("camera", {
-        [&cameraController](MeasurementConditions::Values& values) { DescribeCameraConditions(cameraController, values); },
-        [&cameraController](const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading) { ReadCameraConditions(cameraController, values, reading); },
+        [&camera](MeasurementConditions::Values& values) { DescribeCameraConditions(camera, values); },
+        [&camera](const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading) { ReadCameraConditions(camera, values, reading); },
         { "camera" } });
     MeasurementConditions::Register("size", { DescribeSceneSize, ReadSceneSize, {} });
     MeasurementConditions::Register("taa", { DescribeTaa, ReadTaa, { "settings.Engine Tuning" } });
@@ -1075,6 +1105,7 @@ struct CameraSection
 {
     bool fitModel = false;
     EditorCameraController::Pose pose = { Vector3(kZero), 0.0f, 0.0f };
+    float verticalFov = kDefaultCameraVerticalFov;
 };
 
 // scene 은 scene file 하나로 연다. 형식은 IniFile이고 key는 아래와 같다. 실행 중에는 Scene menu와 scene open 명령으로 다른 scene 을 연다.
@@ -1089,8 +1120,10 @@ struct CameraSection
 //            Fit=Model: 위 셋 대신 둘 수 있다. bounding sphere 중심의 +z 쪽 반지름의 2배와 near clip을 더한 거리에서 -z를 본다.
 //            예전 -model의 OrbitCamera가 처음 그린 화면과 bit 단위로 같다. Save는 Fit=Model 줄을 지우고 지금 pose를 위 셋으로 쓴다.
 //            두 형식 중 하나가 없으면 scene file을 열지 않는다.
-// scene 을 열면 camera는 scene file의 pose로 시작한다. 다른 scene 의 줄을 Restore하면 줄의 camera를 쓴다. user.ini는 camera의 이동 속도만
-// 남긴다.
+//            Vertical FOV: camera의 세로 FOV (radian). 0보다 크고 pi보다 작다. 없으면 kDefaultCameraVerticalFov이고, 받을 수 없는 값이면
+//            scene file을 열지 않는다.
+// scene 을 열면 camera는 scene file의 pose와 세로 FOV로 시작한다. 다른 scene 의 줄을 Restore하면 줄의 camera를 쓴다. user.ini는
+// camera의 이동 속도만 남긴다.
 struct SceneFile
 {
     // scale과 radius 중 0이 아닌 하나만 쓴다.
@@ -1119,17 +1152,20 @@ const std::string* FindValue(const IniFile::Values& values, const char* key)
     return value == values.end() ? nullptr : &value->second;
 }
 
-// values가 Fit=Model과 Position, Heading, Pitch 중 한 형식만 가질 때 true를 돌려준다. Fit가 Model이 아니면 false다.
+// values가 Fit=Model과 Position, Heading, Pitch 중 한 형식만 가지고, Vertical FOV가 없거나 IsVerticalFov인 숫자일 때 true를 돌려준다.
+// Fit가 Model이 아니면 false다.
 bool ReadCameraSection(const IniFile::Values& values, CameraSection& camera)
 {
     const std::string* fit = FindValue(values, "Fit");
     const std::string* position = FindValue(values, "Position");
     const std::string* heading = FindValue(values, "Heading");
     const std::string* pitch = FindValue(values, "Pitch");
+    const std::string* verticalFov = FindValue(values, "Vertical FOV");
     camera.fitModel = fit != nullptr && *fit == "Model";
     const bool hasPose = position != nullptr && heading != nullptr && pitch != nullptr && ReadVector(*position, camera.pose.position) &&
         ReadNumbers(*heading, &camera.pose.heading, 1) && ReadNumbers(*pitch, &camera.pose.pitch, 1);
-    return camera.fitModel != hasPose && (fit == nullptr || camera.fitModel);
+    const bool readsVerticalFov = verticalFov == nullptr || (ReadNumbers(*verticalFov, &camera.verticalFov, 1) && IsVerticalFov(camera.verticalFov));
+    return readsVerticalFov && camera.fitModel != hasPose && (fit == nullptr || camera.fitModel);
 }
 
 // 받을 수 없는 값이 있으면 error에 이유를 쓰고 false를 돌려준다.
@@ -1160,7 +1196,7 @@ bool ReadSceneFile(const std::wstring& path, SceneFile& scene, std::string& erro
     CameraSection camera;
     if (!ReadCameraSection(sections[kCameraName], camera))
     {
-        error = "needs either [Camera] Fit=Model or Position=<x>,<y>,<z> with Heading and Pitch";
+        error = "needs either [Camera] Fit=Model or Position=<x>,<y>,<z> with Heading and Pitch, and Vertical FOV, if any, in radians above 0 and below pi";
         return false;
     }
     return true;
@@ -1185,6 +1221,7 @@ void CameraComponent::SaveSettings(IniFile::Values& values) const
     values["Position"] = FormatVector(pose.position);
     values["Heading"] = FormatFloat(pose.heading);
     values["Pitch"] = FormatFloat(pose.pitch);
+    values["Vertical FOV"] = FormatFloat(GetVerticalFov());
 }
 
 void CameraComponent::LoadSettings(const IniFile::Values& values)
@@ -1193,8 +1230,10 @@ void CameraComponent::LoadSettings(const IniFile::Values& values)
     if (!ReadCameraSection(values, camera))
     {
         m_Controller.SetPose(GetDefaultPose());
+        SetVerticalFov(kDefaultCameraVerticalFov);
         return;
     }
+    SetVerticalFov(camera.verticalFov);
     if (!camera.fitModel)
     {
         m_Controller.SetPose(camera.pose);
@@ -1219,8 +1258,12 @@ void ShowCameraDetails(CameraComponent& camera)
         pose.position = Vector3(position[0], position[1], position[2]);
         camera.SetPose(pose);
     }
+    float verticalFov = camera.GetVerticalFov();
+    if (ImGui::SliderAngle("Vertical FOV", &verticalFov, 1.0f, 179.0f, "%.2f deg", ImGuiSliderFlags_AlwaysClamp))
+        camera.SetVerticalFov(verticalFov);
+    ImGui::SetItemTooltip("Vertical field of view. The scene file keeps it in radians.");
     ImGui::TextDisabled("You look through the camera, so it has no icon or gizmo. Move it with the mouse and keys.");
-    ImGui::TextDisabled("Scene > Save writes this pose. The move speed is not part of the scene and stays in user.ini.");
+    ImGui::TextDisabled("Scene > Save writes this pose and field of view. The move speed is not part of the scene and stays in user.ini.");
 }
 
 ControlChannel::Fields DescribeScene(const std::string& path)
@@ -1383,12 +1426,12 @@ void ModelViewer::RegisterSceneCommand(void)
 {
     ControlChannel::Register("scene", "scene open <scene file> | scene save: open opens the scene file, relative to the ModelViewer folder "
         "as -scene takes it, as the Scene menu does. The model changes, the objects take their settings in the scene file, so the camera "
-        "moves to the pose of the scene file and the lights change, and the path tracer starts over. Changes to the objects not saved, "
+        "takes the pose and vertical field of view of the scene file and the lights change, and the path tracer starts over. Changes to the objects not saved, "
         "such as a camera moved since, are lost. The settings, camera move speed, window and UI stay. "
         "Fails and changes nothing if the scene file cannot be opened. "
         "save writes the settings of the objects to the scene file open, as Save in the Scene menu does, and leaves its other lines. "
-        "The camera is one of the objects, so save writes its current pose as Position, Heading and Pitch, as editor get Camera gives them, "
-        "and drops a [Camera] Fit=Model. state scene has the scene file open", [this](const std::string& arguments, const ControlChannel::Reply& reply)
+        "The camera is one of the objects, so save writes its current pose as Position, Heading and Pitch and its vertical field of view "
+        "as Vertical FOV, as editor get Camera gives them, and drops a [Camera] Fit=Model. state scene has the scene file open", [this](const std::string& arguments, const ControlChannel::Reply& reply)
     {
         if (arguments == "save")
         {
@@ -1455,7 +1498,7 @@ void ModelViewer::Startup( void )
 #endif
     m_Camera.SetZRange(1.0f, 10000.0f);
     m_CameraController.reset(new EditorCameraController(m_Camera, Vector3(kYUnitVector)));
-    m_CameraObject.AddComponent<CameraComponent>(*m_CameraController, m_ModelInst);
+    CameraComponent& camera = m_CameraObject.AddComponent<CameraComponent>(*m_CameraController, m_Camera, m_ModelInst);
     // scene 을 열 때 object가 scene file의 설정을 받도록 먼저 등록한다.
     Scene::AddObject(m_ModelObject);
     Scene::AddObject(m_CameraObject);
@@ -1489,7 +1532,7 @@ void ModelViewer::Startup( void )
     RegisterLight(m_Light);
     RegisterSky(m_Sky);
     RegisterSceneConditions();
-    RegisterMeasurementConditions(cameraController, m_Light, m_Sky);
+    RegisterMeasurementConditions(camera, m_Light, m_Sky);
 }
 
 void ModelViewer::Cleanup( void )
