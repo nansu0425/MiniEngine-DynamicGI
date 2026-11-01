@@ -78,3 +78,6 @@
 | 2026-11-01 | d943ca7+ | Profile | NVIDIA GeForce RTX 4060 Laptop GPU | 1024x1024 | [X1] | 0 | 1 | 3.9.1 cuda_ad_rgb | 16384 | 1.12e-03 | 7.03e-04 | -2.51e-05 | 5.20e-05 | 2.69e-05 | 0.00e+00 | 4.60e-04 | 5.02e-04 |
 | 2026-11-01 | d943ca7+ | Profile | NVIDIA GeForce RTX 4060 Laptop GPU | 1024x1024 | [X2] | 1 | 2 | 3.9.1 cuda_ad_rgb | 16384 | 5.64e-03 | 7.20e-04 | -3.32e-05 | 9.77e-05 | 6.45e-05 | 0.00e+00 | 5.28e-04 | 5.31e-04 |
 | 2026-11-01 | d943ca7+ | Profile | NVIDIA GeForce RTX 4060 Laptop GPU | 1024x1024 | [X3] | 64 | 65 | 3.9.1 cuda_ad_rgb | 16384 | 7.70e-03 | 9.37e-04 | -2.43e-05 | 8.61e-05 | 6.18e-05 | 2.21e-04 | 6.04e-04 | 5.62e-04 |
+| 2026-11-01 | d943ca7+ | Profile | NVIDIA GeForce RTX 4060 Laptop GPU | 1024x1024 | [X1] | 0 | 1 | 3.9.1 cuda_ad_rgb | 16384 | 1.12e-03 | 7.03e-04 | -2.51e-05 | 5.20e-05 | 2.69e-05 | 0.00e+00 | 4.60e-04 | 5.02e-04 |
+| 2026-11-01 | d943ca7+ | Profile | NVIDIA GeForce RTX 4060 Laptop GPU | 1024x1024 | [X2] | 1 | 2 | 3.9.1 cuda_ad_rgb | 16384 | 5.64e-03 | 7.20e-04 | -5.30e-05 | 1.17e-04 | 6.45e-05 | 0.00e+00 | 5.01e-04 | 5.31e-04 |
+| 2026-11-01 | d943ca7+ | Profile | NVIDIA GeForce RTX 4060 Laptop GPU | 1024x1024 | [X3] | 64 | 65 | 3.9.1 cuda_ad_rgb | 16384 | 7.70e-03 | 9.37e-04 | -9.36e-06 | 7.11e-05 | 6.18e-05 | 0.00e+00 | 5.56e-04 | 5.62e-04 |
