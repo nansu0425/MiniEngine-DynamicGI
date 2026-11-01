@@ -52,6 +52,16 @@ harness 는 agent 가 ModelViewer 를 build, 실행하고 명령으로 조작, c
 - 할 일: `viewer.py` 가 pixtool 의 launch 와 GPU capture 를 감싼다.
 - 근거: GPU capture, resource 저장, shader debugging 이 필요할 때 쓴다. RenderDoc 은 DXR 을 지원하지 않아 고르지 않았다.
 
+### scene object 를 type 으로 찾기 (로드맵 작업 13 (b) 뒤)
+
+- 할 일: harness 와 check script 가 directional light, camera, sky 같은 역할의 scene object 를 이름이 아니라 component type 으로 찾는다. 그러려면 `state` 가 object 마다 component type 을 주어야 한다. light 는 LightComponent 의 Type 도 준다.
+- 함께 정할 것
+  - app 없이 scene file 을 읽는 script 가 type 으로 section 을 찾으려면 scene file 이 object 의 type 을 담아야 한다. app 이 이름을 바꾼 scene file 을 열 때도 같은 정보가 필요하므로, 이 일은 object 의 이름을 바꾸는 기능과 묶인다. 범위에 넣을지는 시작할 때 정한다.
+  - type 이 같은 object 가 둘 이상인 scene 에서는 type 만으로 object 를 하나로 정할 수 없다. 그때 check 가 object 를 고르는 방법을 정한다.
+- 근거
+  - scene object 의 이름은 scene 안에서 object 를 식별하는 식별자일 뿐이고, 바뀔 수 있으며 scene 마다 다를 수 있다 (사용자가 정한 원칙). harness 가 이름으로 역할을 찾으면, 이름이 바뀔 때 harness 와 check 가 함께 깨진다.
+  - 지금 script 는 app 이 붙인 이름을 여러 곳에 따로 적는다. `viewer.py` 와 `directlightchecks.py` 는 같은 상수 `LIGHT_OBJECT` 를 따로 정의하고, `check-convergence.py` 는 scene file 의 section 을 글자 이름으로 읽는다. Sky Light 를 Sky 로 바꾼 cf8ddc7 은 `scripts/` 의 파일 14 개를 고쳤다.
+
 ## 보류한 결정
 
 ### 사람의 입력을 흉내 내는 조작
