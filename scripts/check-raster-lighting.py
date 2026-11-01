@@ -32,10 +32,11 @@ Sponza 에는 emissive 와 occlusion texture 가 없어서 그 둘은 test scene
 
   [7] profile Generate SSAO 가 실패한다. SSAO pass 가 돌지 않는다.
   [8] Engine Tuning 에 Viewer/Lighting/Environment 와 Viewer/Lighting/Gloss Reduction 이 없다.
-  [13] harness baseline 의 시점에서 camera 를 멈춘 채 motion blur 를 켜고 찍은 capture 가 끄고 찍은 capture 와 같다. motion blur 는
-       g_LinearDepth 로 camera 의 velocity 를 구하므로 (ModelViewer::RenderScene), SSAO 를 빼도 linear depth 가 이번 frame 의 depth
-       로 채워지는지 본다. 끄고 찍은 capture 에서 Front Face capture 가 앞면을 본 pixel 중 0 이 아닌 것이 화면의
-       MIN_LIT_FRACTION 보다 적으면 실패한다. 배경의 sky 는 늘 0 이 아니므로 세지 않는다.
+  [13] 측정 scene (viewer.measurement_scenes) 마다 scene 의 camera 와 light 에서 camera 를 멈춘 채 motion blur 를 켜고 찍은 capture 가
+       끄고 찍은 capture 와 같다. motion blur 는 g_LinearDepth 로 camera 의 velocity 를 구하므로 (ModelViewer::RenderScene), SSAO 를
+       빼도 linear depth 가 이번 frame 의 depth 로 채워지는지 본다. 끄고 찍은 capture 에서 Front Face capture 가 앞면을 본 pixel 중 0 이
+       아닌 것이 화면의 MIN_LIT_FRACTION 보다 적은 scene 은 N/A (해당 없음) 이고, 모든 측정 scene 이 N/A 면 실패한다. 배경의 sky 는
+       늘 0 이 아니므로 세지 않는다.
 
 source:
 
@@ -55,7 +56,7 @@ import numpy as np
 from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from checks import Checks, stop_and_check
+from checks import Checks, check_in_measurement_scenes, stop_and_check
 from gltfwriter import GLTF_FLOAT, GLTF_UNSIGNED_SHORT, BufferBuilder, flatten
 from imagefiles import ImageFileError, read_dds_rgba32f
 from imagemasks import column_groups, eroded
@@ -86,7 +87,8 @@ QUADS = [
                     rotation=(-math.sin(math.pi / 8), 0.0, 0.0, math.cos(math.pi / 8))),
 ]
 
-# harness baseline 의 시점에서 해가 닿는 pixel 은 약 7% 다.
+# 해가 닿는 pixel 은 harness baseline 의 시점에서 약 7% 였고, 측정 scene 에서 sponza-color-bleeding 2.3%, sponza-fireflies 0.19%,
+# sponza-overhead-light 6.3% 다.
 MIN_LIT_FRACTION = 0.01
 MOTION_BLUR_SETTING = 'Graphics/Motion Blur/Enable'
 SSAO_SCOPE = 'Generate SSAO'
@@ -214,15 +216,16 @@ def front_face_mask(session, name):
     return np.all(front_face == FRONT_FACE_COLOR, axis=2)
 
 
-def check_motion_blur(session, check):
-    still = motion_blur_capture(session, False, 'sponza-motion-blur-off')
-    blurred = motion_blur_capture(session, True, 'sponza-motion-blur-on')
+def check_motion_blur(session, check, scene_name):
+    still = motion_blur_capture(session, False, f'{scene_name}-motion-blur-off')
+    blurred = motion_blur_capture(session, True, f'{scene_name}-motion-blur-on')
     session.ask_ok(f'settings set Engine Tuning: {MOTION_BLUR_SETTING}=off')
-    surface = front_face_mask(session, 'sponza-front-face')
+    surface = front_face_mask(session, f'{scene_name}-front-face')
     lit = float((surface & np.any(still != 0.0, axis=2)).mean())
     same = np.array_equal(still.view(np.uint32), blurred.view(np.uint32))
-    check('[13] motion blur with the camera still changes no pixel', same and lit >= MIN_LIT_FRACTION,
-          f'{describe_difference(still, blurred)}; {lit:.1%} of the pixels are lit, at least {MIN_LIT_FRACTION:.0%} needed')
+    judged = check.premised(f'[13] {scene_name}: motion blur with the camera still changes no pixel', lit >= MIN_LIT_FRACTION, same,
+                            f'{describe_difference(still, blurred)}; {lit:.1%} of the pixels are lit, at least {MIN_LIT_FRACTION:.0%} needed')
+    return {'[13]': judged}
 
 
 def run_sponza(build_first, check):
@@ -231,8 +234,8 @@ def run_sponza(build_first, check):
         session = Session(instance)
         try:
             session.ask_ok('ui hide')
-            check_motion_blur(session, check)
             check_settings(session, check)
+            check_in_measurement_scenes(session, check, check_motion_blur)
         finally:
             session.close()
         stop_and_check(instance, check)
