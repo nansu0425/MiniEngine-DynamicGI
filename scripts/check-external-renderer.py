@@ -49,6 +49,12 @@ off) 과 Seed 0, 1 이다. Mitsuba 는 MITSUBA_VARIANT 로 원본 scene 을 그�
   [X5] accumulate 가 깊이마다 PT, Mitsuba, 둘의 차의 PNG 를 같은 exposure (PREVIEW_EXPOSURE) 로 남긴다 (발표용). check --record 는 [X4] 가
        통과하면 [X1] ~ [X3] 이 실패해도 측정 기록에 깊이마다 d, b, 상한, floor, spp, 각 renderer 의 한 run 의 noise
        (imagecompare.relative_noise), Mitsuba 의 version 과 variant 를 덧붙인다.
+  [X6] 깊이마다, Mitsuba scene 의 shape 마다, shape 안쪽 pixel 만으로 낸 imagecompare.bias 의 d 상한과 floor 가 BIAS_BUDGET 이하다.
+       안쪽 pixel 은 가운데, 네 변의 가운데, 네 모서리의 sample 이 모두 그 shape 의 같은 면을 맞는 pixel 이다. 면이 볼록하므로 pixel
+       전체가 그 면을 본다. b 는 image 전체의 rms 로 나누어, 화면의 0.5% 인 light pixel 이 그 rms 를 지배한다. 그래서 어두운 면의 차에
+       둔감하므로 shape 마다 그 shape 의 평균으로 나눈 d 를 본다. 두 renderer 가 그 pixel 에서 모두 0 이면 같다. PT 의 합이 0 인데
+       Mitsuba 가 0 이 아니면 실패다. floor 가 BIAS_BUDGET 을 넘는 (깊이, shape) 는 그 spp 로 판정할 수 없으므로 판정하지 않고 floor 를
+       알린다. Max Bounces 0, 1 의 천장처럼 빛이 거의 닿지 않는 shape 가 그렇다. 대신 모든 shape 가 한 깊이 이상에서 판정되어야 한다.
 """
 
 import argparse
@@ -68,6 +74,7 @@ import cornellbox
 from checks import Checks
 from imagecompare import bias, relative_noise
 from imagefiles import ImageFileError, read_dds_rgba32f
+from pickanswers import PIXEL_CORNER_OFFSETS, PIXEL_EDGE_OFFSETS, seen_faces
 from pathtracerchecks import (BASE, BIAS_BUDGET, SKY_COLOR, SKY_RADIANCE, append_record_row, code_version, describe_machine,
                               path_tracer_settings, set_path_tracer)
 from viewer import (CAMERA_OBJECT, HARNESS_DIR, PREVIEW_EXPOSURE, VIEWER_DIR, HarnessError, Session, baseline_scene, read_scene_file, shots_dir,
@@ -191,8 +198,9 @@ def expected_differences(original, bounces):
 # --- accumulate ---------------------------------------------------------------------------
 
 def state_for_validity(state):
-    """[X4] 가 보는 PT run 의 state"""
-    return {'scene': state['ui']['scene'], 'camera': {key: state['camera'][key] for key in ('x', 'y', 'z', 'heading', 'pitch', 'vertical_fov')},
+    """[X4] 와 [X6] 이 보는 PT run 의 state"""
+    camera_keys = ('x', 'y', 'z', 'heading', 'pitch', 'vertical_fov', 'forward', 'near', 'far')
+    return {'scene': state['ui']['scene'], 'camera': {key: state['camera'][key] for key in camera_keys},
             'light_intensity': state['light']['intensity'], 'sky_intensity': state['sky']['intensity'],
             'path_tracer': path_tracer_settings(state['settings']['Engine Tuning']), 'samples': state['pt']['samples'], 'seconds': state['pt']['seconds']}
 
@@ -368,6 +376,61 @@ def check_comparison(check, results):
               f'noise of a run: PT {path_tracer_noise:.3e}, Mitsuba {mitsuba_noise:.3e}')
 
 
+def shape_interiors(manifest):
+    """[X6] 의 shape 마다 안쪽 pixel 의 mask. PT run 의 camera 와 scene 크기로 Mitsuba scene 의 면을 본다."""
+    faces = cornellbox.world_faces(cornellbox.read(source_scene()), float(read_scene_file(SCENE)['Model']['Scale']))
+    state = manifest['runs'][pt_name(BOUNCES['X1'], SEEDS[0])]['state']
+    center = seen_faces(state['camera'], state['scene'], faces)
+    interior = np.all([seen_faces(state['camera'], state['scene'], faces, offset) == center
+                       for offset in PIXEL_EDGE_OFFSETS[1:] + PIXEL_CORNER_OFFSETS], axis=0)
+    return {shape: interior & np.isin(center, [index for index, face in enumerate(faces) if face.shape == shape])
+            for shape in sorted({face.shape for face in faces})}
+
+
+def compare_shapes(manifest, interiors):
+    """(깊이, shape) 마다 안쪽 pixel 의 imagecompare.bias. 두 renderer 가 모두 0 이면 'zero', PT 의 합만 0 이면 'pt zero' 다."""
+    results = {}
+    for bounces in BOUNCES.values():
+        path_tracer = [read_run(manifest, pt_name(bounces, seed))[..., :3] for seed in SEEDS]
+        mitsuba = [read_run(manifest, mitsuba_name(bounces, seed)) for seed in SEEDS]
+        for shape, interior in interiors.items():
+            pixels = [image[interior] for image in path_tracer + mitsuba]
+            if not any(np.any(image != 0.0) for image in pixels):
+                results[(bounces, shape)] = 'zero'
+            elif not any(np.any(image != 0.0) for image in pixels[:len(SEEDS)]):
+                results[(bounces, shape)] = 'pt zero'
+            else:
+                results[(bounces, shape)] = bias(*pixels)
+    return results
+
+
+def check_shapes(check, interiors, results):
+    """[X6]"""
+    judged = {shape: [] for shape in interiors}
+    for bounces in BOUNCES.values():
+        failed, unjudged, passed = [], [], []
+        for shape, interior in interiors.items():
+            result = results[(bounces, shape)]
+            if result == 'zero':
+                judged[shape].append(bounces)
+                passed.append(f'{shape} 0 in both')
+            elif result == 'pt zero':
+                judged[shape].append(bounces)
+                failed.append(f'{shape}: PT is 0 where Mitsuba is not')
+            elif not result.difference_floor <= BIAS_BUDGET:
+                unjudged.append(f'{shape} (floor {result.difference_floor:.1e})')
+            else:
+                judged[shape].append(bounces)
+                text = (f'{shape} d {result.difference:+.2e} (bound {result.difference_bound:.2e}, floor {result.difference_floor:.1e}, '
+                        f'{int(interior.sum())} pixels)')
+                (failed if result.difference_bound > BIAS_BUDGET else passed).append(text)
+        check(f'[X6] Max Bounces {bounces}: the d bound and floor of each shape in its interior pixels are {BIAS_BUDGET:g} or less',
+              not failed, '; '.join(failed + passed) + (f'; not judged: {", ".join(unjudged)}' if unjudged else ''))
+    never = [shape for shape, depths in judged.items() if not depths]
+    check('[X6] every shape is judged at one depth or more', not never, ', '.join(never) or
+          ', '.join(f'{shape} at {depths}' for shape, depths in judged.items()))
+
+
 def record(manifest, results):
     today = date.today().isoformat()
     mitsuba = f'{manifest["mitsuba"]["version"]} {manifest["mitsuba"]["variant"]}'
@@ -386,6 +449,8 @@ def command_check(args):
         valid = check_validity(check, manifest)
         results = compare(manifest)
         check_comparison(check, results)
+        interiors = shape_interiors(manifest)
+        check_shapes(check, interiors, compare_shapes(manifest, interiors))
     except (OSError, KeyError, ImageFileError, cornellbox.SceneError) as error:
         check('every run of accumulate is kept', False, f'{error!r}; run accumulate')
         valid, results = False, {}

@@ -75,6 +75,39 @@ def nearest_face(origin, direction, faces, t_min, t_max):
     return nearest
 
 
+def seen_faces(camera, scene, faces, offset=(0.0, 0.0)):
+    """scene 의 모든 pixel 에서, pixel 의 가운데를 offset (pixel) 만큼 옮긴 sample 이 near 와 far 사이에서 처음 맞는 면의 faces 안
+    index. miss 는 -1 이다. pixel 마다 camera_ray 와 nearest_face 를 부르는 것과 같은 계산을 배열로 한 번에 한다."""
+    import numpy as np
+    forward = vector_of(camera['forward'])
+    unit_forward = forward / np.linalg.norm(forward)
+    right = np.cross(unit_forward, [0.0, 1.0, 0.0])
+    right /= np.linalg.norm(right)
+    up = np.cross(right, unit_forward)
+    half_height = np.tan(float(camera['vertical_fov']) / 2)
+    half_width = half_height * scene['width'] / scene['height']
+    y, x = np.mgrid[0:scene['height'], 0:scene['width']].astype(np.float64)
+    x, y = x + offset[0], y + offset[1]
+    direction = (unit_forward + right * half_width * (2 * x / scene['width'] - 1)[..., None]
+                 + up * half_height * (1 - 2 * y / scene['height'])[..., None])
+    direction /= np.linalg.norm(direction, axis=-1, keepdims=True)
+    origin = vector_of(camera)
+    cosine = direction @ forward
+    t_min, t_max = float(camera['near']) / cosine, float(camera['far']) / cosine
+    nearest_t, nearest = np.full(cosine.shape, np.inf), np.full(cosine.shape, -1)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        for index, face in enumerate(faces):
+            denominator = direction @ face.normal
+            facing = (denominator != 0.0) & ((denominator < 0.0) | face.double_sided)
+            t = ((face.center - origin) @ face.normal) / denominator
+            local = origin + t[..., None] * direction - face.center
+            dual_u, dual_v = np.cross(face.half_v, face.normal), np.cross(face.normal, face.half_u)
+            s, r = (local @ dual_u) / (face.half_u @ dual_u), (local @ dual_v) / (face.half_v @ dual_v)
+            hit = facing & (t >= t_min) & (t <= t_max) & (t < nearest_t) & (np.abs(s) <= 1.0) & (np.abs(r) <= 1.0)
+            nearest_t, nearest = np.where(hit, t, nearest_t), np.where(hit, index, nearest)
+    return nearest
+
+
 def is_unambiguous(seen_at, pixel, offsets=PIXEL_EDGE_OFFSETS):
     """seen_at(sample) 이 pixel 의 가운데에서 offsets 만큼 옮긴 sample 마다 같은 값을 돌려주는가. seen_at 의 값은 hash 할 수 있어야 한다."""
     import numpy as np
