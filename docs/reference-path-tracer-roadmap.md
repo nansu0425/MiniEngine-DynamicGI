@@ -109,6 +109,7 @@ commit message 와 `docs/harness-roadmap.md` 가 작업을 번호로 가리키�
 - TANGENT 가 없을 때 MikkTSpace 로 tangent 를 만드는 일 (`Specification.adoc:1759`): TANGENT 없이 normal map 을 쓰는 asset 을 처음 쓸 때. 계획은 7b3ba43 의 이 문서 작업 4 (a) 에 있다.
 - metal 의 multiple scattering (`Specification.adoc:3637` 이 권한다): rough 한 metal 의 energy 손실이 결과를 바꾸는 장면이나 RT Reflection 전. 지금은 single scattering 이라 baseColor 1, roughness 1 인 metal 이 수직에서 0.31 만 반사한다 (작업 8 의 `kept/gltf-brdf/brdf/cells.json`).
 - glTF BRDF 의 coupling table 을 grazing 에서 더 촘촘히 두는 일: E_s 의 보간 오차가 μ ≥ 0.03 에서 3.0e-4, 그 아래에서 7.3e-4 까지이고 energy 가 느는 쪽은 3.4e-4 까지다 (`scripts/gltfbrdf.py`). 작업 12 의 bias 가 grazing 에 몰릴 때. 작업 12 는 bias 를 Lambert 로만 재서 이 조건을 보지 못했다.
+- Shading glTF 의 다음 ray 방향을 furnace 가 아닌 scene 에서 검증하는 일: glossy 재질의 정답이 결과를 바꿀 때나 RT Reflection 전. 대상은 PathTracerCS.hlsl 의 TraceRadiance 가 SampleGltfBrdfDirection 이 고른 방향으로 다음 ray 를 쏘는 code 다. 작업 13 (b) 의 외부 renderer 비교는 Shading Lambert 로 그려 이 code 를 지나지 않아서, 지금은 furnace 만 이 code 를 본다. furnace 가 잡지 못하는 오류는 `scripts/check-external-renderer.py` 의 검증하지 않는 범위에 있다.
 - 방향에 따라 다른 sky 와 그 importance sampling, MIS: 상수 sky 로는 볼 수 없는 결과가 필요해질 때. 그때 맞는 sky 를 구하거나 만든다.
 - 상수 sky 의 NEE 와 MIS: 작업 12 가 sky 에서 오는 빛 때문에 수렴이 느리다고 잴 때. 작업 12 는 sky 에서 오는 빛의 몫을 따로 재지 않았다. 상수 sky 의 방향을 cosine 으로 고르면 pdf 가 Lambert 의 BRDF sampling 과 같아서 얻는 것이 적다. Sponza 의 실내에서는 sky 가 courtyard 로만 보이므로, 그 구멍 쪽을 고르는 portal sampling 이 있어야 효과를 볼 것이다 (추측).
 - emissive triangle 의 NEE: 작은 emitter 가 수렴을 막을 때

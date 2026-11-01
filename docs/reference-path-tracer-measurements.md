@@ -65,3 +65,10 @@
 | 2026-11-01 | 926c737+ | Profile | NVIDIA GeForce RTX 4060 Laptop GPU | 1920x1080 | [C3] | sponza-overhead-light | Max Bounces 64 대 4096 | 16384 | -6.16e-11 | 8.85e-11 | 0.00e+00 | 4.27e-07 |
 | 2026-11-01 | 926c737+ | Profile | NVIDIA GeForce RTX 4060 Laptop GPU | 1920x1080 | [C4] | sponza-overhead-light | Max Bounces 8 의 Russian roulette on 대 off | 16384 | 2.69e-08 | 1.45e-06 | 0.00e+00 | 2.12e-04 |
 | 2026-11-01 | 926c737+ | Profile | NVIDIA GeForce RTX 4060 Laptop GPU | 1920x1080 | [C5] | sponza-color-bleeding | 131072 spp 한 run 대 8192 spp 16 run 의 float64 평균 | 131072 | -1.51e-05 | 3.76e-05 | 0.00e+00 | 4.95e-04 |
+
+## 작업 13: 외부 renderer 와의 비교
+
+`python -I scripts/check-external-renderer.py check --record` 가 덧붙인다. 두 renderer 의 조건은 그 script 에 있다. d 와 b, 그 상한과 floor 의 식은 `scripts/imagecompare.py` 의 bias 에 있고, 모두 image 의 크기에 대한 비다. noise 는 각 renderer 의 한 run (Seed 하나) 의 상대 noise 로, 같은 파일의 e 다.
+
+| 날짜 | 코드 | config | GPU | scene | 기준 | PT Max Bounces | Mitsuba max_depth | Mitsuba | spp | PT noise | Mitsuba noise | d | d 상한 | d floor | b | b 상한 | b floor |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
