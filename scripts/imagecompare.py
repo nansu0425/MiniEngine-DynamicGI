@@ -29,6 +29,10 @@ pixel 마다 다른 난수열을 쓴다.
   t = |A1 - B0|^2 - |A0 - A1|^2                               B1 이 없을 때. B0 의 noise 분산이 A 의 한 추정과 같아야 기대값이 |b|^2 이다.
   b = sqrt(mean(t) / 3) / rms(Am)                            rms 차. pixel 마다 부호가 바뀌는 차도 잡는다.
 
+한 설정의 한 추정이 갖는 noise 는 Seed 만 다른 두 추정 X0, X1 로 낸다. Xm 은 둘의 평균이다.
+
+  e = RMSE(X0, X1) / (sqrt(2) rms(Xm))                        상대 noise. 두 추정의 차는 한 추정의 noise 분산의 두 배를 갖는다.
+
 상한은 d 의 크기와 mean(t) 에 각각 표준오차 (pixel 사이의 표준편차 / sqrt(pixel 수)) 의 BOUND_STANDARD_ERRORS 배를 더한 값이다.
 floor 는 차가 0 으로 나왔을 때의 상한이다. floor 가 비교할 비보다 크면 그 spp 로는 차가 그 비 아래인지 판정할 수 없다.
 """
@@ -82,6 +86,14 @@ def rmse(x, y):
 def relative_rmse(x, reference):
     reference = rgb_of(reference)
     return float(np.sqrt(np.sum(np.square(rgb_of(x) - reference)) / np.sum(np.square(reference))))
+
+
+def relative_noise(x0, x1, mask=None):
+    """e. mask 가 있으면 그 pixel 만 본다."""
+    x0, x1 = rgb_of(x0), rgb_of(x1)
+    if mask is not None:
+        x0, x1 = x0[mask], x1[mask]
+    return float(np.sqrt(np.mean(np.square(x0 - x1)) / 2.0) / np.sqrt(np.mean(np.square((x0 + x1) / 2.0))))
 
 
 def agreement(a0, a1, b0, b1):

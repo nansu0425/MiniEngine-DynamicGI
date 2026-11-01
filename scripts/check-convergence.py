@@ -19,7 +19,7 @@ accumulate 는 run 마다 scene 을 다시 열고, 연 뒤의 state 에서 읽�
 MANIFEST 의 run 에 남긴다. check 는 scene file 의 경로와 camera, light, Sky 가 없거나 지금 scene file 의 값과 다른 run 을 쓰지 않고
 FAIL 로 알린다. 쓰지 않은 run 은 다시 accumulate 한다. 세로 FOV 를 남기기 전의 run 은 45° 로 쌓은 것으로 본다 (UNRECORDED_VERTICAL_FOV).
 
-  e(N) = RMSE(X0(N), X1(N)) / (sqrt(2) rms(Xm(N)))   한 run 의 상대 noise. Xm 은 두 Seed 의 평균이다.
+  e(N)   한 run 의 상대 noise. Seed 0, 1 의 N spp export X0(N), X1(N) 의 imagecompare.py 의 e 다.
 
 예산: 정답 한 run 의 e 는 NOISE_BUDGET, bias 원인 하나는 BIAS_BUDGET 이하다. check-gltf-brdf.py 의 [B5] 가 작업 12 의 정답 오차를 1%
 로 보고 허용 오차를 그 1/5 로 정했으므로 같은 값을 쓴다. d, b 와 그 상한, floor 는 imagecompare.py 의 bias 다. floor 가 예산보다 크면
@@ -68,9 +68,10 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from checks import Checks
-from imagecompare import bias
+from imagecompare import bias, relative_noise
 from imagefiles import ImageFileError, read_dds_rgba32f
-from pathtracerchecks import BASE, SKY_COLOR, SKY_RADIANCE, append_record_row, code_version, describe_machine, set_path_tracer
+from pathtracerchecks import (BASE, BIAS_BUDGET, SKY_COLOR, SKY_RADIANCE, append_record_row, code_version, describe_machine,
+                              set_path_tracer)
 from viewer import (ENGINE_DIR, HARNESS_DIR, PREVIEW_EXPOSURE, REPO_ROOT, VIEWER_DIR, HarnessError, Session, default_vertical_fov, make_view,
                     measurement_scenes, read_scene_file, shots_dir, start_instance, stop_instance)
 
@@ -90,7 +91,6 @@ LAMBERT = {'Shading': 'Lambert'}
 GLTF = {'Shading': 'glTF'}
 
 NOISE_BUDGET = 0.01
-BIAS_BUDGET = 0.002
 # N_gt 를 정하지 않고 e 만 재는 측정 scene. sponza-fireflies 는 noise 가 커서 Lambert 가 NOISE_BUDGET 에 이르려면 약 2^19 spp, 한 Seed 에
 # 약 67 분이 걸린다 (e(1024) 로 한 어림). 사용자가 noise 를 줄인 뒤에 정답의 구도로 쓰기로 했다.
 SCENES_WITHOUT_GROUND_TRUTH = ['sponza-fireflies']
@@ -337,11 +337,6 @@ def read_export(manifest, name, samples):
 
 def rgb64(image):
     return np.asarray(image[..., :3], dtype=np.float64)
-
-
-def relative_noise(x0, x1, hits):
-    x0, x1 = rgb64(x0)[hits], rgb64(x1)[hits]
-    return float(np.sqrt(np.mean(np.square(x0 - x1)) / 2.0) / np.sqrt(np.mean(np.square((x0 + x1) / 2.0))))
 
 
 def relative_noise_standard_error(x0, x1, hits):

@@ -16,6 +16,9 @@ from imagefiles import read_dds_r32f
 from viewer import REPO_ROOT, SETTLE_FRAMES, HarnessError, capture
 
 RECORD = REPO_ROOT / 'docs' / 'reference-path-tracer-measurements.md'
+# PT 의 정답에서 bias 원인 하나가 넘지 않아야 하는 차. imagecompare.py 의 bias 가 내는 d, b 의 상한과 floor 를 이 값과 비교한다. 값의 근거는
+# check-convergence.py 의 docstring 의 예산이다.
+BIAS_BUDGET = 0.002
 # PT 의 설정은 Engine Tuning 의 Path Tracer 에 있다. settings 의 key 는 PT 의 설정 이름 앞에 KEY_PREFIX 를 붙인 것이다.
 SECTION = 'Engine Tuning'
 KEY_PREFIX = 'Path Tracer/'
