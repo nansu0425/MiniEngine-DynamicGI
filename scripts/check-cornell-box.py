@@ -21,16 +21,18 @@ scene file 의 Scale 로 바꾼다.
   [E2] KHR_materials_emissive_strength 를 뺀 glTF 에서 [E1] 의 light pixel 은 emissiveFactor 와 상대 1e-6 안이다.
   [N1] [W2] 의 칸에서 shading normal 과 vertex normal 의 각도가 0.1° 이하다.
   [V3] pose, pose look-at, describe, restore 가 error 없이 동작하고 state camera 의 controller 가 editor, state scene 이 SCENE 이다.
-  [V4] 처음과 다른 pose, light, sky, PT 설정의 export E1 과 그 줄 L 을 얻는다. app 을 다시 띄워 L 을 restore 하면 state camera 가 L 의
-       camera, heading, pitch 와 문자열로 같고, 같은 sample 수의 export E2 는 E1 과 rgba 가 bit 단위로 같다.
+  [V4] 처음과 다른 pose, 세로 FOV, light, sky, PT 설정의 export E1 과 그 줄 L 을 얻는다. app 을 다시 띄워 L 을 restore 하면 state camera
+       가 L 의 camera, heading, pitch, vertical fov 와 문자열로 같고, 같은 sample 수의 export E2 는 E1 과 rgba 가 bit 단위로 같다.
   [V5] pose 를 바꾸고 끝낸 run 의 user.ini 의 Editor Camera 에는 Move Speed 만 있다. 예전 형식으로 camera 의 위치와 방향을 적은
        user.ini 로 띄워도 camera 는 scene file 의 pose 로 시작한다.
   [V6] L 은 scene=SCENE 을 담는다. Sponza 의 줄 (scene 을 Sponza 로 바꾼 L 과 scene 을 뺀 L) 을 Cornell box 에서 restore 하면 Sponza 를
-       열고, L 을 Sponza 에서 restore 하면 Cornell box 를 연다. 그 뒤 state scene 이 줄의 scene 이고 state camera 가 줄과 문자열로 같다.
+       열고, L 을 Sponza 에서 restore 하면 Cornell box 를 연다. 그 뒤 state scene 이 줄의 scene 이고 state camera 가 줄의 camera, heading,
+       pitch, vertical fov 와 문자열로 같다.
   [V7] 처음 화면의 pick grid 에 light, 두 상자, 바닥, 천장, 세 벽이 1 칸 이상씩 있다.
-  [V8] scene file 에 적은 처음 pose 가 Mitsuba scene 의 sensor 와 같다. scene file 의 Position 과 띄운 직후 state camera 의
+  [V8] scene file 에 적은 처음 pose 와 세로 FOV 가 Mitsuba scene 의 sensor 와 같다. scene file 의 Position 과 띄운 직후 state camera 의
        위치가 sensor 의 to_world 의 이동에 Scale 을 곱한 float32 와 같고, state camera 의 forward 가 to_world 가 옮긴 +z 와 성분마다
-       1e-6 안이다.
+       1e-6 안이다. scene file 의 Vertical FOV 와 띄운 직후 state camera 의 vertical_fov 가 sensor 의 세로 시야각
+       (cornellbox.read 의 sensor_vertical_fov) 을 radian 으로 바꾼 float32 와 같다.
 """
 
 import argparse
@@ -48,13 +50,14 @@ from checks import Checks, stop_and_check
 from imagefiles import ImageFileError, read_dds_rgba32f
 from pathtracerchecks import BASE, SKY_OBJECT, SKY_RADIANCE, set_path_tracer
 from pickanswers import PIXEL_CORNER_OFFSETS, PIXEL_EDGE_OFFSETS, CameraAnswers, grid_cells, pick_matches, vector_of
-from viewer import (BASELINE_DIR, HARNESS_DIR, SETTLE_FRAMES, VIEWER_DIR, HarnessError, Session, baseline_scene, default_scene,
+from viewer import (BASELINE_DIR, CAMERA_OBJECT, HARNESS_DIR, SETTLE_FRAMES, VIEWER_DIR, HarnessError, Session, baseline_scene, default_scene,
                     read_scene_file, shots_dir, start_instance, stop_instance)
 
 SCENE = baseline_scene('CornellBox.ini')
 NO_STRENGTH_DIR = HARNESS_DIR / 'cornell-box-no-strength'
 OLD_BASELINE_DIR = HARNESS_DIR / 'cornell-box-old-user-ini'
-# 행이 light 를 지나는 grid. light 는 처음 화면에서 세로로 약 10 pixel 이므로 행의 간격과 위치를 보고 골랐다.
+# 행이 light 를 지나는 grid. light 는 처음 화면 (1920x1080) 에서 세로로 약 25 pixel 이고 행의 간격 (약 22 pixel) 보다 크므로, 행 하나
+# 이상이 light 를 지난다.
 GRID = (81, 50)
 SHAPES = ['Light', 'ShortBox', 'TallBox', 'Floor', 'Ceiling', 'BackWall', 'LeftWall', 'RightWall']
 MIN_LIGHT_PIXELS = 100
@@ -62,9 +65,11 @@ EMISSION_SAMPLES = 16
 EMISSION = BASE | {'Shading': 'Lambert', 'Output': 'Radiance', 'Max Bounces': 0, SKY_RADIANCE: 0, 'Target Samples': EMISSION_SAMPLES}
 # light 와 천장 사이에서 light 를 내려다보는 pose. camera_ray 가 쓰는 오른쪽 방향이 정해지도록 수직에서 조금 기울인다.
 ABOVE_LIGHT_PITCH = -1.5
-# [V4] 의 줄. 처음과 모든 조건이 다르다.
+# [V4] 의 줄. camera, 세로 FOV, light, sky, PT 의 Seed 와 Max Bounces 가 처음과 다르다. Shading 은 처음과 같은 glTF 로 둔다. Lambert 는
+# 같은 build 에서도 실행마다 export 가 몇 ulp 달라서 restart 뒤의 export 를 bit 단위로 비교할 수 없다 (로드맵의 뒤로 미룬 일).
 LINE = {
     'pose': '150 400 2500 0.2 0.05',
+    'vertical fov': '0.5',
     'light': 'elevation=25 azimuth=80 color=1,0.9,0.8 intensity=6',
     'sky': 'Color=0.5,0.75,1; Intensity=0.25',
     'path tracer': {'Shading': 'glTF', 'Output': 'Radiance', 'Seed': 5, 'Max Bounces': 6, 'Russian Roulette': 1, 'Geometric Normals': 0},
@@ -96,7 +101,8 @@ def light_material(answers, emissive=True):
 
 def check_scene_camera(check, mitsuba, scale, camera):
     """[V8]"""
-    written = np.float32([float(value) for value in read_scene_file(SCENE)['Camera']['Position'].split(',')])
+    written_camera = read_scene_file(SCENE)[CAMERA_OBJECT]
+    written = np.float32([float(value) for value in written_camera['Position'].split(',')])
     started = np.float32([float(camera[axis]) for axis in 'xyz'])
     expected = np.float32(mitsuba.sensor_to_world[:3, 3] * scale)
     direction = mitsuba.sensor_to_world[:3, :3] @ np.array([0.0, 0.0, 1.0])
@@ -105,6 +111,11 @@ def check_scene_camera(check, mitsuba, scale, camera):
     check('[V8] the scene file pose is the Mitsuba sensor: its position times Scale as float32, and its +z as the forward',
           np.array_equal(written, expected) and np.array_equal(started, expected) and np.abs(forward - direction).max() <= 1e-6,
           f'scene file {written.tolist()}, state {started.tolist()}, sensor {expected.tolist()}; forward {forward.tolist()}, sensor +z {direction.tolist()}')
+    written_fov = written_camera.get('Vertical FOV')
+    expected_fov = np.float32(math.radians(mitsuba.sensor_vertical_fov))
+    check('[V8] the scene file vertical FOV is the vertical field of view of the Mitsuba sensor in radians as float32, and the camera starts at it',
+          written_fov is not None and np.float32(written_fov) == expected_fov and np.float32(camera['vertical_fov']) == expected_fov,
+          f'scene file {written_fov}, state {camera["vertical_fov"]}, sensor {mitsuba.sensor_vertical_fov} degrees = {expected_fov} radians')
 
 
 def check_grid(session, check, answers):
@@ -267,6 +278,7 @@ def light_winding_problems(gltf, material, shape):
 
 def set_line_conditions(session):
     session.ask_ok(f'pose {LINE["pose"]}')
+    session.ask_ok(f'editor set {CAMERA_OBJECT}: Vertical FOV={LINE["vertical fov"]}')
     session.ask_ok(f'light set {LINE["light"]}')
     session.ask_ok(f'editor set {SKY_OBJECT}: {LINE["sky"]}')
     settings = LINE['path tracer'] | {'Show': 1, 'Samples per Frame': 1, 'Target Samples': LINE['samples']}
@@ -281,9 +293,10 @@ def check_restored_scene(session, check, line, scene, label):
     reply = session.ask(f'restore {line}')
     state = session.ask_ok('state')['state']
     values = parse_line(line)
-    camera = [str(state['camera'][key]) for key in ['x', 'y', 'z', 'heading', 'pitch']]
+    camera = [str(state['camera'][key]) for key in ['x', 'y', 'z', 'heading', 'pitch', 'vertical_fov']]
     check(f'[V6] restore of {label} opens {scene} and gives the camera of the line',
-          reply['ok'] and state['scene']['path'] == scene and camera == values['camera'].split(',') + [values['heading'], values['pitch']],
+          reply['ok'] and state['scene']['path'] == scene and
+          camera == values['camera'].split(',') + [values['heading'], values['pitch'], values['vertical fov']],
           reply.get('error') or f'scene {state["scene"]["path"]}, camera {" ".join(camera)}')
 
 
@@ -363,7 +376,7 @@ def second_run(check, line, image):
         try:
             session.ask_ok('ui hide')
             camera = session.ask_ok('state camera')['state']['camera']
-            start = read_scene_file(SCENE)['Camera']
+            start = read_scene_file(SCENE)[CAMERA_OBJECT]
             expected = [np.float32(value) for value in start['Position'].split(',') + [start['Heading'], start['Pitch']]]
             got = [np.float32(camera[key]) for key in ['x', 'y', 'z', 'heading', 'pitch']]
             check('[V5] with an old user.ini that has the camera position and direction, the camera starts at the scene file pose',
@@ -372,9 +385,9 @@ def second_run(check, line, image):
             session.ask_ok(f'restore {line}')
             camera = session.ask_ok('state camera')['state']['camera']
             values = parse_line(line)
-            restored = [str(camera[key]) for key in ['x', 'y', 'z']] + [str(camera['heading']), str(camera['pitch'])]
-            check('[V4] after a restart, restore of the line gives its camera in state camera as the same text',
-                  restored == values['camera'].split(',') + [values['heading'], values['pitch']], ' '.join(restored))
+            restored = [str(camera[key]) for key in ['x', 'y', 'z', 'heading', 'pitch', 'vertical_fov']]
+            check('[V4] after a restart, restore of the line gives its camera and vertical FOV in state camera as the same text',
+                  restored == values['camera'].split(',') + [values['heading'], values['pitch'], values['vertical fov']], ' '.join(restored))
             session.ask_ok('settings set Engine Tuning: Path Tracer/Show=1')
             session.ask_ok(f'pt wait samples={LINE["samples"]}', timeout=WAIT_TIMEOUT)
             again = read_dds_rgba32f(session.ask_ok(f'capture pt {shots_dir(session.instance) / "line-restarted"}')['path'])
@@ -415,10 +428,9 @@ def write_without_strength():
     (NO_STRENGTH_DIR / source.name).write_text(json.dumps(gltf, indent=2), encoding='utf-8')
     shutil.copy2(source.parent / gltf['buffers'][0]['uri'], NO_STRENGTH_DIR / gltf['buffers'][0]['uri'])
     scene = read_scene_file(SCENE)
-    camera = scene['Camera']
+    camera = ''.join(f'{key}={value}\n' for key, value in scene[CAMERA_OBJECT].items())
     (NO_STRENGTH_DIR / 'CornellBox.ini').write_text(
-        f'[Model]\nglTF={source.name}\nScale={scene["Model"]["Scale"]}\n\n'
-        f'[Camera]\nPosition={camera["Position"]}\nHeading={camera["Heading"]}\nPitch={camera["Pitch"]}\n', encoding='utf-8')
+        f'[Model]\nglTF={source.name}\nScale={scene["Model"]["Scale"]}\n\n[{CAMERA_OBJECT}]\n{camera}', encoding='utf-8')
     return (NO_STRENGTH_DIR / 'CornellBox.ini').relative_to(VIEWER_DIR).as_posix(), gltf
 
 

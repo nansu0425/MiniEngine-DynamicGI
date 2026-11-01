@@ -93,6 +93,29 @@ def read_reflectance(element):
     return rgb(inner[0], 'reflectance')
 
 
+def vertical_fov(root, sensor):
+    """perspective sensor 의 세로 시야각 (degree). fov 는 fov_axis 가 가리키는 film 축의 시야각이고 fov_axis 의 기본값은 x 다 (Mitsuba 3
+    문서의 Perspective pinhole camera 절. references/ 에 받지 않았다). x 와 y 밖의 fov_axis 는 받지 않는다."""
+    import math
+    defaults = {element.get('name'): element.get('value') for element in root.findall('default')}
+
+    def value(element):
+        text = element.get('value')
+        return defaults[text[1:]] if text.startswith('$') and text[1:] in defaults else text
+    fovs = [element for element in sensor.findall('float') if element.get('name') == 'fov']
+    axes = [element for element in sensor.findall('string') if element.get('name') == 'fov_axis']
+    films = sensor.findall('film')
+    size = {element.get('name'): float(value(element)) for element in (films[0].findall('integer') if len(films) == 1 else [])
+            if element.get('name') in ('width', 'height')}
+    axis = value(axes[0]) if axes else 'x'
+    if len(fovs) != 1 or len(size) != 2 or axis not in ('x', 'y'):
+        raise SceneError('the sensor needs one fov whose fov_axis is x or y and a film with width and height')
+    fov = float(value(fovs[0]))
+    if axis == 'y' or size['width'] == size['height']:
+        return fov
+    return math.degrees(2.0 * math.atan(math.tan(math.radians(fov) / 2.0) * size['height'] / size['width']))
+
+
 def world_face(matrix, face):
     """local 면을 to_world 로 옮긴 (중심, 반 변 u, 반 변 v, 단위 normal). u x v 가 normal 쪽이다."""
     import numpy as np
@@ -107,7 +130,8 @@ def world_face(matrix, face):
 
 
 def read(path):
-    """scene 의 shape 와 sensor. shape 마다 id, faces (world 의 면), reflectance, radiance (emitter 가 없으면 None) 를 둔다."""
+    """scene 의 shape 와 sensor. shape 마다 id, faces (world 의 면), reflectance, radiance (emitter 가 없으면 None) 를 둔다. sensor 는
+    to_world 와 세로 시야각 (degree) 이다."""
     root = ElementTree.parse(path).getroot()
     if not root.get('version', '').startswith('3.'):
         raise SceneError(f'{path} is not a Mitsuba 3 scene')
@@ -129,7 +153,7 @@ def read(path):
     sensors = root.findall('sensor')
     if len(sensors) != 1 or sensors[0].get('type') != 'perspective':
         raise SceneError('needs one perspective sensor')
-    return SimpleNamespace(shapes=shapes, sensor_to_world=to_world(sensors[0]))
+    return SimpleNamespace(shapes=shapes, sensor_to_world=to_world(sensors[0]), sensor_vertical_fov=vertical_fov(root, sensors[0]))
 
 
 def primitives(shape):
