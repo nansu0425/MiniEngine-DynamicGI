@@ -37,11 +37,10 @@ doubleSided 의 뒷면에서 normal 을 뒤집으라고만 하므로 (material.s
 (Specification.adoc 의 TANGENT 절) 으로 이 image 방향과 같은 tangent frame 을 만드는지 확인한다. 그래서 asset 은 spec 을
 따르고, engine 이 spec 대로 읽으면 정답이 나온다.
 
-d 의 정답은 surface normal 이다. TANGENT 는 xyz 가 단위 벡터이고 w 가 ±1 이면 되므로 (Specification.adoc 의 TANGENT 절) d 의 asset 도
-spec 을 따른다. spec 은 tangent space 가 정의되지 않을 때 normal texture 를 어떻게 쓸지 정하지 않는다. 이 repo 는 normalTexture 가 없으면
-surface normal 을 그대로 쓴다는 규칙 (Specification.adoc 의 Normal Texture 절) 을 따라, tangent space 가 정의되지 않으면 normal texture 를
-쓰지 않고 surface normal 을 쓴다고 해석한다. make 는 d 의 TANGENT 가 bitangent 식의 cross 를 0 으로 만드는지 확인한다. raster 의 정답은
-두 번째 test scene 의 같은 pixel 이다. 두 scene 의 d 는 같은 surface normal 로 shading 하므로 bit 단위로 같아야 한다.
+d 의 정답은 surface normal 이다. d 의 asset 이 spec 을 따른다는 것과, tangent space 가 정의되지 않으면 surface normal 을 쓴다는 해석의
+근거는 MiniEngine/Core/Shaders/NormalTexture.hlsli 의 GetNormalTextureNormal 주석에 있다. make 는 d 의 TANGENT 가 bitangent 식의 cross 를
+0 으로 만드는지 확인한다. raster 의 정답은 두 번째 test scene 의 같은 pixel 이다. 두 scene 의 d 는 같은 surface normal 로 shading 하므로
+bit 단위로 같아야 한다.
 
 판정은 아래와 같고, 하나라도 실패하면 exit 1 이다. Front Face 와 Geometry Normal capture 에서 모두 맞은 pixel 의 가장자리 EDGE_PIXELS 를
 깎고 (camera ray 는 pixel 안의 임의 위치로 나가므로 가장자리는 capture 마다 다르다), 남은 pixel 을 column 이 이어진 덩어리로 나눠
