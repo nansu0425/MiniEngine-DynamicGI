@@ -1,6 +1,7 @@
 #ifndef __HIT_SURFACE_HLSLI__
 #define __HIT_SURFACE_HLSLI__
 
+#include "Core/Shaders/NormalTexture.hlsli"
 #include "Model/Raytracing/RaytracingScene.hlsli"
 
 // ray가 맞은 곳의 surface. raster의 DefaultVS, DefaultPS가 pixel에서 얻는 값을 같은 data로 복원한다.
@@ -73,12 +74,9 @@ HitSurface GetHitSurface(RayHit hit, float textureLod)
     {
         const float4 tangent = InterpolateTangent(data, vertexAddresses, geometry.tangentOffset, weights);
         // tangent는 면 위의 방향이므로 normal과 달리 objectToWorld로 옮긴다.
-        const float3 worldTangent = normalize(mul((float3x3)hit.objectToWorld, tangent.xyz));
-        const float3 worldBitangent = normalize(cross(normal, worldTangent)) * tangent.w;
-
-        float3 textureNormal = SampleMaterialTexture(hitTriangle, kNormalTexture, textureLod).xyz * 2.0 - 1.0;
-        textureNormal = normalize(textureNormal * float3(material.normalTextureScale, material.normalTextureScale, 1.0));
-        normal = normalize(mul(textureNormal, float3x3(worldTangent, worldBitangent, normal)));
+        const float4 worldTangent = float4(mul((float3x3)hit.objectToWorld, tangent.xyz), tangent.w);
+        const float3 normalTextureValue = SampleMaterialTexture(hitTriangle, kNormalTexture, textureLod).xyz;
+        normal = normalize(GetNormalTextureNormal(normal, worldTangent, normalTextureValue, material.normalTextureScale));
     }
 
     // cross(p1 - p0, p2 - p0)는 DXR이 front face로 판정하는 쪽을 향한다.

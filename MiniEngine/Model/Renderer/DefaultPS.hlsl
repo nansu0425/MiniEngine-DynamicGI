@@ -13,6 +13,7 @@
 
 #include "Model/Renderer/Common.hlsli"
 #include "Core/Shaders/SurfaceShading.hlsli"
+#include "Core/Shaders/NormalTexture.hlsli"
 
 Texture2D<float4> baseColorTexture          : register(t0);
 Texture2D<float3> metallicRoughnessTexture  : register(t1);
@@ -84,19 +85,8 @@ float3 ComputeNormal(VSOutput vsOutput)
     if ((flags & NORMAL_TEXTURE_FLAG) == 0)
         return normal;
 
-    // Construct tangent frame
-    float3 tangent = normalize(vsOutput.tangent.xyz);
-    float3 bitangent = normalize(cross(normal, tangent)) * vsOutput.tangent.w;
-    float3x3 tangentFrame = float3x3(tangent, bitangent, normal);
-
     // Read normal map and convert to SNORM (TODO:  convert all normal maps to R8G8B8A8_SNORM?)
-    normal = normalTexture.Sample(normalSampler, UVSET(NORMAL)) * 2.0 - 1.0;
-
-    // glTF spec says to normalize N before and after scaling, but that's excessive
-    normal = normalize(normal * float3(normalTextureScale, normalTextureScale, 1));
-
-    // Multiply by transpose (reverse order)
-    return mul(normal, tangentFrame);
+    return GetNormalTextureNormal(normal, vsOutput.tangent, normalTexture.Sample(normalSampler, UVSET(NORMAL)), normalTextureScale);
 #endif
 }
 
