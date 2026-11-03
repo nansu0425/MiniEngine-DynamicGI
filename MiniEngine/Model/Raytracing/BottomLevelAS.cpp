@@ -112,12 +112,13 @@ void BuildBottomLevelAS(Model& model)
         const Mesh& mesh = *(const Mesh*)pMesh;
         pMesh += sizeof(Mesh) + (mesh.numDraws - 1) * sizeof(Mesh::Draw);
 
+        // glTF spec과 다르다: skinned mesh도 scene에 있지만 (Specification.adoc:2178) ray는 skinned mesh를 보지 않는다. BLAS는 load 때
+        // VB의 position으로 만드는데, skinned mesh의 vertex 위치는 joint의 transform이 vertex마다 정한다 (Specification.adoc:2186).
         if (mesh.psoFlags & PSOFlags::kHasSkin)
             continue;
 
-        // glTF spec과 다르다: BLEND material은 alpha만큼 뒤를 가려야 하지만 ray는 BLEND mesh를 보지 않는다.
-        // 일부만 가리는 hit를 다루려면 closest hit와 visibility가 돌려주는 값의 형태가 바뀌므로 투명한 물체를 shading할 때 정한다.
-        // 그때까지는 BLEND mesh를 depth와 shadow map에 그리지 않는 raster와 같게 둔다.
+        // glTF spec과 다르다: BLEND material은 alpha만큼 뒤를 가려야 하지만 ray는 BLEND mesh를 보지 않는다. 일부만 가리는 hit를
+        // 다루려면 closest hit와 visibility가 돌려주는 값의 형태가 바뀐다. raster도 BLEND mesh를 depth와 shadow map에 그리지 않는다.
         if (mesh.psoFlags & PSOFlags::kAlphaBlend)
             continue;
 

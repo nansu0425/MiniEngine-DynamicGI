@@ -290,7 +290,8 @@ void OptimizeMesh( Renderer::Primitive& outPrim, const glTF::Primitive& inPrim, 
     else
     {
         // glTF spec과 다르다: spec은 TANGENT가 없으면 MikkTSpace로 tangent를 만들지만 여기서는 DirectXMesh의 ComputeTangentFrame으로 만든다.
-        // TANGENT 없이 normal texture를 쓰는 asset을 쓸 때까지 MikkTSpace를 미룬다. 그런 primitive는 scripts/check-mini-geometry.py의 [10]이 센다.
+        // scripts/fetch-assets.ps1이 받는 asset과 check script가 만드는 test scene은 normal texture를 쓰는 primitive에 모두 TANGENT가 있어
+        // ComputeTangentFrame의 tangent로 normal texture를 읽지 않는다. TANGENT 없이 normal texture를 쓰는 primitive는 scripts/check-mini-geometry.py의 [10]이 센다.
         ASSERT(maxIndex < vertexCount);
         ASSERT(indexCount % 3 == 0);
 

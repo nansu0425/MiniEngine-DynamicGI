@@ -129,6 +129,7 @@ HitTriangle GetHitTriangle(uint instanceIndex, uint geometryIndex, uint primitiv
     return hitTriangle;
 }
 
+// glTF spec과 다르다: sampler의 minFilter가 mipmap mode면 footprint에 맞는 mip을 읽어야 하지만 (Specification.adoc:2456, :2476-2482)
 // ray에는 화면 미분이 없어 맞은 곳의 footprint를 모르므로, 따로 정한 query 밖에서는 가장 선명한 mip 0을 읽는다.
 static const float kSharpestTextureLod = 0.0;
 
