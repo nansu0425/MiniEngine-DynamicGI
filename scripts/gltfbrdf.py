@@ -280,8 +280,7 @@ def evaluate(tables, base_color, metallic, roughness, normal, view, light):
 
 def command_tables(args):
     output = Path(args.output) if args.output else TABLES_FILE
-    # .gitattributes 가 이 파일을 CRLF 로 checkout 하므로 같은 줄 끝으로 써서, 다시 만든 파일이 checkout 한 파일과 byte 까지 같게 한다.
-    output.write_bytes(table_source(make_tables()).replace('\n', '\r\n').encode('utf-8'))
+    output.write_text(table_source(make_tables()), encoding='utf-8', newline='\n')
     print(f'wrote {output}')
     return 0
 

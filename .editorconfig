@@ -1,5 +1,12 @@
 root = true
 
+# editor 는 .gitattributes 가 checkout 할 때 쓰는 줄 끝으로 파일을 쓴다
+[*]
+end_of_line = lf
+
+[*.bat]
+end_of_line = crlf
+
 [*.{cpp,h,inl,hlsl,hlsli}]
 charset = utf-8
 

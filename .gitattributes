@@ -1,14 +1,8 @@
 # Auto detect text files and perform LF normalization
-* text=auto
-
-# Explicitly declare code/VS files as CRLF
-*.cpp eol=crlf
-*.h eol=crlf
-*.hlsl eol=crlf
-*.vcxproj eol=crlf
-*.sln eol=crlf
-# scripts/gltfbrdf.py 가 만드는 파일. script 가 CRLF 로 쓰므로 checkout 도 그렇게 해서, 다시 만든 파일과 byte 로 비교할 수 있게 한다.
-MiniEngine/Core/Shaders/GltfBrdfTables.hlsli eol=crlf
+# Claude 와 script 가 text 파일을 LF 로 쓰므로 checkout 도 LF 로 해서, git 이 working tree 의 줄 끝을 바꾸지 않게 한다.
+* text=auto eol=lf
+# cmd.exe 는 줄 끝이 LF 인 batch file 에서 label 을 잘못 찾을 수 있다.
+*.bat eol=crlf
 
 # Explicitly declare resource files as binary
 *.bin binary

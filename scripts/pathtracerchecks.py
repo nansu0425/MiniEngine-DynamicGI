@@ -122,4 +122,4 @@ def append_record_row(section, cells):
     if not table:
         raise HarnessError(f'the section "{section}" of {RECORD} has no table')
     lines.insert(table[-1] + 1, '| ' + ' | '.join(cells) + ' |\n')
-    RECORD.write_text(''.join(lines), encoding='utf-8')
+    RECORD.write_text(''.join(lines), encoding='utf-8', newline='\n')
