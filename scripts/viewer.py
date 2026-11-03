@@ -2341,7 +2341,8 @@ def main():
     command.add_argument('--gpu-validation', action='store_true',
                          help='pass -gpu_debug 1 for GPU-based validation, which checks on the GPU the state and descriptor of each '
                               'resource a shader accesses. Without it, the state of a resource a shader reads is not checked. '
-                              'Debug only. Slower')
+                              'Debug only. Slower. Zero messages with it is weak evidence, as no positive control has shown '
+                              'that its messages reach the log')
 
     command = add_command('do', 'send commands to the running instance one by one and stop at the first error. '
                                 'Reports a crash or a hang but leaves a hung app to stop. "do help" lists the commands', command_do)

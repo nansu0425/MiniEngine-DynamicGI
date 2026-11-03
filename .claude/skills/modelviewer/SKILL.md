@@ -7,14 +7,12 @@ description: ModelViewer 를 build, run, drive, screenshot, verify 하는 harnes
 
 진입점은 `python scripts/viewer.py` 하나다. 각 subcommand 가 무엇을 하는지는 `--help`, app 명령은 `do help`, 명령의 protocol 은 `MiniEngine/Core/Automation/ControlChannel.h`, 종료 이유의 뜻은 `MiniEngine/Core/Automation/UnattendedRun.h`, log 의 D3D12 message 줄은 `MiniEngine/Core/Automation/D3D12MessageLog.h`, app flag 는 `MiniEngine/readme.md` 에 있다. 여기에는 agent 가 harness 를 운용하는 법만 적는다.
 
-harness 로 할 수 없는 일을 만나면 그 일이 계획되어 있는지와 그 근거를 `docs/harness-roadmap.md` 에서 본다.
-
 ## 쓰는 범위
 
 - app 을 직접 실행하지 않고 언제나 `start` 로 띄운다. 그래야 사용자의 설정 파일이 남는다 (`start --help`).
-- harness 로 볼 수 없는 것 (OS 를 거쳐야만 보이는 것과 DXGI message) 은 사용자 확인 목록에 넣어 보고한다 (아래 사용자 확인 목록 절).
+- harness 로 볼 수 없는 것은 사용자 확인 목록에 넣어 보고한다 (아래 사용자 확인 목록 절).
 - D3D12 debug layer 의 message 를 봐야 하면 Debug 로 띄운다. `start` 는 다른 config 에 `-debug 1` 을 주지 않으므로 debug layer 가 꺼져 message 자체가 생기지 않는다 (`start` 가 상태를 알린다).
-- UI 와 mouse 로 바꾸는 상태는 같은 상태를 바꾸는 명령으로 바꾼다. gizmo 가 바꾸는 directional light 의 rotation 과 위치, icon click, Scene Hierarchy panel, W, E 와 scene 위의 gizmo toolbar 가 바꾸는 editor 의 선택, gizmo mode, rotate 의 축, Details panel 이 바꾸는 물체의 설정 (`editor get`, `editor set`), Scene menu 가 바꾸는 scene 과 Save (`scene save`), Engine Tuning 의 Reset to Default, Reset to Defaults, Reset All 이 바꾸는 설정 (`settings reset`) 도 그렇다. 명령은 `do help` 에 있다. gizmo 를 화면으로 보고 판단하거나 끌지 않는다 (근거는 `docs/harness-roadmap.md` 의 보류한 결정).
+- UI 와 mouse 로 바꾸는 상태는 같은 상태를 바꾸는 명령으로 바꾼다. gizmo 가 바꾸는 directional light 의 rotation 과 위치, icon click, Scene Hierarchy panel, W, E 와 scene 위의 gizmo toolbar 가 바꾸는 editor 의 선택, gizmo mode, rotate 의 축, Details panel 이 바꾸는 물체의 설정 (`editor get`, `editor set`), Scene menu 가 바꾸는 scene 과 Save (`scene save`), Engine Tuning 의 Reset to Default, Reset to Defaults, Reset All 이 바꾸는 설정 (`settings reset`) 도 그렇다. 명령은 `do help` 에 있다. gizmo 를 화면으로 보고 판단하거나 끌지 않는다. 입력을 흉내 내는 조작은 click 할 곳과 click 한 결과를 image 로 판단해야 하는데, image 로 판단한 UI 의 상태는 믿을 수 없다.
 
 ## 실행 loop
 
@@ -81,7 +79,7 @@ harness 로 할 수 없는 일을 만나면 그 일이 계획되어 있는지와
 
 harness 로 확인할 수 없는 것은 사용자가 직접 확인하도록 완료 보고에 목록으로 남긴다.
 
-- 목록에 넣는 것은 실제로 present 된 화면, HDR, DPI, 실제 입력 경로 (WM message, DirectInput 의 foreground 검사, ImGui widget 을 mouse 로 다뤄야만 지나는 code. 예: 우클릭 menu), DXGI message 다. harness 로 확인할 수 있는 것은 harness 로 확인하고 목록에 넣지 않는다.
+- 목록에 넣는 것은 실제로 present 된 화면, HDR, DPI, 실제 입력 경로 (WM message, DirectInput 의 foreground 검사, ImGui widget 을 mouse 로 다뤄야만 지나는 code. 예: 우클릭 menu), camera 가 여러 frame 에 걸쳐 움직여야만 지나는 경로 (motion vector 를 쓰는 TAA 와 motion blur. `pose` 는 velocity 를 만들지 않는다), DXGI message 다. harness 로 확인할 수 있는 것은 harness 로 확인하고 목록에 넣지 않는다.
 - 항목마다 띄우는 방법 (config, scene), 조작 순서, 통과의 기준 (무엇이 보이거나 바뀌면 통과인지) 을 적는다.
 - 목록의 항목은 완료 보고에 다루지 않은 조건으로도 적는다 (CLAUDE.md 의 완료 판정 기준).
 - computer use 는 쓰지 않는다. computer use 는 session 마다 사용자가 권한 요청을 승인해야 쓸 수 있다. 사용자는 작업 중에 권한 요청을 지켜보지 않는다. 그래서 권한 요청을 보내면 작업이 승인을 기다리며 멈추고, 끝내 승인받지 못한 것으로 처리된다.

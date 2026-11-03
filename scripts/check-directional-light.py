@@ -55,7 +55,7 @@ check-gltf-brdf.py 도 쓰도록 directlightchecks.py 에 있고, 아래의 대�
   [P8] PT 를 쌓는 동안 light 의 direction, color, intensity 를 바꾸면 pt 의 resets 가 1 늘고, position 을 바꾸면 늘지 않는다.
 
 source:
-  [K8] tracked 와 untracked (ignore 하지 않은) 파일에서 sun 의 세 표기가 SUN_EXCEPTIONS 밖에 없다.
+  [K8] tracked 와 untracked (ignore 하지 않은) 파일에 sun 의 세 표기가 없다. SUN_EXCLUDED_PATHS 의 파일은 보지 않는다.
 
 test scene 의 PT 와 Sponza 의 직접광은 발표에 쓰도록 KEPT_DIR 에 DDS 와 보기용 PNG 로 남긴다.
 """
@@ -119,10 +119,6 @@ QUADS = [
     SimpleNamespace(name='double', x=7.5, normal=(0.0, 0.0, 1.0), rotation=(0.0, 0.0, 0.0, 1.0), occluder='doubleSided'),
 ]
 
-# 이 light 의 이름이 sun 이던 때의 기록. 이 script 의 판정 자체는 SUN_EXCLUDED_PATHS 가 뺀다.
-SUN_EXCEPTIONS = [
-    ('docs/harness-roadmap.md', 'agent 가 sun 의 translate gizmo'),
-]
 SUN_EXCLUDED_PATHS = [':!*.pdf', ':!MiniEngine/Model/Loader/json.hpp', ':!MiniEngine/Model/Sponza', ':!scripts/check-directional-light.py']
 
 
@@ -387,8 +383,7 @@ def run_test_scene(build_first, check, stored):
 def check_sun_name(check):
     found = subprocess.run(['git', '-c', 'core.quotepath=false', 'grep', '--untracked', '-n', '-E', 'sun|Sun|SUN', '--', '.', *SUN_EXCLUDED_PATHS],
                            cwd=REPO_ROOT, capture_output=True, text=True, encoding='utf-8').stdout.splitlines()
-    left = [line for line in found if not any(line.startswith(path + ':') and text in line for path, text in SUN_EXCEPTIONS)]
-    check('[K8] the name sun is left only in the exceptions', not left, '; '.join(line[:160] for line in left))
+    check('[K8] no file has the name sun', not found, '; '.join(line[:160] for line in found))
 
 
 def command_check(args):
