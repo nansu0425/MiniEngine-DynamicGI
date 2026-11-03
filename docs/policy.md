@@ -81,3 +81,15 @@ spec 의 doubleSided 는 camera 에서 그릴 때의 결과만 정하고, shadow
 - 끝난 작업의 확인은 작업이 남긴 check script 에 둔다.
 - 다시 재면 바뀌거나 다시 재기 비싼 수치는 측정 기록 (예: [Reference Path Tracer 측정 기록](reference-path-tracer-measurements.md)) 에 둔다.
 - 조사 기록이 길고 붙일 code 가 없으면 다른 문서로 옮기지 않고 git history 에 둔다.
+
+### 발표 자료
+
+발표 날에는 장표를 만들고 발표만 한다. 그래서 발표에 쓸 image 와 수치는 작업하면서 모으고, 발표 전날까지 정리한다.
+
+- 작업을 시작할 때 완료 기준과 함께, 작업이 발표에 남길 image 와 수치를 정한다.
+- 수치는 측정 기록에 둔다 (위의 "작업에서 알게 된 사실").
+- image 는 `MiniEngine/ModelViewer/Harness/kept/presentation/week<N>/` 아래에 작업마다 폴더를 두고 남긴다. harness 가 image 옆에 쓰는 조건 파일과 state 파일도 함께 둔다.
+- 고치기 전과 고친 뒤를 비교할 image 와 수치는 고치기 전에 남긴다. code 를 고친 뒤에는 이전 commit 을 다시 build 해야 고치기 전의 결과를 만들 수 있다.
+- 발표 전날까지 `kept/presentation/week<N>/outline.md` 에 장표를 순서대로 적는다. 장표마다 전할 문장과 쓸 image 의 경로를 적는다. 수치는 값을 옮겨 적지 않고 측정 기록의 표를 가리킨다. diagram 은 무엇을 그릴지 적는다.
+- 그래프는 발표 전날까지 측정 기록의 수치로 image 를 만들어 `kept/presentation/week<N>/` 에 둔다.
+- 발표 날에는 새로 재거나 찍지 않는다.
