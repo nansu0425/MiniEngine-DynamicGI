@@ -59,3 +59,25 @@ spec 의 doubleSided 는 camera 에서 그릴 때의 결과만 정하고, shadow
 - source 파일은 기능별 폴더에 둔다. C++ 파일과 그 파일이 쓰는 shader 는 같은 폴더에 둔다. 여러 기능이 공유하는 `.hlsli` 는 `MiniEngine/Core/Shaders/` 에 둔다.
 - `#include` 는 C++ 와 shader 모두 `MiniEngine/` 기준 경로로 쓰고, 같은 폴더의 파일이나 pch 도 예외 없이 project 이름부터 쓴다 (예: `#include "Core/pch.h"`, `#include "Model/Renderer/Common.hlsli"`). build 가 만드는 shader header 는 `MiniEngine/Build/<Platform>/<Configuration>/` 기준 경로로 쓴다 (예: `#include "Output/Core/CompiledShaders/ScreenQuadPresentVS.h"`).
 - Visual Studio filter (`.vcxproj.filters`) 는 쓰지 않는다. Solution Explorer 에서 Show All Files 를 켜고 폴더 구조 그대로 본다.
+
+## 작업 계획
+
+- 로드맵 문서는 하기로 정한 작업의 일정을 관리한다. 로드맵에는 하기로 정한 작업과 작업의 순서, 기한만 적는다.
+- 하기로 정하지 않은 일 (할지 모르는 후보, "~할 때 한다" 같은 조건이 붙은 일) 은 로드맵에도 다른 문서에도 적지 않는다. 하기로 정하지 않은 일이 나중에 필요해지면 필요해진 시점의 문제에서 시작하고, 예전에 한 조사는 git history 에서 찾는다.
+- 작업의 설계와 완료 기준은 작업을 시작할 때 code 와 spec 을 보고 정한다. 미리 정한 세부는 작업을 시작하면 달라지고, 달라질 때마다 로드맵을 code 와 맞추는 비용이 들기 때문이다.
+- harness 와 editor 의 기능은 필요해질 때 필요한 만큼만 만든다. 필요할 것을 예상해 미리 설계하거나 만들지 않는다.
+
+### 일정
+
+- 작업마다 끝낼 기한만 정한다. 작업에 드는 시간은 해 봐야 알고 같은 작업도 기한에 따라 들이는 시간이 달라지므로, 작업 시간은 추정하거나 기록하지 않는다.
+- 기한을 날짜로만 적으면 날짜가 끝날 때까지가 기한이다.
+- 작업은 기한 안에 끝내고 임의로 뒤로 미루지 않는다.
+
+### 작업에서 알게 된 사실
+
+작업에서 알게 된 사실은 로드맵에 적지 않고 다음 자리에 둔다.
+
+- code 의 동작과 한계 중 code 를 읽어도 알 수 없는 것은 code 에 주석으로 단다. spec 과 다르게 구현한 곳은 "Rendering 기준" 이 정한 주석에 적는다.
+- 끝난 작업의 확인은 작업이 남긴 check script 에 둔다.
+- 다시 재면 바뀌거나 다시 재기 비싼 수치는 측정 기록 (예: [Reference Path Tracer 측정 기록](reference-path-tracer-measurements.md)) 에 둔다.
+- 조사 기록이 길고 붙일 code 가 없으면 다른 문서로 옮기지 않고 git history 에 둔다.
