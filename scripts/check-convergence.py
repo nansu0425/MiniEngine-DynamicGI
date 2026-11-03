@@ -27,8 +27,8 @@ FAIL 로 알린다. 쓰지 않은 run 은 다시 accumulate 한다. 세로 FOV �
 
 Shading glTF 는 흰 점이 많은 측정 scene 에서 시간 안에 NOISE_BUDGET 에 이르지 못한다. 측정 scene 에서 16384 spp 의 e 가
 sponza-color-bleeding 2.3%, sponza-fireflies 9.9%, sponza-overhead-light 2.5% 였고, squared error 의 8.5%, 65%, 66% 가 상위 0.1% pixel
-에 있었다. sponza-fireflies 는 e 가 N^-0.5 로 줄어도 1% 에 이르려면 2^21 spp 가 필요하다 (어림). 흰 점은 로드맵의 뒤로 미룬 일에
-있다. 그래서 판정은 Lambert 로 하고, glTF 는 e(N) 과 흰 점의 몫만 잰다.
+에 있었다. sponza-fireflies 는 e 가 N^-0.5 로 줄어도 1% 에 이르려면 2^21 spp 가 필요하다 (어림). 그래서 판정은 Lambert 로 하고,
+glTF 는 e(N) 과 흰 점의 몫만 잰다. 흰 점의 원인 조사는 687700b 의 docs/reference-path-tracer-roadmap.md 의 뒤로 미룬 일에 있다.
 
   [C1] Lambert 의 측정 scene 마다 SLOPE_FIT_FROM 부터 끝 spp 까지 log e 대 log N 을 fit 한 기울기가 -0.5 ± SLOPE_TOLERANCE 이고, 끝
        spp 의 1/4 부터 끝까지의 기울기가 -0.5 ± LAST_SLOPE_TOLERANCE 다. 같은 pixel 의 sample 끼리 상관이 있거나 sample 의 분산이
@@ -39,7 +39,7 @@ sponza-color-bleeding 2.3%, sponza-fireflies 9.9%, sponza-overhead-light 2.5% �
   [C3] Max Bounces: 측정 scene 마다 Lambert 를 Max Bounces 64 와 BOUNCES_REFERENCE 로 BIAS_SAMPLES 만큼 쌓은 d, b 의 상한이
        BIAS_BUDGET 이하다. 두 쪽은 Seed 가 같아서 64 번 안에 끝나는 path 가 같은 sample 을 낸다. 그래서 차에는 64 번을 넘는 path 의
        몫만 남고, 64 번을 넘는 path 가 없으면 d, b 와 상한이 0 이다. 다만 Shading Lambert 의 export 는 같은 build 에서도 실행마다 몇 ulp
-       다를 수 있으므로 (로드맵의 뒤로 미룬 일) 실행마다 다른 몫이 d, b 에 남는다.
+       다를 수 있으므로 (check-probe-hit-shading.py 의 LAMBERT_RUN_ULPS) 실행마다 다른 몫이 d, b 에 남는다.
   [C4] Russian roulette: 측정 scene 마다 Lambert 를 Max Bounces ROULETTE_BOUNCES 에서 on 과 off 로 BIAS_SAMPLES 만큼 쌓은 d, b 의
        상한이 BIAS_BUDGET 이하다. Max Bounces 를 줄여 off 의 시간을 줄인다. roulette 는 PathTracerCS.hlsl 의
        kFirstRussianRouletteBounce 번째 반사부터 걸리므로 그 뒤의 반사에서 본다.

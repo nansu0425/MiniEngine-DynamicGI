@@ -1,6 +1,6 @@
 # Reference Path Tracer 측정 기록
 
-[로드맵](reference-path-tracer-roadmap.md) 의 작업이 잰 값 중 다시 재면 바뀌거나 다시 재기 비싼 것을, 잰 조건과 함께 남긴다. 발표는 여기의 값을 쓴다.
+Reference Path Tracer 의 작업이 잰 값 중 다시 재면 바뀌거나 다시 재기 비싼 것을, 잰 조건과 함께 남긴다. 발표는 여기의 값을 쓴다. 이 기록과 code, commit message 의 "작업 N" 은 687700b 의 `docs/reference-path-tracer-roadmap.md` 에 있는 작업 N 이다.
 
 - 항목은 그 값을 잰 script 가 덧붙인다. 덧붙이기만 하고, 고치거나 지우지 않는다.
 - 코드 열은 잴 때의 HEAD 다. `+` 는 commit 하지 않은 변경이 있었다는 뜻이고, 그 변경까지 담은 코드는 그 줄을 더한 commit 이다.

@@ -42,7 +42,7 @@ Sponza (harness baseline 의 시점과 light. [E5] 는 측정 scene 에서도 �
        FURNACE_TOLERANCE 넘게 작아야 하고, 그 평균과 L / S - 1 (a = 0.9 이면 약 -2.2%) 을 찍는다.
   [E5] 첫 점: Indirect Irradiance, Max Bounces 1, light 와 Sky 는 그대로, Seed 0, FIRST_POINT_SAMPLES spp 로 FIRST_POINT_POSE 와 측정 scene
        (viewer.measurement_scenes) 의 camera 마다 Probe Hit 와 Lambert 를 쌓은 export 가 a 는 bit 까지, rgb 는 LAMBERT_RUN_ULPS 안에서
-       같다. Lambert 는 같은 build 에서도 실행마다 rgb 가 4 ulp 까지 다르다 (docs/reference-path-tracer-roadmap.md 의 뒤로 미룬 일).
+       같다. Lambert 는 같은 build 에서도 실행마다 rgb 가 4 ulp 까지 다르다.
        Sponza 에는 emission 이 없으므로 path 의 값은 첫 점에서 고른 방향의 sky 뿐이다. 첫 점의 normal map 을 다른 mip 으로 읽으면 고르는
        방향이 달라지고, 첫 점의 shading 을 더하면 값이 커지므로 둘 다 [E5] 에 걸린다 (추론). Lambert 의 export 가 모두 0 인 측정 scene 은
        N/A (해당 없음) 이고, 모든 측정 scene 이 N/A 면 실패다.
@@ -141,9 +141,9 @@ FURNACE = BASE | PROBE_HIT | {'Furnace': 1, 'Furnace Albedo': FURNACE_ALBEDO, SK
 FIRST_POINT_SAMPLES = 16
 FIRST_POINT = BASE | IRRADIANCE | {'Max Bounces': 1, 'Seed': 0, 'Geometric Normals': 0, 'Russian Roulette': 1,
                                    'Target Samples': FIRST_POINT_SAMPLES}
-# d05ec6f 를 두 번 띄워 쌓은 Lambert 의 export 는 rgb 가 4 ulp 까지 달랐다 (docs/reference-path-tracer-roadmap.md 의 뒤로 미룬 일). 그 두
-# 배를 둔다. 측정 scene 세 구도에서 app 을 두 번 띄워 쌓은 FIRST_POINT 의 export 는 Lambert 끼리, Probe Hit 끼리, 둘 사이가 모두 bit
-# 까지 같았다.
+# d05ec6f 를 두 번 띄워 같은 조건으로 쌓은 export 에서 Lambert 의 rgb 는 4 ulp 까지 달랐고 glTF 는 같았다. Lambert 가 달라지는 원인은
+# 찾지 않았다. 4 ulp 의 두 배를 둔다. 측정 scene 세 구도에서 app 을 두 번 띄워 쌓은 FIRST_POINT 의 export 는 Lambert 끼리, Probe Hit
+# 끼리, 둘 사이가 모두 bit 까지 같았다.
 LAMBERT_RUN_ULPS = 8
 # harness baseline 의 scene 에서 [E5] 를 보는 시점. sky 가 보여 miss pixel 이 있다.
 FIRST_POINT_POSE = 'courtyard-up'

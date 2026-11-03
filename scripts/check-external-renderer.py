@@ -18,8 +18,7 @@ diffuse 와 같은 식이다. Mitsuba 는 변환 전의 원본을 그리므로 �
   EvaluateGltfBrdf, TraceRadiance 가 SampleGltfBrdfDirection 이 고른 방향으로 다음 ray 를 쏘고 그 weight 를 throughput 에 곱하는 곳이다.
   이 code 가 부르는 GltfBrdf.hlsli 의 함수는 check-gltf-brdf.py 의 [B1] ~ [B5] 가 본다. 앞의 두 곳은 같은 script 의 [S3] 가 처음 맞은
   점의 directional light 직접광으로 본다. 다음 ray 를 쏘는 곳은 glTF furnace [S1], [S2] 만 본다. furnace 는 빛이 어느 방향에서나 같게
-  들어오므로, 다음 ray 가 SampleGltfBrdfDirection 이 고른 방향과 다른 방향으로 나가도 답이 같아 잡지 못한다. 이 오류를 보는 일은
-  로드맵의 뒤로 미룬 일에 있다.
+  들어오므로, 다음 ray 가 SampleGltfBrdfDirection 이 고른 방향과 다른 방향으로 나가도 답이 같아 잡지 못한다.
 - directional light 와 Sky: 원본에 없어 intensity 0 으로 두므로 보지 않는다. check-directional-light.py 와 check-sky.py 가 본다.
 - Max Bounces 64 를 넘는 path 의 몫: check-convergence.py 의 [C3] 이 본다.
 

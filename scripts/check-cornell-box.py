@@ -71,7 +71,8 @@ EMISSION = BASE | {'Shading': 'Lambert', 'Output': 'Radiance', 'Max Bounces': 0,
 # light 와 천장 사이에서 light 를 내려다보는 pose. camera_ray 가 쓰는 오른쪽 방향이 정해지도록 수직에서 조금 기울인다.
 ABOVE_LIGHT_PITCH = -1.5
 # [V4] 의 줄. camera, 세로 FOV, light, sky, PT 의 Seed 와 Max Bounces 가 처음과 다르다. Shading 은 처음과 같은 glTF 로 둔다. Lambert 는
-# 같은 build 에서도 실행마다 export 가 몇 ulp 달라서 restart 뒤의 export 를 bit 단위로 비교할 수 없다 (로드맵의 뒤로 미룬 일).
+# 같은 build 에서도 실행마다 export 가 몇 ulp 달라서 restart 뒤의 export 를 bit 단위로 비교할 수 없다 (check-probe-hit-shading.py 의
+# LAMBERT_RUN_ULPS).
 LINE = {
     'pose': '150 400 2500 0.2 0.05',
     'vertical fov': '0.5',
