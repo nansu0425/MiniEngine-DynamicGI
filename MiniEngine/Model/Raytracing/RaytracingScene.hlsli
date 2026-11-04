@@ -187,9 +187,10 @@ struct RayHit
     float3x4 worldToObject;
 };
 
+typedef RayQuery<RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> ClosestHitQuery;
+
 bool TraceClosestHit(RayDesc ray, uint rayFlags, out RayHit hit)
 {
-    typedef RayQuery<RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> ClosestHitQuery;
     ClosestHitQuery query = TraceScene<ClosestHitQuery>(ray, rayFlags);
 
     hit = (RayHit)0;
@@ -225,10 +226,11 @@ bool IsDecidedByAlphaTest(RayDesc ray, uint rayFlags, bool rayHit, RayHit closes
         || !HitsSameTriangle(ray, rayFlags | RAY_FLAG_CULL_NON_OPAQUE, rayHit, closestHit);
 }
 
+typedef RayQuery<RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH> OcclusionQuery;
+
 // ray의 TMin과 TMax 사이에 ray를 막는 것이 있는지 알려 준다. 두 점 사이를 볼 때는 TMax를 두 점의 거리로 둔다.
 bool IsOccluded(RayDesc ray, uint rayFlags)
 {
-    typedef RayQuery<RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH> OcclusionQuery;
     return TraceScene<OcclusionQuery>(ray, rayFlags).CommittedStatus() != COMMITTED_NOTHING;
 }
 
