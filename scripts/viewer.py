@@ -43,7 +43,7 @@ SCENES_DIR = VIEWER_DIR / 'Scenes'
 VALIDATION_SHADER = ENGINE_DIR / 'Model' / 'Raytracing' / 'RayQueryValidationCS.hlsl'
 # selftest 가 pickscene.py 의 test scene 을 쓰는 HARNESS_DIR 안의 폴더
 PICK_SCENE = 'pick-known-answers'
-# selftest 가 run 과 같은 방식으로 실행하고 이름을 붙인 응답으로 판정하는, 완료 판정 기준의 acceptance scenario
+# selftest 가 run 과 같은 방식으로 실행하고 이름을 붙인 응답으로 판정하는 harness 의 acceptance scenario
 ACCEPTANCE_SCENARIO = REPO_ROOT / 'scripts' / 'harness-scenarios' / 'acceptance.txt'
 # run 의 줄 형식. --help 가 사용법을 보인다.
 SCENARIO_NAMED_LINE = re.compile(r'^(\w+) = (.+)$')

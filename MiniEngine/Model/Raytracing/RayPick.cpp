@@ -21,7 +21,7 @@ using namespace Graphics;
 
 namespace
 {
-    // pick grid의 칸 수 한도. 응답이 agent가 읽을 만한 크기에 머물게 한다.
+    // pick grid의 칸 수 한도. 응답이 한 번에 읽을 만한 크기에 머물게 한다.
     constexpr uint32_t kMaxPixels = 4096;
 
     enum RootParameter { kConstants, kScene, kRasterDepth = kScene + RaytracingScene::kNumRootParameters, kPixels, kResults, kNumRootParameters };
