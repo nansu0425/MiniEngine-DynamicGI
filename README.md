@@ -28,6 +28,10 @@
 
 조작법은 [MiniEngine/readme.md](MiniEngine/readme.md) 에 있다.
 
+## 자동화 test 와 측정
+
+[scripts/viewer.py](scripts/viewer.py) 는 ModelViewer 를 명령으로 띄우고 조작해 test 와 측정을 자동화한다. 쓰는 법은 [docs/harness.md](docs/harness.md) 에 있다.
+
 ## 프로젝트 정책
 
 이 repo 에서 작업할 때 따르는 정책은 [docs/policy.md](docs/policy.md) 에 있다.

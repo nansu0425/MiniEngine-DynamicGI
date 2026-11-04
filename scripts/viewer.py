@@ -66,14 +66,14 @@ COMMAND_TIMEOUT = 120
 EXIT_TIMEOUT = 30
 # frame 이 이 시간 동안 오르지 않으면 main loop 나 GPU 가 멈춘 것으로 본다.
 HANG_SECONDS = 10
-# camera 나 설정을 바꾼 뒤 수치를 비교할 capture 까지 기다리는 frame 수. 근거는 .claude/skills/modelviewer/SKILL.md 의 결정성 절에 있다.
+# camera 나 설정을 바꾼 뒤 수치를 비교할 capture 까지 기다리는 frame 수. 근거는 docs/harness.md 의 결정성 절에 있다.
 SETTLE_FRAMES = 1
 # start 가 남겨 두는 run 폴더 수. 실행 중인 instance 의 run 은 이와 관계없이 남긴다.
 KEPT_RUNS = 10
 PREVIEW_MAX_WIDTH = 1280
 # scene capture 의 보기용 PNG 를 만드는 고정 exposure. 보기용이라 수치 판정에는 쓰지 않는다.
 PREVIEW_EXPOSURE = 1.0
-# Validation view 를 끈 뒤 수치를 비교할 scene capture 까지 기다리는 frame 수. 근거는 .claude/skills/modelviewer/SKILL.md 의 결정성 절에 있다.
+# Validation view 를 끈 뒤 수치를 비교할 scene capture 까지 기다리는 frame 수. 근거는 docs/harness.md 의 결정성 절에 있다.
 VALIDATION_VIEW_SETTLE_FRAMES = 10
 # 아무것도 바꾸지 않아도 frame 마다 바뀌는 state 의 값. state 끼리 비교할 때 뺀다.
 TIME_VARYING_STATE = [('frame',), ('pt', 'samples'), ('pt', 'seconds')]

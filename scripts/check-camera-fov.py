@@ -15,7 +15,7 @@ cornellbox.py 로 읽어 해석적으로 구하므로 python -I 로 돌린다. a
   [FV2] editor get Camera 가 Vertical FOV 를 state camera 의 vertical_fov 와 같은 text 로 준다. editor set Camera 로 바꾸면 state camera 와
         editor get 이 그 값이고 pose 는 그대로다. 받을 수 없는 값 (REJECTED_FOVS) 의 editor set 은 error 이고 state 가 그대로다. Harness
         아래에 복사한 scene file 에 scene save 를 하면 Vertical FOV 줄이 생기고, 다른 scene 을 열었다가 다시 열면 저장한 FOV 와 bit 단위로
-        같다. Details panel 이 FOV 를 degree 로 보이고 mouse 로 바꾸는 것은 사용자가 본다 (modelviewer skill 의 사용자 확인 목록).
+        같다. Details panel 이 FOV 를 degree 로 보이고 mouse 로 바꾸는 것은 harness 로 확인할 수 없다 (docs/harness.md 의 "harness 로 확인할 수 없는 것").
   [FV3] describe 와 capture pt 의 줄이 vertical fov 로 state camera 의 vertical_fov 를 같은 text 로 담는다. 기본값과 다른 FOV 의 줄 L 과
         그 export E1 (Shading glTF, LINE_SAMPLES) 을 얻고, app 을 WITH_FOV 로 다시 띄워 L 을 restore 하면 state camera 의 위치, heading,
         pitch, vertical_fov 가 L 과 문자열로 같고, 같은 sample 수의 export E2 가 E1 과 rgba 의 bit 까지 같다. L 의 scene 은 WITHOUT_FOV
