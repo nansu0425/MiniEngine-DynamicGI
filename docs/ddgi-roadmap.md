@@ -9,7 +9,7 @@ probe 로 diffuse 간접광을 구하는 DDGI 를 scene rendering pipeline 에 �
 3. probe 근사와 path tracing 을 비교한다. 간접광의 양을 계산하는 방식만 바꿔 비교한다.
    - (a) 비교할 시점마다 path tracing 으로 간접광의 양을 쌓는다.
    - (b) probe 근사로 구한 간접광의 양을 (a) 와 비교한다.
-4. 발표 자료를 정리하고 WEEK 5 계획을 정한다. 정리는 [docs/policy.md](policy.md) 의 "발표 자료" 를 따른다.
+4. 발표 자료를 정리하고 WEEK 5 계획을 정한다.
 5. 장표를 만들고 발표한다.
 
 ## 일정
