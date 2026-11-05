@@ -42,7 +42,8 @@ void BaseCamera::Update()
 
     m_ViewMatrix = Matrix4(~m_CameraToWorld);
     m_ViewProjMatrix = m_ProjMatrix * m_ViewMatrix;
-    m_ReprojectMatrix = m_PreviousViewProjMatrix * Invert(GetViewProjMatrix());
+    m_InvViewProjMatrix = Invert(GetViewProjMatrix());
+    m_ReprojectMatrix = m_PreviousViewProjMatrix * GetInvViewProjMatrix();
 
     m_FrustumVS = Frustum( m_ProjMatrix );
     m_FrustumWS = m_CameraToWorld * m_FrustumVS;

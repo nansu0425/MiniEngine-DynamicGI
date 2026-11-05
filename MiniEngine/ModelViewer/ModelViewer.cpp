@@ -38,6 +38,7 @@
 #include "Model/Renderer/Renderer.h"
 #include "Model/Model.h"
 #include "Model/Loader/ModelLoader.h"
+#include "Model/Renderer/DynamicGI.h"
 #include "Core/Camera/ShadowCamera.h"
 #include "Core/Display/Display.h"
 #include "Core/Graphics/GraphicsCore.h"
@@ -1640,6 +1641,13 @@ void ModelViewer::RenderScene( void )
         globals.CameraPos = m_Camera.GetPosition();
         globals.LightDirection = LightDirection;
         globals.LightIlluminance = m_Light.GetIlluminance();
+        globals.InvViewProjMatrix = m_Camera.GetInvViewProjMatrix();
+        globals.ViewportOffset.x = m_MainViewport.TopLeftX;
+        globals.ViewportOffset.y = m_MainViewport.TopLeftY;
+        globals.ViewportSize.x = m_MainViewport.Width;
+        globals.ViewportSize.y = m_MainViewport.Height;
+
+        DynamicGI::Update(gfxContext.GetComputeContext());
 
         // Begin rendering depth
         gfxContext.TransitionResource(g_SceneDepthBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, true);

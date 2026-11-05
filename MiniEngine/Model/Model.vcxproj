@@ -74,6 +74,7 @@
   <ItemGroup>
     <ClInclude Include="Animation.h" />
     <ClInclude Include="ConstantBuffers.h" />
+    <ClInclude Include="Renderer\DynamicGI.h" />
     <ClInclude Include="Loader\glTF.h" />
     <ClInclude Include="Loader\IndexOptimizePostTransform.h" />
     <ClInclude Include="Loader\json.hpp" />
@@ -101,6 +102,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Animation.cpp" />
+    <ClCompile Include="Renderer\DynamicGI.cpp" />
     <ClCompile Include="Loader\BuildH3D.cpp" />
     <ClCompile Include="Loader\glTF.cpp" />
     <ClCompile Include="Loader\IndexOptimizePostTransform.cpp" />
@@ -187,6 +189,11 @@
     </FxCompile>
     <FxCompile Include="Renderer\DepthOnlyVS.hlsl">
       <ShaderType>Vertex</ShaderType>
+    </FxCompile>
+    <FxCompile Include="Renderer\PathTracingIndirectIrradianceCS.hlsl">
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">6.5</ShaderModel>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">6.5</ShaderModel>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">6.5</ShaderModel>
     </FxCompile>
     <FxCompile Include="Renderer\SkyBackgroundPS.hlsl">
       <ShaderType>Pixel</ShaderType>

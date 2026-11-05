@@ -45,6 +45,7 @@ namespace Math
         const Matrix4& GetViewMatrix() const { return m_ViewMatrix; }
         const Matrix4& GetProjMatrix() const { return m_ProjMatrix; }
         const Matrix4& GetViewProjMatrix() const { return m_ViewProjMatrix; }
+        const Matrix4& GetInvViewProjMatrix() const { return m_InvViewProjMatrix; }
         const Matrix4& GetReprojectionMatrix() const { return m_ReprojectMatrix; }
         const Frustum& GetViewSpaceFrustum() const { return m_FrustumVS; }
         const Frustum& GetWorldSpaceFrustum() const { return m_FrustumWS; }
@@ -73,6 +74,8 @@ namespace Math
 
         // A concatenation of the view and projection matrices.
         Matrix4 m_ViewProjMatrix;	// i.e.  "World-To-Projection" matrix.
+
+        Matrix4 m_InvViewProjMatrix;
 
         // The view-projection matrix from the previous frame
         Matrix4 m_PreviousViewProjMatrix;
