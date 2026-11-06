@@ -1,25 +1,20 @@
 #include "Model/Raytracing/HitSurface.hlsli"
 
-cbuffer GlobalConstants : register(b1)
+cbuffer Constants : register(b0)
 {
-    float4x4 ViewProj;
-    float4x4 ShadowMatrix;
-    float3 ViewerPos;
-    float3 LightDirection;
-    float3 LightIlluminance;
-    
     float4x4 InvViewProj;
+    float3 CameraPos;
     float2 ViewportOffset;
     float2 ViewportSize;
-}
+};
 
 RWTexture2D<float4> IndirectIrradiance : register(u0);
 
 [numthreads(8, 8, 1)]
-void main(uint2 pixelIdx : SV_DispatchThreadID)
+void main(uint2 DTid : SV_DispatchThreadID)
 {
     // raster가 sample하는 지점의 pixel 좌표
-    float2 pixel = float2(pixelIdx.xy) + 0.5;
+    float2 pixel = float2(DTid.xy) + 0.5;
     pixel -= ViewportOffset;
     
     // pixel -> ndc
@@ -33,7 +28,7 @@ void main(uint2 pixelIdx : SV_DispatchThreadID)
     // pixel을 지나는 primary ray 생성
     RayDesc ray;
     ray.Origin = nearW;
-    ray.Direction = normalize(nearW - ViewerPos);
+    ray.Direction = normalize(nearW - CameraPos);
     ray.TMin = 0.0;
     ray.TMax = 1e30;
     
@@ -42,6 +37,6 @@ void main(uint2 pixelIdx : SV_DispatchThreadID)
     if (TraceClosestHit(ray, kCullSingleSidedBackFaces, hit))
     {
         const HitSurface surface = GetHitSurface(hit, kSharpestTextureLod);
-        IndirectIrradiance[pixelIdx] = surface.baseColor; // 테스트 목적으로 baseColor 기록
+        IndirectIrradiance[DTid] = surface.baseColor; // 테스트 목적으로 baseColor 기록
     }
 }

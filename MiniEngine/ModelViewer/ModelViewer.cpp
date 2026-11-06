@@ -1619,6 +1619,16 @@ void ModelViewer::RenderScene( void )
 
     ParticleEffectManager::Update(gfxContext.GetComputeContext(), Graphics::GetFrameTime());
 
+    DynamicGI::Constants dynamicGIConsts =
+    {
+        .InvViewProj = m_Camera.GetInvViewProjMatrix(),
+        .CameraPos = m_Camera.GetPosition(),
+        .ViewportOffset = *(reinterpret_cast<XMFLOAT2*>(&m_MainViewport)),
+        .ViewportSize = *(reinterpret_cast<XMFLOAT2*>(&m_MainViewport) + 1)
+    };
+
+    DynamicGI::Update(gfxContext.GetComputeContext(), dynamicGIConsts);
+
     if (m_ModelInst.IsNull())
     {
 #ifdef LEGACY_RENDERER
@@ -1641,13 +1651,6 @@ void ModelViewer::RenderScene( void )
         globals.CameraPos = m_Camera.GetPosition();
         globals.LightDirection = LightDirection;
         globals.LightIlluminance = m_Light.GetIlluminance();
-        globals.InvViewProjMatrix = m_Camera.GetInvViewProjMatrix();
-        globals.ViewportOffset.x = m_MainViewport.TopLeftX;
-        globals.ViewportOffset.y = m_MainViewport.TopLeftY;
-        globals.ViewportSize.x = m_MainViewport.Width;
-        globals.ViewportSize.y = m_MainViewport.Height;
-
-        DynamicGI::Update(gfxContext.GetComputeContext());
 
         // Begin rendering depth
         gfxContext.TransitionResource(g_SceneDepthBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, true);
