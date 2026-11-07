@@ -57,7 +57,7 @@ PixelResult ValidateDepthComparison(uint2 pixel)
 {
     PixelResult result = (PixelResult)0;
 
-    RayDesc ray = GetRasterSampleRay(Rays, pixel);
+    RayDesc ray = GetViewportRay(Rays, float2(pixel) + 0.5 - Rays.viewportOffset);
     ClipToRasterDepthRange(ray, CameraForward, NearZ, FarZ);
     const float cosine = dot(ray.Direction, CameraForward);
 

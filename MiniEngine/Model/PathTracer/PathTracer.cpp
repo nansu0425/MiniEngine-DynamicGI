@@ -66,12 +66,12 @@ namespace
             a.furnaceAlbedo == b.furnaceAlbedo && a.furnaceEmission == b.furnaceEmission;
     }
 
-    // rasterSampleOffset은 비교하지 않는다. 그 값은 TAA jitter를 따라 frame마다 바뀌지만, PT는 pixel 격자 안의 위치를 스스로 고르므로
-    // image가 그대로다. 비교하면 TAA를 켠 동안 frame마다 reset되어 sample이 쌓이지 않는다.
+    // viewportOffset은 비교하지 않는다. 그 값은 TAA jitter를 따라 frame마다 바뀌므로, 비교하면 TAA를 켠 동안 frame마다 reset되어 sample이
+    // 쌓이지 않는다. 그래서 TAA를 켜면 누적한 평균이 jitter 위치들의 raster pixel을 섞는다. raster pixel 하나와 비교할 때는 TAA를 끈다.
     bool HaveSameImage(const ImageConditions& a, const ImageConditions& b)
     {
         return XMVector3Equal(a.rays.origin, b.rays.origin) &&
-            XMVector3Equal(a.rays.topLeftCornerDirection, b.rays.topLeftCornerDirection) &&
+            XMVector3Equal(a.rays.viewportCornerDirection, b.rays.viewportCornerDirection) &&
             XMVector3Equal(a.rays.pixelStepRight, b.rays.pixelStepRight) &&
             XMVector3Equal(a.rays.pixelStepDown, b.rays.pixelStepDown) &&
             XMVector3Equal(a.lightDirection, b.lightDirection) && XMVector3Equal(a.lightIlluminance, b.lightIlluminance) &&

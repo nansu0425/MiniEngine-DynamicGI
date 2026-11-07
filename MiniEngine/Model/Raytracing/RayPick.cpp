@@ -256,7 +256,7 @@ void RayPick::Initialize(void)
 
     ControlChannel::Register("pick", "pick <x> <y> | pick grid <columns>x<rows>: what is seen at a client pixel, by a camera ray traced against the ray tracing scene. "
         "Pixel (x, y) covers [x, x + 1) x [y, y + 1) in client pixels from the top left and must be in the scene, not under the UI. "
-        "The ray passes the raster's sample position in it (sample, the pixel's center with TAA off) between the near and far planes, "
+        "The ray passes the raster's sample position in it (sample, the pixel's center; the TAA jitter offsets the viewport, not the sample) between the near and far planes, "
         "culling back faces of single-sided materials as the raster does. "
         "distance is along the ray and depth along the camera forward, in world units, as position is. normal is the triangle's, toward the camera. "
         "vertex_normal is the interpolated vertex normal and shading_normal is the normal the path tracer shades with: vertex_normal with the material's normal texture applied, if it has one. Both are toward the camera. "
@@ -323,8 +323,9 @@ void RayPick::Render(const Camera& camera, const D3D12_VIEWPORT& rasterViewport,
         }
         else
         {
-            fields.Object("pick", DescribePick(results[0], request.x, request.y,
-                (float)sceneRect.left + pixels[0].x + rays.rasterSampleOffset.x, (float)sceneRect.top + pixels[0].y + rays.rasterSampleOffset.y));
+            // rasterizer는 render target pixel의 중심을 sample하므로 sample은 client pixel의 중심이다. TAA jitter는 sample이 아니라 viewport를 옮긴다.
+            fields.Object("pick", DescribePick(results[0], request.x, request.y, (float)sceneRect.left + pixels[0].x + 0.5f,
+                (float)sceneRect.top + pixels[0].y + 0.5f));
         }
         request.reply.Ok(fields);
     }

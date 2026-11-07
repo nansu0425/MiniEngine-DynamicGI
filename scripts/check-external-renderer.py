@@ -28,8 +28,8 @@ off) 과 Seed 0, 1 이다. Mitsuba 는 MITSUBA_VARIANT 로 원본 scene 을 그�
 
 - film 의 rfilter: tent 를 box 로. box 는 sample 을 그 sample 이 든 pixel 에만 같은 무게로 더하므로, pixel 의 값이 pixel 안의 radiance
   평균의 추정이 된다. PT 의 pixel 과 같다.
-- 반 pixel 옮기기: PT 의 pixel 격자는 frustum 을 반 pixel 왼쪽 위로 옮긴 것이다 (CameraRays.cpp). frustum 을 pixel 단위로 [0, W] 로 재면
-  PT 의 pixel x 는 [x - 1/2, x + 1/2] 를 덮는다. Mitsuba 는 film 의 한 변을 W' = 2W + 2 로, 시야각을 tan(fov' / 2) = tan(fov / 2) W' / (2W)
+- 반 pixel 옮기기: PT 의 pixel 은 raster 의 pixel 이고, TAA 를 끄면 viewport 에서 반 pixel 왼쪽 위로 옮겨져 있다 (CameraRays.hlsli 의
+  GetViewportRay). frustum 을 pixel 단위로 [0, W] 로 재면 PT 의 pixel x 는 [x - 1/2, x + 1/2] 를 덮는다. Mitsuba 는 film 의 한 변을 W' = 2W + 2 로, 시야각을 tan(fov' / 2) = tan(fov / 2) W' / (2W)
   로 그린다. 그러면 Mitsuba 의 pixel j 는 [(j - 1) / 2, j / 2] 를 덮으므로, PT 의 pixel x 는 Mitsuba 의 pixel 2x 와 2x + 1 의 평균이다.
   세로도 같다. 원본 film 이 정사각형이고 fov 가 x 축의 값 (fov_axis 가 없다) 일 때만 이 식이 맞으므로 [X4] 가 그것도 본다.
   Mitsuba 의 sub-pixel 규약에 의존하지 않고 film 의 크기와 시야각만 바꾸는 방법이다.

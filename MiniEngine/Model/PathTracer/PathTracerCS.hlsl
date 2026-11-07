@@ -259,11 +259,11 @@ void main(uint2 pixel : SV_DispatchThreadID)
         bool truncated;
 #if INDIRECT_IRRADIANCE
         float3 estimate;
-        if (!TraceIndirectIrradiance(GetCameraRay(Rays, float2(pixel) + 0.5), random, estimate, truncated))
+        if (!TraceIndirectIrradiance(GetViewportRay(Rays, float2(pixel) + 0.5 - Rays.viewportOffset), random, estimate, truncated))
             continue;
 #else
-        // pixel 격자의 [x, x + 1) x [y, y + 1)에서 고르게 고른 위치라 평균이 pixel의 box filter가 된다.
-        const RayDesc cameraRay = GetCameraRay(Rays, float2(pixel) + random.rand2());
+        // raster pixel 안에서 고르게 고른 위치라 평균이 그 pixel의 box filter가 된다.
+        const RayDesc cameraRay = GetViewportRay(Rays, float2(pixel) + random.rand2() - Rays.viewportOffset);
         const float3 estimate = TraceRadiance(cameraRay, 0, random, truncated);
 #endif
         // 하나라도 더하면 그 뒤로 평균이 NaN이나 Inf에 머문다. 값을 잘라 더하는 것은 bias이므로 버린다.

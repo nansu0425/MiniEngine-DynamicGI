@@ -23,7 +23,7 @@ namespace PathTracer
     {
         kRadiance,
         // DDGI가 같은 시점에서 비교할 irradiance (lux). raster는 처음 맞은 점의 emission과, 그 점이 directional light에서 바로 받는 빛을
-        // 직접 구하므로 이 둘을 뺀다. 그 점의 BRDF도 raster가 곱하므로 곱하지 않는다. pixel 중심을 쏘는 것은 TAA를 끈 raster가 그 점에서
+        // 직접 구하므로 이 둘을 뺀다. 그 점의 BRDF도 raster가 곱하므로 곱하지 않는다. raster의 sample 위치를 쏘는 것은 raster가 그 점에서
         // shading하기 때문이다.
         // Shading DDGI Probe Hit로 쌓은 값은 DDGI와 irradiance를 구하는 방식 (probe의 보간과 path tracing)만 다르다. 그래서 DDGI와
         // Probe Hit 값의 차는 DDGI의 irradiance 근사의 오차이고, Probe Hit 값과 Shading glTF 값의 차는 probe hit의 shading이 정답과 다른

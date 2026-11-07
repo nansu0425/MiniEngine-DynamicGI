@@ -19,7 +19,7 @@ def vector_of(fields):
 
 
 def camera_ray(camera, scene, sample):
-    """CameraRays.cpp 와 CameraRays.hlsli 처럼, scene 의 pixel 격자에서 sample (client pixel) 을 지나는 ray 의 origin 과 방향.
+    """CameraRays.cpp 와 CameraRays.hlsli 처럼, client pixel 로 잰 sample 을 지나는 ray 의 origin 과 방향.
     camera 는 roll 이 없다고 본다."""
     import numpy as np
     forward = vector_of(camera['forward'])
@@ -29,7 +29,8 @@ def camera_ray(camera, scene, sample):
     up = np.cross(right, forward)
     half_height = np.tan(float(camera['vertical_fov']) / 2)
     half_width = half_height * scene['width'] / scene['height']
-    # pixel 격자는 frustum 을 반 pixel 왼쪽 위로 옮긴 것이다.
+    # harness baseline 은 TAA 를 끄므로 (harness-baseline/user.ini), viewport 는 TemporalEffects 가 TAA 를 끌 때 두는 0.5 만큼
+    # client pixel 에서 옮겨져 있다 (CameraRays.h 의 viewportOffset).
     x, y = sample[0] - scene['left'] - 0.5, sample[1] - scene['top'] - 0.5
     direction = forward + right * half_width * (2 * x / scene['width'] - 1) + up * half_height * (1 - 2 * y / scene['height'])
     return vector_of(camera), direction / np.linalg.norm(direction)

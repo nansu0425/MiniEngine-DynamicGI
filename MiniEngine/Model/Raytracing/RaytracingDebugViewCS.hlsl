@@ -138,7 +138,7 @@ void main(uint2 pixel : SV_DispatchThreadID)
 {
     float3 color = 0.0;
     RayHit hit;
-    if (TraceClosestHit(GetRasterSampleRay(Rays, pixel), DebugViewRayFlags(), hit))
+    if (TraceClosestHit(GetViewportRay(Rays, float2(pixel) + 0.5 - Rays.viewportOffset), DebugViewRayFlags(), hit))
         color = HitColor(hit);
     Output[pixel] = float4(color, 1.0);
 }

@@ -1773,7 +1773,7 @@ def check_pick(session, check):
           not mismatched and compared >= 0.9 * len(picks),
           '; '.join(mismatched[:3]) or f'{compared} of {len(picks)} cells compared, {decided_by_alpha_test} decided by alpha testing')
 
-    # TAA 를 끄면 scene 의 가운데 pixel 의 sample 은 frustum 의 가운데라서, 그 ray 는 camera 의 forward 와 같다 (CameraRays.h).
+    # TAA 를 끄면 scene 의 가운데 pixel 의 sample 은 frustum 의 가운데라서, 그 ray 는 camera 의 forward 와 같다 (CameraRays.hlsli 의 GetViewportRay).
     # scene 의 폭과 높이가 짝수일 때만 그렇다.
     center = (scene['left'] + scene['width'] // 2, scene['top'] + scene['height'] // 2)
     usable = [pick for pick in picks if pick['hit'] and not pick['alpha_test']]

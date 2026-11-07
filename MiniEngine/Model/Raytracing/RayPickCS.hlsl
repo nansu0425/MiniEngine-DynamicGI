@@ -54,9 +54,8 @@ void main(uint index : SV_DispatchThreadID)
     Result result = (Result)0;
     result.rasterZ = RasterDepth[pixel];
     result.rasterDepth = GetRasterViewDepth(result.rasterZ, NearZ, FarZ);
-
-    // raster가 보는 것과 견주도록 raster의 sample 위치를 지나 raster의 depth 범위 안에서, raster처럼 single-sided 면의 뒷면을 cull한다.
-    RayDesc ray = GetRasterSampleRay(Rays, pixel);
+    
+    RayDesc ray = GetViewportRay(Rays, float2(pixel) + 0.5 - Rays.viewportOffset);
     ClipToRasterDepthRange(ray, CameraForward, NearZ, FarZ);
     RayHit hit;
     const bool rayHit = TraceClosestHit(ray, kCullSingleSidedBackFaces, hit);
