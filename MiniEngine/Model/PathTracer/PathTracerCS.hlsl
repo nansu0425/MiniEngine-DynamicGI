@@ -69,7 +69,7 @@ SamplerComparisonState ShadowMapSampler : register(s0);
 // path가 shading을 쓰는 vertex가 material texture를 읽는 mip. Indirect Irradiance에서 처음 맞은 점은 shading을 쓰지 않으므로
 // TraceIndirectIrradiance가 kSharpestTextureLod로 읽는다.
 #if PROBE_HIT_SHADING
-static const float kShadedVertexTextureLod = kProbeHitTextureLod;
+static const float kShadedVertexTextureLod = kIndirectHitTextureLod;
 #else
 static const float kShadedVertexTextureLod = kSharpestTextureLod;
 #endif
@@ -85,7 +85,7 @@ struct PathVertex
     // 반사 방향을 고르는 normal
     float3 normal;
 #if LAMBERT_SHADING || PROBE_HIT_SHADING
-    // Lambert의 albedo. Shading DDGI Probe Hit에서는 SurfaceShading.hlsli의 GetProbeHitAlbedo다.
+    // Lambert의 albedo. Shading DDGI Probe Hit에서는 SurfaceShading.hlsli의 GetIndirectHitAlbedo다.
     float3 albedo;
 #else
     // 이 vertex의 directional light와 다음 방향 고르기가 같은 값을 쓴다.
@@ -106,9 +106,9 @@ PathVertex GetPathVertex(RayHit hit, float3 view, float textureLod)
     vertex.geometryNormal = surface.geometryNormal;
     vertex.normal = GeometricNormals != 0 ? surface.geometryNormal : surface.shadingNormal;
 #if PROBE_HIT_SHADING
-    // furnace는 Lambert처럼 albedo를 Furnace Albedo로 둔다. SurfaceShading.hlsli의 kProbeHitIndirectScale은 furnace에서도 곱하므로
-    // 해는 emission / (1 - albedo x kProbeHitIndirectScale)이다.
-    vertex.albedo = Furnace != 0 ? FurnaceAlbedo : GetProbeHitAlbedo(surface.baseColor.rgb, surface.metallic);
+    // furnace는 Lambert처럼 albedo를 Furnace Albedo로 둔다. SurfaceShading.hlsli의 kIndirectHitIrradianceScale은 furnace에서도 곱하므로
+    // 해는 emission / (1 - albedo x kIndirectHitIrradianceScale)이다.
+    vertex.albedo = Furnace != 0 ? FurnaceAlbedo : GetIndirectHitAlbedo(surface.baseColor.rgb, surface.metallic);
 #elif LAMBERT_SHADING
     // glTF spec과 다르다: Shading Lambert는 glTF의 metallic-roughness BRDF 대신 albedo가 baseColor x (1 - metallic)인 Lambert로
     // 반사해서, dielectric의 specular와 metal의 반사가 없다. 반사마다의 f cos / pdf가 albedo라서 furnace의 답을 bit로 알고, 작업 13의
@@ -128,15 +128,15 @@ PathVertex GetPathVertex(RayHit hit, float3 view, float textureLod)
 }
 
 #if PROBE_HIT_SHADING
-// probe hit가 path를 거슬러 내는 radiance 중, path를 다음 vertex로 이어 추정하는 irradiance의 몫을 뺀 radiance. radiance와 visibility는
+// indirect hit가 path를 거슬러 내는 radiance 중, path를 다음 vertex로 이어 추정하는 irradiance의 몫을 뺀 radiance. radiance와 visibility는
 // SurfaceShading.hlsli의 계약대로 camera pixel과 같은 routine으로 구한다. furnace는 답을 식으로 알도록 light를 끈다.
-float3 GetProbeHitRadianceWithoutIrradiance(PathVertex vertex)
+float3 GetIndirectHitRadianceWithoutIrradiance(PathVertex vertex)
 {
     const bool lit = Furnace == 0 && any(LightIlluminance != 0.0);
     const float3 shadowCoord = mul(ShadowMatrix, float4(vertex.position, 1.0)).xyz;
     const float visibility = lit ?
         GetDirectionalLightVisibility(ShadowMap, ShadowMapSampler, shadowCoord, vertex.geometryNormal, LightDirection) : 0.0;
-    return GetProbeHitOutgoingRadiance(vertex.albedo, vertex.emission, vertex.normal, LightDirection, lit ? LightIlluminance : 0.0,
+    return GetIndirectHitOutgoingRadiance(vertex.albedo, vertex.emission, vertex.normal, LightDirection, lit ? LightIlluminance : 0.0,
         visibility, 0.0);
 }
 #else
@@ -180,12 +180,12 @@ float3 TraceRadiance(RayDesc ray, uint reflectionsBeforeRay, inout Random random
             truncated = true;
             return radiance + throughput * vertex.emission;
         }
-        radiance += throughput * GetProbeHitRadianceWithoutIrradiance(vertex);
+        radiance += throughput * GetIndirectHitRadianceWithoutIrradiance(vertex);
 
-        // SurfaceShading.hlsli의 계약대로 cosine으로 고른 방향의 radiance에 GetProbeHitIndirectWeight를 곱해 path를 잇는다.
+        // SurfaceShading.hlsli의 계약대로 cosine으로 고른 방향의 radiance에 GetIndirectHitIrradianceWeight를 곱해 path를 잇는다.
         if (!DescribeSurfaceRay(vertex.position, vertex.geometryNormal, SampleLambertDirection(vertex.normal, random.rand2()), ray))
             return radiance;
-        throughput *= GetProbeHitIndirectWeight(vertex.albedo);
+        throughput *= GetIndirectHitIrradianceWeight(vertex.albedo);
 #else
         radiance += throughput * vertex.emission;
         if (bounces == MaxBounces)
