@@ -7,7 +7,7 @@
 - Visual Studio 2022 (17.14 에서 확인), Desktop development with C++ workload, vcpkg 구성 요소
 - Windows SDK
 - inline raytracing (DXR Tier 1.1, Shader Model 6.5) 을 지원하는 GPU. WARP 는 지원하지 않는다.
-- Python 3.12 와 [scripts/requirements.txt](scripts/requirements.txt) 의 package (`pip install -r scripts/requirements.txt`). app 을 build 하고 실행해 확인하는 `scripts/viewer.py` 와 `scripts/` 의 확인 script 가 쓴다.
+- Python 3.12 와 [scripts/requirements.txt](scripts/requirements.txt) 의 package (`pip install -r scripts/requirements.txt`). `scripts/` 의 script 가 쓴다.
 - VS Code 로 build 하고 실행하려면 C/C++ extension (`ms-vscode.cpptools`) 1.32.2 이상. Run Without Debugging 을 이 version 부터 지원한다. VS Code 의 build 는 `scripts/viewer.py` 로 하므로 Python 도 필요하다.
 
 ## 빌드와 실행

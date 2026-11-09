@@ -1,5 +1,5 @@
 // glTF 2.0 metallic-roughness material의 BRDF (references/glTF의 Specification.adoc Appendix B). path tracer와 raster가 같은 함수로
-// 평가한다. scripts/gltfbrdf.py가 같은 BRDF를 float64로 계산하고, scripts/check-gltf-brdf.py가 GPU에서 이 함수를 돌려 그 값과 비교한다.
+// 평가한다.
 
 #ifndef __GLTF_BRDF_HLSLI__
 #define __GLTF_BRDF_HLSLI__
@@ -108,7 +108,7 @@ GltfBrdfInput MakeGltfBrdfInput(float3 baseColor, float metallic, float roughnes
     input.view = view - 2.0 * min(0.0, dot(normal, view)) * normal;
     input.viewCosine = saturate(dot(normal, input.view));
     // α = 0이면 D가 delta가 되어 식으로 평가할 수 없으므로 하한을 둔다 (spec :3741). 하한의 D 최대값 1 / (π α²) ≈ 3.2e5는 float32에서
-    // 안전하고, 이 α에서도 peak 근처의 D가 float32에서 상대 1e-3 안에 든다 (scripts/check-gltf-brdf.py의 [B1]).
+    // 안전하고, 이 α에서도 peak 근처의 D가 float32에서 상대 1e-3 안에 든다.
     input.alpha = max(roughness * roughness, kGltfMinAlpha);
     // Schlick의 F는 f0의 1차식이라 mix(dielectric, metal, metallic)의 두 specular는 f0를 섞은 lobe 하나가 된다 (spec :3532, :3838-3851).
     // metal은 single scattering이라 rough할수록 energy를 잃는다. spec은 multiple scattering을 Note에서만 권하고 (:3637), Note는 informative다 (:137).

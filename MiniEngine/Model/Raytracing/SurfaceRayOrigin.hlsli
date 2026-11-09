@@ -25,7 +25,7 @@ float3 SurfaceRayOrigin(float3 position, float3 geometryNormal)
     // 원래 방법은 성분마다 그 성분의 크기에 맞춰 옮기므로, 0에 가까운 성분은 floatScale만 옮긴다. 그런데 다음 ray가 이 면과 다시
     // 교차하는지 계산하는 오차는 그 성분이 아니라 ray와 삼각형의 모든 좌표의 크기를 따른다 (추측: DXR의 교차 계산이 float32로 ray
     // origin 기준의 좌표를 쓴다고 보고, 그 오차가 가장 큰 좌표의 ULP에 비례한다고 본 것이다). Cornell box에서 y = 0이고 x, z가 512까지 가는
-    // 바닥은 floatScale (1.5e-5) 만큼만 옮겨, 바닥이 받는 두 번째 반사가 Mitsuba보다 4.5% 적었다 (scripts/check-external-renderer.py).
+    // 바닥은 floatScale (1.5e-5) 만큼만 옮겨, 바닥이 받는 두 번째 반사가 Mitsuba보다 4.5% 적었다.
     // scene을 옮겨 바닥을 y = 0에서 떼면 차가 없어졌으므로, 바닥에서 쏜 ray가 바닥에 다시 맞았다고 본다 (추측). 그래서 가장 큰 성분의
     // 크기로 정한 거리만큼도 옮긴다.
     const float largest = max(abs(position.x), max(abs(position.y), abs(position.z)));

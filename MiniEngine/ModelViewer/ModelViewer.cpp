@@ -479,8 +479,7 @@ void SkyComponent::SaveSettings(IniFile::Values& values) const
     values["Intensity"] = text;
 }
 
-// directional light와 달리 intensity의 inf는 받는다. scripts/check-path-tracer-export.py가 inf로 두어 path tracer에 NaN과 Inf인
-// sample을 만든다.
+// directional light와 달리 intensity의 inf는 받는다. path tracer가 NaN과 Inf인 sample을 버리는지 볼 때 inf로 둔다.
 void SkyComponent::LoadSettings(const IniFile::Values& values)
 {
     Properties properties = GetDefaultProperties();

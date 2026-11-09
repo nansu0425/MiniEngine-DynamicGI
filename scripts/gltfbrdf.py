@@ -6,7 +6,7 @@
 BRDF 는 references/glTF 의 Specification.adoc Appendix B 의 식 (D :3697, V :3727, F :3790, 조합 :3532, :3838-3851) 에
 GltfBrdf.hlsli 가 고른 세 가지 (α 의 하한, diffuse 와 specular 의 coupling, n·v ≤ 0 의 처리) 를 더한 것이고, 그 이유는 GltfBrdf.hlsli 에
 있다. 여기서는 spec 의 모양 그대로 float64 로 계산한다. GltfBrdf.hlsli 는 같은 값을 float32 에서 안정한 모양으로 계산하므로, 두 구현의
-차는 float32 의 반올림이어야 한다. scripts/check-gltf-brdf.py 가 이 module 을 참조로 GPU 의 값을 판정한다.
+차는 float32 의 반올림이어야 한다.
 
 table 은 coupling 의 E_s 와 E_avg 다. E_s(μ, α) 는 f0 = DIELECTRIC_F0 인 specular lobe (α 의 하한을 걸고, height-correlated Smith, |V·H| 의
 Schlick) 의 directional albedo 이고 E_avg(α) = 2∫E_s(μ, α) μ dμ 다.

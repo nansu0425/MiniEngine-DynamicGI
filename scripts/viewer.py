@@ -535,7 +535,7 @@ def scene_gltf(scene):
 
 
 def write_scene_file(gltf):
-    """확인 script 가 만든 test scene 의 glTF 옆에 scene file 을 쓰고 그 MiniEngine/ModelViewer 기준 경로를 돌려준다.
+    """test scene 의 glTF 옆에 scene file 을 쓰고 그 MiniEngine/ModelViewer 기준 경로를 돌려준다.
     model 은 bounding sphere 반지름이 10 이 되게 늘리고, camera 는 그 sphere 를 화면에 담는다 (ModelViewer.cpp 의 SceneFile).
     light 와 sky 의 section 은 없으므로 기본값이다."""
     gltf = Path(gltf)
@@ -879,7 +879,7 @@ SNAPSHOT_SAME_CODE_FACTOR = 4
 SNAPSHOT_SAME_CODE_FLOOR = 0.001
 # path tracer 의 shot. SNAPSHOT_PT_POSE 에서 Shading 과 Output 의 조합마다 같은 Seed 로 쌓아 export 한다. 나머지 설정은 harness baseline 과
 # app 의 기본값이다. raster 의 shot 을 찍는 순서가 PT 의 shot 을 넣기 전과 같도록 raster 의 shot 을 다 찍은 뒤에 찍는다. export 는 post
-# effects 전의 누적값이고 TAA 의 jitter 와 무관하므로 (check-indirect-irradiance.py 의 [I9]) app 의 기본 효과를 켠 채 찍어도 된다.
+# effects 전의 누적값이고 TAA 의 jitter 와 무관하므로 app 의 기본 효과를 켠 채 찍어도 된다.
 SNAPSHOT_PT_POSE = 'start'
 SNAPSHOT_PT_SETTINGS = {'Show': 1, 'Seed': 0, 'Samples per Frame': 1, 'Max Bounces': 64, 'Russian Roulette': 1, 'Geometric Normals': 0,
                         'Furnace': 0}

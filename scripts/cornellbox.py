@@ -4,7 +4,7 @@
 
 scripts/fetch-assets.ps1 이 zip 을 받아 푼 뒤에 부른다. glTF 는 그 glTF 를 여는 ModelViewer 의 scene file 이 [Model] glTF 로
 가리키는 곳에 쓰고, glTF 의 asset.extras.source 에 Mitsuba scene 의 경로를 glTF 폴더 기준으로 남긴다 (SOURCE_KEY).
-scripts/check-cornell-box.py 가 그 경로로 정답을 구한다. 받은 파일을 읽으므로 python -I 로 돌리고, 자기 폴더만 sys.path 에 넣어
+받은 파일을 읽으므로 python -I 로 돌리고, 자기 폴더만 sys.path 에 넣어
 module 을 import 한다. 수치는 모두 scene 에서 읽고, 여기에는 Mitsuba 의 shape 정의만 둔다. scene 이 이 script 가 아는 것 밖의
 plugin 이나 transform 을 쓰면 바꾸지 않고 실패한다.
 

@@ -109,7 +109,7 @@ PathVertex GetPathVertex(RayHit hit, float3 view, float textureLod)
     vertex.normal = GeometricNormals != 0 ? surface.geometryNormal : surface.shadingNormal;
 #if PROBE_HIT_SHADING
     // furnace는 Lambert처럼 albedo를 Furnace Albedo로 둔다. SurfaceShading.hlsli의 kProbeHitIndirectScale은 furnace에서도 곱하므로
-    // 해는 emission / (1 - albedo x kProbeHitIndirectScale)이다 (scripts/check-probe-hit-shading.py의 [E4]).
+    // 해는 emission / (1 - albedo x kProbeHitIndirectScale)이다.
     vertex.albedo = Furnace != 0 ? FurnaceAlbedo : GetProbeHitAlbedo(surface.baseColor.rgb, surface.metallic);
 #elif LAMBERT_SHADING
     // glTF spec과 다르다: Shading Lambert는 glTF의 metallic-roughness BRDF 대신 albedo가 baseColor x (1 - metallic)인 Lambert로
@@ -118,7 +118,7 @@ PathVertex GetPathVertex(RayHit hit, float3 view, float textureLod)
     vertex.albedo = Furnace != 0 ? FurnaceAlbedo : surface.baseColor.rgb * (1.0 - surface.metallic);
 #else
     // furnace는 baseColor 1, metallic 0인 BRDF에 Furnace Albedo를 곱한다. 이 BRDF는 모든 view 방향에서 빛을 다 반사하므로
-    // (energy-preserving coupling, scripts/check-gltf-brdf.py의 [B5]) directional albedo가 어디서나 Furnace Albedo가 되어, Lambert처럼 답을 식으로 안다. baseColor를 Furnace Albedo로 두면
+    // (energy-preserving coupling) directional albedo가 어디서나 Furnace Albedo가 되어, Lambert처럼 답을 식으로 안다. baseColor를 Furnace Albedo로 두면
     // albedo가 1보다 작을 때 specular가 baseColor를 따르지 않아 directional albedo가 view 방향에 따라 달라진다. roughness는 그대로 두어
     // specular lobe도 지나게 한다.
     vertex.brdf = MakeGltfBrdfInput(Furnace != 0 ? 1.0 : surface.baseColor.rgb, Furnace != 0 ? 0.0 : surface.metallic, surface.roughness,
