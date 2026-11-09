@@ -66,14 +66,6 @@ Texture2D<float> ShadowMap : register(t0);
 SamplerComparisonState ShadowMapSampler : register(s0);
 #endif
 
-// path가 shading을 쓰는 vertex가 material texture를 읽는 mip. Indirect Irradiance에서 처음 맞은 점은 shading을 쓰지 않으므로
-// TraceIndirectIrradiance가 kSharpestTextureLod로 읽는다.
-#if PROBE_HIT_SHADING
-static const float kShadedVertexTextureLod = kIndirectHitTextureLod;
-#else
-static const float kShadedVertexTextureLod = kSharpestTextureLod;
-#endif
-
 // 몇 번째 반사부터 Russian roulette로 path를 끊는지. 앞의 반사에서 끊으면 아끼는 trace는 적고 분산만 커진다.
 static const uint kFirstRussianRouletteBounce = 3;
 
@@ -84,8 +76,8 @@ struct PathVertex
     float3 geometryNormal;
     // 반사 방향을 고르는 normal
     float3 normal;
-#if LAMBERT_SHADING || PROBE_HIT_SHADING
-    // Lambert의 albedo. Shading DDGI Probe Hit에서는 SurfaceShading.hlsli의 GetIndirectHitAlbedo다.
+#if LAMBERT_SHADING
+    // Lambert의 albedo.
     float3 albedo;
 #else
     // 이 vertex의 directional light와 다음 방향 고르기가 같은 값을 쓴다.
@@ -96,20 +88,16 @@ struct PathVertex
     float3 emission;
 };
 
-// view는 vertex에서 path를 거슬러 가는 쪽, 곧 ray가 온 쪽을 향하는 단위 vector다. textureLod는 material texture를 읽는 mip이다.
-PathVertex GetPathVertex(RayHit hit, float3 view, float textureLod)
+// view는 vertex에서 path를 거슬러 가는 쪽, 곧 ray가 온 쪽을 향하는 단위 vector다.
+PathVertex GetPathVertex(RayHit hit, float3 view)
 {
-    const HitSurface surface = GetHitSurface(hit, textureLod);
+    const HitSurface surface = GetHitSurface(hit, kSharpestTextureLod);
 
     PathVertex vertex;
     vertex.position = surface.position;
     vertex.geometryNormal = surface.geometryNormal;
     vertex.normal = GeometricNormals != 0 ? surface.geometryNormal : surface.shadingNormal;
-#if PROBE_HIT_SHADING
-    // furnace는 Lambert처럼 albedo를 Furnace Albedo로 둔다. SurfaceShading.hlsli의 kIndirectHitIrradianceScale은 furnace에서도 곱하므로
-    // 해는 emission / (1 - albedo x kIndirectHitIrradianceScale)이다.
-    vertex.albedo = Furnace != 0 ? FurnaceAlbedo : GetIndirectHitAlbedo(surface.baseColor.rgb, surface.metallic);
-#elif LAMBERT_SHADING
+#if LAMBERT_SHADING
     // glTF spec과 다르다: Shading Lambert는 glTF의 metallic-roughness BRDF 대신 albedo가 baseColor x (1 - metallic)인 Lambert로
     // 반사해서, dielectric의 specular와 metal의 반사가 없다. 반사마다의 f cos / pdf가 albedo라서 furnace의 답을 bit로 알고, 작업 13의
     // Cornell box가 같은 BRDF를 쓴다. 정답은 Shading glTF로 만든다. DDGI가 probe hit를 shading하는 방식은 Shading DDGI Probe Hit가 따른다.
@@ -129,7 +117,7 @@ PathVertex GetPathVertex(RayHit hit, float3 view, float textureLod)
 
 #if PROBE_HIT_SHADING
 // indirect hit가 path를 거슬러 내는 radiance 중, path를 다음 vertex로 이어 추정하는 irradiance의 몫을 뺀 radiance. visibility는
-// SurfaceShading.hlsli의 계약대로 camera pixel과 같은 routine으로 구한다. furnace는 답을 식으로 알도록 light를 끈다.
+// camera pixel과 같은 routine으로 구한다. furnace는 답을 식으로 알도록 light를 끈다.
 float3 GetIndirectHitRadianceWithoutIrradiance(PathVertex vertex)
 {
     const bool lit = Furnace == 0 && any(LightIlluminance != 0.0);
@@ -137,7 +125,8 @@ float3 GetIndirectHitRadianceWithoutIrradiance(PathVertex vertex)
     const float visibility = lit ?
         GetDirectionalLightVisibility(ShadowMap, ShadowMapSampler, shadowCoord, vertex.geometryNormal, LightDirection) : 0.0;
     const float3 lightIlluminance = lit ? LightIlluminance : 0.0;
-    return vertex.emission + vertex.albedo * kInversePi * lightIlluminance * (max(0.0, dot(vertex.normal, LightDirection)) * visibility);
+    return vertex.emission + EvaluateGltfBrdf(vertex.brdf, LightDirection) * vertex.brdfScale * lightIlluminance *
+        (max(0.0, dot(vertex.normal, LightDirection)) * visibility);
 }
 #else
 // directional light의 빛이 vertex에서 한 번 반사해 path를 거슬러 가는 radiance. light는 방향 하나에서만 오므로 반사 방향을 골라서는
@@ -172,7 +161,7 @@ float3 TraceRadiance(RayDesc ray, uint reflectionsBeforeRay, inout Random random
         if (!TraceClosestHit(ray, kCullSingleSidedBackFaces, hit))
             return radiance + throughput * SkyRadiance;
 
-        const PathVertex vertex = GetPathVertex(hit, -ray.Direction, kShadedVertexTextureLod);
+        const PathVertex vertex = GetPathVertex(hit, -ray.Direction);
 #if PROBE_HIT_SHADING
         // 다른 Shading처럼 마지막 vertex에서는 emission만 본다.
         if (bounces == MaxBounces)
@@ -182,10 +171,10 @@ float3 TraceRadiance(RayDesc ray, uint reflectionsBeforeRay, inout Random random
         }
         radiance += throughput * GetIndirectHitRadianceWithoutIrradiance(vertex);
 
-        // SurfaceShading.hlsli의 계약대로 cosine으로 고른 방향의 radiance에 GetIndirectHitIrradianceWeight를 곱해 path를 잇는다.
-        if (!DescribeSurfaceRay(vertex.position, vertex.geometryNormal, SampleLambertDirection(vertex.normal, random.rand2()), ray))
+        const float3 direction = SampleLambertDirection(vertex.normal, random.rand2());
+        if (!DescribeSurfaceRay(vertex.position, vertex.geometryNormal, direction, ray))
             return radiance;
-        throughput *= GetIndirectHitIrradianceWeight(vertex.albedo);
+        throughput *= kPi * EvaluateGltfDiffuseLobe(vertex.brdf, direction) * vertex.brdfScale;
 #else
         radiance += throughput * vertex.emission;
         if (bounces == MaxBounces)
@@ -235,8 +224,8 @@ bool TraceIndirectIrradiance(RayDesc cameraRay, inout Random random, out float3 
         truncated = true;
         return true;
     }
-    // 처음 맞은 점은 raster가 shading하므로 Shading과 무관하게 다른 query처럼 mip 0으로 읽고 position과 normal만 쓴다.
-    const PathVertex vertex = GetPathVertex(hit, -cameraRay.Direction, kSharpestTextureLod);
+    // 처음 맞은 점은 raster가 shading하므로 position과 normal만 쓴다.
+    const PathVertex vertex = GetPathVertex(hit, -cameraRay.Direction);
     RayDesc ray;
     // cosine으로 고른 방향의 pdf가 cos / π라서 irradiance의 추정은 π L이다.
     if (DescribeSurfaceRay(vertex.position, vertex.geometryNormal, SampleLambertDirection(vertex.normal, random.rand2()), ray))

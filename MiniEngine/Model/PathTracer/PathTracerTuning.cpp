@@ -77,8 +77,8 @@ namespace
             s_Settings.shading = (PathTracer::Shading)shading;
         ImGui::SetItemTooltip("glTF reflects by the glTF metallic-roughness BRDF, the answer to compare with. Lambert reflects diffusely "
             "with albedo base color x (1 - metallic), so the furnaces have answers to the bit. DDGI Probe Hit shades the points a path hits, "
-            "but the first one in Indirect Irradiance, as DDGI shades its probe ray hits: textures at a fixed mip, a diffuse albedo with the "
-            "glossy part added, the raster's shadow map and an indirect scale.");
+            "but the first one in Indirect Irradiance, as DDGI shades its probe ray hits: the glTF BRDF lit by the raster's shadow map, "
+            "reflecting indirect light by the diffuse lobe only.");
         TuningSection::MakeItemResettable("Shading");
 
         const uint32_t step = 1;

@@ -38,10 +38,11 @@ namespace PathTracer
         kGltf,
         // albedo가 baseColor x (1 - metallic)인 Lambert. 반사마다의 f cos / pdf가 albedo라서 furnace의 답을 bit로 알 수 있다.
         kLambert,
-        // DDGI가 probe ray가 맞은 점 (probe hit)을 shading하는 방식 (Core/Shaders/SurfaceShading.hlsli). 정해진 mip의 texture,
-        // glossy 반사를 합친 albedo의 Lambert, raster와 같은 shadow map으로 shading한다. Output Radiance에서는 camera ray가 맞은 점부터
-        // 모든 vertex가 probe hit이므로, camera 위치의 probe가 보는 radiance가 된다. Output Indirect Irradiance에서는 처음 맞은 점을
-        // shading하지 않고, 처음 맞은 점 뒤의 vertex가 probe hit다. 정답을 만드는 glTF와 Lambert는 shadow ray와 mip 0을 쓴다.
+        // DDGI가 probe ray가 맞은 점 (probe hit)을 shading하는 방식. probe hit는 camera pixel처럼 glTF의 metallic-roughness BRDF로
+        // directional light를 반사하고, 그 visibility는 raster와 같은 shadow map으로 구한다. probe는 irradiance만 주므로 probe hit는
+        // 다음 vertex에서 오는 빛을 diffuse lobe로만 반사한다. Output Radiance에서는 camera ray가 맞은 점부터 모든 vertex가 probe hit이므로,
+        // camera 위치의 probe가 보는 radiance가 된다. Output Indirect Irradiance에서는 처음 맞은 점을 shading하지 않고, 처음 맞은 점 뒤의
+        // vertex가 probe hit다. glTF와 Lambert는 visibility를 shadow ray로 구한다.
         kProbeHit,
     };
 

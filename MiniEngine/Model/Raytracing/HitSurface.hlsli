@@ -43,7 +43,7 @@ float3 ObjectToWorldNormal(RayHit hit, float3 normal)
     return normalize(mul(normal, (float3x3)hit.worldToObject));
 }
 
-// textureLod는 material texture를 읽는 mip이다. 따로 정한 query 밖에서는 kSharpestTextureLod다.
+// textureLod는 material texture를 읽는 mip이다.
 HitSurface GetHitSurface(RayHit hit, float textureLod)
 {
     const HitTriangle hitTriangle = GetHitTriangle(hit.instanceIndex, hit.geometryIndex, hit.primitiveIndex, hit.barycentrics);

@@ -29,21 +29,22 @@ float3 TraceIncomingRadiance(RayDesc ray, PathTracingLights lights, Texture2D<fl
         if (!TraceClosestHit(ray, kCullSingleSidedBackFaces, rayHit))
             return radiance + throughput * lights.skyRadiance;
 
-        const HitSurface surface = GetHitSurface(rayHit, kIndirectHitTextureLod);
-        const float3 albedo = GetIndirectHitAlbedo(surface.baseColor.rgb, surface.metallic);
+        const HitSurface surface = GetHitSurface(rayHit, kSharpestTextureLod);
+        const GltfBrdfInput brdf = MakeGltfBrdfInput(surface.baseColor.rgb, surface.metallic, surface.roughness, surface.shadingNormal, -ray.Direction);
         const float3 shadowCoord = mul(lights.shadowMatrix, float4(surface.position, 1.0)).xyz;
         const float visibility = lit ? GetDirectionalLightVisibility(shadowMap, shadowMapSampler, shadowCoord, surface.geometryNormal, lights.lightDirection) : 0.0;
-        const float3 directRadiance = albedo * kInversePi * lights.lightIlluminance * (max(0.0, dot(surface.shadingNormal, lights.lightDirection)) * visibility);
-        
+        const float3 directRadiance = EvaluateGltfBrdf(brdf, lights.lightDirection) * lights.lightIlluminance * (max(0.0, dot(surface.shadingNormal, lights.lightDirection)) * visibility);
+
         radiance += throughput * (surface.emissive + directRadiance);
-        
+
         if (hits == maxHits)
             return radiance;
-     
-        if (!DescribeSurfaceRay(surface.position, surface.geometryNormal, SampleLambertDirection(surface.shadingNormal, random.rand2()), ray))
+
+        const float3 direction = SampleLambertDirection(surface.shadingNormal, random.rand2());
+        if (!DescribeSurfaceRay(surface.position, surface.geometryNormal, direction, ray))
             return radiance;
-        
-        throughput *= GetIndirectHitIrradianceWeight(albedo);
+
+        throughput *= kPi * EvaluateGltfDiffuseLobe(brdf, direction);
 
         if (russianRoulette && hits >= kFirstRussianRouletteHit)
         {
