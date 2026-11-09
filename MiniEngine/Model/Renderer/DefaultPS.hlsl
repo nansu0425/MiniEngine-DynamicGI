@@ -26,6 +26,8 @@ SamplerState emissiveSampler                : register(s3);
 SamplerState normalSampler                  : register(s4);
 
 Texture2D<float> texShadow			    : register(t13);
+// raster가 구하지 않는 간접광의 diffuse 반사 (Renderer::SetIndirectDiffuseRadiance)
+Texture2D<float3> indirectDiffuseTexture    : register(t18);
 
 cbuffer MaterialConstants : register(b0)
 {
@@ -120,7 +122,8 @@ float4 main(VSOutput vsOutput, bool isFrontFace : SV_IsFrontFace) : SV_Target0
 
     const float lightVisibility = GetDirectionalLightVisibility(texShadow, shadowSampler, vsOutput.shadowCoord,
         GetGeometryNormal(vsOutput.worldPos, view), LightDirection);
-    const float3 radiance = GetOutgoingRadiance(surface, view, LightDirection, LightIlluminance, lightVisibility);
+    const float3 radiance = GetOutgoingRadiance(surface, view, LightDirection, LightIlluminance, lightVisibility) +
+        indirectDiffuseTexture[uint2(vsOutput.position.xy)];
 
     // TODO: Shade each light using Forward+ tiles
 

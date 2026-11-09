@@ -21,6 +21,8 @@
 #include "Core/Graphics/GraphicsCommon.h"
 #include "Core/Graphics/Resource/BufferManager.h"
 #include "Core/Camera/ShadowCamera.h"
+#include "Core/Graphics/Command/CommandListManager.h"
+#include "Core/Graphics/Resource/ColorBuffer.h"
 
 #include "Output/Model/CompiledShaders/DefaultVS.h"
 #include "Output/Model/CompiledShaders/DefaultSkinVS.h"
@@ -66,6 +68,12 @@ namespace Renderer
     GraphicsPSO m_SkyBackgroundPSO(L"Renderer: Sky Background PSO");
 
     DescriptorHandle m_CommonTextures;
+
+    // m_CommonTextures에서 t18의 자리
+    const uint32_t kIndirectDiffuseRadianceSlot = 8;
+    // t18이 가리키는 buffer와, view를 복사했을 때 그 buffer의 version ID. nullptr이면 black texture를 가리킨다.
+    const ColorBuffer* s_IndirectDiffuseRadiance = nullptr;
+    uint32_t s_IndirectDiffuseRadianceID = 0;
 }
 
 namespace
@@ -223,10 +231,10 @@ void Renderer::Initialize(void)
     Lighting::InitializeResources();
 
     // Allocate a descriptor table for the common textures
-    m_CommonTextures = s_TextureHeap.Alloc(8);
+    m_CommonTextures = s_TextureHeap.Alloc(9);
 
-    uint32_t DestCount = 8;
-    uint32_t SourceCounts[] = { 1, 1, 1, 1, 1, 1, 1, 1 };
+    uint32_t DestCount = 9;
+    uint32_t SourceCounts[] = { 1, 1, 1, 1, 1, 1, 1, 1, 1 };
 
     // t10 ~ t12는 이 renderer의 shader가 읽지 않는다. LEGACY_RENDERER의 Sponza shader가 t12와 그 뒤를 이 번호로 읽으므로 자리를 둔다.
     D3D12_CPU_DESCRIPTOR_HANDLE SourceTextures[] =
@@ -239,6 +247,7 @@ void Renderer::Initialize(void)
         Lighting::m_LightShadowArray.GetSRV(),
         Lighting::m_LightGrid.GetSRV(),
         Lighting::m_LightGridBitMask.GetSRV(),
+        GetDefaultTexture(kBlackOpaque2D),
     };
 
     g_Device->CopyDescriptors(1, &m_CommonTextures, &DestCount, DestCount, SourceTextures, SourceCounts, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -273,6 +282,21 @@ void Renderer::UpdateGlobalDescriptors(void)
     g_SSAOFullScreenID = g_SSAOFullScreen.GetVersionID();
     g_ShadowBufferID = g_ShadowBuffer.GetVersionID();
 
+}
+
+void Renderer::SetIndirectDiffuseRadiance(const ColorBuffer* radiance)
+{
+    const uint32_t versionID = radiance != nullptr ? radiance->GetVersionID() : 0;
+    if (radiance == s_IndirectDiffuseRadiance && versionID == s_IndirectDiffuseRadianceID)
+        return;
+
+    // 앞 frame의 draw가 읽고 있을 수 있는 descriptor를 덮어쓰므로 GPU를 기다린다. 항을 켜고 끄거나 buffer를 다시 만들 때만 온다.
+    g_CommandManager.IdleGPU();
+    const D3D12_CPU_DESCRIPTOR_HANDLE view = radiance != nullptr ? radiance->GetSRV() : GetDefaultTexture(kBlackOpaque2D);
+    const DescriptorHandle dest = m_CommonTextures + kIndirectDiffuseRadianceSlot * s_TextureHeap.GetDescriptorSize();
+    g_Device->CopyDescriptorsSimple(1, dest, view, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    s_IndirectDiffuseRadiance = radiance;
+    s_IndirectDiffuseRadianceID = versionID;
 }
 
 void Renderer::Shutdown(void)

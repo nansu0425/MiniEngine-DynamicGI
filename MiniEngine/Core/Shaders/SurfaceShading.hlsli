@@ -46,7 +46,7 @@ float3 GetOutgoingRadiance(SurfaceShadingInput surface, float3 view, float3 ligh
 // deferred shader에 probe ray를 위한 switch를 둔다 (references/G3D-DefaultRenderer_deferredShade.pix:215의 GLOSSY_TO_MATTE). 이
 // module에서는 아래 함수와 상수가 그 switch다. G3D의 code는 가져오지 않고 식만 따랐다.
 //
-// DDGI의 probe trace와 path tracer의 Shading DDGI Probe Hit가 함께 따르는 계약:
+// DDGI의 probe trace, DynamicGI의 path tracing, path tracer의 Shading DDGI Probe Hit가 함께 따르는 계약:
 // - indirect hit의 material texture는 emission과 normal map까지 kIndirectHitTextureLod의 mip으로 읽는다.
 // - indirect hit는 GetIndirectHitAlbedo의 albedo로 반사하는 Lambert다. ray가 온 쪽으로 내는 radiance는 emission과, directional
 //   light와 directional light 밖의 빛을 이 Lambert로 반사한 빛의 합이다.

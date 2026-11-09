@@ -1,0 +1,187 @@
+#include "Model/DynamicGI/PathTracedLighting.h"
+#include "Model/Raytracing/CameraRays.h"
+#include "Model/Raytracing/RaytracingScene.h"
+#include "Model/Raytracing/SceneHeapTable.h"
+#include "Core/Graphics/GraphicsCore.h"
+#include "Core/Graphics/GraphicsCommon.h"
+#include "Core/Graphics/Command/CommandContext.h"
+#include "Core/Graphics/Command/CommandListManager.h"
+#include "Core/Graphics/Resource/ColorBuffer.h"
+#include "Core/Graphics/Resource/GpuBuffer.h"
+#include "Core/Graphics/Resource/ShadowBuffer.h"
+
+#include "Output/Model/CompiledShaders/PathTracedDiffuseCS.h"
+
+#include <algorithm>
+
+using namespace Math;
+using namespace Graphics;
+
+namespace
+{
+    enum RootParameter { kConstants, kScene, kSurfaces = kScene + RaytracingScene::kNumRootParameters, kShadowMap, kOutputs, kNumRootParameters };
+    RootSignature s_RootSignature;
+    ComputePSO s_DiffusePSO(L"Path Traced Diffuse");
+
+    SceneHeapTable s_ShadowMapSRV;
+    SceneHeapTable s_OutputUAVs;
+    ColorBuffer s_DiffuseRadiance;
+
+    struct AccumulationConditions
+    {
+        CameraRays rays;
+        PathTracedLighting::Settings settings;
+        Vector3 lightDirection;
+        Vector3 lightIlluminance;
+        Vector3 skyRadiance;
+        Matrix4 shadowMatrix;
+    };
+
+    // samplesPerFrame과 targetSamples는 쌓는 속도와 양만 정하므로 비교하지 않는다.
+    bool CanKeepAccumulating(const PathTracedLighting::Settings& a, const PathTracedLighting::Settings& b)
+    {
+        return a.seed == b.seed && a.maxHits == b.maxHits && a.russianRoulette == b.russianRoulette;
+    }
+
+    bool CanKeepAccumulating(const AccumulationConditions& a, const AccumulationConditions& b)
+    {
+        return XMVector3Equal(a.rays.origin, b.rays.origin) &&
+            XMVector3Equal(a.rays.viewportCornerDirection, b.rays.viewportCornerDirection) &&
+            XMVector3Equal(a.rays.pixelStepRight, b.rays.pixelStepRight) &&
+            XMVector3Equal(a.rays.pixelStepDown, b.rays.pixelStepDown) &&
+            XMVector3Equal(a.lightDirection, b.lightDirection) && XMVector3Equal(a.lightIlluminance, b.lightIlluminance) &&
+            XMVector3Equal(a.skyRadiance, b.skyRadiance) && XMVector4Equal(a.shadowMatrix.GetX(), b.shadowMatrix.GetX()) &&
+            XMVector4Equal(a.shadowMatrix.GetY(), b.shadowMatrix.GetY()) && XMVector4Equal(a.shadowMatrix.GetZ(), b.shadowMatrix.GetZ()) &&
+            XMVector4Equal(a.shadowMatrix.GetW(), b.shadowMatrix.GetW()) && CanKeepAccumulating(a.settings, b.settings);
+    }
+
+    bool s_ResetRequested = true;
+    AccumulationConditions s_CurrentAccumConditions;
+    PathTracedLighting::Progress s_Progress = {};
+
+    __declspec(align(16)) struct Constants
+    {
+        // raster의 GlobalConstants처럼 Matrix4를 그대로 담고, HLSL은 mul(ShadowMatrix, position)으로 쓴다.
+        Matrix4 ShadowMatrix;
+        // HLSL의 cbuffer는 float3 뒤의 scalar를 같은 16 byte에 채우므로 XMFLOAT3로 둔다.
+        XMFLOAT3 LightDirection;
+        uint32_t Width;
+        XMFLOAT3 LightIlluminance;
+        uint32_t Height;
+        XMFLOAT3 SkyRadiance;
+        uint32_t Seed;
+        uint32_t SamplesBeforeThisFrame;
+        uint32_t SamplesThisFrame;
+        uint32_t MaxHits;
+        uint32_t RussianRoulette;
+    };
+
+    // SceneHeapTable.h의 규칙대로, 앞 frame의 dispatch가 읽고 있을 수 있는 buffer는 GPU를 기다린 뒤에 다시 만든다.
+    void FitAccumulationTo(uint32_t width, uint32_t height)
+    {
+        if (s_DiffuseRadiance.GetWidth() == width && s_DiffuseRadiance.GetHeight() == height)
+            return;
+
+        g_CommandManager.IdleGPU();
+        s_DiffuseRadiance.Create(L"Path Traced Diffuse Radiance", width, height, 1, DXGI_FORMAT_R32G32B32A32_FLOAT);
+        s_ResetRequested = true;
+    }
+}
+
+void PathTracedLighting::Initialize(void)
+{
+    s_RootSignature.Reset(kNumRootParameters, 1);
+    s_RootSignature[kConstants].InitAsConstantBuffer(0);
+    RaytracingScene::InitRootParameters(s_RootSignature, kScene);
+    s_RootSignature[kSurfaces].InitAsBufferSRV(0);
+    s_RootSignature[kShadowMap].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1);
+    s_RootSignature[kOutputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 1);
+    // PathTracedDiffuseCS.hlsl의 ShadowMapSampler는 raster의 Renderer와 같은 shadow map 비교 sampler다.
+    s_RootSignature.InitStaticSampler(0, SamplerShadowDesc);
+    s_RootSignature.Finalize(L"Path Traced Lighting");
+
+    s_DiffusePSO.SetRootSignature(s_RootSignature);
+    s_DiffusePSO.SetComputeShader(g_pPathTracedDiffuseCS, sizeof(g_pPathTracedDiffuseCS));
+    s_DiffusePSO.Finalize();
+
+    s_ShadowMapSRV.Create(1);
+    s_OutputUAVs.Create(1);
+}
+
+void PathTracedLighting::Shutdown(void)
+{
+    s_DiffuseRadiance.Destroy();
+}
+
+void PathTracedLighting::Reset(void)
+{
+    s_ResetRequested = true;
+}
+
+PathTracedLighting::Progress PathTracedLighting::GetProgress(void)
+{
+    return s_Progress;
+}
+
+void PathTracedLighting::Accumulate(ComputeContext& context, const Settings& settings, const GIFrameInputs& inputs,
+    StructuredBuffer& surfaces, uint32_t width, uint32_t height)
+{
+    ScopedTimer _prof(L"Path Traced Diffuse", context);
+
+    FitAccumulationTo(width, height);
+
+    const AccumulationConditions conditions = {
+        .rays = DescribeCameraRays(inputs.camera, inputs.rasterViewport),
+        .settings = settings,
+        .lightDirection = inputs.lightDirection,
+        .lightIlluminance = inputs.lightIlluminance,
+        .skyRadiance = inputs.skyRadiance,
+        .shadowMatrix = inputs.shadowMatrix,
+    };
+    if (s_ResetRequested || !CanKeepAccumulating(conditions, s_CurrentAccumConditions))
+    {
+        s_CurrentAccumConditions = conditions;
+        s_Progress.samples = 0;
+        ++s_Progress.resets;
+        s_ResetRequested = false;
+    }
+
+    Constants constants;
+    constants.ShadowMatrix = inputs.shadowMatrix;
+    XMStoreFloat3(&constants.LightDirection, inputs.lightDirection);
+    XMStoreFloat3(&constants.LightIlluminance, inputs.lightIlluminance);
+    XMStoreFloat3(&constants.SkyRadiance, inputs.skyRadiance);
+    constants.Width = width;
+    constants.Height = height;
+    constants.Seed = settings.seed;
+    constants.SamplesBeforeThisFrame = s_Progress.samples;
+    constants.SamplesThisFrame = s_Progress.samples < settings.targetSamples ?
+        std::min(settings.samplesPerFrame, settings.targetSamples - s_Progress.samples) : 0;
+    constants.MaxHits = settings.maxHits;
+    constants.RussianRoulette = settings.russianRoulette ? 1 : 0;
+
+    if (constants.SamplesThisFrame == 0)
+        return;
+
+    s_ShadowMapSRV.PointTo(0, inputs.shadowMap, inputs.shadowMap.GetSRV());
+    s_OutputUAVs.PointTo(0, s_DiffuseRadiance, s_DiffuseRadiance.GetUAV());
+
+    context.SetRootSignature(s_RootSignature);
+    context.SetPipelineState(s_DiffusePSO);
+    context.TransitionResource(surfaces, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+    context.TransitionResource(inputs.shadowMap, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+    context.TransitionResource(s_DiffuseRadiance, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+    context.SetDynamicConstantBufferView(kConstants, sizeof(constants), &constants);
+    inputs.scene.Bind(context, kScene);
+    context.SetBufferSRV(kSurfaces, surfaces);
+    s_ShadowMapSRV.Bind(context, kShadowMap);
+    s_OutputUAVs.Bind(context, kOutputs);
+    context.Dispatch2D(width, height);
+
+    s_Progress.samples += constants.SamplesThisFrame;
+}
+
+ColorBuffer& PathTracedLighting::GetDiffuseRadiance(void)
+{
+    return s_DiffuseRadiance;
+}

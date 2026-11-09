@@ -34,6 +34,7 @@
 #include "Model/PathTracer/PathTracer.h"
 #include "Model/PathTracer/PathTracerTuning.h"
 #include "Model/PathTracer/BrdfTest.h"
+#include "Model/DynamicGI/DynamicGI.h"
 #include "Model/Loader/glTF.h"
 #include "Model/Renderer/Renderer.h"
 #include "Model/Model.h"
@@ -1318,6 +1319,7 @@ void ModelViewer::ShowScene(const PreparedScene& scene)
     m_SceneName = scene.name;
     Scene::LoadObjectSettings(scene.file.sections);
     PathTracer::Reset();
+    DynamicGI::Reset();
 }
 
 bool ModelViewer::SaveScene(std::string& error)
@@ -1484,6 +1486,7 @@ void ModelViewer::Startup( void )
     RaytracingView::Initialize();
     RayPick::Initialize();
     PathTracerTuning::Initialize();
+    DynamicGI::Initialize();
     BrdfTest::Initialize();
 
     uint32_t rebuildValue;
@@ -1541,6 +1544,7 @@ void ModelViewer::Cleanup( void )
     Scene::RemoveObject(m_LightObject);
     Scene::RemoveObject(m_CameraObject);
     Scene::RemoveObject(m_ModelObject);
+    DynamicGI::Shutdown();
     PathTracerTuning::Shutdown();
     RayPick::Shutdown();
     RaytracingView::Shutdown();
@@ -1677,6 +1681,18 @@ void ModelViewer::RenderScene( void )
                 shadowSorter.Sort();
                 shadowSorter.RenderMeshes(MeshSorter::kZPass, gfxContext, globals);
             }
+
+            const GIFrameInputs giInputs = {
+                .camera = m_Camera,
+                .rasterViewport = viewport,
+                .scene = m_RaytracingScene,
+                .lightDirection = LightDirection,
+                .lightIlluminance = m_Light.GetIlluminance(),
+                .skyRadiance = m_Sky.GetRadiance(),
+                .shadowMap = g_ShadowBuffer,
+                .shadowMatrix = m_ShadowCamera.GetShadowMatrix(),
+            };
+            DynamicGI::Update(gfxContext.GetComputeContext(), giInputs, g_SceneColorBuffer.GetWidth(), g_SceneColorBuffer.GetHeight());
 
             gfxContext.TransitionResource(g_SceneColorBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
             gfxContext.ClearColor(g_SceneColorBuffer);

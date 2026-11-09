@@ -27,6 +27,7 @@
 class GraphicsPSO;
 class RootSignature;
 class DescriptorHeap;
+class ColorBuffer;
 class ShadowCamera;
 class ShadowBuffer;
 struct GlobalConstants;
@@ -63,6 +64,10 @@ namespace Renderer
 
     uint8_t GetPSO(uint16_t psoFlags);
     void UpdateGlobalDescriptors(void);
+    // DefaultPS가 pixel의 radiance에 더하는 간접광의 diffuse 반사 (t18)를 정한다. radiance는 render target과 같은 크기이고, pixel마다 그 pixel이
+    // 보는 면이 camera 쪽으로 반사하는 radiance (cd/m²)를 rgb에 담는다. nullptr이면 더하지 않는다.
+    // opaque pass 전에 부르고, radiance는 pixel shader resource 상태로 둔다.
+    void SetIndirectDiffuseRadiance(const ColorBuffer* radiance);
     // 불투명한 면을 다 그린 뒤, 아무 면도 그리지 않은 scene color의 pixel에 camera에서 바로 보이는 sky의 radiance (cd/m²)를 쓴다.
     // raster는 sky로 surface를 비추지 않으므로 이것이 raster가 sky를 쓰는 전부다.
     void DrawSkyBackground(GraphicsContext& gfxContext, const D3D12_VIEWPORT& viewport, const D3D12_RECT& scissor, const Math::Vector3& skyRadiance);
