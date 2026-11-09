@@ -131,6 +131,14 @@ GltfBrdfInput MakeGltfBrdfInput(float3 baseColor, float metallic, float roughnes
     return input;
 }
 
+float3 EvaluateGltfDiffuseLobe(GltfBrdfInput input, float3 light)
+{
+    const float lightCosine = dot(input.normal, light);
+    if (lightCosine <= 0.0)
+        return 0.0;
+    return input.diffuseFactor * (1.0 - GetDielectricSpecularAlbedo(lightCosine, input.alpha));
+}
+
 // light 쪽에서 와서 view 쪽으로 반사하는 빛의 f. light는 단위 vector이고, normal 아래에서 오는 light는 0이다.
 // distribution은 그 방향의 D다. 다음 방향의 pdf가 같은 값을 쓴다.
 float3 EvaluateGltfBrdf(GltfBrdfInput input, float3 light, out float distribution)
@@ -144,7 +152,7 @@ float3 EvaluateGltfBrdf(GltfBrdfInput input, float3 light, out float distributio
     distribution = GetMicrofacetDistribution(input.normal, halfway, input.alpha);
     const float3 specular = GetSchlickFresnel(input.specularF0, viewHalfCosine) *
         (distribution * GetVisibility(input.viewCosine, lightCosine, input.alpha));
-    return specular + input.diffuseFactor * (1.0 - GetDielectricSpecularAlbedo(lightCosine, input.alpha));
+    return specular + EvaluateGltfDiffuseLobe(input, light);
 }
 
 float3 EvaluateGltfBrdf(GltfBrdfInput input, float3 light)
