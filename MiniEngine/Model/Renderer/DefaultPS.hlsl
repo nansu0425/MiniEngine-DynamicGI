@@ -12,6 +12,7 @@
 //              Justin Saunders (ATG)
 
 #include "Model/Renderer/Common.hlsli"
+#include "Core/Shaders/GltfBrdf.hlsli"
 #include "Core/Shaders/SurfaceShading.hlsli"
 #include "Core/Shaders/NormalTexture.hlsli"
 
@@ -26,7 +27,6 @@ SamplerState emissiveSampler                : register(s3);
 SamplerState normalSampler                  : register(s4);
 
 Texture2D<float> texShadow			    : register(t13);
-// raster가 구하지 않는 간접광의 diffuse 반사 (Renderer::SetIndirectDiffuseRadiance)
 Texture2D<float3> indirectDiffuseTexture    : register(t18);
 
 cbuffer MaterialConstants : register(b0)
@@ -105,27 +105,30 @@ float3 GetGeometryNormal(float3 worldPos, float3 view)
 float4 main(VSOutput vsOutput, bool isFrontFace : SV_IsFrontFace) : SV_Target0
 {
     // Load and modulate textures
-    float4 baseColor = baseColorFactor * baseColorTexture.Sample(baseColorSampler, UVSET(BASECOLOR));
-    float2 metallicRoughness = metallicRoughnessFactor * 
-        metallicRoughnessTexture.Sample(metallicRoughnessSampler, UVSET(METALLICROUGHNESS)).bg;
+    const float4 baseColor = baseColorFactor * baseColorTexture.Sample(baseColorSampler, UVSET(BASECOLOR));
+    const float2 metallicRoughness = metallicRoughnessFactor * metallicRoughnessTexture.Sample(metallicRoughnessSampler, UVSET(METALLICROUGHNESS)).bg;
 
-    SurfaceShadingInput surface;
-    surface.baseColor = baseColor.rgb;
-    surface.metallic = metallicRoughness.x;
-    surface.roughness = metallicRoughness.y;
-    surface.emissive = emissiveFactor * emissiveTexture.Sample(emissiveSampler, UVSET(EMISSIVE));
     // GltfBrdf.hlsli는 단위 normal을 받는다. tangent frame을 보간한 normal map의 normal은 길이가 1이 아닐 수 있다.
-    surface.normal = normalize(ComputeNormal(vsOutput));
+    float3 normal = normalize(ComputeNormal(vsOutput));
+    // double-sided material의 뒷면에서는 뒤집은 normal로 반사한다.
     if (!isFrontFace)
-        surface.normal = -surface.normal;
+        normal = -normal;
     const float3 view = normalize(ViewerPos - vsOutput.worldPos);
+    const GltfBrdfInput brdf = MakeGltfBrdfInput(baseColor.rgb, metallicRoughness.x, metallicRoughness.y, normal, view);
 
-    const float lightVisibility = GetDirectionalLightVisibility(texShadow, shadowSampler, vsOutput.shadowCoord,
-        GetGeometryNormal(vsOutput.worldPos, view), LightDirection);
-    const float3 radiance = GetOutgoingRadiance(surface, view, LightDirection, LightIlluminance, lightVisibility) +
-        indirectDiffuseTexture[uint2(vsOutput.position.xy)];
+    // emissive light
+    const float3 emittedRadiance = emissiveFactor * emissiveTexture.Sample(emissiveSampler, UVSET(EMISSIVE));
 
-    // TODO: Shade each light using Forward+ tiles
+    // direct light
+    const float lightVisibility = GetDirectionalLightVisibility(texShadow, shadowSampler, vsOutput.shadowCoord, GetGeometryNormal(vsOutput.worldPos, view), LightDirection);
+    const float3 directRadiance = EvaluateGltfBrdf(brdf, LightDirection) * LightIlluminance * (max(0.0, dot(normal, LightDirection)) * lightVisibility);
 
-    return float4(radiance, baseColor.a);
+    // indirect diffuse light
+    const float3 indirectDiffuseRadiance = indirectDiffuseTexture[uint2(vsOutput.position.xy)];
+    
+    // TODO: indirect specular light
+
+    float3 outgoingRadiance = emittedRadiance + directRadiance + indirectDiffuseRadiance;
+    
+    return float4(outgoingRadiance, baseColor.a);
 }
