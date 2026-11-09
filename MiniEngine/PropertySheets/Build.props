@@ -15,6 +15,9 @@
       <WarningLevel>Level4</WarningLevel>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <FloatingPointModel>Fast</FloatingPointModel>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <!-- C++20은 /permissive-를 함께 켠다. MiniEngine의 code는 임시 값의 주소를 받는 것처럼 표준이 막는 구문을 쓰므로 끈다. -->
+      <ConformanceMode>false</ConformanceMode>
       <!-- 시스템 code page와 관계없이 source를 UTF-8로 읽는다. -->
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>

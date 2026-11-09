@@ -74,12 +74,12 @@ namespace
     enum DepthPass { kDepthPrePass, kShadowPass, kNumDepthPasses };
     enum CullMode { kCullBack, kCullFront, kCullNone, kNumCullModes };
     const uint32_t kNumDepthTemplates = 4;
-    const uint32_t kNumDepthPSOs = kNumDepthPasses * kNumCullModes * kNumDepthTemplates;
+    const uint32_t kNumDepthPSOs = (uint32_t)kNumDepthPasses * kNumCullModes * kNumDepthTemplates;
 
     uint32_t DepthPSOIndex(DepthPass pass, CullMode cull, bool skinned, bool alphaTest)
     {
         uint32_t depthTemplate = (skinned ? 2 : 0) + (alphaTest ? 1 : 0);
-        return (pass * kNumCullModes + cull) * kNumDepthTemplates + depthTemplate;
+        return ((uint32_t)pass * kNumCullModes + cull) * kNumDepthTemplates + depthTemplate;
     }
 }
 

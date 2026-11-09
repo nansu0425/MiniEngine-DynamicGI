@@ -21,7 +21,7 @@ using namespace Utility;
 
 namespace Utility
 {
-    ByteArray NullFile = make_shared<vector<byte> > (vector<byte>() );
+    ByteArray NullFile = make_shared<vector<::byte> > (vector<::byte>() );
 }
 
 //ByteArray DecompressZippedFile( wstring& fileName );
@@ -37,7 +37,7 @@ ByteArray ReadFileHelper(const wstring& fileName)
     if (!file)
         return NullFile;
 
-    Utility::ByteArray byteArray = make_shared<vector<byte> >( fileStat.st_size );
+    Utility::ByteArray byteArray = make_shared<vector<::byte> >( fileStat.st_size );
     file.read( (char*)byteArray->data(), byteArray->size() );
     file.close();
 
@@ -83,7 +83,7 @@ ByteArray Inflate(ByteArray CompressedSource, int& err, uint32_t ChunkSize = 0x1
 
     ASSERT(strm.total_out > 0, "Nothing to decompress");
 
-    Utility::ByteArray byteArray = make_shared<vector<byte> >( strm.total_out );
+    Utility::ByteArray byteArray = make_shared<vector<::byte> >( strm.total_out );
 
     // Allocate actual memory for this.
     // copy the bits into that RAM.
