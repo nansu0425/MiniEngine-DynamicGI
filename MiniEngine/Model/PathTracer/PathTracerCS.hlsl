@@ -128,7 +128,7 @@ PathVertex GetPathVertex(RayHit hit, float3 view, float textureLod)
 }
 
 #if PROBE_HIT_SHADING
-// indirect hit가 path를 거슬러 내는 radiance 중, path를 다음 vertex로 이어 추정하는 irradiance의 몫을 뺀 radiance. radiance와 visibility는
+// indirect hit가 path를 거슬러 내는 radiance 중, path를 다음 vertex로 이어 추정하는 irradiance의 몫을 뺀 radiance. visibility는
 // SurfaceShading.hlsli의 계약대로 camera pixel과 같은 routine으로 구한다. furnace는 답을 식으로 알도록 light를 끈다.
 float3 GetIndirectHitRadianceWithoutIrradiance(PathVertex vertex)
 {
@@ -136,8 +136,8 @@ float3 GetIndirectHitRadianceWithoutIrradiance(PathVertex vertex)
     const float3 shadowCoord = mul(ShadowMatrix, float4(vertex.position, 1.0)).xyz;
     const float visibility = lit ?
         GetDirectionalLightVisibility(ShadowMap, ShadowMapSampler, shadowCoord, vertex.geometryNormal, LightDirection) : 0.0;
-    return GetIndirectHitOutgoingRadiance(vertex.albedo, vertex.emission, vertex.normal, LightDirection, lit ? LightIlluminance : 0.0,
-        visibility, 0.0);
+    const float3 lightIlluminance = lit ? LightIlluminance : 0.0;
+    return vertex.emission + vertex.albedo * kInversePi * lightIlluminance * (max(0.0, dot(vertex.normal, LightDirection)) * visibility);
 }
 #else
 // directional light의 빛이 vertex에서 한 번 반사해 path를 거슬러 가는 radiance. light는 방향 하나에서만 오므로 반사 방향을 골라서는

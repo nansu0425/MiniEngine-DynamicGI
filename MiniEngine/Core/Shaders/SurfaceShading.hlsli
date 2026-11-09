@@ -48,13 +48,14 @@ float3 GetOutgoingRadiance(SurfaceShadingInput surface, float3 view, float3 ligh
 //
 // DDGI의 probe trace와 path tracer의 Shading DDGI Probe Hit가 함께 따르는 계약:
 // - indirect hit의 material texture는 emission과 normal map까지 kIndirectHitTextureLod의 mip으로 읽는다.
-// - indirect hit가 ray가 온 쪽으로 내는 radiance는 GetIndirectHitOutgoingRadiance다. albedo는 GetIndirectHitAlbedo다.
-// - lightVisibility는 camera pixel처럼 GetDirectionalLightVisibility로 같은 frame의 shadow map에서 구한다. shadow map의 좌표는
+// - indirect hit는 GetIndirectHitAlbedo의 albedo로 반사하는 Lambert다. ray가 온 쪽으로 내는 radiance는 emission과, directional
+//   light와 directional light 밖의 빛을 이 Lambert로 반사한 빛의 합이다.
+// - directional light가 indirect hit에 닿는 비율은 camera pixel처럼 GetDirectionalLightVisibility로 같은 frame의 shadow map에서 구한다. shadow map의 좌표는
 //   raster처럼 ShadowMatrix로 옮긴 position이다 (Model/Renderer/DefaultVS.hlsl). 논문은 shadow map을 VSM으로 두지만, camera pixel과
 //   같은 routine을 쓴다는 원칙을 따라 raster가 지금 쓰는 조회를 쓴다.
-// - GetIndirectHitOutgoingRadiance의 irradiance는 indirect hit가 directional light 밖의 빛에서 받는 irradiance다. DDGI는 이 irradiance를
-//   probe에서 보간해 넘긴다. path tracing은 0을 넘기고, cosine으로 고른 방향의 radiance에 GetIndirectHitIrradianceWeight를 곱해 path를
-//   잇는다. cosine sampling의 pdf가 cos / π라서 곱한 값의 기대값이 GetIndirectHitOutgoingRadiance의 irradiance 항이다.
+// - directional light 밖의 빛에서 받는 irradiance E를 반사한 radiance는 GetIndirectHitIrradianceWeight(albedo) E / π다. path tracing은
+//   cosine으로 고른 방향의 radiance에 GetIndirectHitIrradianceWeight를 곱해 path를 잇는다. cosine sampling의 pdf가 cos / π라서 곱한
+//   값의 기대값이 그 radiance다.
 
 // indirect hit가 material texture를 읽는 mip. G3D는 irradiance probe의 ray를 m_diffuseMipLevel 8로 읽는다
 // (references/G3D-DefaultRenderer.h:68, references/G3D-DefaultRenderer.cpp:195).
@@ -84,17 +85,6 @@ float3 GetIndirectHitAlbedo(float3 baseColor, float metallic)
 float3 GetIndirectHitIrradianceWeight(float3 albedo)
 {
     return albedo * kIndirectHitIrradianceScale;
-}
-
-// indirect hit가 ray가 온 쪽으로 내는 radiance. emission과, directional light와 irradiance를 albedo의 Lambert로 반사한 빛을 더한다.
-// albedo는 GetIndirectHitAlbedo이고, irradiance는 위의 계약대로 directional light 밖의 빛에서 받는 irradiance다. 나머지 인자의 뜻은
-// GetOutgoingRadiance와 같다. Lambert의 반사는 view 방향과 무관하므로 view를 받지 않는다.
-float3 GetIndirectHitOutgoingRadiance(float3 albedo, float3 emissive, float3 normal, float3 lightDirection, float3 lightIlluminance,
-    float lightVisibility, float3 irradiance)
-{
-    // illuminance는 light에 수직인 면의 값이므로 normal과의 cos를 곱한다.
-    return emissive + albedo * kInversePi * lightIlluminance * (max(0.0, dot(normal, lightDirection)) * lightVisibility) +
-        GetIndirectHitIrradianceWeight(albedo) * kInversePi * irradiance;
 }
 
 #endif
