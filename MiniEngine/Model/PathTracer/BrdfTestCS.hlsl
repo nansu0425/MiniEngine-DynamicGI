@@ -23,7 +23,6 @@ static const uint kQuadrature = 1;
 static const uint kSample = 2;
 static const uint kGroupSize = 256;
 static const uint kRecordBytes = 64;
-static const float kPi = 3.14159265358979323846;
 // half-angle 구간 경계의 최대 개수. α의 하한에서 두 수열이 각각 11개와 μ_o ≥ 0.03에서 7개쯤이다.
 static const uint kMaxBounds = 40;
 

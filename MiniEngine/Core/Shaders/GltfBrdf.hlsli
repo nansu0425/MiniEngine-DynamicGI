@@ -7,6 +7,7 @@
 #include "Core/Shaders/GltfBrdfTables.hlsli"
 #include "Core/Shaders/LambertBrdf.hlsli"
 
+static const float kPi = 3.14159265358979323846;
 static const float kInversePi = 0.318309886183790671538;
 static const float3 kRec709Luminance = float3(0.2126, 0.7152, 0.0722);
 

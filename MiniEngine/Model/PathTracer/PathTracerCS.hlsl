@@ -66,8 +66,6 @@ Texture2D<float> ShadowMap : register(t0);
 SamplerComparisonState ShadowMapSampler : register(s0);
 #endif
 
-static const float kPi = 3.14159265358979323846;
-
 // path가 shading을 쓰는 vertex가 material texture를 읽는 mip. Indirect Irradiance에서 처음 맞은 점은 shading을 쓰지 않으므로
 // TraceIndirectIrradiance가 kSharpestTextureLod로 읽는다.
 #if PROBE_HIT_SHADING
