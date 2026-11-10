@@ -7,7 +7,7 @@ class ComputeContext;
 
 // G-buffer의 surface가 camera 쪽으로 반사하는 간접광을 path tracing으로 구한다. pixel마다 sample을 frame에 걸쳐 누적한다.
 // 누적한 평균이 서로 다른 image의 sample을 섞지 않도록, image를 정하는 조건이 쌓을 때와 달라지면 처음부터 다시 쌓는다.
-// path가 맞은 점은 DDGI의 probe hit와 같은 shading으로 shading한다 (PathTracing.hlsli).
+// path가 맞은 점은 DDGI의 probe hit와 같은 shading으로 shading한다 (HitLighting.hlsli).
 namespace PathTracedLighting
 {
     struct Settings

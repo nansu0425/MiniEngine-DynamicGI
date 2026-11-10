@@ -32,7 +32,7 @@ float3 EstimateDiffuseRadiance(RasterSurface surface, float3 view, inout Random 
     if (!DescribeSurfaceRay(surface.position, surface.geometryNormal, direction, ray))
         return 0.0;
 
-    PathTracingLights lights;
+    GILights lights;
     lights.lightDirection = LightDirection;
     lights.lightIlluminance = LightIlluminance;
     lights.skyRadiance = SkyRadiance;
