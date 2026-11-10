@@ -1647,21 +1647,27 @@ void ModelViewer::RenderScene( void )
         // Begin rendering depth
         gfxContext.TransitionResource(g_SceneDepthBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, true);
         gfxContext.ClearDepth(g_SceneDepthBuffer);
+        for (ColorBuffer& target : g_GBuffer)
+        {
+            gfxContext.TransitionResource(target, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
+            gfxContext.ClearColor(target);
+        }
 
         MeshSorter sorter(MeshSorter::kDefault);
 		sorter.SetCamera(m_Camera);
 		sorter.SetViewport(viewport);
 		sorter.SetScissor(scissor);
 		sorter.SetDepthStencilTarget(g_SceneDepthBuffer);
-		sorter.AddRenderTarget(g_SceneColorBuffer);
+        for (ColorBuffer& target : g_GBuffer)
+            sorter.AddRenderTarget(target);
 
         m_ModelInst.Render(sorter);
 
         sorter.Sort();
 
         {
-            ScopedTimer _prof(L"Depth Pre-Pass", gfxContext);
-            sorter.RenderMeshes(MeshSorter::kZPass, gfxContext, globals);
+            ScopedTimer _prof(L"G-Buffer Pass", gfxContext);
+            sorter.RenderMeshes(MeshSorter::kOpaque, gfxContext, globals);
         }
 
         LinearDepth::Update(gfxContext.GetComputeContext(), m_Camera.GetNearClip(), m_Camera.GetFarClip());
@@ -1679,7 +1685,7 @@ void ModelViewer::RenderScene( void )
                 m_ModelInst.Render(shadowSorter);
 
                 shadowSorter.Sort();
-                shadowSorter.RenderMeshes(MeshSorter::kZPass, gfxContext, globals);
+                shadowSorter.RenderMeshes(MeshSorter::kOpaque, gfxContext, globals);
             }
 
             const GIFrameInputs giInputs = {
@@ -1697,15 +1703,7 @@ void ModelViewer::RenderScene( void )
             gfxContext.TransitionResource(g_SceneColorBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
             gfxContext.ClearColor(g_SceneColorBuffer);
 
-            {
-                ScopedTimer _prof(L"Render Color", gfxContext);
-
-                gfxContext.TransitionResource(g_SceneDepthBuffer, D3D12_RESOURCE_STATE_DEPTH_READ);
-                gfxContext.SetRenderTarget(g_SceneColorBuffer.GetRTV(), g_SceneDepthBuffer.GetDSV_DepthReadOnly());
-                gfxContext.SetViewportAndScissor(viewport, scissor);
-
-                sorter.RenderMeshes(MeshSorter::kOpaque, gfxContext, globals);
-            }
+            Renderer::ShadeOpaqueSurfaces(gfxContext.GetComputeContext(), m_Camera, globals, g_SceneColorBuffer);
 
             Renderer::DrawSkyBackground(gfxContext, viewport, scissor, m_Sky.GetRadiance());
 

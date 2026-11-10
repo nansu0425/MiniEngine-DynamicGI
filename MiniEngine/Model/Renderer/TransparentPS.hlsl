@@ -12,6 +12,7 @@
 //              Justin Saunders (ATG)
 
 #include "Model/Renderer/Common.hlsli"
+#include "Model/Renderer/RasterMaterial.hlsli"
 #include "Model/Renderer/SurfaceRadiance.hlsli"
 
 Texture2D<float> texShadow			    : register(t13);

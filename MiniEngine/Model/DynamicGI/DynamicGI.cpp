@@ -186,7 +186,7 @@ void DynamicGI::Update(ComputeContext& context, const GIFrameInputs& inputs, uin
         {
             PathTracedLighting::Accumulate(context, s_Settings.pathTraced, inputs, GISurface::GetSurfaces(), width, height);
             diffuseRadiance = &PathTracedLighting::GetDiffuseRadiance();
-            context.TransitionResource(*diffuseRadiance, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+            context.TransitionResource(*diffuseRadiance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         }
     }
     Renderer::SetIndirectDiffuseRadiance(diffuseRadiance);

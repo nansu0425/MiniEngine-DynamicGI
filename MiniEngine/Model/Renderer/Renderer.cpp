@@ -26,16 +26,16 @@
 
 #include "Output/Model/CompiledShaders/DefaultVS.h"
 #include "Output/Model/CompiledShaders/DefaultSkinVS.h"
-#include "Output/Model/CompiledShaders/DefaultPS.h"
+#include "Output/Model/CompiledShaders/TransparentPS.h"
 #include "Output/Model/CompiledShaders/DefaultNoUV1VS.h"
 #include "Output/Model/CompiledShaders/DefaultNoUV1SkinVS.h"
-#include "Output/Model/CompiledShaders/DefaultNoUV1PS.h"
+#include "Output/Model/CompiledShaders/TransparentNoUV1PS.h"
 #include "Output/Model/CompiledShaders/DefaultNoTangentVS.h"
 #include "Output/Model/CompiledShaders/DefaultNoTangentSkinVS.h"
-#include "Output/Model/CompiledShaders/DefaultNoTangentPS.h"
+#include "Output/Model/CompiledShaders/TransparentNoTangentPS.h"
 #include "Output/Model/CompiledShaders/DefaultNoTangentNoUV1VS.h"
 #include "Output/Model/CompiledShaders/DefaultNoTangentNoUV1SkinVS.h"
-#include "Output/Model/CompiledShaders/DefaultNoTangentNoUV1PS.h"
+#include "Output/Model/CompiledShaders/TransparentNoTangentNoUV1PS.h"
 #include "Output/Model/CompiledShaders/DepthOnlyVS.h"
 #include "Output/Model/CompiledShaders/DepthOnlySkinVS.h"
 #include "Output/Model/CompiledShaders/CutoutDepthVS.h"
@@ -43,6 +43,11 @@
 #include "Output/Model/CompiledShaders/CutoutDepthPS.h"
 #include "Output/Model/CompiledShaders/SkyBackgroundVS.h"
 #include "Output/Model/CompiledShaders/SkyBackgroundPS.h"
+#include "Output/Model/CompiledShaders/GBufferPS.h"
+#include "Output/Model/CompiledShaders/GBufferNoUV1PS.h"
+#include "Output/Model/CompiledShaders/GBufferNoTangentPS.h"
+#include "Output/Model/CompiledShaders/GBufferNoTangentNoUV1PS.h"
+#include "Output/Model/CompiledShaders/OpaqueShadingCS.h"
 
 #pragma warning(disable:4319) // '~': zero extending 'uint32_t' to 'uint64_t' of greater size
 
@@ -52,8 +57,6 @@ using namespace Renderer;
 
 namespace Renderer
 {
-    BoolVar SeparateZPass("Renderer/Separate Z Pass", true);
-
     bool s_Initialized = false;
 
     DescriptorHeap s_TextureHeap;
@@ -78,17 +81,30 @@ namespace Renderer
 
 namespace
 {
-    // sm_PSOs의 앞쪽에 고정한 depth와 shadow PSO의 배치다. GetPSO는 color PSO를 그 뒤에 붙인다.
-    enum DepthPass { kDepthPrePass, kShadowPass, kNumDepthPasses };
-    enum CullMode { kCullBack, kCullFront, kCullNone, kNumCullModes };
-    const uint32_t kNumDepthTemplates = 4;
-    const uint32_t kNumDepthPSOs = (uint32_t)kNumDepthPasses * kNumCullModes * kNumDepthTemplates;
+    // sm_PSOs의 앞쪽에 고정한 shadow PSO의 배치다. GetPSO는 color PSO를 그 뒤에 붙인다.
+    enum CullMode { kCullFront, kCullNone, kNumCullModes };
+    const uint32_t kNumShadowTemplates = 4;
+    const uint32_t kNumShadowPSOs = (uint32_t)kNumCullModes * kNumShadowTemplates;
 
-    uint32_t DepthPSOIndex(DepthPass pass, CullMode cull, bool skinned, bool alphaTest)
+    uint32_t ShadowPSOIndex(CullMode cull, bool skinned, bool alphaTest)
     {
-        uint32_t depthTemplate = (skinned ? 2 : 0) + (alphaTest ? 1 : 0);
-        return ((uint32_t)pass * kNumCullModes + cull) * kNumDepthTemplates + depthTemplate;
+        uint32_t shadowTemplate = (skinned ? 2 : 0) + (alphaTest ? 1 : 0);
+        return (uint32_t)cull * kNumShadowTemplates + shadowTemplate;
     }
+
+    enum OpaqueShadingRootParameter { kOpaqueShadingConstants, kOpaqueShadingInputs, kOpaqueShadingOutput, kNumOpaqueShadingRootParameters };
+    RootSignature s_OpaqueShadingRootSig;
+    ComputePSO s_OpaqueShadingPSO(L"Renderer: Opaque Shading PSO");
+
+    __declspec(align(16)) struct OpaqueShadingConstants
+    {
+        Matrix4 ShadowMatrix;
+        XMFLOAT3 ViewerPos;
+        uint32_t Width;
+        XMFLOAT3 LightDirection;
+        uint32_t Height;
+        XMFLOAT3 LightIlluminance;
+    };
 }
 
 void Renderer::Initialize(void)
@@ -170,35 +186,27 @@ void Renderer::Initialize(void)
     SkinCutoutDepthPSO.SetInputLayout(_countof(skinPosAndUV), skinPosAndUV);
     SkinCutoutDepthPSO.SetVertexShader(g_pCutoutDepthSkinVS, sizeof(g_pCutoutDepthSkinVS));
 
-    const GraphicsPSO* DepthTemplates[2][2] =
+    const GraphicsPSO* ShadowTemplates[2][2] =
     {
         { &DepthOnlyPSO, &CutoutDepthPSO },
         { &SkinDepthOnlyPSO, &SkinCutoutDepthPSO },
     };
-    const D3D12_RASTERIZER_DESC* DepthRasterizers[kNumDepthPasses][kNumCullModes] =
-    {
-        { &RasterizerDefault, &RasterizerCullFront, &RasterizerTwoSided },
-        { &RasterizerShadow, &RasterizerShadowCullFront, &RasterizerShadowTwoSided },
-    };
-    const DXGI_FORMAT DepthTargetFormats[kNumDepthPasses] = { DepthFormat, g_ShadowBuffer.GetFormat() };
+    const D3D12_RASTERIZER_DESC* ShadowRasterizers[kNumCullModes] = { &RasterizerShadowCullFront, &RasterizerShadowTwoSided };
+    const DXGI_FORMAT ShadowFormat = g_ShadowBuffer.GetFormat();
+    ASSERT(ShadowFormat != DXGI_FORMAT_UNKNOWN);
 
-    sm_PSOs.resize(kNumDepthPSOs);
-    for (uint32_t pass = 0; pass < kNumDepthPasses; ++pass)
+    sm_PSOs.resize(kNumShadowPSOs);
+    for (uint32_t cull = 0; cull < kNumCullModes; ++cull)
     {
-        ASSERT(DepthTargetFormats[pass] != DXGI_FORMAT_UNKNOWN);
-        for (uint32_t cull = 0; cull < kNumCullModes; ++cull)
+        for (bool skinned : { false, true })
         {
-            ASSERT(DepthRasterizers[pass][cull] != nullptr);
-            for (bool skinned : { false, true })
+            for (bool alphaTest : { false, true })
             {
-                for (bool alphaTest : { false, true })
-                {
-                    GraphicsPSO DepthPSO = *DepthTemplates[skinned][alphaTest];
-                    DepthPSO.SetRasterizerState(*DepthRasterizers[pass][cull]);
-                    DepthPSO.SetRenderTargetFormats(0, nullptr, DepthTargetFormats[pass]);
-                    DepthPSO.Finalize();
-                    sm_PSOs[DepthPSOIndex((DepthPass)pass, (CullMode)cull, skinned, alphaTest)] = DepthPSO;
-                }
+                GraphicsPSO ShadowPSO = *ShadowTemplates[skinned][alphaTest];
+                ShadowPSO.SetRasterizerState(*ShadowRasterizers[cull]);
+                ShadowPSO.SetRenderTargetFormats(0, nullptr, ShadowFormat);
+                ShadowPSO.Finalize();
+                sm_PSOs[ShadowPSOIndex((CullMode)cull, skinned, alphaTest)] = ShadowPSO;
             }
         }
     }
@@ -213,13 +221,24 @@ void Renderer::Initialize(void)
     m_DefaultPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
     m_DefaultPSO.SetRenderTargetFormats(1, &ColorFormat, DepthFormat);
     m_DefaultPSO.SetVertexShader(g_pDefaultVS, sizeof(g_pDefaultVS));
-    m_DefaultPSO.SetPixelShader(g_pDefaultPS, sizeof(g_pDefaultPS));
+    m_DefaultPSO.SetPixelShader(g_pTransparentPS, sizeof(g_pTransparentPS));
 
     m_SkyBackgroundPSO = m_DefaultPSO;
     m_SkyBackgroundPSO.SetDepthStencilState(DepthStateReadOnly);
     m_SkyBackgroundPSO.SetVertexShader(g_pSkyBackgroundVS, sizeof(g_pSkyBackgroundVS));
     m_SkyBackgroundPSO.SetPixelShader(g_pSkyBackgroundPS, sizeof(g_pSkyBackgroundPS));
     m_SkyBackgroundPSO.Finalize();
+
+    s_OpaqueShadingRootSig.Reset(kNumOpaqueShadingRootParameters, 1);
+    s_OpaqueShadingRootSig[kOpaqueShadingConstants].InitAsConstantBuffer(0);
+    s_OpaqueShadingRootSig[kOpaqueShadingInputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, kNumGBufferTargets + 2);
+    s_OpaqueShadingRootSig[kOpaqueShadingOutput].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 1);
+    s_OpaqueShadingRootSig.InitStaticSampler(0, SamplerShadowDesc);
+    s_OpaqueShadingRootSig.Finalize(L"Renderer: Opaque Shading");
+
+    s_OpaqueShadingPSO.SetRootSignature(s_OpaqueShadingRootSig);
+    s_OpaqueShadingPSO.SetComputeShader(g_pOpaqueShadingCS, sizeof(g_pOpaqueShadingCS));
+    s_OpaqueShadingPSO.Finalize();
 
     TextureManager::Initialize(L"");
 
@@ -344,12 +363,12 @@ uint8_t Renderer::GetPSO(uint16_t psoFlags)
             if (psoFlags & kHasUV1)
             {
                 ColorPSO.SetVertexShader(g_pDefaultSkinVS, sizeof(g_pDefaultSkinVS));
-                ColorPSO.SetPixelShader(g_pDefaultPS, sizeof(g_pDefaultPS));
+                ColorPSO.SetPixelShader(g_pTransparentPS, sizeof(g_pTransparentPS));
             }
             else
             {
                 ColorPSO.SetVertexShader(g_pDefaultNoUV1SkinVS, sizeof(g_pDefaultNoUV1SkinVS));
-                ColorPSO.SetPixelShader(g_pDefaultNoUV1PS, sizeof(g_pDefaultNoUV1PS));
+                ColorPSO.SetPixelShader(g_pTransparentNoUV1PS, sizeof(g_pTransparentNoUV1PS));
             }
         }
         else
@@ -357,12 +376,12 @@ uint8_t Renderer::GetPSO(uint16_t psoFlags)
             if (psoFlags & kHasUV1)
             {
                 ColorPSO.SetVertexShader(g_pDefaultNoTangentSkinVS, sizeof(g_pDefaultNoTangentSkinVS));
-                ColorPSO.SetPixelShader(g_pDefaultNoTangentPS, sizeof(g_pDefaultNoTangentPS));
+                ColorPSO.SetPixelShader(g_pTransparentNoTangentPS, sizeof(g_pTransparentNoTangentPS));
             }
             else
             {
                 ColorPSO.SetVertexShader(g_pDefaultNoTangentNoUV1SkinVS, sizeof(g_pDefaultNoTangentNoUV1SkinVS));
-                ColorPSO.SetPixelShader(g_pDefaultNoTangentNoUV1PS, sizeof(g_pDefaultNoTangentNoUV1PS));
+                ColorPSO.SetPixelShader(g_pTransparentNoTangentNoUV1PS, sizeof(g_pTransparentNoTangentNoUV1PS));
             }
         }
     }
@@ -373,12 +392,12 @@ uint8_t Renderer::GetPSO(uint16_t psoFlags)
             if (psoFlags & kHasUV1)
             {
                 ColorPSO.SetVertexShader(g_pDefaultVS, sizeof(g_pDefaultVS));
-                ColorPSO.SetPixelShader(g_pDefaultPS, sizeof(g_pDefaultPS));
+                ColorPSO.SetPixelShader(g_pTransparentPS, sizeof(g_pTransparentPS));
             }
             else
             {
                 ColorPSO.SetVertexShader(g_pDefaultNoUV1VS, sizeof(g_pDefaultNoUV1VS));
-                ColorPSO.SetPixelShader(g_pDefaultNoUV1PS, sizeof(g_pDefaultNoUV1PS));
+                ColorPSO.SetPixelShader(g_pTransparentNoUV1PS, sizeof(g_pTransparentNoUV1PS));
             }
         }
         else
@@ -386,12 +405,12 @@ uint8_t Renderer::GetPSO(uint16_t psoFlags)
             if (psoFlags & kHasUV1)
             {
                 ColorPSO.SetVertexShader(g_pDefaultNoTangentVS, sizeof(g_pDefaultNoTangentVS));
-                ColorPSO.SetPixelShader(g_pDefaultNoTangentPS, sizeof(g_pDefaultNoTangentPS));
+                ColorPSO.SetPixelShader(g_pTransparentNoTangentPS, sizeof(g_pTransparentNoTangentPS));
             }
             else
             {
                 ColorPSO.SetVertexShader(g_pDefaultNoTangentNoUV1VS, sizeof(g_pDefaultNoTangentNoUV1VS));
-                ColorPSO.SetPixelShader(g_pDefaultNoTangentNoUV1PS, sizeof(g_pDefaultNoTangentNoUV1PS));
+                ColorPSO.SetPixelShader(g_pTransparentNoTangentNoUV1PS, sizeof(g_pTransparentNoTangentNoUV1PS));
             }
         }
     }
@@ -419,14 +438,34 @@ uint8_t Renderer::GetPSO(uint16_t psoFlags)
     // If not found, keep the new one, and return its index
     sm_PSOs.push_back(ColorPSO);
 
-    // The returned PSO index has read-write depth.  The index+1 tests for equal depth.
-    ColorPSO.SetDepthStencilState(DepthStateTestEqual);
-    ColorPSO.Finalize();
+    // The returned PSO index has read-write depth.  The index+1 writes the G-buffer.
+    GraphicsPSO GBufferPSO = ColorPSO;
+    if (psoFlags & kHasTangent)
+    {
+        if (psoFlags & kHasUV1)
+            GBufferPSO.SetPixelShader(g_pGBufferPS, sizeof(g_pGBufferPS));
+        else
+            GBufferPSO.SetPixelShader(g_pGBufferNoUV1PS, sizeof(g_pGBufferNoUV1PS));
+    }
+    else
+    {
+        if (psoFlags & kHasUV1)
+            GBufferPSO.SetPixelShader(g_pGBufferNoTangentPS, sizeof(g_pGBufferNoTangentPS));
+        else
+            GBufferPSO.SetPixelShader(g_pGBufferNoTangentNoUV1PS, sizeof(g_pGBufferNoTangentNoUV1PS));
+    }
+    DXGI_FORMAT GBufferFormats[kNumGBufferTargets];
+    for (uint32_t i = 0; i < kNumGBufferTargets; ++i)
+        GBufferFormats[i] = g_GBuffer[i].GetFormat();
+    GBufferPSO.SetRenderTargetFormats(kNumGBufferTargets, GBufferFormats, g_SceneDepthBuffer.GetFormat());
+    GBufferPSO.SetBlendState(BlendDisable);
+    GBufferPSO.SetDepthStencilState(DepthStateReadWrite);
+    GBufferPSO.Finalize();
 #ifdef DEBUG
     for (uint32_t i = 0; i < sm_PSOs.size(); ++i)
-        ASSERT(ColorPSO.GetPipelineStateObject() != sm_PSOs[i].GetPipelineStateObject());
+        ASSERT(GBufferPSO.GetPipelineStateObject() != sm_PSOs[i].GetPipelineStateObject());
 #endif
-    sm_PSOs.push_back(ColorPSO);
+    sm_PSOs.push_back(GBufferPSO);
 
     ASSERT(sm_PSOs.size() <= 256, "Ran out of room for unique PSOs");
 
@@ -444,6 +483,8 @@ void Renderer::DrawSkyBackground(GraphicsContext& gfxContext, const D3D12_VIEWPO
 
     gfxContext.SetRootSignature(m_RootSig);
     gfxContext.SetPipelineState(m_SkyBackgroundPSO);
+    gfxContext.SetDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, s_TextureHeap.GetHeapPointer());
+    gfxContext.SetDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, s_SamplerHeap.GetHeapPointer());
 
     gfxContext.TransitionResource(g_SceneDepthBuffer, D3D12_RESOURCE_STATE_DEPTH_READ);
     gfxContext.TransitionResource(g_SceneColorBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
@@ -452,6 +493,39 @@ void Renderer::DrawSkyBackground(GraphicsContext& gfxContext, const D3D12_VIEWPO
 
     gfxContext.SetDynamicConstantBufferView(kMaterialConstants, sizeof(constants), &constants);
     gfxContext.Draw(3);
+}
+
+void Renderer::ShadeOpaqueSurfaces(ComputeContext& context, const BaseCamera& camera, const GlobalConstants& globals, ColorBuffer& sceneColor)
+{
+    ScopedTimer _prof(L"Opaque Shading", context);
+
+    OpaqueShadingConstants constants;
+    constants.ShadowMatrix = globals.ShadowMatrix;
+    XMStoreFloat3(&constants.ViewerPos, camera.GetPosition());
+    XMStoreFloat3(&constants.LightDirection, globals.LightDirection);
+    XMStoreFloat3(&constants.LightIlluminance, globals.LightIlluminance);
+    constants.Width = sceneColor.GetWidth();
+    constants.Height = sceneColor.GetHeight();
+
+    const D3D12_RESOURCE_STATES shaderResource = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    D3D12_CPU_DESCRIPTOR_HANDLE inputs[kNumGBufferTargets + 2];
+    for (uint32_t i = 0; i < kNumGBufferTargets; ++i)
+    {
+        ColorBuffer& target = g_GBuffer[i];
+        context.TransitionResource(target, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+        inputs[i] = target.GetSRV();
+    }
+    context.TransitionResource(g_ShadowBuffer, shaderResource);
+    inputs[kNumGBufferTargets] = g_ShadowBuffer.GetSRV();
+    inputs[kNumGBufferTargets + 1] = s_IndirectDiffuseRadiance != nullptr ? s_IndirectDiffuseRadiance->GetSRV() : GetDefaultTexture(kBlackOpaque2D);
+    context.TransitionResource(sceneColor, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+    context.SetRootSignature(s_OpaqueShadingRootSig);
+    context.SetPipelineState(s_OpaqueShadingPSO);
+    context.SetDynamicConstantBufferView(kOpaqueShadingConstants, sizeof(constants), &constants);
+    context.SetDynamicDescriptors(kOpaqueShadingInputs, 0, _countof(inputs), inputs);
+    context.SetDynamicDescriptor(kOpaqueShadingOutput, 0, sceneColor.GetUAV());
+    context.Dispatch2D(constants.Width, constants.Height);
 }
 
 void MeshSorter::AddMesh( const Mesh& mesh, float distance,
@@ -476,14 +550,14 @@ void MeshSorter::AddMesh( const Mesh& mesh, float distance,
 		if (alphaBlend)
 			return;
 
-		key.passID = kZPass;
+		key.passID = kOpaque;
 		// single-sided material의 앞면을 cull하는 기준은 docs/policy.md의 "camera 밖에서 본 doubleSided"다.
-		key.psoIdx = DepthPSOIndex(kShadowPass, twoSided ? kCullNone : kCullFront, skinned, alphaTest);
+		key.psoIdx = ShadowPSOIndex(twoSided ? kCullNone : kCullFront, skinned, alphaTest);
         key.key = dist.u;
 		m_SortKeys.push_back(key.value);
-		m_PassCounts[kZPass]++;
+		m_PassCounts[kOpaque]++;
 	}
-    else if (mesh.psoFlags & PSOFlags::kAlphaBlend)
+    else if (alphaBlend)
     {
         key.passID = kTransparent;
         key.psoIdx = mesh.pso;
@@ -491,24 +565,10 @@ void MeshSorter::AddMesh( const Mesh& mesh, float distance,
         m_SortKeys.push_back(key.value);
         m_PassCounts[kTransparent]++;
     }
-    else if (SeparateZPass || alphaTest)
-    {
-        key.passID = kZPass;
-        key.psoIdx = DepthPSOIndex(kDepthPrePass, twoSided ? kCullNone : kCullBack, skinned, alphaTest);
-        key.key = dist.u;
-        m_SortKeys.push_back(key.value);
-        m_PassCounts[kZPass]++;
-
-        key.passID = kOpaque;
-        key.psoIdx = mesh.pso + 1;
-        key.key = dist.u;
-        m_SortKeys.push_back(key.value);
-        m_PassCounts[kOpaque]++;
-    }
     else
     {
         key.passID = kOpaque;
-        key.psoIdx = mesh.pso;
+        key.psoIdx = mesh.pso + 1;
         key.key = dist.u;
         m_SortKeys.push_back(key.value);
         m_PassCounts[kOpaque]++;
@@ -602,24 +662,18 @@ void MeshSorter::RenderMeshes(
 		{
 			switch (m_CurrentPass)
 			{
-			case kZPass:
-				context.TransitionResource(*m_DSV, D3D12_RESOURCE_STATE_DEPTH_WRITE);
-				context.SetDepthStencilTarget(m_DSV->GetDSV());
-				break;
 			case kOpaque:
-				if (SeparateZPass)
+			{
+				D3D12_CPU_DESCRIPTOR_HANDLE rtvs[8];
+				for (uint32_t i = 0; i < m_NumRTVs; ++i)
 				{
-					context.TransitionResource(*m_DSV, D3D12_RESOURCE_STATE_DEPTH_READ);
-					context.TransitionResource(g_SceneColorBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET);
-					context.SetRenderTarget(g_SceneColorBuffer.GetRTV(), m_DSV->GetDSV_DepthReadOnly());
+					context.TransitionResource(*m_RTV[i], D3D12_RESOURCE_STATE_RENDER_TARGET);
+					rtvs[i] = m_RTV[i]->GetRTV();
 				}
-				else
-				{
-					context.TransitionResource(*m_DSV, D3D12_RESOURCE_STATE_DEPTH_WRITE);
-					context.TransitionResource(g_SceneColorBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET);
-					context.SetRenderTarget(g_SceneColorBuffer.GetRTV(), m_DSV->GetDSV());
-				}
+				context.TransitionResource(*m_DSV, D3D12_RESOURCE_STATE_DEPTH_WRITE);
+				context.SetRenderTargets(m_NumRTVs, rtvs, m_DSV->GetDSV());
 				break;
+			}
 			case kTransparent:
 				context.TransitionResource(*m_DSV, D3D12_RESOURCE_STATE_DEPTH_READ);
 				context.TransitionResource(g_SceneColorBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET);
@@ -651,7 +705,7 @@ void MeshSorter::RenderMeshes(
             }
             context.SetPipelineState(sm_PSOs[key.psoIdx]);
 
-            if (m_CurrentPass == kZPass)
+            if (m_BatchType == kShadows)
             {
                 bool alphaTest = (mesh.psoFlags & PSOFlags::kAlphaTest) == PSOFlags::kAlphaTest;
                 uint32_t stride = alphaTest ? 20u : 12u;

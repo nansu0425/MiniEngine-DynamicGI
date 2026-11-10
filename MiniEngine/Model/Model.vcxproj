@@ -140,6 +140,8 @@
     <None Include="Renderer\LightGrid.hlsli" />
     <None Include="Renderer\RasterSurface.hlsli" />
     <None Include="Renderer\SurfaceRadiance.hlsli" />
+    <None Include="Renderer\RasterMaterial.hlsli" />
+    <None Include="Renderer\GBuffer.hlsli" />
     <None Include="Raytracing\RaytracingScene.hlsli" />
     <None Include="Raytracing\HitSurface.hlsli" />
     <None Include="Raytracing\SurfaceRayOrigin.hlsli" />
@@ -160,7 +162,7 @@
     <FxCompile Include="Renderer\CutoutDepthVS.hlsl">
       <ShaderType>Vertex</ShaderType>
     </FxCompile>
-    <FxCompile Include="Renderer\DefaultNoTangentNoUV1PS.hlsl">
+    <FxCompile Include="Renderer\TransparentNoTangentNoUV1PS.hlsl">
       <ShaderType>Pixel</ShaderType>
     </FxCompile>
     <FxCompile Include="Renderer\DefaultNoTangentNoUV1SkinVS.hlsl">
@@ -169,7 +171,7 @@
     <FxCompile Include="Renderer\DefaultNoTangentNoUV1VS.hlsl">
       <ShaderType>Vertex</ShaderType>
     </FxCompile>
-    <FxCompile Include="Renderer\DefaultNoTangentPS.hlsl">
+    <FxCompile Include="Renderer\TransparentNoTangentPS.hlsl">
       <ShaderType>Pixel</ShaderType>
     </FxCompile>
     <FxCompile Include="Renderer\DefaultNoTangentSkinVS.hlsl">
@@ -178,7 +180,7 @@
     <FxCompile Include="Renderer\DefaultNoTangentVS.hlsl">
       <ShaderType>Vertex</ShaderType>
     </FxCompile>
-    <FxCompile Include="Renderer\DefaultNoUV1PS.hlsl">
+    <FxCompile Include="Renderer\TransparentNoUV1PS.hlsl">
       <ShaderType>Pixel</ShaderType>
     </FxCompile>
     <FxCompile Include="Renderer\DefaultNoUV1SkinVS.hlsl">
@@ -215,7 +217,20 @@
     <FxCompile Include="Renderer\FillLightGridCS_24.hlsl" />
     <FxCompile Include="Renderer\FillLightGridCS_32.hlsl" />
     <FxCompile Include="Renderer\FillLightGridCS_8.hlsl" />
-    <FxCompile Include="Renderer\DefaultPS.hlsl">
+    <FxCompile Include="Renderer\GBufferPS.hlsl">
+      <ShaderType>Pixel</ShaderType>
+    </FxCompile>
+    <FxCompile Include="Renderer\GBufferNoTangentPS.hlsl">
+      <ShaderType>Pixel</ShaderType>
+    </FxCompile>
+    <FxCompile Include="Renderer\GBufferNoUV1PS.hlsl">
+      <ShaderType>Pixel</ShaderType>
+    </FxCompile>
+    <FxCompile Include="Renderer\GBufferNoTangentNoUV1PS.hlsl">
+      <ShaderType>Pixel</ShaderType>
+    </FxCompile>
+    <FxCompile Include="Renderer\OpaqueShadingCS.hlsl" />
+    <FxCompile Include="Renderer\TransparentPS.hlsl">
       <ShaderType>Pixel</ShaderType>
     </FxCompile>
     <FxCompile Include="Sponza\ModelViewerPS.hlsl">

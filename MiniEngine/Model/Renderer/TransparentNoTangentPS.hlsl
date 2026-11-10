@@ -11,5 +11,5 @@
 // Author(s):  James Stanard
 //
 
-#define NO_SECOND_UV 1
-#include "Model/Renderer/DefaultPS.hlsl"
+#define NO_TANGENT_FRAME 1
+#include "Model/Renderer/TransparentPS.hlsl"

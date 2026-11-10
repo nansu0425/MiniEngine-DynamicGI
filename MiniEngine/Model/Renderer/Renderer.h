@@ -36,8 +36,6 @@ struct Joint;
 
 namespace Renderer
 {
-    extern BoolVar SeparateZPass;
-
     using namespace Math;
 
     extern std::vector<GraphicsPSO> sm_PSOs;
@@ -64,10 +62,11 @@ namespace Renderer
 
     uint8_t GetPSO(uint16_t psoFlags);
     void UpdateGlobalDescriptors(void);
-    // DefaultPS가 pixel의 radiance에 더하는 간접광의 diffuse 반사 (t18)를 정한다. radiance는 render target과 같은 크기이고, pixel마다 그 pixel이
+    // ShadeOpaqueSurfaces와 TransparentPS가 pixel의 radiance에 더하는 간접광의 diffuse 반사 (t18)를 정한다. radiance는 render target과 같은 크기이고, pixel마다 그 pixel이
     // 보는 면이 camera 쪽으로 반사하는 radiance (cd/m²)를 rgb에 담는다. nullptr이면 더하지 않는다.
-    // opaque pass 전에 부르고, radiance는 pixel shader resource 상태로 둔다.
+    // ShadeOpaqueSurfaces 전에 부르고, radiance는 pixel shader와 non-pixel shader resource 상태로 둔다.
     void SetIndirectDiffuseRadiance(const ColorBuffer* radiance);
+    void ShadeOpaqueSurfaces(ComputeContext& context, const Math::BaseCamera& camera, const GlobalConstants& globals, ColorBuffer& sceneColor);
     // 불투명한 면을 다 그린 뒤, 아무 면도 그리지 않은 scene color의 pixel에 camera에서 바로 보이는 sky의 radiance (cd/m²)를 쓴다.
     // raster는 sky로 surface를 비추지 않으므로 이것이 raster가 sky를 쓰는 전부다.
     void DrawSkyBackground(GraphicsContext& gfxContext, const D3D12_VIEWPORT& viewport, const D3D12_RECT& scissor, const Math::Vector3& skyRadiance);
@@ -76,7 +75,7 @@ namespace Renderer
     {
     public:
 		enum BatchType { kDefault, kShadows };
-        enum DrawPass { kZPass, kOpaque, kTransparent, kNumPasses };
+        enum DrawPass { kOpaque, kTransparent, kNumPasses };
 
 		MeshSorter(BatchType type)
 		{
@@ -89,7 +88,7 @@ namespace Renderer
 			m_SortObjects.clear();
 			m_SortKeys.clear();
 			std::memset(m_PassCounts, 0, sizeof(m_PassCounts));
-			m_CurrentPass = kZPass;
+			m_CurrentPass = kOpaque;
 			m_CurrentDraw = 0;
 		}
 
