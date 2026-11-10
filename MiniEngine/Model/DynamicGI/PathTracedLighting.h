@@ -7,7 +7,6 @@ class ComputeContext;
 
 // G-buffer의 surface가 camera 쪽으로 반사하는 간접광을 path tracing으로 구한다. pixel마다 sample을 frame에 걸쳐 누적한다.
 // 누적한 평균이 서로 다른 image의 sample을 섞지 않도록, image를 정하는 조건이 쌓을 때와 달라지면 처음부터 다시 쌓는다.
-// path가 맞은 점은 DDGI의 probe hit와 같은 shading으로 shading한다 (HitLighting.hlsli).
 namespace PathTracedLighting
 {
     struct Settings
@@ -43,6 +42,6 @@ namespace PathTracedLighting
     // 이번 frame의 G-buffer를 읽는다. width와 height는 G-buffer의 pixel 격자의 크기다.
     void Accumulate(ComputeContext& context, const Settings& settings, const GIFrameInputs& inputs, uint32_t width, uint32_t height);
 
-    // camera 쪽으로 반사하는 diffuse 간접광의 radiance (cd/m²). rgb는 평균이고 a는 더한 sample 수다.
-    ColorBuffer& GetDiffuseRadiance(void);
+    // camera 쪽으로 반사하는 간접광의 radiance (cd/m²). rgb는 평균이고 a는 더한 sample 수다.
+    ColorBuffer& GetIndirectRadiance(void);
 }

@@ -73,10 +73,10 @@ namespace Renderer
     DescriptorHandle m_CommonTextures;
 
     // m_CommonTextures에서 t18의 자리
-    const uint32_t kIndirectDiffuseRadianceSlot = 8;
+    const uint32_t kIndirectRadianceSlot = 8;
     // t18이 가리키는 buffer와, view를 복사했을 때 그 buffer의 version ID. nullptr이면 black texture를 가리킨다.
-    const ColorBuffer* s_IndirectDiffuseRadiance = nullptr;
-    uint32_t s_IndirectDiffuseRadianceID = 0;
+    const ColorBuffer* s_IndirectRadiance = nullptr;
+    uint32_t s_IndirectRadianceID = 0;
     const ColorBuffer* s_IndirectDiffuseProbes = nullptr;
     IrradianceProbeGrid s_IndirectDiffuseProbeGrid = {};
 }
@@ -308,19 +308,19 @@ void Renderer::UpdateGlobalDescriptors(void)
 
 }
 
-void Renderer::SetIndirectDiffuseRadiance(const ColorBuffer* radiance)
+void Renderer::SetIndirectRadiance(const ColorBuffer* radiance)
 {
     const uint32_t versionID = radiance != nullptr ? radiance->GetVersionID() : 0;
-    if (radiance == s_IndirectDiffuseRadiance && versionID == s_IndirectDiffuseRadianceID)
+    if (radiance == s_IndirectRadiance && versionID == s_IndirectRadianceID)
         return;
 
     // 앞 frame의 draw가 읽고 있을 수 있는 descriptor를 덮어쓰므로 GPU를 기다린다. 항을 켜고 끄거나 buffer를 다시 만들 때만 온다.
     g_CommandManager.IdleGPU();
     const D3D12_CPU_DESCRIPTOR_HANDLE view = radiance != nullptr ? radiance->GetSRV() : GetDefaultTexture(kBlackOpaque2D);
-    const DescriptorHandle dest = m_CommonTextures + kIndirectDiffuseRadianceSlot * s_TextureHeap.GetDescriptorSize();
+    const DescriptorHandle dest = m_CommonTextures + kIndirectRadianceSlot * s_TextureHeap.GetDescriptorSize();
     g_Device->CopyDescriptorsSimple(1, dest, view, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-    s_IndirectDiffuseRadiance = radiance;
-    s_IndirectDiffuseRadianceID = versionID;
+    s_IndirectRadiance = radiance;
+    s_IndirectRadianceID = versionID;
 }
 
 void Renderer::SetIndirectDiffuseProbes(const ColorBuffer* irradiance, const IrradianceProbeGrid& grid)
@@ -530,7 +530,7 @@ void Renderer::ShadeOpaqueSurfaces(ComputeContext& context, const BaseCamera& ca
     }
     context.TransitionResource(g_ShadowBuffer, shaderResource);
     inputs[kNumGBufferTargets] = g_ShadowBuffer.GetSRV();
-    inputs[kNumGBufferTargets + 1] = s_IndirectDiffuseRadiance != nullptr ? s_IndirectDiffuseRadiance->GetSRV() : GetDefaultTexture(kBlackOpaque2D);
+    inputs[kNumGBufferTargets + 1] = s_IndirectRadiance != nullptr ? s_IndirectRadiance->GetSRV() : GetDefaultTexture(kBlackOpaque2D);
     inputs[kNumGBufferTargets + 2] = s_IndirectDiffuseProbes != nullptr ? s_IndirectDiffuseProbes->GetSRV() : GetDefaultTexture(kBlackOpaque2D);
     context.TransitionResource(sceneColor, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 

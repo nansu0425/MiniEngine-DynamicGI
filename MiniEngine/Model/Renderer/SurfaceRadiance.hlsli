@@ -6,7 +6,7 @@
 #include "Core/Shaders/SurfaceShading.hlsli"
 
 float3 GetOutgoingRadiance(RasterSurface surface, float3 view, float3 shadowCoord, Texture2D<float> shadowMap, SamplerComparisonState shadowMapSampler,
-    float3 lightDirection, float3 lightIlluminance, float3 indirectDiffuseRadiance)
+    float3 lightDirection, float3 lightIlluminance, float3 indirectRadiance)
 {
     const GltfBrdfInput brdf = MakeGltfBrdfInput(surface.baseColor.rgb, surface.metallic, surface.roughness, surface.shadingNormal, view);
 
@@ -16,7 +16,7 @@ float3 GetOutgoingRadiance(RasterSurface surface, float3 view, float3 shadowCoor
 
     // TODO: indirect specular light
 
-    return surface.emissive + directRadiance + indirectDiffuseRadiance;
+    return surface.emissive + directRadiance + indirectRadiance;
 }
 
 #endif

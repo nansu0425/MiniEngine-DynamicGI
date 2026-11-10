@@ -5,14 +5,12 @@
 #include "Model/Raytracing/RaytracingScene.h"
 #include "Model/Raytracing/SceneHeapTable.h"
 #include "Core/Graphics/GraphicsCore.h"
-#include "Core/Graphics/GraphicsCommon.h"
 #include "Core/Graphics/Command/CommandContext.h"
 #include "Core/Graphics/Command/CommandListManager.h"
 #include "Core/Graphics/Resource/ColorBuffer.h"
 #include "Core/Graphics/Resource/BufferManager.h"
-#include "Core/Graphics/Resource/ShadowBuffer.h"
 
-#include "Output/Model/CompiledShaders/PathTracedDiffuseCS.h"
+#include "Output/Model/CompiledShaders/PathTracedIndirectCS.h"
 
 #include <algorithm>
 
@@ -21,14 +19,13 @@ using namespace Graphics;
 
 namespace
 {
-    enum RootParameter { kConstants, kScene, kGBuffer = kScene + RaytracingScene::kNumRootParameters, kShadowMap, kOutputs, kNumRootParameters };
+    enum RootParameter { kConstants, kScene, kGBuffer = kScene + RaytracingScene::kNumRootParameters, kOutputs, kNumRootParameters };
     RootSignature s_RootSignature;
-    ComputePSO s_DiffusePSO(L"Path Traced Diffuse");
+    ComputePSO s_IndirectPSO(L"Path Traced Indirect");
 
     SceneHeapTable s_GBufferSRVs;
-    SceneHeapTable s_ShadowMapSRV;
     SceneHeapTable s_OutputUAVs;
-    ColorBuffer s_DiffuseRadiance;
+    ColorBuffer s_IndirectRadiance;
 
     struct AccumulationConditions
     {
@@ -37,7 +34,6 @@ namespace
         Vector3 lightDirection;
         Vector3 lightIlluminance;
         Vector3 skyRadiance;
-        Matrix4 shadowMatrix;
     };
 
     // samplesPerFrame과 targetSamples는 쌓는 속도와 양만 정하므로 비교하지 않는다.
@@ -53,9 +49,7 @@ namespace
             XMVector3Equal(a.rays.pixelStepRight, b.rays.pixelStepRight) &&
             XMVector3Equal(a.rays.pixelStepDown, b.rays.pixelStepDown) &&
             XMVector3Equal(a.lightDirection, b.lightDirection) && XMVector3Equal(a.lightIlluminance, b.lightIlluminance) &&
-            XMVector3Equal(a.skyRadiance, b.skyRadiance) && XMVector4Equal(a.shadowMatrix.GetX(), b.shadowMatrix.GetX()) &&
-            XMVector4Equal(a.shadowMatrix.GetY(), b.shadowMatrix.GetY()) && XMVector4Equal(a.shadowMatrix.GetZ(), b.shadowMatrix.GetZ()) &&
-            XMVector4Equal(a.shadowMatrix.GetW(), b.shadowMatrix.GetW()) && CanKeepAccumulating(a.settings, b.settings);
+            XMVector3Equal(a.skyRadiance, b.skyRadiance) && CanKeepAccumulating(a.settings, b.settings);
     }
 
     bool s_ResetRequested = true;
@@ -79,39 +73,35 @@ namespace
     // SceneHeapTable.h의 규칙대로, 앞 frame의 dispatch가 읽고 있을 수 있는 buffer는 GPU를 기다린 뒤에 다시 만든다.
     void FitAccumulationTo(uint32_t width, uint32_t height)
     {
-        if (s_DiffuseRadiance.GetWidth() == width && s_DiffuseRadiance.GetHeight() == height)
+        if (s_IndirectRadiance.GetWidth() == width && s_IndirectRadiance.GetHeight() == height)
             return;
 
         g_CommandManager.IdleGPU();
-        s_DiffuseRadiance.Create(L"Path Traced Diffuse Radiance", width, height, 1, DXGI_FORMAT_R32G32B32A32_FLOAT);
+        s_IndirectRadiance.Create(L"Path Traced Indirect Radiance", width, height, 1, DXGI_FORMAT_R32G32B32A32_FLOAT);
         s_ResetRequested = true;
     }
 }
 
 void PathTracedLighting::Initialize(void)
 {
-    s_RootSignature.Reset(kNumRootParameters, 1);
+    s_RootSignature.Reset(kNumRootParameters);
     s_RootSignature[kConstants].InitAsConstantBuffer(0);
     RaytracingScene::InitRootParameters(s_RootSignature, kScene);
     s_RootSignature[kGBuffer].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, kNumGBufferTargets);
-    s_RootSignature[kShadowMap].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, kNumGBufferTargets, 1);
     s_RootSignature[kOutputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 1);
-    // PathTracedDiffuseCS.hlsl의 ShadowMapSampler는 raster의 Renderer와 같은 shadow map 비교 sampler다.
-    s_RootSignature.InitStaticSampler(0, SamplerShadowDesc);
     s_RootSignature.Finalize(L"Path Traced Lighting");
 
-    s_DiffusePSO.SetRootSignature(s_RootSignature);
-    s_DiffusePSO.SetComputeShader(g_pPathTracedDiffuseCS, sizeof(g_pPathTracedDiffuseCS));
-    s_DiffusePSO.Finalize();
+    s_IndirectPSO.SetRootSignature(s_RootSignature);
+    s_IndirectPSO.SetComputeShader(g_pPathTracedIndirectCS, sizeof(g_pPathTracedIndirectCS));
+    s_IndirectPSO.Finalize();
 
     s_GBufferSRVs.Create(kNumGBufferTargets);
-    s_ShadowMapSRV.Create(1);
     s_OutputUAVs.Create(1);
 }
 
 void PathTracedLighting::Shutdown(void)
 {
-    s_DiffuseRadiance.Destroy();
+    s_IndirectRadiance.Destroy();
 }
 
 void PathTracedLighting::Reset(void)
@@ -126,7 +116,7 @@ PathTracedLighting::Progress PathTracedLighting::GetProgress(void)
 
 void PathTracedLighting::Accumulate(ComputeContext& context, const Settings& settings, const GIFrameInputs& inputs, uint32_t width, uint32_t height)
 {
-    ScopedTimer _prof(L"Path Traced Diffuse", context);
+    ScopedTimer _prof(L"Path Traced Indirect", context);
 
     FitAccumulationTo(width, height);
 
@@ -136,7 +126,6 @@ void PathTracedLighting::Accumulate(ComputeContext& context, const Settings& set
         .lightDirection = inputs.lightDirection,
         .lightIlluminance = inputs.lightIlluminance,
         .skyRadiance = inputs.skyRadiance,
-        .shadowMatrix = inputs.shadowMatrix,
     };
     if (s_ResetRequested || !CanKeepAccumulating(conditions, s_CurrentAccumConditions))
     {
@@ -163,26 +152,23 @@ void PathTracedLighting::Accumulate(ComputeContext& context, const Settings& set
 
     for (uint32_t i = 0; i < kNumGBufferTargets; ++i)
         s_GBufferSRVs.PointTo(i, g_GBuffer[i], g_GBuffer[i].GetSRV());
-    s_ShadowMapSRV.PointTo(0, inputs.shadowMap, inputs.shadowMap.GetSRV());
-    s_OutputUAVs.PointTo(0, s_DiffuseRadiance, s_DiffuseRadiance.GetUAV());
+    s_OutputUAVs.PointTo(0, s_IndirectRadiance, s_IndirectRadiance.GetUAV());
 
     context.SetRootSignature(s_RootSignature);
-    context.SetPipelineState(s_DiffusePSO);
+    context.SetPipelineState(s_IndirectPSO);
     for (ColorBuffer& target : g_GBuffer)
         context.TransitionResource(target, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-    context.TransitionResource(inputs.shadowMap, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-    context.TransitionResource(s_DiffuseRadiance, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+    context.TransitionResource(s_IndirectRadiance, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
     context.SetDynamicConstantBufferView(kConstants, sizeof(constants), &constants);
     inputs.scene.Bind(context, kScene);
     s_GBufferSRVs.Bind(context, kGBuffer);
-    s_ShadowMapSRV.Bind(context, kShadowMap);
     s_OutputUAVs.Bind(context, kOutputs);
     context.Dispatch2D(width, height);
 
     s_Progress.samples += constants.SamplesThisFrame;
 }
 
-ColorBuffer& PathTracedLighting::GetDiffuseRadiance(void)
+ColorBuffer& PathTracedLighting::GetIndirectRadiance(void)
 {
-    return s_DiffuseRadiance;
+    return s_IndirectRadiance;
 }

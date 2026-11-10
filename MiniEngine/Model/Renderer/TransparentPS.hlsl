@@ -16,7 +16,7 @@
 #include "Model/Renderer/SurfaceRadiance.hlsli"
 
 Texture2D<float> texShadow			    : register(t13);
-Texture2D<float3> indirectDiffuseTexture    : register(t18);
+Texture2D<float3> indirectRadianceTexture   : register(t18);
 
 cbuffer GlobalConstants : register(b1)
 {
@@ -33,11 +33,11 @@ float4 main(VSOutput vsOutput, bool isFrontFace : SV_IsFrontFace) : SV_Target0
     const float3 view = normalize(ViewerPos - vsOutput.worldPos);
     const RasterSurface surface = GetRasterSurface(vsOutput, isFrontFace, view);
 
-    // indirect diffuse light
-    const float3 indirectDiffuseRadiance = indirectDiffuseTexture[uint2(vsOutput.position.xy)];
+    // indirect light
+    const float3 indirectRadiance = indirectRadianceTexture[uint2(vsOutput.position.xy)];
 
     const float3 outgoingRadiance = GetOutgoingRadiance(surface, view, vsOutput.shadowCoord, texShadow, shadowSampler,
-        LightDirection, LightIlluminance, indirectDiffuseRadiance);
+        LightDirection, LightIlluminance, indirectRadiance);
 
     return float4(outgoingRadiance, surface.baseColor.a);
 }

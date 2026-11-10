@@ -15,16 +15,16 @@ cbuffer Constants : register(b0)
 }
 
 Texture2D<float> ShadowMap : register(t5);
-Texture2D<float3> IndirectDiffuseRadiance : register(t6);
+Texture2D<float3> IndirectRadiance : register(t6);
 Texture2D<float4> ProbeIrradiance : register(t7);
 RWTexture2D<float3> SceneColor : register(u0);
 SamplerComparisonState ShadowMapSampler : register(s0);
 SamplerState LinearClamp : register(s1);
 
-float3 GetIndirectDiffuseRadiance(RasterSurface surface, float3 view, uint2 pixel)
+float3 GetIndirectRadiance(RasterSurface surface, float3 view, uint2 pixel)
 {
     if (UseIrradianceProbes == 0)
-        return IndirectDiffuseRadiance[pixel];
+        return IndirectRadiance[pixel];
 
     const GltfBrdfInput brdf = MakeGltfBrdfInput(surface.baseColor.rgb, surface.metallic, surface.roughness, surface.shadingNormal, view);
     return kPi * EvaluateGltfDiffuseLobeForIrradiance(brdf) * SampleIrradianceProbes(ProbeIrradiance, LinearClamp, Probes, surface.position, surface.shadingNormal);
@@ -43,5 +43,5 @@ void main(uint3 DTid : SV_DispatchThreadID)
     const float3 view = normalize(ViewerPos - surface.position);
     const float3 shadowCoord = mul(ShadowMatrix, float4(surface.position, 1.0)).xyz;
     SceneColor[DTid.xy] = GetOutgoingRadiance(surface, view, shadowCoord, ShadowMap, ShadowMapSampler,
-        LightDirection, LightIlluminance, GetIndirectDiffuseRadiance(surface, view, DTid.xy));
+        LightDirection, LightIlluminance, GetIndirectRadiance(surface, view, DTid.xy));
 }

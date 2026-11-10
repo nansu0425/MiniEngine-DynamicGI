@@ -23,16 +23,16 @@ namespace
 
     struct Settings
     {
-        Source diffuse = Source::kOff;
+        Source indirect = Source::kOff;
         PathTracedLighting::Settings pathTraced;
         ProbeLighting::Settings probe;
     };
 
     Settings s_Settings;
 
-    bool IsAnyTermOn(void)
+    bool IsIndirectOn(void)
     {
-        return s_Settings.diffuse != Source::kOff;
+        return s_Settings.indirect != Source::kOff;
     }
 
     // --- Engine Tuning과 harness --------------------------------------------------------------------
@@ -65,12 +65,13 @@ namespace
 
     void ShowSettings(void)
     {
-        int diffuse = (int)s_Settings.diffuse;
-        if (ImGui::Combo("Diffuse", &diffuse, kSourceNames, IM_ARRAYSIZE(kSourceNames)))
-            s_Settings.diffuse = (Source)diffuse;
-        ImGui::SetItemTooltip("How the raster finds the diffuse light reflected from indirect light at the surface it samples. "
-            "Path Traced accumulates it over frames. Probe interpolates the irradiance of a probe grid updated every frame.");
-        TuningSection::MakeItemResettable("Diffuse");
+        int indirect = (int)s_Settings.indirect;
+        if (ImGui::Combo("Indirect", &indirect, kSourceNames, IM_ARRAYSIZE(kSourceNames)))
+            s_Settings.indirect = (Source)indirect;
+        ImGui::SetItemTooltip("How the raster finds the light reflected from indirect light at the surface it samples. "
+            "Path Traced accumulates it over frames with the whole glTF BRDF. Probe interpolates the irradiance of a probe grid updated every frame "
+            "and reflects it with the diffuse lobe only.");
+        TuningSection::MakeItemResettable("Indirect");
 
         ImGui::SeparatorText("Path Traced");
         PathTracedLighting::Settings& pathTraced = s_Settings.pathTraced;
@@ -129,7 +130,7 @@ namespace
     void SaveSettings(TuningSection::Values& values)
     {
         const PathTracedLighting::Settings& pathTraced = s_Settings.pathTraced;
-        values["Diffuse"] = kSourceNames[(int)s_Settings.diffuse];
+        values["Indirect"] = kSourceNames[(int)s_Settings.indirect];
         values["Samples per Frame"] = std::to_string(pathTraced.samplesPerFrame);
         values["Target Samples"] = std::to_string(pathTraced.targetSamples);
         values["Seed"] = std::to_string(pathTraced.seed);
@@ -180,7 +181,7 @@ namespace
     void LoadSettings(const TuningSection::Values& values)
     {
         PathTracedLighting::Settings& pathTraced = s_Settings.pathTraced;
-        ReadSource(values, "Diffuse", s_Settings.diffuse);
+        ReadSource(values, "Indirect", s_Settings.indirect);
         ReadUInt(values, "Samples per Frame", pathTraced.samplesPerFrame);
         ReadUInt(values, "Target Samples", pathTraced.targetSamples);
         ReadUInt(values, "Seed", pathTraced.seed);
@@ -200,7 +201,7 @@ namespace
     {
         const PathTracedLighting::Progress progress = PathTracedLighting::GetProgress();
         return ControlChannel::Fields()
-            .Text("diffuse", kSourceNames[(int)s_Settings.diffuse])
+            .Text("indirect", kSourceNames[(int)s_Settings.indirect])
             .Object("path_traced", ControlChannel::Fields()
                 .Integer("samples", progress.samples)
                 .Integer("target", s_Settings.pathTraced.targetSamples)
@@ -235,24 +236,24 @@ void DynamicGI::Reset(void)
 
 void DynamicGI::Update(ComputeContext& context, const GIFrameInputs& inputs, uint32_t width, uint32_t height)
 {
-    ColorBuffer* diffuseRadiance = nullptr;
+    ColorBuffer* indirectRadiance = nullptr;
     ColorBuffer* probeIrradiance = nullptr;
-    if (IsAnyTermOn())
+    if (IsIndirectOn())
     {
         ScopedTimer _prof(L"Dynamic GI", context);
-        if (s_Settings.diffuse == Source::kPathTraced)
+        if (s_Settings.indirect == Source::kPathTraced)
         {
             PathTracedLighting::Accumulate(context, s_Settings.pathTraced, inputs, width, height);
-            diffuseRadiance = &PathTracedLighting::GetDiffuseRadiance();
-            context.TransitionResource(*diffuseRadiance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+            indirectRadiance = &PathTracedLighting::GetIndirectRadiance();
+            context.TransitionResource(*indirectRadiance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         }
-        else if (s_Settings.diffuse == Source::kProbe)
+        else if (s_Settings.indirect == Source::kProbe)
         {
             ProbeLighting::Update(context, s_Settings.probe, inputs);
             probeIrradiance = &ProbeLighting::GetIrradiance();
             context.TransitionResource(*probeIrradiance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
         }
     }
-    Renderer::SetIndirectDiffuseRadiance(diffuseRadiance);
+    Renderer::SetIndirectRadiance(indirectRadiance);
     Renderer::SetIndirectDiffuseProbes(probeIrradiance, ProbeLighting::GetGrid());
 }
