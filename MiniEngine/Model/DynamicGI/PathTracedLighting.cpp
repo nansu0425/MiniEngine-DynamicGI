@@ -1,4 +1,5 @@
 #include "Model/DynamicGI/PathTracedLighting.h"
+#include "Model/DynamicGI/GILights.h"
 #include "Model/Raytracing/CameraRays.h"
 #include "Core/Camera/Camera.h"
 #include "Model/Raytracing/RaytracingScene.h"
@@ -63,20 +64,16 @@ namespace
 
     __declspec(align(16)) struct Constants
     {
-        // raster의 GlobalConstants처럼 Matrix4를 그대로 담고, HLSL은 mul(ShadowMatrix, position)으로 쓴다.
-        Matrix4 ShadowMatrix;
+        GILights Lights;
         // HLSL의 cbuffer는 float3 뒤의 scalar를 같은 16 byte에 채우므로 XMFLOAT3로 둔다.
-        XMFLOAT3 LightDirection;
+        XMFLOAT3 ViewerPos;
         uint32_t Width;
-        XMFLOAT3 LightIlluminance;
         uint32_t Height;
-        XMFLOAT3 SkyRadiance;
         uint32_t Seed;
         uint32_t SamplesBeforeThisFrame;
         uint32_t SamplesThisFrame;
         uint32_t MaxHits;
         uint32_t RussianRoulette;
-        XMFLOAT3 ViewerPos;
     };
 
     // SceneHeapTable.h의 규칙대로, 앞 frame의 dispatch가 읽고 있을 수 있는 buffer는 GPU를 기다린 뒤에 다시 만든다.
@@ -150,10 +147,8 @@ void PathTracedLighting::Accumulate(ComputeContext& context, const Settings& set
     }
 
     Constants constants;
-    constants.ShadowMatrix = inputs.shadowMatrix;
-    XMStoreFloat3(&constants.LightDirection, inputs.lightDirection);
-    XMStoreFloat3(&constants.LightIlluminance, inputs.lightIlluminance);
-    XMStoreFloat3(&constants.SkyRadiance, inputs.skyRadiance);
+    constants.Lights = DescribeGILights(inputs);
+    XMStoreFloat3(&constants.ViewerPos, inputs.camera.GetPosition());
     constants.Width = width;
     constants.Height = height;
     constants.Seed = settings.seed;
@@ -162,7 +157,6 @@ void PathTracedLighting::Accumulate(ComputeContext& context, const Settings& set
         std::min(settings.samplesPerFrame, settings.targetSamples - s_Progress.samples) : 0;
     constants.MaxHits = settings.maxHits;
     constants.RussianRoulette = settings.russianRoulette ? 1 : 0;
-    XMStoreFloat3(&constants.ViewerPos, inputs.camera.GetPosition());
 
     if (constants.SamplesThisFrame == 0)
         return;

@@ -4,19 +4,16 @@
 
 cbuffer Constants : register(b0)
 {
-    float4x4 ShadowMatrix;
-    float3 LightDirection;
+    GILights Lights;
+    float3 ViewerPos;
     uint Width;
-    float3 LightIlluminance;
     uint Height;
-    float3 SkyRadiance;
     uint Seed;
     // reset 뒤 이번 frame 앞까지 sample 수
     uint SamplesBeforeThisFrame;
     uint SamplesThisFrame;
     uint MaxHits;
     uint RussianRoulette;
-    float3 ViewerPos;
 };
 
 Texture2D<float> ShadowMap : register(t5);
@@ -32,14 +29,8 @@ float3 EstimateDiffuseRadiance(RasterSurface surface, float3 view, inout Random 
     if (!DescribeSurfaceRay(surface.position, surface.geometryNormal, direction, ray))
         return 0.0;
 
-    GILights lights;
-    lights.lightDirection = LightDirection;
-    lights.lightIlluminance = LightIlluminance;
-    lights.skyRadiance = SkyRadiance;
-    lights.shadowMatrix = ShadowMatrix;
-
     // pdf = cos / pi -----> BRDF * Li * cos / (cos / pi) = pi * BRDF * Li
-    return kPi * EvaluateGltfDiffuseLobe(brdf, direction) * TraceIncomingRadiance(ray, lights, ShadowMap, ShadowMapSampler, MaxHits, RussianRoulette != 0, random);
+    return kPi * EvaluateGltfDiffuseLobe(brdf, direction) * TraceIncomingRadiance(ray, Lights, ShadowMap, ShadowMapSampler, MaxHits, RussianRoulette != 0, random);
 }
 
 [numthreads(8, 8, 1)]

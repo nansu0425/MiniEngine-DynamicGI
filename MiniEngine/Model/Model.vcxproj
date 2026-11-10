@@ -97,6 +97,7 @@
     <ClInclude Include="PathTracer\BrdfTest.h" />
     <ClInclude Include="DynamicGI\DynamicGI.h" />
     <ClInclude Include="DynamicGI\GIFrameInputs.h" />
+    <ClInclude Include="DynamicGI\GILights.h" />
     <ClInclude Include="DynamicGI\PathTracedLighting.h" />
     <ClInclude Include="Renderer\Renderer.h" />
     <ClInclude Include="Sponza\SponzaRenderer.h" />
