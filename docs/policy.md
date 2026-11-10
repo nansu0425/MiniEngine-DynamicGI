@@ -20,12 +20,12 @@
 
 이 repo 는 MIT 로 공개한다. 그래서 `references/` 에는 이 repo 에서 자유롭게 참고할 수 있는 자료만 둔다.
 
-- 논문은 알고리즘과 수식을 참고해 구현한다. 본문과 그림은 repo 에 옮기지 않는다.
-- MIT 처럼 허용하는 license 의 코드는 가져다 쓸 수 있다. 가져온 코드는 다음처럼 표시한다.
+- 논문과 spec 은 알고리즘과 수식을 참고해 구현한다. 본문과 그림은 repo 에 옮기지 않는다.
+- 다른 project 의 코드 구현은 license 와 상관없이 참고하지 않고 가져오지도 않는다. 구현은 이 프로젝트에서 문제를 직접 겪으며 이 프로젝트에 맞는 형태로 만든다. upstream MiniEngine 은 이 프로젝트가 고쳐 나가는 코드이므로 이 규칙의 대상이 아니다.
+- 이 규칙을 정하기 전에 다른 project 에서 가져온 코드는 다음처럼 표시한다.
   - 가져온 함수나 class 의 주석에 출처 project 와 파일 경로, 원래 이름을 적고, license 는 `THIRD_PARTY_NOTICES.md` 에 있다고 적는다. 고친 점이 있으면 이어서 적는다. 예: `// Capsaicin의 src/core/src/geometry/geometry.hlsl에서 offsetPosition을 가져왔다. license는 THIRD_PARTY_NOTICES.md에 있다.` `THIRD_PARTY_NOTICES.md` 로 검색하면 가져온 코드를 모두 찾을 수 있다.
-  - copyright 와 license 문구의 전문은 [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md) 에 출처 project 마다 한 번만 둔다. MIT 는 문구를 copy 에 포함하라고만 하고 위치는 정하지 않는다. 새 project 에서 코드를 가져오면 `THIRD_PARTY_NOTICES.md` 에 새 project 의 항목을 추가한다.
+  - copyright 와 license 문구의 전문은 [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md) 에 출처 project 마다 한 번만 둔다. MIT 는 문구를 copy 에 포함하라고만 하고 위치는 정하지 않는다.
   - 파일 상단에는 license 전문을 붙이지 않는다. 파일 전체가 다른 project 에서 가져온 코드처럼 보이기 때문이다. 파일을 통째로 가져왔을 때만 원래 파일의 header 를 그대로 둔다.
-- license 가 없거나 재배포를 막는 코드는 사용하지 않는다. 코드가 구현한 idea만 참고한다.
 
 ## Rendering 기준
 

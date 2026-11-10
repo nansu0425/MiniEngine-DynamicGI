@@ -138,6 +138,8 @@
     <None Include="Renderer\Common.hlsli" />
     <None Include="Renderer\FillLightGridCS.hlsli" />
     <None Include="Renderer\LightGrid.hlsli" />
+    <None Include="Renderer\RasterSurface.hlsli" />
+    <None Include="Renderer\SurfaceRadiance.hlsli" />
     <None Include="Raytracing\RaytracingScene.hlsli" />
     <None Include="Raytracing\HitSurface.hlsli" />
     <None Include="Raytracing\SurfaceRayOrigin.hlsli" />

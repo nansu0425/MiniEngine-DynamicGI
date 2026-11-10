@@ -1,5 +1,3 @@
-// normal texture로 shading normal을 구하는 식. raster의 DefaultPS와 ray의 GetHitSurface가 함께 쓴다.
-
 #ifndef __NORMAL_TEXTURE_HLSLI__
 #define __NORMAL_TEXTURE_HLSLI__
 

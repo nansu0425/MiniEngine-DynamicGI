@@ -4,8 +4,7 @@
 #include "Core/Shaders/NormalTexture.hlsli"
 #include "Model/Raytracing/RaytracingScene.hlsli"
 
-// ray가 맞은 곳의 surface. raster의 DefaultVS, DefaultPS가 pixel에서 얻는 값을 같은 data로 복원한다.
-// occlusion texture는 ray tracing이 직접 구할 visibility와 겹치므로 읽지 않는다.
+// ray가 맞은 곳의 surface
 struct HitSurface
 {
     float3 position;
