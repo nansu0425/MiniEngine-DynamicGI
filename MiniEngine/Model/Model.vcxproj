@@ -98,6 +98,8 @@
     <ClInclude Include="DynamicGI\DynamicGI.h" />
     <ClInclude Include="DynamicGI\GIFrameInputs.h" />
     <ClInclude Include="DynamicGI\GILights.h" />
+    <ClInclude Include="DynamicGI\ProbeLighting.h" />
+    <ClInclude Include="Renderer\IrradianceProbeGrid.h" />
     <ClInclude Include="DynamicGI\PathTracedLighting.h" />
     <ClInclude Include="Renderer\Renderer.h" />
     <ClInclude Include="Sponza\SponzaRenderer.h" />
@@ -129,6 +131,7 @@
     <ClCompile Include="PathTracer\BrdfTest.cpp" />
     <ClCompile Include="DynamicGI\DynamicGI.cpp" />
     <ClCompile Include="DynamicGI\PathTracedLighting.cpp" />
+    <ClCompile Include="DynamicGI\ProbeLighting.cpp" />
     <ClCompile Include="Renderer\Renderer.cpp" />
     <ClCompile Include="Sponza\SponzaRenderer.cpp" />
     <ClCompile Include="Loader\TextureConvert.cpp" />
@@ -150,6 +153,7 @@
     <None Include="Raytracing\RayQueryValidationStats.hlsli" />
     <None Include="DynamicGI\PathTracing.hlsli" />
     <None Include="DynamicGI\HitLighting.hlsli" />
+    <None Include="DynamicGI\ProbeRays.hlsli" />
     <None Include="Sponza\Lighting.hlsli" />
   </ItemGroup>
   <ItemGroup>
@@ -273,6 +277,11 @@
     <FxCompile Include="DynamicGI\PathTracedDiffuseCS.hlsl">
       <ShaderModel>6.5</ShaderModel>
     </FxCompile>
+    <FxCompile Include="DynamicGI\ProbeTraceCS.hlsl">
+      <ShaderModel>6.5</ShaderModel>
+    </FxCompile>
+    <FxCompile Include="DynamicGI\ProbeUpdateCS.hlsl" />
+    <FxCompile Include="DynamicGI\ProbeBorderCS.hlsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <Import Project="$([MSBuild]::GetDirectoryNameOfFileAbove('$(MSBuildThisFileDirectory)', 'vcpkg.json'))\vcpkg\DirectX.vcpkg.targets" />

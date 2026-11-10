@@ -77,6 +77,8 @@ namespace Renderer
     // t18이 가리키는 buffer와, view를 복사했을 때 그 buffer의 version ID. nullptr이면 black texture를 가리킨다.
     const ColorBuffer* s_IndirectDiffuseRadiance = nullptr;
     uint32_t s_IndirectDiffuseRadianceID = 0;
+    const ColorBuffer* s_IndirectDiffuseProbes = nullptr;
+    IrradianceProbeGrid s_IndirectDiffuseProbeGrid = {};
 }
 
 namespace
@@ -104,6 +106,8 @@ namespace
         XMFLOAT3 LightDirection;
         uint32_t Height;
         XMFLOAT3 LightIlluminance;
+        uint32_t UseIrradianceProbes;
+        IrradianceProbeGrid Probes;
     };
 }
 
@@ -229,11 +233,12 @@ void Renderer::Initialize(void)
     m_SkyBackgroundPSO.SetPixelShader(g_pSkyBackgroundPS, sizeof(g_pSkyBackgroundPS));
     m_SkyBackgroundPSO.Finalize();
 
-    s_OpaqueShadingRootSig.Reset(kNumOpaqueShadingRootParameters, 1);
+    s_OpaqueShadingRootSig.Reset(kNumOpaqueShadingRootParameters, 2);
     s_OpaqueShadingRootSig[kOpaqueShadingConstants].InitAsConstantBuffer(0);
-    s_OpaqueShadingRootSig[kOpaqueShadingInputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, kNumGBufferTargets + 2);
+    s_OpaqueShadingRootSig[kOpaqueShadingInputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, kNumGBufferTargets + 3);
     s_OpaqueShadingRootSig[kOpaqueShadingOutput].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 1);
     s_OpaqueShadingRootSig.InitStaticSampler(0, SamplerShadowDesc);
+    s_OpaqueShadingRootSig.InitStaticSampler(1, SamplerLinearClampDesc);
     s_OpaqueShadingRootSig.Finalize(L"Renderer: Opaque Shading");
 
     s_OpaqueShadingPSO.SetRootSignature(s_OpaqueShadingRootSig);
@@ -316,6 +321,12 @@ void Renderer::SetIndirectDiffuseRadiance(const ColorBuffer* radiance)
     g_Device->CopyDescriptorsSimple(1, dest, view, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     s_IndirectDiffuseRadiance = radiance;
     s_IndirectDiffuseRadianceID = versionID;
+}
+
+void Renderer::SetIndirectDiffuseProbes(const ColorBuffer* irradiance, const IrradianceProbeGrid& grid)
+{
+    s_IndirectDiffuseProbes = irradiance;
+    s_IndirectDiffuseProbeGrid = grid;
 }
 
 void Renderer::Shutdown(void)
@@ -506,9 +517,11 @@ void Renderer::ShadeOpaqueSurfaces(ComputeContext& context, const BaseCamera& ca
     XMStoreFloat3(&constants.LightIlluminance, globals.LightIlluminance);
     constants.Width = sceneColor.GetWidth();
     constants.Height = sceneColor.GetHeight();
+    constants.UseIrradianceProbes = s_IndirectDiffuseProbes != nullptr ? 1 : 0;
+    constants.Probes = s_IndirectDiffuseProbeGrid;
 
     const D3D12_RESOURCE_STATES shaderResource = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-    D3D12_CPU_DESCRIPTOR_HANDLE inputs[kNumGBufferTargets + 2];
+    D3D12_CPU_DESCRIPTOR_HANDLE inputs[kNumGBufferTargets + 3];
     for (uint32_t i = 0; i < kNumGBufferTargets; ++i)
     {
         ColorBuffer& target = g_GBuffer[i];
@@ -518,6 +531,7 @@ void Renderer::ShadeOpaqueSurfaces(ComputeContext& context, const BaseCamera& ca
     context.TransitionResource(g_ShadowBuffer, shaderResource);
     inputs[kNumGBufferTargets] = g_ShadowBuffer.GetSRV();
     inputs[kNumGBufferTargets + 1] = s_IndirectDiffuseRadiance != nullptr ? s_IndirectDiffuseRadiance->GetSRV() : GetDefaultTexture(kBlackOpaque2D);
+    inputs[kNumGBufferTargets + 2] = s_IndirectDiffuseProbes != nullptr ? s_IndirectDiffuseProbes->GetSRV() : GetDefaultTexture(kBlackOpaque2D);
     context.TransitionResource(sceneColor, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
     context.SetRootSignature(s_OpaqueShadingRootSig);

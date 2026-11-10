@@ -1697,6 +1697,7 @@ void ModelViewer::RenderScene( void )
                 .skyRadiance = m_Sky.GetRadiance(),
                 .shadowMap = g_ShadowBuffer,
                 .shadowMatrix = m_ShadowCamera.GetShadowMatrix(),
+                .modelBounds = m_ModelInst.GetAxisAlignedBox(),
             };
             DynamicGI::Update(gfxContext.GetComputeContext(), giInputs, g_SceneColorBuffer.GetWidth(), g_SceneColorBuffer.GetHeight());
 

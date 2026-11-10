@@ -19,6 +19,7 @@
 #include "Core/Graphics/Command/CommandContext.h"
 #include "Core/Graphics/Resource/UploadBuffer.h"
 #include "Core/Graphics/Texture/TextureManager.h"
+#include "Model/Renderer/IrradianceProbeGrid.h"
 #include <cstdint>
 #include <vector>
 
@@ -66,6 +67,7 @@ namespace Renderer
     // 보는 면이 camera 쪽으로 반사하는 radiance (cd/m²)를 rgb에 담는다. nullptr이면 더하지 않는다.
     // ShadeOpaqueSurfaces 전에 부르고, radiance는 pixel shader와 non-pixel shader resource 상태로 둔다.
     void SetIndirectDiffuseRadiance(const ColorBuffer* radiance);
+    void SetIndirectDiffuseProbes(const ColorBuffer* irradiance, const IrradianceProbeGrid& grid);
     void ShadeOpaqueSurfaces(ComputeContext& context, const Math::BaseCamera& camera, const GlobalConstants& globals, ColorBuffer& sceneColor);
     // 불투명한 면을 다 그린 뒤, 아무 면도 그리지 않은 scene color의 pixel에 camera에서 바로 보이는 sky의 radiance (cd/m²)를 쓴다.
     // raster는 sky로 surface를 비추지 않으므로 이것이 raster가 sky를 쓰는 전부다.

@@ -1,5 +1,6 @@
 #include "Model/Renderer/GBufferTextures.hlsli"
 #include "Model/Renderer/SurfaceRadiance.hlsli"
+#include "Core/Shaders/IrradianceProbes.hlsli"
 
 cbuffer Constants : register(b0)
 {
@@ -9,12 +10,25 @@ cbuffer Constants : register(b0)
     float3 LightDirection;
     uint Height;
     float3 LightIlluminance;
+    uint UseIrradianceProbes;
+    IrradianceProbeGrid Probes;
 }
 
 Texture2D<float> ShadowMap : register(t5);
 Texture2D<float3> IndirectDiffuseRadiance : register(t6);
+Texture2D<float4> ProbeIrradiance : register(t7);
 RWTexture2D<float3> SceneColor : register(u0);
 SamplerComparisonState ShadowMapSampler : register(s0);
+SamplerState LinearClamp : register(s1);
+
+float3 GetIndirectDiffuseRadiance(RasterSurface surface, float3 view, uint2 pixel)
+{
+    if (UseIrradianceProbes == 0)
+        return IndirectDiffuseRadiance[pixel];
+
+    const GltfBrdfInput brdf = MakeGltfBrdfInput(surface.baseColor.rgb, surface.metallic, surface.roughness, surface.shadingNormal, view);
+    return kPi * EvaluateGltfDiffuseLobeForIrradiance(brdf) * SampleIrradianceProbes(ProbeIrradiance, LinearClamp, Probes, surface.position, surface.shadingNormal);
+}
 
 [numthreads(8, 8, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
@@ -29,5 +43,5 @@ void main(uint3 DTid : SV_DispatchThreadID)
     const float3 view = normalize(ViewerPos - surface.position);
     const float3 shadowCoord = mul(ShadowMatrix, float4(surface.position, 1.0)).xyz;
     SceneColor[DTid.xy] = GetOutgoingRadiance(surface, view, shadowCoord, ShadowMap, ShadowMapSampler,
-        LightDirection, LightIlluminance, IndirectDiffuseRadiance[DTid.xy]);
+        LightDirection, LightIlluminance, GetIndirectDiffuseRadiance(surface, view, DTid.xy));
 }

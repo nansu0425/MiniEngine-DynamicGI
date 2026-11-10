@@ -139,6 +139,13 @@ float3 EvaluateGltfDiffuseLobe(GltfBrdfInput input, float3 light)
     return input.diffuseFactor * (1.0 - GetDielectricSpecularAlbedo(lightCosine, input.alpha));
 }
 
+// light 방향에서 오는 specular 반사율 대신 specular 반사율의 cosine-weighted 평균을 사용
+// indirect diffuse 계산에 Irradiance 값을 사용할 때 BRDF를 상수로 빼기위한 근사 BRDF
+float3 EvaluateGltfDiffuseLobeForIrradiance(GltfBrdfInput input)
+{
+    return input.diffuseFactor * (1.0 - GetAverageDielectricSpecularAlbedo(input.alpha));
+}
+
 // light 쪽에서 와서 view 쪽으로 반사하는 빛의 f. light는 단위 vector이고, normal 아래에서 오는 light는 0이다.
 // distribution은 그 방향의 D다. 다음 방향의 pdf가 같은 값을 쓴다.
 float3 EvaluateGltfBrdf(GltfBrdfInput input, float3 light, out float distribution)
