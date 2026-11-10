@@ -97,7 +97,6 @@
     <ClInclude Include="PathTracer\BrdfTest.h" />
     <ClInclude Include="DynamicGI\DynamicGI.h" />
     <ClInclude Include="DynamicGI\GIFrameInputs.h" />
-    <ClInclude Include="DynamicGI\GISurface.h" />
     <ClInclude Include="DynamicGI\PathTracedLighting.h" />
     <ClInclude Include="Renderer\Renderer.h" />
     <ClInclude Include="Sponza\SponzaRenderer.h" />
@@ -128,7 +127,6 @@
     <ClCompile Include="PathTracer\PathTracerTuning.cpp" />
     <ClCompile Include="PathTracer\BrdfTest.cpp" />
     <ClCompile Include="DynamicGI\DynamicGI.cpp" />
-    <ClCompile Include="DynamicGI\GISurface.cpp" />
     <ClCompile Include="DynamicGI\PathTracedLighting.cpp" />
     <ClCompile Include="Renderer\Renderer.cpp" />
     <ClCompile Include="Sponza\SponzaRenderer.cpp" />
@@ -142,13 +140,13 @@
     <None Include="Renderer\SurfaceRadiance.hlsli" />
     <None Include="Renderer\RasterMaterial.hlsli" />
     <None Include="Renderer\GBuffer.hlsli" />
+    <None Include="Renderer\GBufferTextures.hlsli" />
     <None Include="Raytracing\RaytracingScene.hlsli" />
     <None Include="Raytracing\HitSurface.hlsli" />
     <None Include="Raytracing\SurfaceRayOrigin.hlsli" />
     <None Include="Raytracing\SurfaceRay.hlsli" />
     <None Include="Raytracing\CameraRays.hlsli" />
     <None Include="Raytracing\RayQueryValidationStats.hlsli" />
-    <None Include="DynamicGI\GISurface.hlsli" />
     <None Include="DynamicGI\PathTracing.hlsli" />
     <None Include="Sponza\Lighting.hlsli" />
   </ItemGroup>
@@ -270,9 +268,6 @@
       <ShaderModel>6.5</ShaderModel>
     </FxCompile>
     <FxCompile Include="PathTracer\BrdfTestCS.hlsl" />
-    <FxCompile Include="DynamicGI\GISurfaceCS.hlsl">
-      <ShaderModel>6.5</ShaderModel>
-    </FxCompile>
     <FxCompile Include="DynamicGI\PathTracedDiffuseCS.hlsl">
       <ShaderModel>6.5</ShaderModel>
     </FxCompile>

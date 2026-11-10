@@ -75,7 +75,7 @@ float3 GetGeometryNormal(float3 worldPos, float3 view)
     float3 geometryNormal = cross(ddx(worldPos), ddy(worldPos));
     if (dot(geometryNormal, view) < 0.0)
         geometryNormal = -geometryNormal;
-    return geometryNormal;
+    return normalize(geometryNormal);
 }
 
 RasterSurface GetRasterSurface(VSOutput vsOutput, bool isFrontFace, float3 view)

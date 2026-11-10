@@ -1,5 +1,6 @@
 #include "Model/DynamicGI/PathTracedLighting.h"
 #include "Model/Raytracing/CameraRays.h"
+#include "Core/Camera/Camera.h"
 #include "Model/Raytracing/RaytracingScene.h"
 #include "Model/Raytracing/SceneHeapTable.h"
 #include "Core/Graphics/GraphicsCore.h"
@@ -7,7 +8,7 @@
 #include "Core/Graphics/Command/CommandContext.h"
 #include "Core/Graphics/Command/CommandListManager.h"
 #include "Core/Graphics/Resource/ColorBuffer.h"
-#include "Core/Graphics/Resource/GpuBuffer.h"
+#include "Core/Graphics/Resource/BufferManager.h"
 #include "Core/Graphics/Resource/ShadowBuffer.h"
 
 #include "Output/Model/CompiledShaders/PathTracedDiffuseCS.h"
@@ -19,10 +20,11 @@ using namespace Graphics;
 
 namespace
 {
-    enum RootParameter { kConstants, kScene, kSurfaces = kScene + RaytracingScene::kNumRootParameters, kShadowMap, kOutputs, kNumRootParameters };
+    enum RootParameter { kConstants, kScene, kGBuffer = kScene + RaytracingScene::kNumRootParameters, kShadowMap, kOutputs, kNumRootParameters };
     RootSignature s_RootSignature;
     ComputePSO s_DiffusePSO(L"Path Traced Diffuse");
 
+    SceneHeapTable s_GBufferSRVs;
     SceneHeapTable s_ShadowMapSRV;
     SceneHeapTable s_OutputUAVs;
     ColorBuffer s_DiffuseRadiance;
@@ -74,6 +76,7 @@ namespace
         uint32_t SamplesThisFrame;
         uint32_t MaxHits;
         uint32_t RussianRoulette;
+        XMFLOAT3 ViewerPos;
     };
 
     // SceneHeapTable.h의 규칙대로, 앞 frame의 dispatch가 읽고 있을 수 있는 buffer는 GPU를 기다린 뒤에 다시 만든다.
@@ -93,8 +96,8 @@ void PathTracedLighting::Initialize(void)
     s_RootSignature.Reset(kNumRootParameters, 1);
     s_RootSignature[kConstants].InitAsConstantBuffer(0);
     RaytracingScene::InitRootParameters(s_RootSignature, kScene);
-    s_RootSignature[kSurfaces].InitAsBufferSRV(0);
-    s_RootSignature[kShadowMap].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1);
+    s_RootSignature[kGBuffer].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, kNumGBufferTargets);
+    s_RootSignature[kShadowMap].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, kNumGBufferTargets, 1);
     s_RootSignature[kOutputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 1);
     // PathTracedDiffuseCS.hlsl의 ShadowMapSampler는 raster의 Renderer와 같은 shadow map 비교 sampler다.
     s_RootSignature.InitStaticSampler(0, SamplerShadowDesc);
@@ -104,6 +107,7 @@ void PathTracedLighting::Initialize(void)
     s_DiffusePSO.SetComputeShader(g_pPathTracedDiffuseCS, sizeof(g_pPathTracedDiffuseCS));
     s_DiffusePSO.Finalize();
 
+    s_GBufferSRVs.Create(kNumGBufferTargets);
     s_ShadowMapSRV.Create(1);
     s_OutputUAVs.Create(1);
 }
@@ -123,8 +127,7 @@ PathTracedLighting::Progress PathTracedLighting::GetProgress(void)
     return s_Progress;
 }
 
-void PathTracedLighting::Accumulate(ComputeContext& context, const Settings& settings, const GIFrameInputs& inputs,
-    StructuredBuffer& surfaces, uint32_t width, uint32_t height)
+void PathTracedLighting::Accumulate(ComputeContext& context, const Settings& settings, const GIFrameInputs& inputs, uint32_t width, uint32_t height)
 {
     ScopedTimer _prof(L"Path Traced Diffuse", context);
 
@@ -159,21 +162,25 @@ void PathTracedLighting::Accumulate(ComputeContext& context, const Settings& set
         std::min(settings.samplesPerFrame, settings.targetSamples - s_Progress.samples) : 0;
     constants.MaxHits = settings.maxHits;
     constants.RussianRoulette = settings.russianRoulette ? 1 : 0;
+    XMStoreFloat3(&constants.ViewerPos, inputs.camera.GetPosition());
 
     if (constants.SamplesThisFrame == 0)
         return;
 
+    for (uint32_t i = 0; i < kNumGBufferTargets; ++i)
+        s_GBufferSRVs.PointTo(i, g_GBuffer[i], g_GBuffer[i].GetSRV());
     s_ShadowMapSRV.PointTo(0, inputs.shadowMap, inputs.shadowMap.GetSRV());
     s_OutputUAVs.PointTo(0, s_DiffuseRadiance, s_DiffuseRadiance.GetUAV());
 
     context.SetRootSignature(s_RootSignature);
     context.SetPipelineState(s_DiffusePSO);
-    context.TransitionResource(surfaces, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+    for (ColorBuffer& target : g_GBuffer)
+        context.TransitionResource(target, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     context.TransitionResource(inputs.shadowMap, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     context.TransitionResource(s_DiffuseRadiance, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
     context.SetDynamicConstantBufferView(kConstants, sizeof(constants), &constants);
     inputs.scene.Bind(context, kScene);
-    context.SetBufferSRV(kSurfaces, surfaces);
+    s_GBufferSRVs.Bind(context, kGBuffer);
     s_ShadowMapSRV.Bind(context, kShadowMap);
     s_OutputUAVs.Bind(context, kOutputs);
     context.Dispatch2D(width, height);

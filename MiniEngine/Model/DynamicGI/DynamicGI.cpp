@@ -1,5 +1,4 @@
 #include "Model/DynamicGI/DynamicGI.h"
-#include "Model/DynamicGI/GISurface.h"
 #include "Model/DynamicGI/PathTracedLighting.h"
 #include "Core/Automation/ControlChannel.h"
 #include "Core/Editor/MeasurementConditions.h"
@@ -158,7 +157,6 @@ namespace
 
 void DynamicGI::Initialize(void)
 {
-    GISurface::Initialize();
     PathTracedLighting::Initialize();
 
     ControlChannel::RegisterState("gi", DescribeState);
@@ -167,7 +165,6 @@ void DynamicGI::Initialize(void)
 void DynamicGI::Shutdown(void)
 {
     PathTracedLighting::Shutdown();
-    GISurface::Shutdown();
 }
 
 void DynamicGI::Reset(void)
@@ -181,10 +178,9 @@ void DynamicGI::Update(ComputeContext& context, const GIFrameInputs& inputs, uin
     if (IsAnyTermOn())
     {
         ScopedTimer _prof(L"Dynamic GI", context);
-        GISurface::Update(context, inputs, width, height);
         if (s_Settings.diffuse == Source::kPathTraced)
         {
-            PathTracedLighting::Accumulate(context, s_Settings.pathTraced, inputs, GISurface::GetSurfaces(), width, height);
+            PathTracedLighting::Accumulate(context, s_Settings.pathTraced, inputs, width, height);
             diffuseRadiance = &PathTracedLighting::GetDiffuseRadiance();
             context.TransitionResource(*diffuseRadiance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         }
