@@ -1,6 +1,7 @@
 #include "Core/pch.h"
 #include "Core/Editor/EditorCameraController.h"
 #include "Core/App/UserSettings.h"
+#include "Core/Editor/MeasurementConditions.h"
 #include "Core/Camera/Camera.h"
 #include "Core/App/GameInput.h"
 #include "Core/Math/Rotation.h"
@@ -19,14 +20,6 @@ namespace
     float GetKeyAxis(GameInput::DigitalInput positive, GameInput::DigitalInput negative)
     {
         return (GameInput::IsPressed(positive) ? 1.0f : 0.0f) - (GameInput::IsPressed(negative) ? 1.0f : 0.0f);
-    }
-
-    // float로 다시 읽었을 때 같은 값이 되는 자릿수로 쓴다.
-    std::string FormatFloat(float value)
-    {
-        char text[32];
-        sprintf_s(text, "%.9g", value);
-        return text;
     }
 
     bool ReadFloat(const UserSettings::Values& values, const char* key, float& value)
@@ -50,7 +43,7 @@ EditorCameraController::EditorCameraController(Camera& camera, Vector3 worldUp) 
     m_MoveSpeed = 1000.0f;
 
     UserSettings::Register(kSettingsSection,
-        [this](UserSettings::Values& values) { values["Move Speed"] = FormatFloat(m_MoveSpeed); },
+        [this](UserSettings::Values& values) { values["Move Speed"] = MeasurementConditions::FormatFloat(m_MoveSpeed); },
         [this](const UserSettings::Values& values)
         {
             float moveSpeed;

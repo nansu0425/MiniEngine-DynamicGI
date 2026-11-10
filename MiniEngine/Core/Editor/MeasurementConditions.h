@@ -25,6 +25,8 @@ namespace MeasurementConditions
     // 줄의 value 하나를 읽는다. 앞뒤에 다른 글자가 있으면 false다. ReadFloat는 inf와 nan도 읽는다.
     bool ReadFloat(const std::string& text, float& value);
     bool ReadUInt(const std::string& text, uint32_t& value);
+    // float로 다시 읽었을 때 같은 값이 되는 자릿수로 쓴다.
+    std::string FormatFloat(float value);
 
     // group의 read가 줄에서 읽은 것
     struct Reading

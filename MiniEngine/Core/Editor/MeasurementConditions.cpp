@@ -59,6 +59,13 @@ bool MeasurementConditions::ReadFloat(const std::string& text, float& value)
     return end == text.c_str() + text.size();
 }
 
+std::string MeasurementConditions::FormatFloat(float value)
+{
+    char text[32];
+    sprintf_s(text, "%.9g", value);
+    return text;
+}
+
 bool MeasurementConditions::ReadUInt(const std::string& text, uint32_t& value)
 {
     if (text.empty() || text.find_first_not_of("0123456789") != std::string::npos)

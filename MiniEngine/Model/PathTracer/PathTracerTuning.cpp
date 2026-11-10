@@ -135,13 +135,6 @@ namespace
         return value ? "1" : "0";
     }
 
-    std::string FormatFloat(float value)
-    {
-        char text[32];
-        sprintf_s(text, "%.9g", value);
-        return text;
-    }
-
     void SaveSettings(TuningSection::Values& values)
     {
         values["Show"] = FormatFlag(s_Show);
@@ -154,8 +147,8 @@ namespace
         values["Russian Roulette"] = FormatFlag(s_Settings.russianRoulette);
         values["Geometric Normals"] = FormatFlag(s_Settings.geometricNormals);
         values["Furnace"] = FormatFlag(s_Settings.furnace);
-        values["Furnace Albedo"] = FormatFloat(s_Settings.furnaceAlbedo);
-        values["Furnace Emission"] = FormatFloat(s_Settings.furnaceEmission);
+        values["Furnace Albedo"] = MeasurementConditions::FormatFloat(s_Settings.furnaceAlbedo);
+        values["Furnace Emission"] = MeasurementConditions::FormatFloat(s_Settings.furnaceEmission);
     }
 
     void ReadFlag(const TuningSection::Values& values, const char* key, bool& value)
@@ -217,8 +210,8 @@ namespace
         values["pt russian roulette"] = FormatFlag(s_Settings.russianRoulette);
         values["pt geometric normals"] = FormatFlag(s_Settings.geometricNormals);
         values["pt furnace"] = FormatFlag(s_Settings.furnace);
-        values["pt furnace albedo"] = FormatFloat(s_Settings.furnaceAlbedo);
-        values["pt furnace emission"] = FormatFloat(s_Settings.furnaceEmission);
+        values["pt furnace albedo"] = MeasurementConditions::FormatFloat(s_Settings.furnaceAlbedo);
+        values["pt furnace emission"] = MeasurementConditions::FormatFloat(s_Settings.furnaceEmission);
         values["pt samples"] = std::to_string(PathTracer::GetProgress().samples);
     }
 
