@@ -2,7 +2,7 @@
 
 ## Reference
 
-구현할 때 참고하는 외부 자료는 `references/` 아래에 받는다. git 은 [references/manifest.json](../references/manifest.json) 만 tracking 하고, 받은 자료는 tracking 하지 않는다.
+참고하는 외부 자료는 `references/` 아래에 받는다. git 은 [references/manifest.json](../references/manifest.json) 만 tracking 하고, 받은 자료는 tracking 하지 않는다.
 
 ```powershell
 .\scripts\fetch-references.ps1
@@ -18,10 +18,11 @@
 
 ### 참고 범위
 
-이 repo 는 MIT 로 공개한다. 그래서 `references/` 에는 이 repo 에서 자유롭게 참고할 수 있는 자료만 둔다.
+외부 자료에서는 기술의 핵심 아이디어만 얻는다. 구현은 이 프로젝트에서 문제를 직접 겪으며 이 프로젝트에 맞는 형태로 만든다.
 
-- 논문과 spec 은 알고리즘과 수식을 참고해 구현한다. 본문과 그림은 repo 에 옮기지 않는다.
-- 다른 project 의 코드 구현은 license 와 상관없이 참고하지 않고 가져오지도 않는다. 구현은 이 프로젝트에서 문제를 직접 겪으며 이 프로젝트에 맞는 형태로 만든다. upstream MiniEngine 은 이 프로젝트가 고쳐 나가는 코드이므로 이 규칙의 대상이 아니다.
+- `references/` 에는 논문과 spec 만 둔다. 다른 project 의 구현 코드를 담은 repo 는 두지 않는다.
+- 논문과 spec 은 모든 내용을 참고할 수 있다. 이 repo 는 MIT 로 공개하므로 본문과 그림은 repo 에 옮기지 않는다.
+- 다른 project 의 코드 구현은 license 와 상관없이 참고하지 않고 가져오지도 않는다. `MiniEngine/` 아래의 upstream MiniEngine 코드는 이 프로젝트가 고쳐 나가는 코드이므로 이 규칙의 대상이 아니다.
 - 이 규칙을 정하기 전에 다른 project 에서 가져온 코드는 다음처럼 표시한다.
   - 가져온 함수나 class 의 주석에 출처 project 와 파일 경로, 원래 이름을 적고, license 는 `THIRD_PARTY_NOTICES.md` 에 있다고 적는다. 고친 점이 있으면 이어서 적는다. 예: `// Capsaicin의 src/core/src/geometry/geometry.hlsl에서 offsetPosition을 가져왔다. license는 THIRD_PARTY_NOTICES.md에 있다.` `THIRD_PARTY_NOTICES.md` 로 검색하면 가져온 코드를 모두 찾을 수 있다.
   - copyright 와 license 문구의 전문은 [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md) 에 출처 project 마다 한 번만 둔다. MIT 는 문구를 copy 에 포함하라고만 하고 위치는 정하지 않는다.

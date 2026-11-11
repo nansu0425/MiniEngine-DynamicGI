@@ -5,7 +5,7 @@
 ## Capsaicin
 
 - 출처: <https://github.com/GPUOpen-LibrariesAndSDKs/Capsaicin>
-- 가져온 commit 은 [references/manifest.json](references/manifest.json) 의 `Capsaicin` 항목에 있다.
+- 가져온 commit: `914b91596cd119eda85fbc1d3c7ee6ac391b1452`
 - 아래 문구는 가져온 source 파일의 header 에 있는 문구다.
 
 ```text
