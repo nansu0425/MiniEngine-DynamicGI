@@ -79,6 +79,7 @@ namespace Renderer
     uint32_t s_IndirectRadianceID = 0;
     const ColorBuffer* s_IndirectDiffuseProbes = nullptr;
     IrradianceProbeGrid s_IndirectDiffuseProbeGrid = {};
+    Renderer::ShadingOutput s_ShadingOutput = Renderer::ShadingOutput::kLit;
 }
 
 namespace
@@ -107,6 +108,7 @@ namespace
         uint32_t Height;
         XMFLOAT3 LightIlluminance;
         uint32_t UseIrradianceProbes;
+        uint32_t ShadingOutput;
         IrradianceProbeGrid Probes;
     };
 }
@@ -329,6 +331,11 @@ void Renderer::SetIndirectDiffuseProbes(const ColorBuffer* irradiance, const Irr
     s_IndirectDiffuseProbeGrid = grid;
 }
 
+void Renderer::SetShadingOutput(ShadingOutput output)
+{
+    s_ShadingOutput = output;
+}
+
 void Renderer::Shutdown(void)
 {
     Lighting::Shutdown();
@@ -519,6 +526,7 @@ void Renderer::ShadeOpaqueSurfaces(ComputeContext& context, const BaseCamera& ca
     constants.Height = sceneColor.GetHeight();
     constants.UseIrradianceProbes = s_IndirectDiffuseProbes != nullptr ? 1 : 0;
     constants.Probes = s_IndirectDiffuseProbeGrid;
+    constants.ShadingOutput = (uint32_t)s_ShadingOutput;
 
     const D3D12_RESOURCE_STATES shaderResource = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     D3D12_CPU_DESCRIPTOR_HANDLE inputs[kNumGBufferTargets + 3];

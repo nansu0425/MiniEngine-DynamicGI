@@ -25,6 +25,7 @@ namespace
     struct Settings
     {
         Source indirect = Source::kOff;
+        Renderer::ShadingOutput view = Renderer::ShadingOutput::kLit;
         PathTracedLighting::Settings pathTraced;
         ProbeLighting::Settings probe;
         ProbeVisualization::Settings probeSpheres;
@@ -51,6 +52,7 @@ namespace
 
     // Source의 순서이고, Engine Tuning의 저장과 settings 명령이 이 이름으로 읽고 쓴다.
     const char* kSourceNames[] = { "Off", "Path Traced", "Probe" };
+    const char* kViewNames[] = { "Lit", "Indirect Irradiance", "Indirect Radiance" };
 
     void ClampSettings(void)
     {
@@ -69,6 +71,28 @@ namespace
         probeSpheres.radiusPerSpacing = std::max(0.0f, std::min(probeSpheres.radiusPerSpacing, kMaxRadiusPerSpacing));
     }
 
+    void ShowViewCombo(void)
+    {
+        if (ImGui::BeginCombo("View", kViewNames[(int)s_Settings.view]))
+        {
+            for (int view = 0; view < IM_ARRAYSIZE(kViewNames); ++view)
+            {
+                const bool needsProbes = (Renderer::ShadingOutput)view == Renderer::ShadingOutput::kIndirectIrradiance;
+                const ImGuiSelectableFlags flags = needsProbes && s_Settings.indirect != Source::kProbe ? ImGuiSelectableFlags_Disabled : 0;
+                const bool selected = (int)s_Settings.view == view;
+                if (ImGui::Selectable(kViewNames[view], selected, flags))
+                    s_Settings.view = (Renderer::ShadingOutput)view;
+                if (selected)
+                    ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::SetItemTooltip("What the raster writes for the opaque surfaces. Lit adds the emission, the directional light and the indirect light. "
+            "Indirect Irradiance shows the probe irradiance from the shading normal, the same way Show Probes does, and needs the Probe source. "
+            "Indirect Radiance shows the indirect light reflected toward the camera only. Without indirect light both views are black.");
+        TuningSection::MakeItemResettable("View");
+    }
+
     void ShowSettings(void)
     {
         int indirect = (int)s_Settings.indirect;
@@ -78,6 +102,8 @@ namespace
             "Path Traced accumulates it over frames with the whole glTF BRDF. Probe interpolates the irradiance of a probe grid updated every frame "
             "and reflects it with the diffuse lobe only.");
         TuningSection::MakeItemResettable("Indirect");
+
+        ShowViewCombo();
 
         ImGui::SeparatorText("Path Traced");
         PathTracedLighting::Settings& pathTraced = s_Settings.pathTraced;
@@ -149,6 +175,7 @@ namespace
     {
         const PathTracedLighting::Settings& pathTraced = s_Settings.pathTraced;
         values["Indirect"] = kSourceNames[(int)s_Settings.indirect];
+        values["View"] = kViewNames[(int)s_Settings.view];
         values["Samples per Frame"] = std::to_string(pathTraced.samplesPerFrame);
         values["Target Samples"] = std::to_string(pathTraced.targetSamples);
         values["Seed"] = std::to_string(pathTraced.seed);
@@ -190,20 +217,22 @@ namespace
             value = text->second == "1";
     }
 
-    void ReadSource(const TuningSection::Values& values, const char* key, Source& value)
+    template <typename Enum, size_t NumNames>
+    void ReadName(const TuningSection::Values& values, const char* key, const char* const (&names)[NumNames], Enum& value)
     {
         const auto text = values.find(key);
         if (text == values.end())
             return;
-        const auto name = std::find(std::begin(kSourceNames), std::end(kSourceNames), text->second);
-        if (name != std::end(kSourceNames))
-            value = (Source)(name - std::begin(kSourceNames));
+        const auto name = std::find(std::begin(names), std::end(names), text->second);
+        if (name != std::end(names))
+            value = (Enum)(name - std::begin(names));
     }
 
     void LoadSettings(const TuningSection::Values& values)
     {
         PathTracedLighting::Settings& pathTraced = s_Settings.pathTraced;
-        ReadSource(values, "Indirect", s_Settings.indirect);
+        ReadName(values, "Indirect", kSourceNames, s_Settings.indirect);
+        ReadName(values, "View", kViewNames, s_Settings.view);
         ReadUInt(values, "Samples per Frame", pathTraced.samplesPerFrame);
         ReadUInt(values, "Target Samples", pathTraced.targetSamples);
         ReadUInt(values, "Seed", pathTraced.seed);
@@ -228,6 +257,7 @@ namespace
         const PathTracedLighting::Progress progress = PathTracedLighting::GetProgress();
         return ControlChannel::Fields()
             .Text("indirect", kSourceNames[(int)s_Settings.indirect])
+            .Text("view", kViewNames[(int)s_Settings.view])
             .Object("path_traced", ControlChannel::Fields()
                 .Integer("samples", progress.samples)
                 .Integer("target", s_Settings.pathTraced.targetSamples)
@@ -283,6 +313,7 @@ void DynamicGI::Update(ComputeContext& context, const GIFrameInputs& inputs, uin
     }
     Renderer::SetIndirectRadiance(indirectRadiance);
     Renderer::SetIndirectDiffuseProbes(probeIrradiance, ProbeLighting::GetGrid());
+    Renderer::SetShadingOutput(s_Settings.view);
 }
 
 void DynamicGI::DrawProbes(GraphicsContext& context, const Math::Camera& camera, const D3D12_VIEWPORT& viewport, const D3D12_RECT& scissor)

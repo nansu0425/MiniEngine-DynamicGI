@@ -68,6 +68,8 @@ namespace Renderer
     // ShadeOpaqueSurfaces 전에 부르고, radiance는 pixel shader와 non-pixel shader resource 상태로 둔다.
     void SetIndirectRadiance(const ColorBuffer* radiance);
     void SetIndirectDiffuseProbes(const ColorBuffer* irradiance, const IrradianceProbeGrid& grid);
+    enum class ShadingOutput { kLit, kIndirectIrradiance, kIndirectRadiance };
+    void SetShadingOutput(ShadingOutput output);
     void ShadeOpaqueSurfaces(ComputeContext& context, const Math::BaseCamera& camera, const GlobalConstants& globals, ColorBuffer& sceneColor);
     // 불투명한 면을 다 그린 뒤, 아무 면도 그리지 않은 scene color의 pixel에 camera에서 바로 보이는 sky의 radiance (cd/m²)를 쓴다.
     // raster는 sky로 surface를 비추지 않으므로 이것이 raster가 sky를 쓰는 전부다.
