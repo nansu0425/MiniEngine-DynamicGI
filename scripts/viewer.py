@@ -103,6 +103,7 @@ kernel32.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
 kernel32.WaitForSingleObject.restype = wintypes.DWORD
 kernel32.TerminateProcess.argtypes = [wintypes.HANDLE, wintypes.UINT]
 kernel32.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+kernel32.K32EnumProcesses.argtypes = [ctypes.POINTER(wintypes.DWORD), wintypes.DWORD, ctypes.POINTER(wintypes.DWORD)]
 kernel32.QueryFullProcessImageNameW.argtypes = [wintypes.HANDLE, wintypes.DWORD, wintypes.LPWSTR, ctypes.POINTER(wintypes.DWORD)]
 kernel32.PeekNamedPipe.argtypes = [wintypes.HANDLE, wintypes.LPVOID, wintypes.DWORD, ctypes.POINTER(wintypes.DWORD),
                                    ctypes.POINTER(wintypes.DWORD), ctypes.POINTER(wintypes.DWORD)]
@@ -451,6 +452,22 @@ def stop_instance(instance, kill_now=False):
             'log': instance['log']}
 
 
+def find_user_apps():
+    """harness 가 띄우지 않고 실행 중인 ModelViewer.exe 의 pid"""
+    pids = (wintypes.DWORD * 4096)()
+    filled = wintypes.DWORD()
+    if not kernel32.K32EnumProcesses(pids, ctypes.sizeof(pids), ctypes.byref(filled)):
+        raise HarnessError('cannot list the running processes')
+    instance = load_instance()
+    harness_pid = instance['pid'] if instance is not None and is_running(instance) else None
+    found = []
+    for pid in pids[:filled.value // ctypes.sizeof(wintypes.DWORD)]:
+        image = process_image(pid)
+        if image is not None and os.path.basename(image).lower() == 'modelviewer.exe' and pid != harness_pid:
+            found.append(pid)
+    return found
+
+
 def stop_running_instance():
     instance = load_instance()
     if instance is None:
@@ -544,11 +561,15 @@ def write_scene_file(gltf):
     return scene.relative_to(VIEWER_DIR).as_posix()
 
 
-def start_instance(config, scene=None, build_first=True, gpu_validation=False, baseline=BASELINE_DIR, app_default_scene=False):
-    """scene (MiniEngine/ModelViewer 기준 scene file 경로) 을 -scene 으로 연 app 을 띄운다. None 이면 default_baseline_scene() 을 연다.
-    app_default_scene 이면 scene 을 무시하고 -scene 없이 띄워, app 이 스스로 고르는 default_scene() 을 연다.
-    baseline 은 run 폴더에 복사해 app 이 처음 읽게 할 user.ini 와 imgui.ini 의 폴더다."""
-    opened = default_scene() if app_default_scene else scene or default_baseline_scene()
+def start_instance(config, scene=None, build_first=True, gpu_validation=False, baseline=BASELINE_DIR, user_state=False):
+    """scene (MiniEngine/ModelViewer 기준 scene file 경로) 을 -scene 으로 연 app 을 띄운다. scene 이 None 이면 default_baseline_scene() 을
+    연다. baseline 은 run 폴더에 복사해 app 이 처음 읽게 할 user.ini 와 imgui.ini 의 폴더다.
+    user_state 면 사용자가 app 을 직접 실행할 때처럼 띄운다. baseline 대신 사용자의 user.ini 와 imgui.ini (USER_SETTINGS) 를 복사하고,
+    scene 이 None 이면 -scene 없이 띄워 app 이 스스로 고르는 default_scene() 을 열고, -hdr_output 0 을 주지 않는다.
+    harness 가 띄우지 않은 ModelViewer 가 실행 중이면 띄우지 않는다."""
+    if scene is None and not user_state:
+        scene = default_baseline_scene()
+    opened = scene or default_scene()
     if not (VIEWER_DIR / opened).exists():
         raise HarnessError(f'missing the scene file {VIEWER_DIR / opened}')
     gltf = VIEWER_DIR / scene_gltf(opened)
@@ -557,6 +578,11 @@ def start_instance(config, scene=None, build_first=True, gpu_validation=False, b
                          for folder in [SCENES_DIR, BASELINE_SCENES_DIR, MEASUREMENT_SCENES_DIR])
         hint = ' Run .\\scripts\\fetch-assets.ps1.' if repo_scene else ''
         raise HarnessError(f'missing {gltf}, which {opened} opens.{hint}')
+
+    user_apps = find_user_apps()
+    if user_apps:
+        raise HarnessError(f'ModelViewer not started by harness is running (pid {", ".join(map(str, user_apps))}). Quit it so that it saves '
+                           'user.ini and does not write the .mini and DDS caches at the same time, then start again')
 
     stop_running_instance()
     if build_first:
@@ -575,20 +601,22 @@ def start_instance(config, scene=None, build_first=True, gpu_validation=False, b
         suffix += 1
         run_dir = RUNS_DIR / f'{run_id}-{suffix}'
     run_dir.mkdir(parents=True)
-    for settings in Path(baseline).glob('*.ini'):
+    for settings in [path for path in USER_SETTINGS if path.exists()] if user_state else Path(baseline).glob('*.ini'):
         shutil.copy2(settings, run_dir / settings.name)
     prune_runs()
 
     log = run_dir / 'app.log'
     pipe = f'ModelViewerHarness-{run_dir.name}'
-    command = [str(exe), '-settings_dir', str(run_dir), '-log', str(log), '-unattended', '1', '-control', pipe, '-hdr_output', '0']
-    if not app_default_scene:
-        command += ['-scene', opened]
+    command = [str(exe), '-settings_dir', str(run_dir), '-log', str(log), '-unattended', '1', '-control', pipe]
+    if scene is not None:
+        command += ['-scene', scene]
+    if not user_state:
+        command += ['-hdr_output', '0']
     if gpu_validation:
         command += ['-gpu_debug', '1']
     process = launch(command, VIEWER_DIR)
 
-    instance = {'pid': process.pid, 'exe': str(exe), 'config': config, 'scene': opened, 'pipe': pipe,
+    instance = {'pid': process.pid, 'exe': str(exe), 'config': config, 'user_state': user_state, 'scene': opened, 'pipe': pipe,
                 'run_dir': str(run_dir), 'log': str(log)}
     HARNESS_DIR.mkdir(parents=True, exist_ok=True)
     INSTANCE_FILE.write_text(json.dumps(instance, indent=2), encoding='utf-8')
@@ -796,13 +824,14 @@ def command_start(args):
     if args.gpu_validation and args.config != 'Debug':
         raise HarnessError(f'--gpu-validation works only in Debug: start does not turn on the D3D12 debug layer in {args.config}, '
                            'so GPU-based validation would stay off')
-    instance = start_instance(args.config, args.scene, not args.no_build, args.gpu_validation)
+    instance = start_instance(args.config, args.scene, not args.no_build, args.gpu_validation, user_state=not args.baseline)
     session = Session(instance)
     try:
         status = session.ask_ok('status')
     finally:
         session.close()
-    print(f'started {instance["config"]} pid {instance["pid"]}: client {status["client"]}, scene {status["scene"]}, '
+    settings = "the user's settings" if instance['user_state'] else 'harness baseline'
+    print(f'started {instance["config"]} with {settings}, pid {instance["pid"]}: client {status["client"]}, scene {status["scene"]}, '
           f'ui {status["ui"]}, gpu {status["gpu"]}')
     print(describe_d3d12_status(summarize_log(Path(instance['log']))['d3d12']))
     print(f'run dir: {instance["run_dir"]}')
@@ -2253,14 +2282,18 @@ def main():
     command = add_command('build', 'build ModelViewer and print only the errors', command_build)
     add_config(command)
 
-    command = add_command('start', 'build, then start ModelViewer in a new run folder under MiniEngine/ModelViewer/Harness/runs '
-                                   "with a copy of scripts/harness-baseline as -settings_dir, so the user's user.ini and imgui.ini "
-                                   f'stay untouched. Deletes all but the newest {KEPT_RUNS} run folders, keeping the running one', command_start)
+    command = add_command('start', "build, then start ModelViewer as the user runs it, with a copy of the user's user.ini and "
+                                   'imgui.ini in a new run folder under MiniEngine/ModelViewer/Harness/runs as -settings_dir, so the '
+                                   "user's files stay untouched. Refuses while a ModelViewer not started by harness is running. "
+                                   f'Deletes all but the newest {KEPT_RUNS} run folders, keeping the running one', command_start)
     add_config(command)
+    command.add_argument('--baseline', action='store_true',
+                         help="copy scripts/harness-baseline instead of the user's settings and pass -hdr_output 0, for measurements "
+                              "and comparisons that must not depend on the user's settings")
     command.add_argument('--scene', help='scene file path relative to MiniEngine/ModelViewer, passed as -scene. Without it the app '
-                                          f'opens the measurement scene {DEFAULT_MEASUREMENT_SCENE} of '
-                                          'scripts/harness-baseline/measurement-scenes, so the scene files the user saves do not change '
-                                          'the measurements')
+                                          "opens the scene the user's app opens, or with --baseline the measurement scene "
+                                          f'{DEFAULT_MEASUREMENT_SCENE} of scripts/harness-baseline/measurement-scenes, so the scene files '
+                                          'the user saves do not change the measurements')
     command.add_argument('--no-build', action='store_true')
     command.add_argument('--gpu-validation', action='store_true',
                          help='pass -gpu_debug 1 for GPU-based validation, which checks on the GPU the state and descriptor of each '

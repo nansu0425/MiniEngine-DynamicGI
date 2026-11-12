@@ -7,21 +7,22 @@ harness 는 ModelViewer 의 test 와 측정을 자동화하는 도구다. app �
 ## 띄우기와 조작
 
 - harness 로 다룰 app 은 직접 실행하지 않고 `start` 로 띄운다. 그래야 사용자의 설정 파일이 남는다 (`start --help`).
+- `start` 는 사용자가 app 을 직접 실행할 때와 같은 상태로 띄운다. 사용자의 `user.ini` 와 `imgui.ini` 를 run 폴더에 복사해 쓰고, `--scene` 이 없으면 사용자의 app 이 여는 scene 을 연다. 실행마다 같은 결과가 나와야 하는 측정과 비교는 `start --baseline` 으로 `scripts/harness-baseline/` 의 설정에서 띄운다. snapshot, selftest, `scripts/measure-*.py` 는 늘 baseline 으로 띄운다.
+- harness 가 띄우지 않은 ModelViewer 가 실행 중이면 `start` 는 띄우지 않는다. 사용자의 app 은 끝날 때 `user.ini` 를 저장하므로 끝난 뒤에야 그 상태를 복사할 수 있고, 두 app 이 함께 돌면 `.mini` 와 DDS cache 쓰기가 겹칠 수 있다.
 - D3D12 debug layer 의 message 를 봐야 하면 Debug 로 띄운다. `start` 는 다른 config 에 `-debug 1` 을 주지 않으므로 debug layer 가 꺼져 message 자체가 생기지 않는다 (`start` 가 상태를 알린다).
 - UI 와 mouse 로 바꾸는 상태는 같은 상태를 바꾸는 명령으로 바꾼다. gizmo 가 바꾸는 directional light 의 rotation 과 위치, icon click, Scene Hierarchy panel, W, E 와 scene 위의 gizmo toolbar 가 바꾸는 editor 의 선택, gizmo mode, rotate 의 축, Details panel 이 바꾸는 물체의 설정 (`editor get`, `editor set`), Scene menu 가 바꾸는 scene 과 Save (`scene save`), Engine Tuning 의 Reset to Default, Reset to Defaults, Reset All 이 바꾸는 설정 (`settings reset`) 도 그렇다. 명령은 `do help` 에 있다.
 - harness 는 gizmo 를 화면에서 찾아 끄는 식으로 입력을 흉내 내지 않는다. 입력을 흉내 내는 조작은 click 할 곳과 click 한 결과를 image 로 판단해야 하는데, image 로 판단한 UI 의 상태는 믿을 수 없다.
 
 ## 실행 순서
 
-1. `start` 로 띄운다. 기능 확인은 기본값 Debug 로, 시간은 `--config Profile` 로 잰다. pass 의 GPU time 은 `profile` 명령으로 읽는다.
+1. `start` 로 띄운다. 수치를 비교하거나 시간을 잴 때는 `--baseline` 을 준다. 기능 확인은 기본값 Debug 로, 시간은 `--config Profile` 로 잰다. pass 의 GPU time 은 `profile` 명령으로 읽는다.
 2. `do "state <path>"` 로 지금 상태를 읽고, `do "<명령>" "<명령>" ...` 로 조작한다. 서로 기다릴 필요가 없는 명령은 한 번의 `do` 에 묶는다.
 3. 지금 무엇이 보이는지는 `pick grid` 로 본다. 대략의 구도를 보고 싶으면 `shot display|scene|overlay` 로 capture 해 view PNG 를 본다.
 4. `stop` 으로 끝낸다.
 
-- 앞 명령의 응답에 있는 값을 뒤 명령에 넣거나 같은 순서를 되풀이하려면 명령을 파일에 적어 `run` 으로 보낸다. 형식은 `run --help` 에 있고, `scripts/harness-scenarios/acceptance.txt` 가 명령 파일의 예다.
+- 앞 명령의 응답에 있는 값을 뒤 명령에 넣거나 같은 순서를 되풀이하려면 명령을 파일에 적어 `run` 으로 보낸다. 형식은 `run --help` 에 있고, `scripts/harness-scenarios/acceptance.txt` 가 명령 파일의 예다. 이 예는 `--baseline` 으로 띄운 app 을 전제한다.
 - 나중에 비교할 shot 은 `MiniEngine/ModelViewer/Harness/kept/` 로 복사해 둔다. `runs/` 의 run 은 뒤의 `start` 와 `selftest` 가 지울 수 있다.
-- 사용자가 직접 띄운 ModelViewer 와 동시에 실행하면 `.mini` 와 DDS cache 쓰기가 겹칠 수 있다.
-- `start` 는 `--scene` 이 없으면 측정 scene 중 viewer.py 의 `DEFAULT_MEASUREMENT_SCENE` 을 연다. 측정 scene 은 시점에 의존하는 확인과 snapshot 이 차례로 여는 Sponza 의 구도로, `scripts/harness-baseline/measurement-scenes/` 에 있고 (viewer.py 의 `measurement_scenes`), 구도의 목적은 각 scene file 의 머리말에 있다. Cornell box 의 측정용 scene file 은 `scripts/harness-baseline/scenes/` 에 있다. `MiniEngine/ModelViewer/Scenes/` 의 scene file 을 측정에 쓰지 않는 이유는 viewer.py 의 `BASELINE_SCENES_DIR` 주석에 있다. 다른 scene 은 `--scene <scene file>` 로 연다. camera 는 늘 scene file 의 pose 와 세로 FOV 로 시작하고, light 와 sky 도 scene file 의 값으로 시작한다. 실행 중에는 `scene open <scene file>` 로 다른 scene 을 연다. `scene save` 는 연 scene file 을 고치므로 `Scenes/`, `scripts/harness-baseline/scenes/`, `scripts/harness-baseline/measurement-scenes/` 의 scene file 에는 쓰지 않는다. 저장을 확인할 때는 Harness 아래에 복사한 scene file 을 연다.
+- `start --baseline` 은 `--scene` 이 없으면 측정 scene 중 viewer.py 의 `DEFAULT_MEASUREMENT_SCENE` 을 연다. 측정 scene 은 시점에 의존하는 확인과 snapshot 이 차례로 여는 Sponza 의 구도로, `scripts/harness-baseline/measurement-scenes/` 에 있고 (viewer.py 의 `measurement_scenes`), 구도의 목적은 각 scene file 의 머리말에 있다. Cornell box 의 측정용 scene file 은 `scripts/harness-baseline/scenes/` 에 있다. `MiniEngine/ModelViewer/Scenes/` 의 scene file 을 측정에 쓰지 않는 이유는 viewer.py 의 `BASELINE_SCENES_DIR` 주석에 있다. 다른 scene 은 `--scene <scene file>` 로 연다. camera 는 늘 scene file 의 pose 와 세로 FOV 로 시작하고, light 와 sky 도 scene file 의 값으로 시작한다. 실행 중에는 `scene open <scene file>` 로 다른 scene 을 연다. `scene save` 는 연 scene file 을 고치므로 `Scenes/`, `scripts/harness-baseline/scenes/`, `scripts/harness-baseline/measurement-scenes/` 의 scene file 에는 쓰지 않는다. 저장을 확인할 때는 Harness 아래에 복사한 scene file 을 연다.
 
 ## capture 고르기
 
@@ -35,7 +36,7 @@ harness 는 ModelViewer 의 test 와 측정을 자동화하는 도구다. app �
 
 ## 결정성
 
-- 시작 상태는 `scripts/harness-baseline/` 이고, 값을 고른 이유는 baseline 파일의 주석에 있다.
+- 이 절은 `--baseline` 으로 띄운 app 에 해당한다. 시작 상태는 `scripts/harness-baseline/` 이고, 값을 고른 이유는 baseline 파일의 주석에 있다.
 - 두 명령 사이에는 1 frame 이상이 지나지만 몇 frame 인지는 timing 이 정한다 (명령을 실행하는 방식은 `ControlChannel.h`). `frames <n>` 도 n frame 이상을 기다릴 뿐이다.
 - TAA 를 끈 다음 frame 부터는 frame 마다 scene 이 같은 frame 의 raster 만으로 정해진다. 같은 상태에서 찍은 scene 은 camera 를 옮겼다 되돌린 뒤에도, TAA 를 켰다 끈 뒤에도, TAA 의 Sharpness 를 바꾼 뒤에도 bit 가 같다 (selftest 가 확인한다).
 - 1 frame 늦게 반영되는 것이 둘 있다. TAA 를 끈 frame 은 앞 frame 이 정한 jitter 로 그려지고, Exposure 를 바꾼 frame 의 display 는 바꾸기 전의 밝기다. viewer.py 의 `SETTLE_FRAMES` 는 1 frame 의 지연을 명령 간격에 의존하지 않고 덮는 frame 수다. 상태를 바꾼 뒤 수치를 비교할 capture 는 `frames <SETTLE_FRAMES>` 뒤에 찍는다.
@@ -83,6 +84,9 @@ harness 는 ModelViewer 의 test 와 측정을 자동화하는 도구다. app �
 python scripts/viewer.py start
 python scripts/viewer.py do "ui hide" "state light" "light set elevation=20 azimuth=200" "pick grid 16x9"
 python scripts/viewer.py shot overlay --max-width 640
+python scripts/viewer.py stop
+
+python scripts/viewer.py start --baseline
 python scripts/viewer.py run scripts/harness-scenarios/acceptance.txt
 python scripts/viewer.py stop
 
