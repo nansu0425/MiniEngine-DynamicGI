@@ -209,7 +209,7 @@ private:
 // group 아래의 변수보다 먼저 보인다. save가 채운 값은 key 앞에 path를 붙여 다른 변수와 함께 저장하고, load는 그중 이 section의 값만 받는다.
 // key에는 '/'를 쓰지 않고 group 아래의 변수와 같은 이름을 쓰지 않는다.
 // 기본값으로 되돌릴 때 load는 되돌릴 key를 기본값으로 바꾼 값을 받는다. 기본값에 없는 key는 다른 값에 따라 기본값이 달라지는 key이고
-// (예: Ray Tracing의 Heatmap은 고른 view에 따라 다르다), 빠진 채로 load에 넘어가므로 load가 남은 값에 맞춰 정한다.
+// 빠진 채로 load에 넘어가므로 load가 남은 값에 맞춰 정한다.
 class TuningSection : public EngineVar
 {
 public:

@@ -27,7 +27,7 @@ harness 는 ModelViewer 의 test 와 측정을 자동화하는 도구다. app �
 
 - display: UI 흐름과 panel 내용을 볼 때 쓴다.
 - scene: 수치는 원본 DDS 로 비교한다. view PNG 는 고정 exposure 로 만든 보기용이다.
-- overlay: debug view 와 heatmap 만 볼 때 쓴다.
+- overlay: debug view 만 볼 때 쓴다.
 - pt: path tracer 의 값은 scene 이 아니라 pt 로 비교한다. scene 은 R11G11B10 으로 양자화한 값이다. 비교의 식은 `scripts/imagecompare.py` 에 있다.
 - pt-truncated: pt 의 값을 답과 비교할 때 Max Bounces 에서 끊긴 sample 이 답을 바꾸면 함께 찍는다. 값의 뜻은 `PathTracerCS.hlsl` 의 `TruncatedSamples` 에, view PNG 가 그리는 것은 `viewer.py` 의 `make_view` 에 있다.
 - 수치를 재는 shot 은 `ui hide` 뒤에 찍는다. UI 가 보이면 scene 크기가 dock 배치를 따른다.
@@ -40,7 +40,6 @@ harness 는 ModelViewer 의 test 와 측정을 자동화하는 도구다. app �
 - TAA 를 끈 다음 frame 부터는 frame 마다 scene 이 같은 frame 의 raster 만으로 정해진다. 같은 상태에서 찍은 scene 은 camera 를 옮겼다 되돌린 뒤에도, TAA 를 켰다 끈 뒤에도, TAA 의 Sharpness 를 바꾼 뒤에도 bit 가 같다 (selftest 가 확인한다).
 - 1 frame 늦게 반영되는 것이 둘 있다. TAA 를 끈 frame 은 앞 frame 이 정한 jitter 로 그려지고, Exposure 를 바꾼 frame 의 display 는 바꾸기 전의 밝기다. viewer.py 의 `SETTLE_FRAMES` 는 1 frame 의 지연을 명령 간격에 의존하지 않고 덮는 frame 수다. 상태를 바꾼 뒤 수치를 비교할 capture 는 `frames <SETTLE_FRAMES>` 뒤에 찍는다.
 - TAA 나 adaptive exposure 를 켜면 결과가 지난 frame 수에 따라 바뀌므로, 같은 명령 순서로도 실행마다 다를 수 있다. 수치를 비교할 capture 는 둘을 끄고 찍는다.
-- Validation view 를 켠 채 명령 몇 개를 보내고 끈 직후에 찍은 scene 은, 끄기 전과 몇 pixel 이 다를 수 있다. Profile 의 baseline 에서는 늘 같은 36 pixel 이 최대 1/128 달랐고, 몇 번에 한 번 일어났으며, 3 frame 뒤에는 같았다. 원인은 확인하지 않았다. `state` 와 `pick` 을 더하기 전의 30152da 로 build 한 app 에서도 같은 pixel 수와 차이로 일어난다. Validation view 를 끈 뒤 수치를 비교할 capture 는 viewer.py 의 `VALIDATION_VIEW_SETTLE_FRAMES` 만큼 `frames` 로 기다린 뒤에 찍는다.
 
 ## 판정
 
@@ -50,7 +49,6 @@ harness 는 ModelViewer 의 test 와 측정을 자동화하는 도구다. app �
 - 지금 무엇이 보이는지는 `pick grid` 의 칸마다 instance, material, 거리, 위치로 본다. 응답은 지도처럼 보이도록 격자의 행마다 instance, material, 거리, 위치를 각각 text 한 줄로 쓴다. 한 줄은 칸의 값을 공백으로 이은 것이고, miss 인 칸은 `-` 다. 한 pixel 은 `pick <x> <y>` 로 본다. mesh 와 material 은 이름 없이 index 만 있다 (.mini 에 이름이 없다).
 - pick 의 좌표는 client pixel 이고 scene 영역 안이어야 한다. UI 가 보이면 dock 이 덮은 곳은 error 다. `state editor` 의 icon 화면 위치에 무엇이 있는지는 icon 의 화면 위치를 반올림한 pixel 로 pick 한다. icon 위치는 ImGui 좌표라서 TAA 를 끄면 pick 의 pixel 격자와 반 pixel 어긋난다 (코드에서 추론했고 실행으로 확인하지 않았다).
 - pick 의 `alpha_test` 가 true 면 raster 는 다른 것을 볼 수 있다. raster 의 cutout 은 mip chain 을, ray 는 mip 0 을 읽는다. 같은 pixel 의 raster depth 는 응답의 `raster` 에 있다.
-- `validation fit` 은 같은 view 의 `validation capture` 가 먼저 있어야 한다.
 - D3D12 message 는 `stop` 의 요약과 `do status` 의 `d3d12_messages` 로 센다. 실행 중의 CORRUPTION, ERROR, WARNING 중 하나라도 0 이 아니면 FAIL 이다 (selftest 가 baseline 에서 셋 다 0 인 것을 확인한다). 종료 때는 `#274 LIVE_DEVICE` 하나만 나와야 하고, 다른 message 는 device 보다 오래 남은 object 다 (selftest 가 baseline 에서 확인한다).
 - 어느 명령이 message 를 냈는지는 의심되는 명령의 앞뒤에서 `do status` 의 `d3d12_messages` 를 비교해 찾는다. `status` 는 제한 없이 세지만 log 는 같은 ID 를 정해진 횟수까지만 줄로 남기므로 (`D3D12MessageLog.h`) `log mark` 로 나눈 구간에는 줄이 없을 수 있다.
 - `start --gpu-validation` 이 무엇을 더 검사하는지는 `start --help` 에 있다.
@@ -84,7 +82,6 @@ harness 는 ModelViewer 의 test 와 측정을 자동화하는 도구다. app �
 ```
 python scripts/viewer.py start
 python scripts/viewer.py do "ui hide" "state light" "light set elevation=20 azimuth=200" "pick grid 16x9"
-python scripts/viewer.py do "settings set Engine Tuning: Ray Tracing/View=Validation: Depth Comparison" "frames 2" "validation capture" "validation fit"
 python scripts/viewer.py shot overlay --max-width 640
 python scripts/viewer.py run scripts/harness-scenarios/acceptance.txt
 python scripts/viewer.py stop

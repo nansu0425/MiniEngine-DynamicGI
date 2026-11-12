@@ -40,7 +40,6 @@ USER_SETTINGS = [VIEWER_DIR / 'user.ini', VIEWER_DIR / 'imgui.ini']
 MODEL_VIEWER_SOURCE = VIEWER_DIR / 'ModelViewer.cpp'
 # repo 가 갖는 scene file 의 폴더. 그 glTF 는 scripts/fetch-assets.ps1 이 받거나 만든다.
 SCENES_DIR = VIEWER_DIR / 'Scenes'
-VALIDATION_SHADER = ENGINE_DIR / 'Model' / 'Raytracing' / 'RayQueryValidationCS.hlsl'
 # selftest 가 pickscene.py 의 test scene 을 쓰는 HARNESS_DIR 안의 폴더
 PICK_SCENE = 'pick-known-answers'
 # selftest 가 run 과 같은 방식으로 실행하고 이름을 붙인 응답으로 판정하는 harness 의 acceptance scenario
@@ -73,8 +72,7 @@ KEPT_RUNS = 10
 PREVIEW_MAX_WIDTH = 1280
 # scene capture 의 보기용 PNG 를 만드는 고정 exposure. 보기용이라 수치 판정에는 쓰지 않는다.
 PREVIEW_EXPOSURE = 1.0
-# Validation view 를 끈 뒤 수치를 비교할 scene capture 까지 기다리는 frame 수. 근거는 docs/harness.md 의 결정성 절에 있다.
-VALIDATION_VIEW_SETTLE_FRAMES = 10
+DEPTH_MATCH_TOLERANCE = 1e-4
 # 아무것도 바꾸지 않아도 frame 마다 바뀌는 state 의 값. state 끼리 비교할 때 뺀다.
 TIME_VARYING_STATE = [('frame',), ('pt', 'samples'), ('pt', 'seconds')]
 
@@ -1350,17 +1348,6 @@ def check_state(session, check):
     change('panel close', 'panel Profiler close', 'ui')
     change('ui hide', 'ui hide', 'ui')
 
-    original_view = whole['settings']['Engine Tuning']['Ray Tracing/View']
-    session.ask_ok('settings set Engine Tuning: Ray Tracing/View=Validation: Depth Comparison')
-    session.ask_ok('frames 2')
-    captured = change('validation capture', 'validation capture', 'validation')
-    validation = session.ask_ok('state validation')['state']['validation']
-    check('state validation has the values validation capture replies',
-          validation['captured'] and validation.get('values') == captured['values'] and not whole['validation']['captured'],
-          captured['line'])
-    session.ask_ok(f'settings set Engine Tuning: Ray Tracing/View={original_view}')
-    session.ask_ok(f'frames {VALIDATION_VIEW_SETTLE_FRAMES}')
-
     check_changes(check, 'commands that change the state reply with the changed part as state then reads it', changes)
 
     session.ask_ok('pose ' + ' '.join(str(start[key]) for key in pose_keys))
@@ -1655,62 +1642,6 @@ def check_editor(session, check, changes):
     check('editor and camera are back as they were', editor_state() == original and session.ask_ok('state camera')['state']['camera'] == start)
 
 
-def check_fit_needs_a_capture(session, check):
-    """validation fit 이 Fit to Capture 처럼 그 view 의 capture 가 없으면 맞추지 않는지 본다. 아무 capture 도 하기 전에 부른다."""
-    section = 'Engine Tuning'
-    original = session.ask_ok(f'settings get {section}')['values']['Ray Tracing/View']
-    session.ask_ok(f'settings set {section}: Ray Tracing/View=Validation: Depth Comparison')
-    session.ask_ok(f'settings set {section}: Ray Tracing/Heatmap=Depth Error')
-    before = session.ask_ok('state')['state']
-    refused = session.ask('validation fit')
-    unchanged = without_time_varying(session.ask_ok('state')['state']) == without_time_varying(before)
-    check('validation fit fails without a capture of the view and changes nothing',
-          not refused['ok'] and 'capture' in refused.get('error', '') and not before['validation']['captured'] and unchanged, refused.get('error'))
-    session.ask_ok(f'settings set {section}: Ray Tracing/View={original}')
-    session.ask_ok(f'frames {VALIDATION_VIEW_SETTLE_FRAMES}')
-
-
-def check_validation_fit(session, check, changes):
-    """validation fit 이 Fit to Capture 처럼 Heatmap Range 를 마지막 capture 에 맞추고, 버튼이 disabled 인 조건에서는 거절하는지 본다.
-    Engine Tuning 의 Ray Tracing/View 를 처음 값으로 되돌려 놓는다."""
-    section = 'Engine Tuning'
-    path = f'settings.{section}'
-    usage = session.ask_ok('help')['commands']['validation']
-    check('validation usage gives what fit changes', all(term in usage for term in ['fit', 'Fit to Capture', 'Heatmap Range', 'p1 ~ p99']), usage)
-    original = session.ask_ok(f'settings get {section}')['values']['Ray Tracing/View']
-
-    def refused():
-        before = session.ask_ok(f'state {path}')['state']
-        reply = session.ask('validation fit')
-        return not reply['ok'] and session.ask_ok(f'state {path}')['state'] == before, reply.get('error')
-
-    session.ask_ok(f'settings set {section}: Ray Tracing/View=Off')
-    not_validation = refused()
-    session.ask_ok(f'settings set {section}: Ray Tracing/View=Validation: Depth Comparison')
-    # Validation view 를 고르면 heatmap 은 첫 category 에서 시작한다.
-    category = refused()
-    check('validation fit fails where Fit to Capture is disabled and changes nothing', not_validation[0] and category[0],
-          f'not a Validation view: {not_validation[1]}; a category heatmap: {category[1]}')
-
-    start_range = '-3,3'
-    session.ask_ok(f'settings set {section}: Ray Tracing/Heatmap=Depth Error; Ray Tracing/Heatmap Range={start_range}')
-    session.ask_ok('frames 2')
-    session.ask_ok('validation capture')
-    fitted = record_change(session, changes, 'validation fit', 'validation fit', path)['state']['settings'][section]['Ray Tracing/Heatmap Range']
-    again = session.ask_ok('validation fit')['state']['settings'][section]['Ray Tracing/Heatmap Range']
-    check('validation fit fits the Heatmap Range to the capture and gives the same range again', fitted != start_range and again == fitted,
-          f'{start_range} -> {fitted} -> {again}')
-    session.ask_ok(f'settings set {section}: Ray Tracing/View={original}')
-    session.ask_ok(f'frames {VALIDATION_VIEW_SETTLE_FRAMES}')
-
-
-def depth_match_tolerance():
-    match = re.search(r'^static const float kDepthMatchTolerance = ([0-9.e+-]+);', VALIDATION_SHADER.read_text(encoding='utf-8'), re.M)
-    if match is None:
-        raise HarnessError(f'{VALIDATION_SHADER} has no line starting with static const float kDepthMatchTolerance = <number>;')
-    return float(match.group(1))
-
-
 def raster_depth_of(z, camera):
     """Camera.cpp 의 reverse Z projection 을 거꾸로 풀어 depth buffer 값을 camera forward 방향의 거리로 되돌린다."""
     near, far = float(camera['near']), float(camera['far'])
@@ -1752,8 +1683,8 @@ def check_pick(session, check):
           not differing and not outside and hits > len(picks) // 2,
           '; '.join(differing[:3] + outside[:3]) or f'{hits} of {len(picks)} cells hit')
 
-    # Depth Comparison validation 처럼, alpha test 가 ray 가 맞은 것을 정한 pixel 은 raster 가 다른 mip 을 읽어 다른 것을 볼 수 있으므로 뺀다.
-    tolerance = depth_match_tolerance()
+    # alpha test 가 ray 가 맞은 것을 정한 pixel 은 raster 가 다른 mip 을 읽어 다른 것을 볼 수 있으므로 뺀다.
+    tolerance = DEPTH_MATCH_TOLERANCE
     compared, decided_by_alpha_test, mismatched, misdecoded = 0, 0, [], []
     for pick in picks:
         if not (pick['hit'] and pick['raster']['hit']):
@@ -1915,28 +1846,23 @@ def check_acceptance(session, check):
               f'state editor {editor["selected"]}, {editor["gizmo_mode"]}; frame {saved["frame"]} file {saved["editor"]["selected"]}, '
               f'{saved["editor"]["gizmo_mode"]}')
 
-        unfitted = responses['unfitted']['state']['settings']['Engine Tuning']['Ray Tracing/Heatmap Range']
-        fitted = responses['fitted']['state']['settings']['Engine Tuning']['Ray Tracing/Heatmap Range']
-        check('acceptance 3: validation fit changes the Heatmap Range', fitted != unfitted, f'{unfitted} -> {fitted}')
-
         floor, center = responses['floor']['pick'], responses['center']['pick']
         missed_by = np.linalg.norm(vector_of(center['position']) - vector_of(floor['position'])) if floor['hit'] and center['hit'] else None
-        check('acceptance 4: the picked point faces up, and the pick at the scene center after pose look-at hits it',
+        check('acceptance 3: the picked point faces up, and the pick at the scene center after pose look-at hits it',
               floor['hit'] and not floor['alpha_test'] and float(floor['normal']['y']) > 0.99
               and missed_by is not None and missed_by <= 1e-4 * float(center['distance']),
               f'floor {floor.get("position")} normal {floor.get("normal")}; center {missed_by} away at distance {center.get("distance")}')
 
         cells = grid_cells(responses['grid']['grid'])
         on_floor = sum(values['material'] == str(floor['material']) for _, _, values in cells)
-        check('acceptance 5: most cells of pick grid are the material of the floor', on_floor > len(cells) / 2,
+        check('acceptance 4: most cells of pick grid are the material of the floor', on_floor > len(cells) / 2,
               f'{on_floor} of {len(cells)} cells are material {floor["material"]}')
     finally:
         session.ask_ok(f'restore {restore_line}')
         session.ask_ok(f'editor select {before["editor"]["selected"]}')
         session.ask_ok(f'editor mode {before["editor"]["gizmo_mode"]}')
-        session.ask_ok(f'settings set Engine Tuning: Ray Tracing/View={before["settings"]["Engine Tuning"]["Ray Tracing/View"]}')
         session.ask_ok('ui hide' if not before['ui']['visible'] else 'ui show')
-        session.ask_ok(f'frames {VALIDATION_VIEW_SETTLE_FRAMES}')
+        session.ask_ok(f'frames {SETTLE_FRAMES}')
 
 
 def check_pick_known_answers(args, check):
@@ -2031,7 +1957,7 @@ def check_pick_known_answers(args, check):
                 base_color = np.array([float(pick['base_color'][channel]) for channel in 'rgba'])
                 if np.abs(base_color - np.array(surface.base_color)).max() > 1e-3:
                     problems.append(f'base color {base_color.tolist()} for {surface.base_color}')
-                if not pick['raster']['hit'] or abs(raster_depth_of(pick['raster']['z'], camera) - depth) > depth_match_tolerance() * depth:
+                if not pick['raster']['hit'] or abs(raster_depth_of(pick['raster']['z'], camera) - depth) > DEPTH_MATCH_TOLERANCE * depth:
                     problems.append(f'raster {pick["raster"]} for depth {depth}')
             if problems:
                 wrong.append(f'{seen or "sky"} at {pixel}: ' + ', '.join(problems))
@@ -2177,14 +2103,12 @@ def selftest_running_app(args, check):
         check_same_as_settled('selftest-scene-sharpness-0', 'scene with TAA off does not change with Sharpness')
         session.ask_ok(f'settings set Engine Tuning: {sharpness}={original_sharpness}')
 
-        check_fit_needs_a_capture(session, check)
         check_state(session, check)
         changes = []
         check_light(session, check, changes)
         check_look_at(session, check, changes)
         check_editor(session, check, changes)
-        check_validation_fit(session, check, changes)
-        check_changes(check, 'light set, pose look-at, editor and validation fit change the state and reply with the changed part', changes)
+        check_changes(check, 'light set, pose look-at and editor change the state and reply with the changed part', changes)
         check_pick(session, check)
         check_rest_of_ui_commands(session, check)
         check_acceptance(session, check)

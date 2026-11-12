@@ -17,20 +17,11 @@ gizmo = capture display {shots}/acceptance-rotate-gizmo
 selection = state editor
 ui hide
 
-# 3. Depth Error heatmap 의 Heatmap Range 를 capture 에 맞춘다. 판정: Heatmap Range 가 fit 전과 다르다.
-settings set Engine Tuning: Ray Tracing/View=Validation: Depth Comparison
-settings set Engine Tuning: Ray Tracing/Heatmap=Depth Error
-unfitted = state settings.Engine Tuning
-frames 2
-validation capture
-fitted = validation fit
-settings set Engine Tuning: Ray Tracing/View=Off
-
-# 4. atrium 바닥 가까이 서서 바닥의 한 점을 pick 하고 그 점을 본다. 판정: 그 점은 위를 향하고, 화면 가운데의 pick 이 그 점에 닿는다.
+# 3. atrium 바닥 가까이 서서 바닥의 한 점을 pick 하고 그 점을 본다. 판정: 그 점은 위를 향하고, 화면 가운데의 pick 이 그 점에 닿는다.
 pose 0 200 0 1.6 -0.4
 floor = pick 960 1000
 pose look-at {floor.pick.position.x} {floor.pick.position.y} {floor.pick.position.z}
 center = pick 960 540
 
-# 5. 화면이 무엇으로 덮였는지 본다. 판정: grid 칸의 과반이 그 바닥의 material 이다.
+# 4. 화면이 무엇으로 덮였는지 본다. 판정: grid 칸의 과반이 그 바닥의 material 이다.
 grid = pick grid 16x9

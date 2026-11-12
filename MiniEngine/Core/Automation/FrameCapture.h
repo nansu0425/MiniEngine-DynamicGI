@@ -12,7 +12,7 @@ namespace FrameCapture
     {
         // tone mapping 전의 HDR scene. 값을 그대로 남기려고 R32G32B32A32_FLOAT DDS로 쓴다.
         kScene,
-        // debug view와 heatmap을 그린 scene overlay. PNG로 쓴다.
+        // debug view를 그린 scene overlay. PNG로 쓴다.
         kOverlay,
         // UI까지 합성해 present하는 backbuffer. PNG로 쓴다.
         kDisplay,

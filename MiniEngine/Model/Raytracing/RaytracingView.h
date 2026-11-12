@@ -2,7 +2,6 @@
 
 class ComputeContext;
 class ColorBuffer;
-class DepthBuffer;
 class RaytracingScene;
 struct D3D12_VIEWPORT;
 
@@ -16,8 +15,7 @@ namespace Math
 namespace RaytracingView
 {
     void Initialize(void);
-    void Shutdown(void);
-    // 고른 view가 없으면 아무것도 그리지 않는다. 인자의 뜻은 RaytracingDebugView::Render, RayQueryValidation::Render와 같다.
-    void Render(ComputeContext& context, const Math::Camera& camera, const D3D12_VIEWPORT& rasterViewport, DepthBuffer& rasterDepth,
+    // 고른 view가 없으면 아무것도 그리지 않는다. 인자의 뜻은 RaytracingDebugView::Render와 같다.
+    void Render(ComputeContext& context, const Math::Camera& camera, const D3D12_VIEWPORT& rasterViewport,
         const RaytracingScene& scene, const Math::Vector3& lightDirection, ColorBuffer& target);
 }

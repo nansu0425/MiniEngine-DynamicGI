@@ -88,7 +88,6 @@
     <ClInclude Include="Raytracing\CameraRays.h" />
     <ClInclude Include="Raytracing\RaytracingDebugView.h" />
     <ClInclude Include="Raytracing\RaytracingView.h" />
-    <ClInclude Include="Raytracing\RayQueryValidation.h" />
     <ClInclude Include="Raytracing\RayPick.h" />
     <ClInclude Include="Raytracing\RayQuerySmokeTest.h" />
     <ClInclude Include="Raytracing\SceneHeapTable.h" />
@@ -122,7 +121,6 @@
     <ClCompile Include="Raytracing\CameraRays.cpp" />
     <ClCompile Include="Raytracing\RaytracingDebugView.cpp" />
     <ClCompile Include="Raytracing\RaytracingView.cpp" />
-    <ClCompile Include="Raytracing\RayQueryValidation.cpp" />
     <ClCompile Include="Raytracing\RayPick.cpp" />
     <ClCompile Include="Raytracing\RayQuerySmokeTest.cpp" />
     <ClCompile Include="Raytracing\SceneHeapTable.cpp" />
@@ -150,7 +148,6 @@
     <None Include="Raytracing\SurfaceRayOrigin.hlsli" />
     <None Include="Raytracing\SurfaceRay.hlsli" />
     <None Include="Raytracing\CameraRays.hlsli" />
-    <None Include="Raytracing\RayQueryValidationStats.hlsli" />
     <None Include="DynamicGI\HitLighting.hlsli" />
     <None Include="DynamicGI\ProbeRays.hlsli" />
     <None Include="Sponza\Lighting.hlsli" />
@@ -246,9 +243,6 @@
       <ShaderModel>6.5</ShaderModel>
     </FxCompile>
     <FxCompile Include="Raytracing\RaytracingDebugViewCS.hlsl">
-      <ShaderModel>6.5</ShaderModel>
-    </FxCompile>
-    <FxCompile Include="Raytracing\RayQueryValidationCS.hlsl">
       <ShaderModel>6.5</ShaderModel>
     </FxCompile>
     <FxCompile Include="Raytracing\RayPickCS.hlsl">

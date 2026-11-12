@@ -29,7 +29,6 @@
 #include "Model/Raytracing/RayQuerySmokeTest.h"
 #include "Model/Raytracing/RaytracingScene.h"
 #include "Model/Raytracing/RaytracingView.h"
-#include "Model/Raytracing/RayQueryValidation.h"
 #include "Model/Raytracing/RayPick.h"
 #include "Model/PathTracer/PathTracer.h"
 #include "Model/PathTracer/PathTracerTuning.h"
@@ -1547,7 +1546,6 @@ void ModelViewer::Cleanup( void )
     DynamicGI::Shutdown();
     PathTracerTuning::Shutdown();
     RayPick::Shutdown();
-    RaytracingView::Shutdown();
     m_RaytracingScene.Destroy();
     m_ModelInst = nullptr;
     m_Models.clear();
@@ -1728,7 +1726,7 @@ void ModelViewer::RenderScene( void )
         MotionBlur::RenderObjectBlur(gfxContext, g_VelocityBuffer);
 
     // scene color의 마지막 pass 뒤에 덮어써서, PT가 raster와 같은 bloom, exposure, tone mapping을 거쳐 두 화면을 같은 조건으로 견주게 한다.
-    // raster는 그대로 그린다. ray tracing view의 validation이 raster의 depth를 읽는다. PT의 Shading DDGI Probe Hit는 이 frame의 shadow
+    // raster는 그대로 그린다. PT의 Shading DDGI Probe Hit는 이 frame의 shadow
     // pass가 그린 shadow map을 읽는다.
     PathTracerTuning::Render(gfxContext.GetComputeContext(), m_Camera, m_MainViewport, m_RaytracingScene, m_Light.GetDirection(), m_Light.GetIlluminance(),
         m_Sky.GetRadiance(), g_ShadowBuffer, m_ShadowCamera.GetShadowMatrix(), g_SceneColorBuffer);
@@ -1740,5 +1738,5 @@ void ModelViewer::RenderScene( void )
 
 void ModelViewer::RenderSceneOverlay( GraphicsContext& gfxContext )
 {
-    RaytracingView::Render(gfxContext.GetComputeContext(), m_Camera, m_MainViewport, g_SceneDepthBuffer, m_RaytracingScene, m_Light.GetDirection(), g_SceneOverlayBuffer);
+    RaytracingView::Render(gfxContext.GetComputeContext(), m_Camera, m_MainViewport, m_RaytracingScene, m_Light.GetDirection(), g_SceneOverlayBuffer);
 }
