@@ -30,5 +30,6 @@ namespace ProbeLighting
     void Update(ComputeContext& context, const Settings& settings, const GIFrameInputs& inputs);
 
     ColorBuffer& GetIrradiance(void);
+    ColorBuffer& GetRayRadiance(void);
     const IrradianceProbeGrid& GetGrid(void);
 }

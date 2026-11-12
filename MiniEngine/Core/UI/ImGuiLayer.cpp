@@ -6,6 +6,7 @@
 #include "Core/Graphics/Command/CommandListManager.h"
 #include "Core/Graphics/Descriptor/DescriptorHeap.h"
 #include "Core/Graphics/Resource/BufferManager.h"
+#include "Core/Graphics/Resource/ColorBuffer.h"
 #include "Core/App/UserSettings.h"
 
 #include <imgui.h>
@@ -33,7 +34,12 @@ namespace
     constexpr float kBaseFontSize = 16.0f;
     constexpr float kDefaultFontSize = 13.0f;
 
+    constexpr uint32_t kMaxBoundTexturesPerFrame = 8;
+
     DescriptorHeap s_SrvHeap;
+    DescriptorHandle s_BoundTextureDescriptors;
+    std::vector<ColorBuffer*> s_BoundTextures;
+    uint32_t s_FrameInFlight = 0;
     // ImGui는 경로를 복사하지 않고 pointer로 들고 있다.
     std::string s_IniFilePath;
     float s_DpiScale = 0.0f;
@@ -182,6 +188,7 @@ void ImGuiLayer::Initialize(void)
     ApplyDpiScale(ImGui_ImplWin32_GetDpiScaleForHwnd(GameCore::g_hWnd));
 
     s_SrvHeap.Create(L"ImGui SRV Descriptors", D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 64);
+    s_BoundTextureDescriptors = s_SrvHeap.Alloc(kNumFramesInFlight * kMaxBoundTexturesPerFrame);
 
     ImGui_ImplDX12_InitInfo initInfo;
     initInfo.Device = g_Device;
@@ -261,12 +268,41 @@ void ImGuiLayer::Render(void)
 
     // UI를 숨겨도 scene overlay는 보여야 하므로 숨김 여부와 관계없이 그린다.
     GraphicsContext& context = GraphicsContext::Begin(L"Render ImGui");
+    for (ColorBuffer* texture : s_BoundTextures)
+        context.TransitionResource(*texture, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
     context.TransitionResource(g_WindowOverlayBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
     context.ClearColor(g_WindowOverlayBuffer);
     context.SetRenderTarget(g_WindowOverlayBuffer.GetRTV());
     context.SetDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, s_SrvHeap.GetHeapPointer());
     ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), context.GetCommandList());
     context.Finish();
+
+    s_BoundTextures.clear();
+    s_FrameInFlight = (s_FrameInFlight + 1) % kNumFramesInFlight;
+}
+
+ImTextureID ImGuiLayer::BindTexture(ColorBuffer& texture)
+{
+    ASSERT(s_BoundTextures.size() < kMaxBoundTexturesPerFrame, "한 frame에 bind할 수 있는 texture는 %u개다", kMaxBoundTexturesPerFrame);
+
+    const uint32_t slot = s_FrameInFlight * kMaxBoundTexturesPerFrame + (uint32_t)s_BoundTextures.size();
+    const DescriptorHandle descriptor = s_BoundTextureDescriptors + slot * s_SrvHeap.GetDescriptorSize();
+
+    const D3D12_RESOURCE_DESC resourceDesc = texture.GetResource()->GetDesc();
+    ASSERT(resourceDesc.DepthOrArraySize == 1 && resourceDesc.SampleDesc.Count == 1, "BindTexture는 array가 아니고 MSAA가 아닌 2D texture만 받는다");
+
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.Format = texture.GetFormat();
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.Shader4ComponentMapping = D3D12_ENCODE_SHADER_4_COMPONENT_MAPPING(
+        D3D12_SHADER_COMPONENT_MAPPING_FROM_MEMORY_COMPONENT_0,
+        D3D12_SHADER_COMPONENT_MAPPING_FROM_MEMORY_COMPONENT_1,
+        D3D12_SHADER_COMPONENT_MAPPING_FROM_MEMORY_COMPONENT_2,
+        D3D12_SHADER_COMPONENT_MAPPING_FORCE_VALUE_1);
+    srvDesc.Texture2D.MipLevels = resourceDesc.MipLevels;
+    g_Device->CreateShaderResourceView(texture.GetResource(), &srvDesc, descriptor);
+    s_BoundTextures.push_back(&texture);
+    return (ImTextureID)descriptor.GetGpuPtr();
 }
 
 bool ImGuiLayer::BeginSceneOverlay(void)

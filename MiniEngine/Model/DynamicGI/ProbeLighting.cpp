@@ -224,6 +224,11 @@ ColorBuffer& ProbeLighting::GetIrradiance(void)
     return s_Irradiance;
 }
 
+ColorBuffer& ProbeLighting::GetRayRadiance(void)
+{
+    return s_RayRadiance;
+}
+
 const IrradianceProbeGrid& ProbeLighting::GetGrid(void)
 {
     return s_Grid;

@@ -4,6 +4,7 @@
 #include "Model/DynamicGI/ProbeVisualization.h"
 #include "Core/Automation/ControlChannel.h"
 #include "Core/Editor/MeasurementConditions.h"
+#include "Core/Editor/TextureViewer.h"
 #include "Model/Renderer/Renderer.h"
 #include "Core/Graphics/Command/CommandContext.h"
 #include "Core/Graphics/Resource/ColorBuffer.h"
@@ -275,6 +276,10 @@ void DynamicGI::Initialize(void)
     PathTracedLighting::Initialize();
     ProbeLighting::Initialize();
     ProbeVisualization::Initialize();
+
+    TextureViewer::AddTexture("Probe Irradiance", ProbeLighting::GetIrradiance());
+    TextureViewer::AddTexture("Probe Ray Radiance", ProbeLighting::GetRayRadiance());
+    TextureViewer::AddTexture("Path Traced Indirect Radiance", PathTracedLighting::GetIndirectRadiance());
 
     ControlChannel::RegisterState("gi", DescribeState);
 }

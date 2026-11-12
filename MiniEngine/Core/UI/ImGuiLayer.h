@@ -1,6 +1,9 @@
 #pragma once
 
 #include <functional>
+#include <imgui.h>
+
+class ColorBuffer;
 
 namespace ImGuiLayer
 {
@@ -13,6 +16,8 @@ namespace ImGuiLayer
     RECT GetSceneViewport(void);
     // 이번 frame의 widget을 g_WindowOverlayBuffer에 그린다.
     void Render(void);
+
+    ImTextureID BindTexture(ColorBuffer& texture);
 
     // 사이에서 그린 widget은 scene 영역 안에만 보이고, UI를 숨겨도 보인다.
     // ImGui::Begin과 달리 false를 반환하면 End를 부르지 않는다.

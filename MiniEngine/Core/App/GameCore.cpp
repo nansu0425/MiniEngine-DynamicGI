@@ -21,6 +21,7 @@
 #include "Core/Effects/PostEffects/PostEffects.h"
 #include "Core/Display/Display.h"
 #include "Core/UI/ImGuiLayer.h"
+#include "Core/Editor/TextureViewer.h"
 #include "Core/Utility/CommandLineArg.h"
 #include "Core/App/UserSettings.h"
 #include "Core/Automation/ControlChannel.h"
@@ -154,6 +155,7 @@ namespace GameCore
 
         EngineProfiling::ShowFrameStats();
         EngineProfiling::ShowProfiler();
+        TextureViewer::Show();
         ImGuiLayer::Render();
 
         Display::Present();
