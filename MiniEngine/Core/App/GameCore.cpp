@@ -100,6 +100,7 @@ namespace GameCore
         GameInput::Initialize();
         EngineTuning::Initialize();
         ImGuiLayer::Initialize();
+        TextureViewer::Initialize();
         UserSettings::Register("Window", WindowSettings::Save, WindowSettings::Load);
 
         game.Startup();
@@ -116,6 +117,7 @@ namespace GameCore
         UserSettings::Save();
         game.Cleanup();
 
+        TextureViewer::Shutdown();
         ImGuiLayer::Shutdown();
 
         GameInput::Shutdown();
