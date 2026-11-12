@@ -32,10 +32,12 @@ HARNESS_DIR = VIEWER_DIR / 'Harness'
 RUNS_DIR = HARNESS_DIR / 'runs'
 INSTANCE_FILE = HARNESS_DIR / 'instance.json'
 BASELINE_DIR = REPO_ROOT / 'scripts' / 'harness-baseline'
-# harness 가 측정에 여는 scene file 의 폴더. SCENES_DIR 을 측정에 쓰지 않는 이유는 이 폴더의 Sponza.ini 머리말에 있다.
+# harness 가 측정에 여는 scene file 의 폴더. SCENES_DIR 의 scene file 은 사용자가 Scene > Save 로 바꾸므로, 측정 조건이 사용자의 scene 을
+# 따라 바뀌지 않게 따로 둔다. harness 는 이 폴더와 MEASUREMENT_SCENES_DIR 의 scene file 에 scene save 를 하지 않는다.
 BASELINE_SCENES_DIR = BASELINE_DIR / 'scenes'
 # 측정 scene 의 폴더. 구도의 목적은 각 scene file 의 머리말에 있다.
 MEASUREMENT_SCENES_DIR = BASELINE_DIR / 'measurement-scenes'
+DEFAULT_MEASUREMENT_SCENE = 'sponza-overhead-light'
 USER_SETTINGS = [VIEWER_DIR / 'user.ini', VIEWER_DIR / 'imgui.ini']
 MODEL_VIEWER_SOURCE = VIEWER_DIR / 'ModelViewer.cpp'
 # repo 가 갖는 scene file 의 폴더. 그 glTF 는 scripts/fetch-assets.ps1 이 받거나 만든다.
@@ -501,8 +503,8 @@ def baseline_scene(name):
 
 
 def default_baseline_scene():
-    """scene 을 주지 않은 start_instance 가 여는 측정용 scene file. default_scene() 과 이름이 같다."""
-    return baseline_scene(posixpath.basename(default_scene()))
+    """scene 을 주지 않은 start_instance 가 여는 측정 scene file"""
+    return measurement_scenes()[DEFAULT_MEASUREMENT_SCENE]
 
 
 def measurement_scenes():
@@ -853,9 +855,8 @@ def command_stop(args):
 # --- snapshot -----------------------------------------------------------------------------
 
 SNAPSHOT_DIR = HARNESS_DIR / 'kept' / 'snapshots'
-# -scene 없이 연 scene 의 처음 시점 (start) 과, 그 scene 에서 해가 닿는 곳과 닿지 않는 곳이 고루 보이도록 고른 시점
+# -scene 없이 연 scene 에서 찍는 시점. 예전 기본 scene 의 light 에서 해가 닿는 곳과 닿지 않는 곳이 고루 보이도록 골랐다.
 SNAPSHOT_POSES = {
-    'start': None,
     'courtyard-up': '0 300 0 1.5708 1.2',
     'shadowed-wall': '1500 150 0 1.5708 0.05',
     'gallery': '-1200 150 400 -1.5708 0.1',
@@ -875,10 +876,9 @@ SNAPSHOT_PANEL_SIZE = (640, 360)
 # SSAO 와 함께 linear depth 가 빠진 bug 는 0.30% ~ 6.74% 였다.
 SNAPSHOT_SAME_CODE_FACTOR = 4
 SNAPSHOT_SAME_CODE_FLOOR = 0.001
-# path tracer 의 shot. SNAPSHOT_PT_POSE 에서 Shading 과 Output 의 조합마다 같은 Seed 로 쌓아 export 한다. 나머지 설정은 harness baseline 과
-# app 의 기본값이다. raster 의 shot 을 찍는 순서가 PT 의 shot 을 넣기 전과 같도록 raster 의 shot 을 다 찍은 뒤에 찍는다. export 는 post
-# effects 전의 누적값이고 TAA 의 jitter 와 무관하므로 app 의 기본 효과를 켠 채 찍어도 된다.
-SNAPSHOT_PT_POSE = 'start'
+# path tracer 의 shot. -scene 없이 연 scene 의 처음 시점 (baseline_scene_pose()) 에서 Shading 과 Output 의 조합마다 같은 Seed 로 쌓아
+# export 한다. 나머지 설정은 harness baseline 과 app 의 기본값이다. raster 의 shot 을 찍는 순서가 PT 의 shot 을 넣기 전과 같도록 raster 의
+# shot 을 다 찍은 뒤에 찍는다. export 는 post effects 전의 누적값이고 TAA 의 jitter 와 무관하므로 app 의 기본 효과를 켠 채 찍어도 된다.
 SNAPSHOT_PT_SETTINGS = {'Show': 1, 'Seed': 0, 'Samples per Frame': 1, 'Max Bounces': 64, 'Russian Roulette': 1, 'Geometric Normals': 0,
                         'Furnace': 0}
 SNAPSHOT_PT_RUNS = [(shading, output) for shading in ('glTF', 'Lambert', 'DDGI Probe Hit') for output in ('Radiance', 'Indirect Irradiance')]
@@ -904,12 +904,12 @@ def code_revision():
 
 def path_tracer_snapshot():
     """snapshot.json 에 남기는 PT shot 의 조건. JSON 으로 오간 값과 비교하도록 list 로 둔다."""
-    return {'pose': SNAPSHOT_POSES[SNAPSHOT_PT_POSE] or baseline_scene_pose(), 'settings': SNAPSHOT_PT_SETTINGS,
+    return {'pose': baseline_scene_pose(), 'settings': SNAPSHOT_PT_SETTINGS,
             'runs': [list(run) for run in SNAPSHOT_PT_RUNS], 'samples': SNAPSHOT_PT_SAMPLES}
 
 
 def path_tracer_shot_name(shading, output):
-    return f'pt-{SNAPSHOT_PT_POSE}-{shading}-{output}'.lower().replace(' ', '-')
+    return f'pt-{shading}-{output}'.lower().replace(' ', '-')
 
 
 def capture_path_tracer(session, folder):
@@ -977,7 +977,7 @@ def capture_snapshot(config, build_first, folder):
                 if settings:
                     session.ask_ok('settings set Engine Tuning: ' + '; '.join(f'{key}={value}' for key, value in settings.items()))
                 for pose_name, pose in SNAPSHOT_POSES.items():
-                    session.ask_ok(f'pose {pose or baseline_scene_pose()}')
+                    session.ask_ok(f'pose {pose}')
                     session.ask_ok(f'frames {SNAPSHOT_SETTLE_FRAMES[settings_name]}')
                     name = f'{settings_name}-{pose_name}'
                     for target in ['scene', 'display']:
@@ -1110,7 +1110,7 @@ def command_snapshot_save(args):
     same_code = {name: change_counts(shot_change(folder, same_code_folder, name)) for name in shots}
     path_tracer_same_code = {name: path_tracer_counts(path_tracer_change(folder, same_code_folder, name)) for name in path_tracer_shots}
     manifest = {'code': code_revision(), 'config': args.config, 'created': time.strftime('%Y-%m-%d %H:%M:%S'), 'shots': shots,
-                'poses': {name: pose or baseline_scene_pose() for name, pose in SNAPSHOT_POSES.items()}, 'settings': SNAPSHOT_SETTINGS,
+                'poses': SNAPSHOT_POSES, 'settings': SNAPSHOT_SETTINGS,
                 'measurement_scenes': measurement_scenes_snapshot(), 'same_code': same_code, 'path_tracer': path_tracer_snapshot(),
                 'path_tracer_same_code': path_tracer_same_code}
     (folder / 'snapshot.json').write_text(json.dumps(manifest, indent=2), encoding='utf-8')
@@ -1131,8 +1131,7 @@ def command_snapshot_compare(args):
     if not manifest_path.exists():
         raise HarnessError(f'no snapshot {before_folder}. Take it with snapshot save {args.name} before changing the code')
     manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
-    poses = {name: pose or baseline_scene_pose() for name, pose in SNAPSHOT_POSES.items()}
-    if (manifest['poses'] != poses or manifest['settings'] != SNAPSHOT_SETTINGS or manifest.get('path_tracer') != path_tracer_snapshot()
+    if (manifest['poses'] != SNAPSHOT_POSES or manifest['settings'] != SNAPSHOT_SETTINGS or manifest.get('path_tracer') != path_tracer_snapshot()
             or manifest.get('measurement_scenes') != measurement_scenes_snapshot() or manifest['config'] != args.config):
         raise HarnessError(f'{args.name} was taken with other poses, settings, measurement scenes or config. '
                            'Take a new snapshot with this viewer.py')
@@ -2259,8 +2258,9 @@ def main():
                                    f'stay untouched. Deletes all but the newest {KEPT_RUNS} run folders, keeping the running one', command_start)
     add_config(command)
     command.add_argument('--scene', help='scene file path relative to MiniEngine/ModelViewer, passed as -scene. Without it the app '
-                                          'opens the scene file of scripts/harness-baseline/scenes named as the one kDefaultScene in '
-                                          'ModelViewer.cpp names, so the scene files the user saves do not change the measurements')
+                                          f'opens the measurement scene {DEFAULT_MEASUREMENT_SCENE} of '
+                                          'scripts/harness-baseline/measurement-scenes, so the scene files the user saves do not change '
+                                          'the measurements')
     command.add_argument('--no-build', action='store_true')
     command.add_argument('--gpu-validation', action='store_true',
                          help='pass -gpu_debug 1 for GPU-based validation, which checks on the GPU the state and descriptor of each '
