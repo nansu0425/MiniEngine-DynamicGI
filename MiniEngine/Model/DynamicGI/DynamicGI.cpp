@@ -1,6 +1,7 @@
 #include "Model/DynamicGI/DynamicGI.h"
 #include "Model/DynamicGI/PathTracedLighting.h"
 #include "Model/DynamicGI/ProbeLighting.h"
+#include "Model/DynamicGI/ProbeVisualization.h"
 #include "Core/Automation/ControlChannel.h"
 #include "Core/Editor/MeasurementConditions.h"
 #include "Model/Renderer/Renderer.h"
@@ -26,6 +27,7 @@ namespace
         Source indirect = Source::kOff;
         PathTracedLighting::Settings pathTraced;
         ProbeLighting::Settings probe;
+        ProbeVisualization::Settings probeSpheres;
     };
 
     Settings s_Settings;
@@ -45,6 +47,7 @@ namespace
     constexpr uint32_t kMaxProbesPerAxis = 64;
     constexpr uint32_t kMaxRaysPerProbe = 1024;
     constexpr float kMaxHysteresis = 0.999f;
+    constexpr float kMaxRadiusPerSpacing = 0.5f;
 
     // Source의 순서이고, Engine Tuning의 저장과 settings 명령이 이 이름으로 읽고 쓴다.
     const char* kSourceNames[] = { "Off", "Path Traced", "Probe" };
@@ -61,6 +64,9 @@ namespace
             count = std::max(2u, std::min(count, kMaxProbesPerAxis));
         probe.raysPerProbe = std::max(1u, std::min(probe.raysPerProbe, kMaxRaysPerProbe));
         probe.hysteresis = std::max(0.0f, std::min(probe.hysteresis, kMaxHysteresis));
+
+        ProbeVisualization::Settings& probeSpheres = s_Settings.probeSpheres;
+        probeSpheres.radiusPerSpacing = std::max(0.0f, std::min(probeSpheres.radiusPerSpacing, kMaxRadiusPerSpacing));
     }
 
     void ShowSettings(void)
@@ -120,6 +126,18 @@ namespace
             ProbeLighting::Reset();
         ImGui::SetItemTooltip("Clears the probes. Changing the grid, the rays per probe or the model also clears them.");
         ImGui::Text("Updates: %u", ProbeLighting::GetProgress().updates);
+
+        ProbeVisualization::Settings& probeSpheres = s_Settings.probeSpheres;
+        ImGui::BeginDisabled(s_Settings.indirect != Source::kProbe);
+        ImGui::Checkbox("Show Probes", &probeSpheres.show);
+        ImGui::SetItemTooltip("Draws a sphere at each probe. Each point of a sphere shows the probe's irradiance from its normal, "
+            "as the radiance of a white diffuse sphere there lit by the indirect light only.");
+        TuningSection::MakeItemResettable("Show Probes");
+        ImGui::SliderFloat("Probe Radius", &probeSpheres.radiusPerSpacing, 0.0f, kMaxRadiusPerSpacing);
+        ImGui::SetItemTooltip("Radius of the spheres as a fraction of the shortest probe spacing. At 0.5 neighbors touch.");
+        TuningSection::MakeItemResettable("Probe Radius");
+        ImGui::EndDisabled();
+        ClampSettings();
     }
 
     std::string FormatFlag(bool value)
@@ -143,6 +161,10 @@ namespace
         values["Probes Z"] = std::to_string(probe.probeCounts[2]);
         values["Rays per Probe"] = std::to_string(probe.raysPerProbe);
         values["Hysteresis"] = MeasurementConditions::FormatFloat(probe.hysteresis);
+
+        const ProbeVisualization::Settings& probeSpheres = s_Settings.probeSpheres;
+        values["Show Probes"] = FormatFlag(probeSpheres.show);
+        values["Probe Radius"] = MeasurementConditions::FormatFloat(probeSpheres.radiusPerSpacing);
     }
 
     void ReadUInt(const TuningSection::Values& values, const char* key, uint32_t& value)
@@ -194,6 +216,10 @@ namespace
         ReadUInt(values, "Probes Z", probe.probeCounts[2]);
         ReadUInt(values, "Rays per Probe", probe.raysPerProbe);
         ReadFloat(values, "Hysteresis", probe.hysteresis);
+
+        ProbeVisualization::Settings& probeSpheres = s_Settings.probeSpheres;
+        ReadFlag(values, "Show Probes", probeSpheres.show);
+        ReadFloat(values, "Probe Radius", probeSpheres.radiusPerSpacing);
         ClampSettings();
     }
 
@@ -218,6 +244,7 @@ void DynamicGI::Initialize(void)
 {
     PathTracedLighting::Initialize();
     ProbeLighting::Initialize();
+    ProbeVisualization::Initialize();
 
     ControlChannel::RegisterState("gi", DescribeState);
 }
@@ -251,9 +278,18 @@ void DynamicGI::Update(ComputeContext& context, const GIFrameInputs& inputs, uin
         {
             ProbeLighting::Update(context, s_Settings.probe, inputs);
             probeIrradiance = &ProbeLighting::GetIrradiance();
-            context.TransitionResource(*probeIrradiance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+            context.TransitionResource(*probeIrradiance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         }
     }
     Renderer::SetIndirectRadiance(indirectRadiance);
     Renderer::SetIndirectDiffuseProbes(probeIrradiance, ProbeLighting::GetGrid());
+}
+
+void DynamicGI::DrawProbes(GraphicsContext& context, const Math::Camera& camera, const D3D12_VIEWPORT& viewport, const D3D12_RECT& scissor)
+{
+    if (s_Settings.indirect != Source::kProbe || !s_Settings.probeSpheres.show)
+        return;
+
+    ProbeVisualization::DrawSpheres(context, camera, viewport, scissor, ProbeLighting::GetIrradiance(), ProbeLighting::GetGrid(),
+        s_Settings.probeSpheres.radiusPerSpacing);
 }

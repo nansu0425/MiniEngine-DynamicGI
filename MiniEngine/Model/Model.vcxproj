@@ -98,6 +98,7 @@
     <ClInclude Include="DynamicGI\GIFrameInputs.h" />
     <ClInclude Include="DynamicGI\GILights.h" />
     <ClInclude Include="DynamicGI\ProbeLighting.h" />
+    <ClInclude Include="DynamicGI\ProbeVisualization.h" />
     <ClInclude Include="Renderer\IrradianceProbeGrid.h" />
     <ClInclude Include="DynamicGI\PathTracedLighting.h" />
     <ClInclude Include="Renderer\Renderer.h" />
@@ -130,6 +131,7 @@
     <ClCompile Include="DynamicGI\DynamicGI.cpp" />
     <ClCompile Include="DynamicGI\PathTracedLighting.cpp" />
     <ClCompile Include="DynamicGI\ProbeLighting.cpp" />
+    <ClCompile Include="DynamicGI\ProbeVisualization.cpp" />
     <ClCompile Include="Renderer\Renderer.cpp" />
     <ClCompile Include="Sponza\SponzaRenderer.cpp" />
     <ClCompile Include="Loader\TextureConvert.cpp" />
@@ -150,6 +152,7 @@
     <None Include="Raytracing\CameraRays.hlsli" />
     <None Include="DynamicGI\HitLighting.hlsli" />
     <None Include="DynamicGI\ProbeRays.hlsli" />
+    <None Include="DynamicGI\ProbeSphere.hlsli" />
     <None Include="Sponza\Lighting.hlsli" />
   </ItemGroup>
   <ItemGroup>
@@ -275,6 +278,12 @@
     </FxCompile>
     <FxCompile Include="DynamicGI\ProbeUpdateCS.hlsl" />
     <FxCompile Include="DynamicGI\ProbeBorderCS.hlsl" />
+    <FxCompile Include="DynamicGI\ProbeSphereVS.hlsl">
+      <ShaderType>Vertex</ShaderType>
+    </FxCompile>
+    <FxCompile Include="DynamicGI\ProbeSpherePS.hlsl">
+      <ShaderType>Pixel</ShaderType>
+    </FxCompile>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <Import Project="$([MSBuild]::GetDirectoryNameOfFileAbove('$(MSBuildThisFileDirectory)', 'vcpkg.json'))\vcpkg\DirectX.vcpkg.targets" />

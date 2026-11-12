@@ -1706,6 +1706,8 @@ void ModelViewer::RenderScene( void )
 
             Renderer::DrawSkyBackground(gfxContext, viewport, scissor, m_Sky.GetRadiance());
 
+            DynamicGI::DrawProbes(gfxContext, m_Camera, viewport, scissor);
+
             sorter.RenderMeshes(MeshSorter::kTransparent, gfxContext, globals);
         }
     }
