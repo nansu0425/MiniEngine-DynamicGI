@@ -1,5 +1,7 @@
 #include "Core/pch.h"
 #include "Core/Editor/TextureViewer.h"
+#include "Core/Automation/ControlChannel.h"
+#include "Core/Editor/MeasurementConditions.h"
 #include "Core/Graphics/GraphicsCore.h"
 #include "Core/Graphics/Command/CommandContext.h"
 #include "Core/Graphics/Command/CommandListManager.h"
@@ -152,6 +154,78 @@ namespace
         ImGui::Image(ImGuiLayer::BindTexture(ConvertForDisplay(texture)), FitToContentRegion(texture.GetWidth(), texture.GetHeight()));
     }
 
+    ControlChannel::Fields DescribeTexture(const ColorBuffer& texture)
+    {
+        ControlChannel::Fields fields;
+        fields.Flag("created", texture.GetResource() != nullptr);
+        if (texture.GetResource() != nullptr)
+            fields.Integer("width", texture.GetWidth()).Integer("height", texture.GetHeight()).Text("format", GetFormatName(texture.GetFormat()));
+        return fields;
+    }
+
+    ControlChannel::Fields DescribeState(void)
+    {
+        ControlChannel::Fields textures;
+        for (const RegisteredTexture& registered : s_Textures)
+            textures.Object(registered.name, DescribeTexture(*registered.texture));
+
+        ControlChannel::Fields fields;
+        if (!s_Textures.empty())
+            fields.Text("texture", s_Textures[s_Selected].name);
+        return fields.Text("channel", kChannels[s_Channel].name).Float("exposure_value", s_ExposureValue).Object("textures", textures);
+    }
+
+    bool SelectTexture(const std::string& name)
+    {
+        const auto found = std::find_if(s_Textures.begin(), s_Textures.end(), [&name](const RegisteredTexture& texture) { return texture.name == name; });
+        if (found == s_Textures.end())
+            return false;
+        s_Selected = found - s_Textures.begin();
+        return true;
+    }
+
+    bool SelectChannel(const std::string& name)
+    {
+        const auto found = std::find_if(std::begin(kChannels), std::end(kChannels), [&name](const Channel& channel) { return name == channel.name; });
+        if (found == std::end(kChannels))
+            return false;
+        s_Channel = (int)(found - std::begin(kChannels));
+        return true;
+    }
+
+    bool SetExposureValue(const std::string& text)
+    {
+        float exposureValue = 0.0f;
+        if (!MeasurementConditions::ReadFloat(text, exposureValue) || !(exposureValue >= -kMaxExposureValue && exposureValue <= kMaxExposureValue))
+            return false;
+        s_ExposureValue = exposureValue;
+        return true;
+    }
+
+    void ChangeViewByCommand(const std::string& arguments, const ControlChannel::Reply& reply)
+    {
+        const size_t valueStart = arguments.find(' ');
+        const std::string action = arguments.substr(0, valueStart);
+        const std::string value = valueStart == std::string::npos ? std::string() : Utility::Trim(arguments.substr(valueStart + 1));
+
+        std::string error;
+        if (action == "select")
+            error = SelectTexture(value) ? "" : "no texture named '" + value + "'. state texture_viewer.textures has the names";
+        else if (action == "channel")
+            error = SelectChannel(value) ? "" : "no channel '" + value + "'. The channels are RGB, R, G, B and A";
+        else if (action == "ev")
+            error = SetExposureValue(value) ? "" : "ev takes a number from -16 to 16, not '" + value + "'";
+        else
+            error = "usage: texture-viewer select <name> | channel RGB|R|G|B|A | ev <value>";
+
+        if (!error.empty())
+        {
+            reply.Error(error);
+            return;
+        }
+        ControlChannel::AfterFrames(1, [reply] { reply.Ok(ControlChannel::Fields().Object("state", ControlChannel::GetState("texture_viewer"))); });
+    }
+
     void ShowContent(void)
     {
         if (s_Textures.empty())
@@ -176,6 +250,12 @@ void TextureViewer::Initialize(void)
     s_ViewPSO.SetRootSignature(s_RootSignature);
     s_ViewPSO.SetComputeShader(g_pTextureViewCS, sizeof(g_pTextureViewCS));
     s_ViewPSO.Finalize();
+
+    ControlChannel::Register("texture-viewer", "texture-viewer select <name> | channel RGB|R|G|B|A | ev <value>: the texture the Texture Viewer "
+        "panel shows, the channel it shows and its exposure in EV from -16 to 16, as the panel's Texture, Channel and Exposure (EV) change them. "
+        "A channel of R, G, B or A shows that component as gray. state texture_viewer has them and the textures it can show, each with "
+        "its size and format once its owner has created it", ChangeViewByCommand);
+    ControlChannel::RegisterState("texture_viewer", DescribeState);
 }
 
 void TextureViewer::Shutdown(void)

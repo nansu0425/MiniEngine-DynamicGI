@@ -10,7 +10,7 @@ harness 는 ModelViewer 의 test 와 측정을 자동화하는 도구다. app �
 - `start` 는 사용자가 app 을 직접 실행할 때와 같은 상태로 띄운다. 사용자의 `user.ini` 와 `imgui.ini` 를 run 폴더에 복사해 쓰고, `--scene` 이 없으면 사용자의 app 이 여는 scene 을 연다. 실행마다 같은 결과가 나와야 하는 측정과 비교는 `start --baseline` 으로 `scripts/harness-baseline/` 의 설정에서 띄운다. snapshot, selftest, `scripts/measure-*.py` 는 늘 baseline 으로 띄운다.
 - harness 가 띄우지 않은 ModelViewer 가 실행 중이면 `start` 는 띄우지 않는다. 사용자의 app 은 끝날 때 `user.ini` 를 저장하므로 끝난 뒤에야 그 상태를 복사할 수 있고, 두 app 이 함께 돌면 `.mini` 와 DDS cache 쓰기가 겹칠 수 있다.
 - D3D12 debug layer 의 message 를 봐야 하면 Debug 로 띄운다. `start` 는 다른 config 에 `-debug 1` 을 주지 않으므로 debug layer 가 꺼져 message 자체가 생기지 않는다 (`start` 가 상태를 알린다).
-- UI 와 mouse 로 바꾸는 상태는 같은 상태를 바꾸는 명령으로 바꾼다. gizmo 가 바꾸는 directional light 의 rotation 과 위치, icon click, Scene Hierarchy panel, W, E 와 scene 위의 gizmo toolbar 가 바꾸는 editor 의 선택, gizmo mode, rotate 의 축, Details panel 이 바꾸는 물체의 설정 (`editor get`, `editor set`), Scene menu 가 바꾸는 scene 과 Save (`scene save`), Engine Tuning 의 Reset to Default, Reset to Defaults, Reset All 이 바꾸는 설정 (`settings reset`) 도 그렇다. 명령은 `do help` 에 있다.
+- UI 와 mouse 로 바꾸는 상태는 같은 상태를 바꾸는 명령으로 바꾼다. gizmo 가 바꾸는 directional light 의 rotation 과 위치, icon click, Scene Hierarchy panel, W, E 와 scene 위의 gizmo toolbar 가 바꾸는 editor 의 선택, gizmo mode, rotate 의 축, Details panel 이 바꾸는 물체의 설정 (`editor get`, `editor set`), Scene menu 가 바꾸는 scene 과 Save (`scene save`), Engine Tuning 의 Reset to Default, Reset to Defaults, Reset All 이 바꾸는 설정 (`settings reset`), Texture Viewer panel 의 Texture, Channel, Exposure (EV) (`texture-viewer`) 도 그렇다. 명령은 `do help` 에 있다.
 - harness 는 gizmo 를 화면에서 찾아 끄는 식으로 입력을 흉내 내지 않는다. 입력을 흉내 내는 조작은 click 할 곳과 click 한 결과를 image 로 판단해야 하는데, image 로 판단한 UI 의 상태는 믿을 수 없다.
 
 ## 실행 순서
