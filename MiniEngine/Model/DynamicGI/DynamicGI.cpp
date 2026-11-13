@@ -54,7 +54,7 @@ namespace
     // Source의 순서이고, Engine Tuning의 저장과 settings 명령이 이 이름으로 읽고 쓴다.
     const char* kSourceNames[] = { "Off", "Path Traced", "Probe" };
     const char* kViewNames[] = { "Lit", "Indirect Irradiance", "Indirect Radiance" };
-    const char* kVisibilityNames[] = { "None", "Shadow Ray" };
+    const char* kVisibilityNames[] = { "None", "Shadow Ray", "Chebyshev" };
 
     void ClampSettings(void)
     {
@@ -152,7 +152,8 @@ namespace
         if (ImGui::Combo("Visibility", &visibility, kVisibilityNames, IM_ARRAYSIZE(kVisibilityNames)))
             probe.visibility = (ProbeLighting::Visibility)visibility;
         ImGui::SetItemTooltip("Which of the probes around a point the interpolation keeps. None keeps all of them. "
-            "Shadow Ray traces a ray from the point to each probe and keeps the probes it reaches.");
+            "Shadow Ray traces a ray from the point to each probe and keeps the probes it reaches. "
+            "Chebyshev weights each probe by how likely the distances it stored toward the point leave the point visible.");
         TuningSection::MakeItemResettable("Visibility");
         ClampSettings();
 
@@ -288,7 +289,8 @@ void DynamicGI::Initialize(void)
     ProbeVisualization::Initialize();
 
     TextureViewer::AddTexture("Probes Irradiance", ProbeLighting::GetProbesIrradiance());
-    TextureViewer::AddTexture("Probe Ray Radiance", ProbeLighting::GetRayRadiance());
+    TextureViewer::AddTexture("Probes Distance", ProbeLighting::GetProbesDistance());
+    TextureViewer::AddTexture("Probe Ray Samples", ProbeLighting::GetRaySamples());
     TextureViewer::AddTexture("Probe Screen Irradiance", ProbeLighting::GetScreenIrradiance());
     TextureViewer::AddTexture("Path Traced Indirect Radiance", PathTracedLighting::GetIndirectRadiance());
 
@@ -324,9 +326,9 @@ void DynamicGI::Update(ComputeContext& context, const GIFrameInputs& inputs, uin
         else if (s_Settings.indirect == Source::kProbe)
         {
             ProbeLighting::Update(context, s_Settings.probe, inputs);
-            if (s_Settings.probe.visibility == ProbeLighting::Visibility::kShadowRay)
+            if (s_Settings.probe.visibility != ProbeLighting::Visibility::kNone)
             {
-                ProbeLighting::EstimateScreenIrradiance(context, inputs, width, height);
+                ProbeLighting::EstimateScreenIrradiance(context, s_Settings.probe.visibility, inputs, width, height);
                 screenIndirectIrradiance = &ProbeLighting::GetScreenIrradiance();
                 context.TransitionResource(*screenIndirectIrradiance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
             }

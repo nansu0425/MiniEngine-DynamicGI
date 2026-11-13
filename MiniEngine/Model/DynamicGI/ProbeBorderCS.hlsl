@@ -5,7 +5,7 @@ cbuffer Constants : register(b0)
     IrradianceProbeGrid Grid;
 };
 
-RWTexture2D<float4> ProbesIrradiance : register(u0);
+RWTexture2D<float4> ProbesAtlas : register(u0);
 
 uint2 GetBorderSource(uint2 border)
 {
@@ -26,5 +26,5 @@ void main(uint3 Gid : SV_GroupID, uint3 GTid : SV_GroupThreadID)
         return;
 
     const uint2 tileOrigin = GetProbeTileOrigin(Grid, GetProbeCoordinate(Grid, Gid.x));
-    ProbesIrradiance[tileOrigin + GTid.xy] = ProbesIrradiance[tileOrigin + GetBorderSource(GTid.xy)];
+    ProbesAtlas[tileOrigin + GTid.xy] = ProbesAtlas[tileOrigin + GetBorderSource(GTid.xy)];
 }

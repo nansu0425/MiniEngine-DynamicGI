@@ -35,7 +35,7 @@ namespace
     RootSignature s_UpdateRootSignature;
     RootSignature s_ScreenRootSignature;
     ComputePSO s_TracePSO(L"Probe Trace");
-    ComputePSO s_UpdatePSO(L"Probes Irradiance Update");
+    ComputePSO s_UpdatePSO(L"Probes Update");
     ComputePSO s_BorderPSO(L"Probe Border Copy");
     ComputePSO s_ScreenPSO(L"Probe Screen Irradiance");
 
@@ -43,8 +43,9 @@ namespace
     SceneHeapTable s_TraceOutputs;
     SceneHeapTable s_ScreenInputs;
     SceneHeapTable s_ScreenOutputs;
-    ColorBuffer s_RayRadiance;
+    ColorBuffer s_RaySamples;
     ColorBuffer s_ProbesIrradiance;
+    ColorBuffer s_ProbesDistance;
     ColorBuffer s_ScreenIrradiance;
 
     IrradianceProbeGrid s_Grid = {};
@@ -77,6 +78,7 @@ namespace
     {
         uint32_t width;
         uint32_t height;
+        uint32_t visibility;
         IrradianceProbeGrid grid;
     };
 
@@ -120,7 +122,9 @@ namespace
         g_CommandManager.IdleGPU();
         s_ProbesIrradiance.Create(L"Probes Irradiance", grid.counts[0] * grid.counts[1] * kProbeTileSize, grid.counts[2] * kProbeTileSize, 1,
             DXGI_FORMAT_R32G32B32A32_FLOAT);
-        s_RayRadiance.Create(L"Probe Ray Radiance", raysPerProbe, GetProbeCount(grid), 1, DXGI_FORMAT_R32G32B32A32_FLOAT);
+        s_ProbesDistance.Create(L"Probes Distance", grid.counts[0] * grid.counts[1] * kProbeTileSize, grid.counts[2] * kProbeTileSize, 1,
+            DXGI_FORMAT_R32G32_FLOAT);
+        s_RaySamples.Create(L"Probe Ray Samples", raysPerProbe, GetProbeCount(grid), 1, DXGI_FORMAT_R32G32B32A32_FLOAT);
         s_Grid = grid;
         s_RaysPerProbe = raysPerProbe;
         s_ResetRequested = true;
@@ -141,7 +145,7 @@ void ProbeLighting::Initialize(void)
     s_TraceRootSignature.Reset(kNumTraceRootParameters, 2);
     s_TraceRootSignature[kTraceConstants].InitAsConstantBuffer(0);
     RaytracingScene::InitRootParameters(s_TraceRootSignature, kTraceScene);
-    s_TraceRootSignature[kTraceInputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 2);
+    s_TraceRootSignature[kTraceInputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 3);
     s_TraceRootSignature[kTraceOutputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 1);
     s_TraceRootSignature.InitStaticSampler(0, SamplerShadowDesc);
     s_TraceRootSignature.InitStaticSampler(1, SamplerLinearClampDesc);
@@ -154,8 +158,8 @@ void ProbeLighting::Initialize(void)
     s_UpdateRootSignature.Reset(kNumUpdateRootParameters, 0);
     s_UpdateRootSignature[kUpdateConstants].InitAsConstantBuffer(0);
     s_UpdateRootSignature[kUpdateInputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 1);
-    s_UpdateRootSignature[kUpdateOutputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 1);
-    s_UpdateRootSignature.Finalize(L"Probes Irradiance Update");
+    s_UpdateRootSignature[kUpdateOutputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 2);
+    s_UpdateRootSignature.Finalize(L"Probes Update");
 
     s_UpdatePSO.SetRootSignature(s_UpdateRootSignature);
     s_UpdatePSO.SetComputeShader(g_pProbeUpdateCS, sizeof(g_pProbeUpdateCS));
@@ -168,7 +172,7 @@ void ProbeLighting::Initialize(void)
     s_ScreenRootSignature.Reset(kNumScreenRootParameters, 1);
     s_ScreenRootSignature[kScreenConstants].InitAsConstantBuffer(0);
     RaytracingScene::InitRootParameters(s_ScreenRootSignature, kScreenScene);
-    s_ScreenRootSignature[kScreenInputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, kNumGBufferTargets + 1);
+    s_ScreenRootSignature[kScreenInputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, kNumGBufferTargets + 2);
     s_ScreenRootSignature[kScreenOutputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 1);
     s_ScreenRootSignature.InitStaticSampler(0, SamplerLinearClampDesc);
     s_ScreenRootSignature.Finalize(L"Probe Screen Irradiance");
@@ -177,16 +181,17 @@ void ProbeLighting::Initialize(void)
     s_ScreenPSO.SetComputeShader(g_pProbeScreenIrradianceCS, sizeof(g_pProbeScreenIrradianceCS));
     s_ScreenPSO.Finalize();
 
-    s_TraceInputs.Create(2);
+    s_TraceInputs.Create(3);
     s_TraceOutputs.Create(1);
-    s_ScreenInputs.Create(kNumGBufferTargets + 1);
+    s_ScreenInputs.Create(kNumGBufferTargets + 2);
     s_ScreenOutputs.Create(1);
 }
 
 void ProbeLighting::Shutdown(void)
 {
-    s_RayRadiance.Destroy();
+    s_RaySamples.Destroy();
     s_ProbesIrradiance.Destroy();
+    s_ProbesDistance.Destroy();
     s_ScreenIrradiance.Destroy();
 }
 
@@ -209,6 +214,8 @@ void ProbeLighting::Update(ComputeContext& context, const Settings& settings, co
     {
         context.TransitionResource(s_ProbesIrradiance, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, true);
         context.ClearUAV(s_ProbesIrradiance);
+        context.TransitionResource(s_ProbesDistance, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, true);
+        context.ClearUAV(s_ProbesDistance);
         s_Random.seed(0);
         s_Progress.updates = 0;
         ++s_Progress.resets;
@@ -224,13 +231,15 @@ void ProbeLighting::Update(ComputeContext& context, const Settings& settings, co
         const TraceConstants constants = { (uint32_t)settings.visibility, DescribeGILights(inputs), rays };
         s_TraceInputs.PointTo(0, inputs.shadowMap, inputs.shadowMap.GetSRV());
         s_TraceInputs.PointTo(1, s_ProbesIrradiance, s_ProbesIrradiance.GetSRV());
-        s_TraceOutputs.PointTo(0, s_RayRadiance, s_RayRadiance.GetUAV());
+        s_TraceInputs.PointTo(2, s_ProbesDistance, s_ProbesDistance.GetSRV());
+        s_TraceOutputs.PointTo(0, s_RaySamples, s_RaySamples.GetUAV());
 
         context.SetRootSignature(s_TraceRootSignature);
         context.SetPipelineState(s_TracePSO);
         context.TransitionResource(inputs.shadowMap, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
         context.TransitionResource(s_ProbesIrradiance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-        context.TransitionResource(s_RayRadiance, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+        context.TransitionResource(s_ProbesDistance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+        context.TransitionResource(s_RaySamples, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
         context.SetDynamicConstantBufferView(kTraceConstants, sizeof(constants), &constants);
         inputs.scene.Bind(context, kTraceScene);
         s_TraceInputs.Bind(context, kTraceInputs);
@@ -239,28 +248,36 @@ void ProbeLighting::Update(ComputeContext& context, const Settings& settings, co
     }
 
     {
-        ScopedTimer _updateProf(L"Probes Irradiance Update", context);
+        ScopedTimer _updateProf(L"Probes Update", context);
 
         const UpdateConstants constants = { std::max(1.0f - settings.hysteresis, 1.0f / (s_Progress.updates + 1)), rays };
         context.SetRootSignature(s_UpdateRootSignature);
         context.SetPipelineState(s_UpdatePSO);
-        context.TransitionResource(s_RayRadiance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+        context.TransitionResource(s_RaySamples, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
         context.TransitionResource(s_ProbesIrradiance, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+        context.TransitionResource(s_ProbesDistance, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
         context.SetDynamicConstantBufferView(kUpdateConstants, sizeof(constants), &constants);
-        context.SetDynamicDescriptor(kUpdateInputs, 0, s_RayRadiance.GetSRV());
+        context.SetDynamicDescriptor(kUpdateInputs, 0, s_RaySamples.GetSRV());
         context.SetDynamicDescriptor(kUpdateOutputs, 0, s_ProbesIrradiance.GetUAV());
+        context.SetDynamicDescriptor(kUpdateOutputs, 1, s_ProbesDistance.GetUAV());
         context.Dispatch(probeCount);
 
         context.InsertUAVBarrier(s_ProbesIrradiance);
+        context.InsertUAVBarrier(s_ProbesDistance);
         context.SetPipelineState(s_BorderPSO);
         context.SetDynamicConstantBufferView(kUpdateConstants, sizeof(s_Grid), &s_Grid);
-        context.Dispatch(probeCount);
+        for (ColorBuffer* atlas : { &s_ProbesIrradiance, &s_ProbesDistance })
+        {
+            context.SetDynamicDescriptor(kUpdateOutputs, 0, atlas->GetUAV());
+            context.Dispatch(probeCount);
+        }
     }
 
     ++s_Progress.updates;
 }
 
-void ProbeLighting::EstimateScreenIrradiance(ComputeContext& context, const GIFrameInputs& inputs, uint32_t width, uint32_t height)
+void ProbeLighting::EstimateScreenIrradiance(ComputeContext& context, Visibility visibility, const GIFrameInputs& inputs, uint32_t width,
+    uint32_t height)
 {
     ScopedTimer _prof(L"Probe Screen Irradiance", context);
 
@@ -269,14 +286,16 @@ void ProbeLighting::EstimateScreenIrradiance(ComputeContext& context, const GIFr
     for (uint32_t i = 0; i < kNumGBufferTargets; ++i)
         s_ScreenInputs.PointTo(i, g_GBuffer[i], g_GBuffer[i].GetSRV());
     s_ScreenInputs.PointTo(kNumGBufferTargets, s_ProbesIrradiance, s_ProbesIrradiance.GetSRV());
+    s_ScreenInputs.PointTo(kNumGBufferTargets + 1, s_ProbesDistance, s_ProbesDistance.GetSRV());
     s_ScreenOutputs.PointTo(0, s_ScreenIrradiance, s_ScreenIrradiance.GetUAV());
 
-    const ScreenConstants constants = { width, height, s_Grid };
+    const ScreenConstants constants = { width, height, (uint32_t)visibility, s_Grid };
     context.SetRootSignature(s_ScreenRootSignature);
     context.SetPipelineState(s_ScreenPSO);
     for (ColorBuffer& target : g_GBuffer)
         context.TransitionResource(target, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     context.TransitionResource(s_ProbesIrradiance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+    context.TransitionResource(s_ProbesDistance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     context.TransitionResource(s_ScreenIrradiance, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
     context.SetDynamicConstantBufferView(kScreenConstants, sizeof(constants), &constants);
     inputs.scene.Bind(context, kScreenScene);
@@ -290,9 +309,14 @@ ColorBuffer& ProbeLighting::GetProbesIrradiance(void)
     return s_ProbesIrradiance;
 }
 
-ColorBuffer& ProbeLighting::GetRayRadiance(void)
+ColorBuffer& ProbeLighting::GetProbesDistance(void)
 {
-    return s_RayRadiance;
+    return s_ProbesDistance;
+}
+
+ColorBuffer& ProbeLighting::GetRaySamples(void)
+{
+    return s_RaySamples;
 }
 
 ColorBuffer& ProbeLighting::GetScreenIrradiance(void)

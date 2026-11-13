@@ -8,7 +8,7 @@ class ComputeContext;
 
 namespace ProbeLighting
 {
-    enum class Visibility { kNone, kShadowRay };
+    enum class Visibility { kNone, kShadowRay, kChebyshev };
 
     struct Settings
     {
@@ -31,10 +31,11 @@ namespace ProbeLighting
     Progress GetProgress(void);
 
     void Update(ComputeContext& context, const Settings& settings, const GIFrameInputs& inputs);
-    void EstimateScreenIrradiance(ComputeContext& context, const GIFrameInputs& inputs, uint32_t width, uint32_t height);
+    void EstimateScreenIrradiance(ComputeContext& context, Visibility visibility, const GIFrameInputs& inputs, uint32_t width, uint32_t height);
 
     ColorBuffer& GetProbesIrradiance(void);
-    ColorBuffer& GetRayRadiance(void);
+    ColorBuffer& GetProbesDistance(void);
+    ColorBuffer& GetRaySamples(void);
     ColorBuffer& GetScreenIrradiance(void);
     const IrradianceProbeGrid& GetGrid(void);
 }

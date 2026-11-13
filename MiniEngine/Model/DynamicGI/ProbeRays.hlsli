@@ -10,6 +10,13 @@ struct ProbeRays
     uint raysPerProbe;
 };
 
+static const float kProbeRayMaxDistancePerSpacing = 1.5;
+
+float GetProbeRayMaxDistance(IrradianceProbeGrid grid)
+{
+    return kProbeRayMaxDistancePerSpacing * length(grid.spacing);
+}
+
 float3 GetSphericalFibonacciDirection(uint index, uint count)
 {
     static const float kGoldenRatioFraction = 0.6180339887;
