@@ -67,7 +67,7 @@ namespace Renderer
     // 보는 면이 camera 쪽으로 반사하는 radiance (cd/m²)를 rgb에 담는다. nullptr이면 더하지 않는다.
     // ShadeOpaqueSurfaces 전에 부르고, radiance는 pixel shader와 non-pixel shader resource 상태로 둔다.
     void SetIndirectRadiance(const ColorBuffer* radiance);
-    void SetIndirectDiffuseProbes(const ColorBuffer* irradiance, const IrradianceProbeGrid& grid);
+    void SetProbesIndirectIrradiance(const ColorBuffer* irradiance, const IrradianceProbeGrid& grid);
     enum class ShadingOutput { kLit, kIndirectIrradiance, kIndirectRadiance };
     void SetShadingOutput(ShadingOutput output);
     void ShadeOpaqueSurfaces(ComputeContext& context, const Math::BaseCamera& camera, const GlobalConstants& globals, ColorBuffer& sceneColor);

@@ -8,7 +8,7 @@ cbuffer Constants : register(b0)
 };
 
 Texture2D<float> ShadowMap : register(t0);
-Texture2D<float4> ProbeIrradiance : register(t1);
+Texture2D<float4> ProbesIrradiance : register(t1);
 SamplerComparisonState ShadowMapSampler : register(s0);
 SamplerState LinearClamp : register(s1);
 RWTexture2D<float4> RayRadiance : register(u0);
@@ -28,7 +28,7 @@ float3 TraceProbeRay(float3 origin, float3 direction)
     const HitSurface surface = GetHitSurface(rayHit, kSharpestTextureLod);
     const GltfBrdfInput brdf = MakeGltfBrdfInput(surface.baseColor.rgb, surface.metallic, surface.roughness, surface.shadingNormal, -direction);
     const float3 indirectRadiance = kPi * EvaluateGltfDiffuseLobeForIrradiance(brdf) *
-        SampleIrradianceProbes(ProbeIrradiance, LinearClamp, Rays.grid, surface.position, surface.shadingNormal);
+        SampleIrradianceProbes(ProbesIrradiance, LinearClamp, Rays.grid, surface.position, surface.shadingNormal);
     const float3 directRadiance = GetHitDirectRadiance(surface, brdf, Lights, ShadowMap, ShadowMapSampler);
 
     return surface.emissive + directRadiance + indirectRadiance;

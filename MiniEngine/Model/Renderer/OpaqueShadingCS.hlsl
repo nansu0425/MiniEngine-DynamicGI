@@ -21,7 +21,7 @@ static const uint kShadingOutputIndirectRadiance = 2;
 
 Texture2D<float> ShadowMap : register(t5);
 Texture2D<float3> IndirectRadiance : register(t6);
-Texture2D<float4> ProbeIrradiance : register(t7);
+Texture2D<float4> ProbesIndirectIrradiance : register(t7);
 RWTexture2D<float3> SceneColor : register(u0);
 SamplerComparisonState ShadowMapSampler : register(s0);
 SamplerState LinearClamp : register(s1);
@@ -31,7 +31,7 @@ float3 GetIndirectIrradiance(RasterSurface surface)
     if (UseIrradianceProbes == 0)
         return 0.0;
 
-    return SampleIrradianceProbes(ProbeIrradiance, LinearClamp, Probes, surface.position, surface.shadingNormal);
+    return SampleIrradianceProbes(ProbesIndirectIrradiance, LinearClamp, Probes, surface.position, surface.shadingNormal);
 }
 
 float3 GetIndirectRadiance(RasterSurface surface, float3 view, uint2 pixel)

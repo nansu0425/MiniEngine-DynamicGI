@@ -30,13 +30,13 @@ namespace
     RootSignature s_TraceRootSignature;
     RootSignature s_UpdateRootSignature;
     ComputePSO s_TracePSO(L"Probe Trace");
-    ComputePSO s_UpdatePSO(L"Probe Irradiance Update");
+    ComputePSO s_UpdatePSO(L"Probes Irradiance Update");
     ComputePSO s_BorderPSO(L"Probe Border Copy");
 
     SceneHeapTable s_TraceInputs;
     SceneHeapTable s_TraceOutputs;
     ColorBuffer s_RayRadiance;
-    ColorBuffer s_Irradiance;
+    ColorBuffer s_ProbesIrradiance;
 
     IrradianceProbeGrid s_Grid = {};
     uint32_t s_RaysPerProbe = 0;
@@ -101,7 +101,7 @@ namespace
             return;
 
         g_CommandManager.IdleGPU();
-        s_Irradiance.Create(L"Probe Irradiance", grid.counts[0] * grid.counts[1] * kProbeTileSize, grid.counts[2] * kProbeTileSize, 1,
+        s_ProbesIrradiance.Create(L"Probes Irradiance", grid.counts[0] * grid.counts[1] * kProbeTileSize, grid.counts[2] * kProbeTileSize, 1,
             DXGI_FORMAT_R32G32B32A32_FLOAT);
         s_RayRadiance.Create(L"Probe Ray Radiance", raysPerProbe, GetProbeCount(grid), 1, DXGI_FORMAT_R32G32B32A32_FLOAT);
         s_Grid = grid;
@@ -129,7 +129,7 @@ void ProbeLighting::Initialize(void)
     s_UpdateRootSignature[kUpdateConstants].InitAsConstantBuffer(0);
     s_UpdateRootSignature[kUpdateInputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 1);
     s_UpdateRootSignature[kUpdateOutputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 1);
-    s_UpdateRootSignature.Finalize(L"Probe Irradiance Update");
+    s_UpdateRootSignature.Finalize(L"Probes Irradiance Update");
 
     s_UpdatePSO.SetRootSignature(s_UpdateRootSignature);
     s_UpdatePSO.SetComputeShader(g_pProbeUpdateCS, sizeof(g_pProbeUpdateCS));
@@ -146,7 +146,7 @@ void ProbeLighting::Initialize(void)
 void ProbeLighting::Shutdown(void)
 {
     s_RayRadiance.Destroy();
-    s_Irradiance.Destroy();
+    s_ProbesIrradiance.Destroy();
 }
 
 void ProbeLighting::Reset(void)
@@ -166,8 +166,8 @@ void ProbeLighting::Update(ComputeContext& context, const Settings& settings, co
     FitResourcesTo(DescribeGrid(inputs.modelBounds, settings.probeCounts), settings.raysPerProbe);
     if (s_ResetRequested)
     {
-        context.TransitionResource(s_Irradiance, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, true);
-        context.ClearUAV(s_Irradiance);
+        context.TransitionResource(s_ProbesIrradiance, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, true);
+        context.ClearUAV(s_ProbesIrradiance);
         s_Random.seed(0);
         s_Progress.updates = 0;
         ++s_Progress.resets;
@@ -182,13 +182,13 @@ void ProbeLighting::Update(ComputeContext& context, const Settings& settings, co
 
         const TraceConstants constants = { DescribeGILights(inputs), rays };
         s_TraceInputs.PointTo(0, inputs.shadowMap, inputs.shadowMap.GetSRV());
-        s_TraceInputs.PointTo(1, s_Irradiance, s_Irradiance.GetSRV());
+        s_TraceInputs.PointTo(1, s_ProbesIrradiance, s_ProbesIrradiance.GetSRV());
         s_TraceOutputs.PointTo(0, s_RayRadiance, s_RayRadiance.GetUAV());
 
         context.SetRootSignature(s_TraceRootSignature);
         context.SetPipelineState(s_TracePSO);
         context.TransitionResource(inputs.shadowMap, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-        context.TransitionResource(s_Irradiance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+        context.TransitionResource(s_ProbesIrradiance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
         context.TransitionResource(s_RayRadiance, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
         context.SetDynamicConstantBufferView(kTraceConstants, sizeof(constants), &constants);
         inputs.scene.Bind(context, kTraceScene);
@@ -198,19 +198,19 @@ void ProbeLighting::Update(ComputeContext& context, const Settings& settings, co
     }
 
     {
-        ScopedTimer _updateProf(L"Probe Irradiance Update", context);
+        ScopedTimer _updateProf(L"Probes Irradiance Update", context);
 
         const UpdateConstants constants = { std::max(1.0f - settings.hysteresis, 1.0f / (s_Progress.updates + 1)), rays };
         context.SetRootSignature(s_UpdateRootSignature);
         context.SetPipelineState(s_UpdatePSO);
         context.TransitionResource(s_RayRadiance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-        context.TransitionResource(s_Irradiance, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+        context.TransitionResource(s_ProbesIrradiance, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
         context.SetDynamicConstantBufferView(kUpdateConstants, sizeof(constants), &constants);
         context.SetDynamicDescriptor(kUpdateInputs, 0, s_RayRadiance.GetSRV());
-        context.SetDynamicDescriptor(kUpdateOutputs, 0, s_Irradiance.GetUAV());
+        context.SetDynamicDescriptor(kUpdateOutputs, 0, s_ProbesIrradiance.GetUAV());
         context.Dispatch(probeCount);
 
-        context.InsertUAVBarrier(s_Irradiance);
+        context.InsertUAVBarrier(s_ProbesIrradiance);
         context.SetPipelineState(s_BorderPSO);
         context.SetDynamicConstantBufferView(kUpdateConstants, sizeof(s_Grid), &s_Grid);
         context.Dispatch(probeCount);
@@ -219,9 +219,9 @@ void ProbeLighting::Update(ComputeContext& context, const Settings& settings, co
     ++s_Progress.updates;
 }
 
-ColorBuffer& ProbeLighting::GetIrradiance(void)
+ColorBuffer& ProbeLighting::GetProbesIrradiance(void)
 {
-    return s_Irradiance;
+    return s_ProbesIrradiance;
 }
 
 ColorBuffer& ProbeLighting::GetRayRadiance(void)

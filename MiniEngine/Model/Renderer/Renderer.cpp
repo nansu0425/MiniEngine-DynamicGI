@@ -77,8 +77,8 @@ namespace Renderer
     // t18이 가리키는 buffer와, view를 복사했을 때 그 buffer의 version ID. nullptr이면 black texture를 가리킨다.
     const ColorBuffer* s_IndirectRadiance = nullptr;
     uint32_t s_IndirectRadianceID = 0;
-    const ColorBuffer* s_IndirectDiffuseProbes = nullptr;
-    IrradianceProbeGrid s_IndirectDiffuseProbeGrid = {};
+    const ColorBuffer* s_ProbesIndirectIrradiance = nullptr;
+    IrradianceProbeGrid s_ProbesIndirectIrradianceGrid = {};
     Renderer::ShadingOutput s_ShadingOutput = Renderer::ShadingOutput::kLit;
 }
 
@@ -325,10 +325,10 @@ void Renderer::SetIndirectRadiance(const ColorBuffer* radiance)
     s_IndirectRadianceID = versionID;
 }
 
-void Renderer::SetIndirectDiffuseProbes(const ColorBuffer* irradiance, const IrradianceProbeGrid& grid)
+void Renderer::SetProbesIndirectIrradiance(const ColorBuffer* irradiance, const IrradianceProbeGrid& grid)
 {
-    s_IndirectDiffuseProbes = irradiance;
-    s_IndirectDiffuseProbeGrid = grid;
+    s_ProbesIndirectIrradiance = irradiance;
+    s_ProbesIndirectIrradianceGrid = grid;
 }
 
 void Renderer::SetShadingOutput(ShadingOutput output)
@@ -524,8 +524,8 @@ void Renderer::ShadeOpaqueSurfaces(ComputeContext& context, const BaseCamera& ca
     XMStoreFloat3(&constants.LightIlluminance, globals.LightIlluminance);
     constants.Width = sceneColor.GetWidth();
     constants.Height = sceneColor.GetHeight();
-    constants.UseIrradianceProbes = s_IndirectDiffuseProbes != nullptr ? 1 : 0;
-    constants.Probes = s_IndirectDiffuseProbeGrid;
+    constants.UseIrradianceProbes = s_ProbesIndirectIrradiance != nullptr ? 1 : 0;
+    constants.Probes = s_ProbesIndirectIrradianceGrid;
     constants.ShadingOutput = (uint32_t)s_ShadingOutput;
 
     const D3D12_RESOURCE_STATES shaderResource = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
@@ -539,7 +539,7 @@ void Renderer::ShadeOpaqueSurfaces(ComputeContext& context, const BaseCamera& ca
     context.TransitionResource(g_ShadowBuffer, shaderResource);
     inputs[kNumGBufferTargets] = g_ShadowBuffer.GetSRV();
     inputs[kNumGBufferTargets + 1] = s_IndirectRadiance != nullptr ? s_IndirectRadiance->GetSRV() : GetDefaultTexture(kBlackOpaque2D);
-    inputs[kNumGBufferTargets + 2] = s_IndirectDiffuseProbes != nullptr ? s_IndirectDiffuseProbes->GetSRV() : GetDefaultTexture(kBlackOpaque2D);
+    inputs[kNumGBufferTargets + 2] = s_ProbesIndirectIrradiance != nullptr ? s_ProbesIndirectIrradiance->GetSRV() : GetDefaultTexture(kBlackOpaque2D);
     context.TransitionResource(sceneColor, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
     context.SetRootSignature(s_OpaqueShadingRootSig);

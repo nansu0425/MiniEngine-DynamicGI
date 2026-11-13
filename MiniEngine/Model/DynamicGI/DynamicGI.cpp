@@ -277,7 +277,7 @@ void DynamicGI::Initialize(void)
     ProbeLighting::Initialize();
     ProbeVisualization::Initialize();
 
-    TextureViewer::AddTexture("Probe Irradiance", ProbeLighting::GetIrradiance());
+    TextureViewer::AddTexture("Probes Irradiance", ProbeLighting::GetProbesIrradiance());
     TextureViewer::AddTexture("Probe Ray Radiance", ProbeLighting::GetRayRadiance());
     TextureViewer::AddTexture("Path Traced Indirect Radiance", PathTracedLighting::GetIndirectRadiance());
 
@@ -299,7 +299,7 @@ void DynamicGI::Reset(void)
 void DynamicGI::Update(ComputeContext& context, const GIFrameInputs& inputs, uint32_t width, uint32_t height)
 {
     ColorBuffer* indirectRadiance = nullptr;
-    ColorBuffer* probeIrradiance = nullptr;
+    ColorBuffer* probesIndirectIrradiance = nullptr;
     if (IsIndirectOn())
     {
         ScopedTimer _prof(L"Dynamic GI", context);
@@ -312,12 +312,12 @@ void DynamicGI::Update(ComputeContext& context, const GIFrameInputs& inputs, uin
         else if (s_Settings.indirect == Source::kProbe)
         {
             ProbeLighting::Update(context, s_Settings.probe, inputs);
-            probeIrradiance = &ProbeLighting::GetIrradiance();
-            context.TransitionResource(*probeIrradiance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+            probesIndirectIrradiance = &ProbeLighting::GetProbesIrradiance();
+            context.TransitionResource(*probesIndirectIrradiance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         }
     }
     Renderer::SetIndirectRadiance(indirectRadiance);
-    Renderer::SetIndirectDiffuseProbes(probeIrradiance, ProbeLighting::GetGrid());
+    Renderer::SetProbesIndirectIrradiance(probesIndirectIrradiance, ProbeLighting::GetGrid());
     Renderer::SetShadingOutput(s_Settings.view);
 }
 
@@ -326,6 +326,6 @@ void DynamicGI::DrawProbes(GraphicsContext& context, const Math::Camera& camera,
     if (s_Settings.indirect != Source::kProbe || !s_Settings.probeSpheres.show)
         return;
 
-    ProbeVisualization::DrawSpheres(context, camera, viewport, scissor, ProbeLighting::GetIrradiance(), ProbeLighting::GetGrid(),
+    ProbeVisualization::DrawSpheres(context, camera, viewport, scissor, ProbeLighting::GetProbesIrradiance(), ProbeLighting::GetGrid(),
         s_Settings.probeSpheres.radiusPerSpacing);
 }

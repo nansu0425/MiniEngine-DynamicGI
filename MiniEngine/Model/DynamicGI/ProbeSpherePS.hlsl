@@ -1,6 +1,6 @@
 #include "Model/DynamicGI/ProbeSphere.hlsli"
 
-Texture2D<float4> ProbeIrradiance : register(t0);
+Texture2D<float4> ProbesIrradiance : register(t0);
 SamplerState LinearClamp : register(s0);
 
 struct ProbeQuadPixel
@@ -28,7 +28,7 @@ ProbeQuadPixel main(ProbeQuadVertex vertex)
     
     // probe의 normal 방향 irradiance를 구하고, quad 뒤에 있는 교점의 depth를 구한다
     ProbeQuadPixel pixel;
-    pixel.color = float4(SampleProbeIrradiance(ProbeIrradiance, LinearClamp, Grid, vertex.probeCoordinate, normal), 1.0);
+    pixel.color = float4(SampleProbeIrradiance(ProbesIrradiance, LinearClamp, Grid, vertex.probeCoordinate, normal), 1.0);
     pixel.depth = min(clipPosition.z / clipPosition.w, vertex.position.z);
     
     return pixel;
