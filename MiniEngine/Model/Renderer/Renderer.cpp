@@ -79,6 +79,7 @@ namespace Renderer
     uint32_t s_IndirectRadianceID = 0;
     const ColorBuffer* s_ProbesIndirectIrradiance = nullptr;
     IrradianceProbeGrid s_ProbesIndirectIrradianceGrid = {};
+    const ColorBuffer* s_ScreenIndirectIrradiance = nullptr;
     Renderer::ShadingOutput s_ShadingOutput = Renderer::ShadingOutput::kLit;
 }
 
@@ -95,6 +96,15 @@ namespace
         return (uint32_t)cull * kNumShadowTemplates + shadowTemplate;
     }
 
+    enum IndirectIrradianceSource { kIndirectIrradianceNone, kProbesIndirectIrradiance, kScreenIndirectIrradiance };
+
+    uint32_t GetIndirectIrradianceSource(void)
+    {
+        if (s_ScreenIndirectIrradiance != nullptr)
+            return kScreenIndirectIrradiance;
+        return s_ProbesIndirectIrradiance != nullptr ? kProbesIndirectIrradiance : kIndirectIrradianceNone;
+    }
+
     enum OpaqueShadingRootParameter { kOpaqueShadingConstants, kOpaqueShadingInputs, kOpaqueShadingOutput, kNumOpaqueShadingRootParameters };
     RootSignature s_OpaqueShadingRootSig;
     ComputePSO s_OpaqueShadingPSO(L"Renderer: Opaque Shading PSO");
@@ -107,7 +117,7 @@ namespace
         XMFLOAT3 LightDirection;
         uint32_t Height;
         XMFLOAT3 LightIlluminance;
-        uint32_t UseIrradianceProbes;
+        uint32_t IndirectIrradianceSource;
         uint32_t ShadingOutput;
         IrradianceProbeGrid Probes;
     };
@@ -237,7 +247,7 @@ void Renderer::Initialize(void)
 
     s_OpaqueShadingRootSig.Reset(kNumOpaqueShadingRootParameters, 2);
     s_OpaqueShadingRootSig[kOpaqueShadingConstants].InitAsConstantBuffer(0);
-    s_OpaqueShadingRootSig[kOpaqueShadingInputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, kNumGBufferTargets + 3);
+    s_OpaqueShadingRootSig[kOpaqueShadingInputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, kNumGBufferTargets + 4);
     s_OpaqueShadingRootSig[kOpaqueShadingOutput].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 1);
     s_OpaqueShadingRootSig.InitStaticSampler(0, SamplerShadowDesc);
     s_OpaqueShadingRootSig.InitStaticSampler(1, SamplerLinearClampDesc);
@@ -329,6 +339,11 @@ void Renderer::SetProbesIndirectIrradiance(const ColorBuffer* irradiance, const 
 {
     s_ProbesIndirectIrradiance = irradiance;
     s_ProbesIndirectIrradianceGrid = grid;
+}
+
+void Renderer::SetScreenIndirectIrradiance(const ColorBuffer* irradiance)
+{
+    s_ScreenIndirectIrradiance = irradiance;
 }
 
 void Renderer::SetShadingOutput(ShadingOutput output)
@@ -524,12 +539,12 @@ void Renderer::ShadeOpaqueSurfaces(ComputeContext& context, const BaseCamera& ca
     XMStoreFloat3(&constants.LightIlluminance, globals.LightIlluminance);
     constants.Width = sceneColor.GetWidth();
     constants.Height = sceneColor.GetHeight();
-    constants.UseIrradianceProbes = s_ProbesIndirectIrradiance != nullptr ? 1 : 0;
+    constants.IndirectIrradianceSource = GetIndirectIrradianceSource();
     constants.Probes = s_ProbesIndirectIrradianceGrid;
     constants.ShadingOutput = (uint32_t)s_ShadingOutput;
 
     const D3D12_RESOURCE_STATES shaderResource = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-    D3D12_CPU_DESCRIPTOR_HANDLE inputs[kNumGBufferTargets + 3];
+    D3D12_CPU_DESCRIPTOR_HANDLE inputs[kNumGBufferTargets + 4];
     for (uint32_t i = 0; i < kNumGBufferTargets; ++i)
     {
         ColorBuffer& target = g_GBuffer[i];
@@ -540,6 +555,7 @@ void Renderer::ShadeOpaqueSurfaces(ComputeContext& context, const BaseCamera& ca
     inputs[kNumGBufferTargets] = g_ShadowBuffer.GetSRV();
     inputs[kNumGBufferTargets + 1] = s_IndirectRadiance != nullptr ? s_IndirectRadiance->GetSRV() : GetDefaultTexture(kBlackOpaque2D);
     inputs[kNumGBufferTargets + 2] = s_ProbesIndirectIrradiance != nullptr ? s_ProbesIndirectIrradiance->GetSRV() : GetDefaultTexture(kBlackOpaque2D);
+    inputs[kNumGBufferTargets + 3] = s_ScreenIndirectIrradiance != nullptr ? s_ScreenIndirectIrradiance->GetSRV() : GetDefaultTexture(kBlackOpaque2D);
     context.TransitionResource(sceneColor, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
     context.SetRootSignature(s_OpaqueShadingRootSig);

@@ -54,6 +54,7 @@ namespace
     // Source의 순서이고, Engine Tuning의 저장과 settings 명령이 이 이름으로 읽고 쓴다.
     const char* kSourceNames[] = { "Off", "Path Traced", "Probe" };
     const char* kViewNames[] = { "Lit", "Indirect Irradiance", "Indirect Radiance" };
+    const char* kVisibilityNames[] = { "None", "Shadow Ray" };
 
     void ClampSettings(void)
     {
@@ -147,6 +148,12 @@ namespace
         ImGui::SliderFloat("Hysteresis", &probe.hysteresis, 0.0f, kMaxHysteresis);
         ImGui::SetItemTooltip("How much of the old irradiance each update keeps.");
         TuningSection::MakeItemResettable("Hysteresis");
+        int visibility = (int)probe.visibility;
+        if (ImGui::Combo("Visibility", &visibility, kVisibilityNames, IM_ARRAYSIZE(kVisibilityNames)))
+            probe.visibility = (ProbeLighting::Visibility)visibility;
+        ImGui::SetItemTooltip("Which of the probes around a point the interpolation keeps. None keeps all of them. "
+            "Shadow Ray traces a ray from the point to each probe and keeps the probes it reaches.");
+        TuningSection::MakeItemResettable("Visibility");
         ClampSettings();
 
         if (ImGui::Button("Reset Probes"))
@@ -189,6 +196,7 @@ namespace
         values["Probes Z"] = std::to_string(probe.probeCounts[2]);
         values["Rays per Probe"] = std::to_string(probe.raysPerProbe);
         values["Hysteresis"] = MeasurementConditions::FormatFloat(probe.hysteresis);
+        values["Visibility"] = kVisibilityNames[(int)probe.visibility];
 
         const ProbeVisualization::Settings& probeSpheres = s_Settings.probeSpheres;
         values["Show Probes"] = FormatFlag(probeSpheres.show);
@@ -246,6 +254,7 @@ namespace
         ReadUInt(values, "Probes Z", probe.probeCounts[2]);
         ReadUInt(values, "Rays per Probe", probe.raysPerProbe);
         ReadFloat(values, "Hysteresis", probe.hysteresis);
+        ReadName(values, "Visibility", kVisibilityNames, probe.visibility);
 
         ProbeVisualization::Settings& probeSpheres = s_Settings.probeSpheres;
         ReadFlag(values, "Show Probes", probeSpheres.show);
@@ -264,6 +273,7 @@ namespace
                 .Integer("target", s_Settings.pathTraced.targetSamples)
                 .Integer("resets", progress.resets))
             .Object("probe", ControlChannel::Fields()
+                .Text("visibility", kVisibilityNames[(int)s_Settings.probe.visibility])
                 .Integer("updates", ProbeLighting::GetProgress().updates)
                 .Integer("resets", ProbeLighting::GetProgress().resets));
     }
@@ -279,6 +289,7 @@ void DynamicGI::Initialize(void)
 
     TextureViewer::AddTexture("Probes Irradiance", ProbeLighting::GetProbesIrradiance());
     TextureViewer::AddTexture("Probe Ray Radiance", ProbeLighting::GetRayRadiance());
+    TextureViewer::AddTexture("Probe Screen Irradiance", ProbeLighting::GetScreenIrradiance());
     TextureViewer::AddTexture("Path Traced Indirect Radiance", PathTracedLighting::GetIndirectRadiance());
 
     ControlChannel::RegisterState("gi", DescribeState);
@@ -300,6 +311,7 @@ void DynamicGI::Update(ComputeContext& context, const GIFrameInputs& inputs, uin
 {
     ColorBuffer* indirectRadiance = nullptr;
     ColorBuffer* probesIndirectIrradiance = nullptr;
+    ColorBuffer* screenIndirectIrradiance = nullptr;
     if (IsIndirectOn())
     {
         ScopedTimer _prof(L"Dynamic GI", context);
@@ -312,12 +324,20 @@ void DynamicGI::Update(ComputeContext& context, const GIFrameInputs& inputs, uin
         else if (s_Settings.indirect == Source::kProbe)
         {
             ProbeLighting::Update(context, s_Settings.probe, inputs);
-            probesIndirectIrradiance = &ProbeLighting::GetProbesIrradiance();
-            context.TransitionResource(*probesIndirectIrradiance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+            if (s_Settings.probe.visibility == ProbeLighting::Visibility::kShadowRay)
+            {
+                ProbeLighting::EstimateScreenIrradiance(context, inputs, width, height);
+                screenIndirectIrradiance = &ProbeLighting::GetScreenIrradiance();
+                context.TransitionResource(*screenIndirectIrradiance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+            }
+            else
+                probesIndirectIrradiance = &ProbeLighting::GetProbesIrradiance();
+            context.TransitionResource(ProbeLighting::GetProbesIrradiance(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         }
     }
     Renderer::SetIndirectRadiance(indirectRadiance);
     Renderer::SetProbesIndirectIrradiance(probesIndirectIrradiance, ProbeLighting::GetGrid());
+    Renderer::SetScreenIndirectIrradiance(screenIndirectIrradiance);
     Renderer::SetShadingOutput(s_Settings.view);
 }
 

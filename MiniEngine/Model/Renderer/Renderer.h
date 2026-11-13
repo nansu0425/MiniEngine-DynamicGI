@@ -68,6 +68,7 @@ namespace Renderer
     // ShadeOpaqueSurfaces 전에 부르고, radiance는 pixel shader와 non-pixel shader resource 상태로 둔다.
     void SetIndirectRadiance(const ColorBuffer* radiance);
     void SetProbesIndirectIrradiance(const ColorBuffer* irradiance, const IrradianceProbeGrid& grid);
+    void SetScreenIndirectIrradiance(const ColorBuffer* irradiance);
     enum class ShadingOutput { kLit, kIndirectIrradiance, kIndirectRadiance };
     void SetShadingOutput(ShadingOutput output);
     void ShadeOpaqueSurfaces(ComputeContext& context, const Math::BaseCamera& camera, const GlobalConstants& globals, ColorBuffer& sceneColor);

@@ -10,7 +10,7 @@ cbuffer Constants : register(b0)
     float3 LightDirection;
     uint Height;
     float3 LightIlluminance;
-    uint UseIrradianceProbes;
+    uint IndirectIrradianceSource;
     uint ShadingOutput;
     IrradianceProbeGrid Probes;
 }
@@ -19,34 +19,40 @@ static const uint kShadingOutputLit = 0;
 static const uint kShadingOutputIndirectIrradiance = 1;
 static const uint kShadingOutputIndirectRadiance = 2;
 
+static const uint kIndirectIrradianceNone = 0;
+static const uint kProbesIndirectIrradiance = 1;
+static const uint kScreenIndirectIrradiance = 2;
+
 Texture2D<float> ShadowMap : register(t5);
 Texture2D<float3> IndirectRadiance : register(t6);
 Texture2D<float4> ProbesIndirectIrradiance : register(t7);
+Texture2D<float3> ScreenIndirectIrradiance : register(t8);
 RWTexture2D<float3> SceneColor : register(u0);
 SamplerComparisonState ShadowMapSampler : register(s0);
 SamplerState LinearClamp : register(s1);
 
-float3 GetIndirectIrradiance(RasterSurface surface)
+float3 GetIndirectIrradiance(RasterSurface surface, uint2 pixel)
 {
-    if (UseIrradianceProbes == 0)
-        return 0.0;
-
-    return SampleIrradianceProbes(ProbesIndirectIrradiance, LinearClamp, Probes, surface.position, surface.shadingNormal);
+    if (IndirectIrradianceSource == kScreenIndirectIrradiance)
+        return ScreenIndirectIrradiance[pixel];
+    if (IndirectIrradianceSource == kProbesIndirectIrradiance)
+        return SampleIrradianceProbes(ProbesIndirectIrradiance, LinearClamp, Probes, surface.position, surface.shadingNormal);
+    return 0.0;
 }
 
 float3 GetIndirectRadiance(RasterSurface surface, float3 view, uint2 pixel)
 {
-    if (UseIrradianceProbes == 0)
+    if (IndirectIrradianceSource == kIndirectIrradianceNone)
         return IndirectRadiance[pixel];
 
     const GltfBrdfInput brdf = MakeGltfBrdfInput(surface.baseColor.rgb, surface.metallic, surface.roughness, surface.shadingNormal, view);
-    return kPi * EvaluateGltfDiffuseLobeForIrradiance(brdf) * GetIndirectIrradiance(surface);
+    return kPi * EvaluateGltfDiffuseLobeForIrradiance(brdf) * GetIndirectIrradiance(surface, pixel);
 }
 
 float3 GetSceneColor(RasterSurface surface, uint2 pixel)
 {
     if (ShadingOutput == kShadingOutputIndirectIrradiance)
-        return GetIndirectIrradiance(surface);
+        return GetIndirectIrradiance(surface, pixel);
 
     const float3 view = normalize(ViewerPos - surface.position);
     const float3 indirectRadiance = GetIndirectRadiance(surface, view, pixel);
