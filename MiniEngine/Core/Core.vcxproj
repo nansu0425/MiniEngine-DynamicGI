@@ -235,6 +235,7 @@
   <ItemGroup>
     <FxCompile Include="Effects\PostEffects\AdaptExposureCS.hlsl" />
     <FxCompile Include="Editor\TextureViewCS.hlsl" />
+    <FxCompile Include="Editor\ReadTexelCS.hlsl" />
     <FxCompile Include="Effects\SSAO\AoBlurUpsampleBlendOutCS.hlsl" />
     <FxCompile Include="Effects\SSAO\AoBlurUpsampleCS.hlsl" />
     <FxCompile Include="Effects\SSAO\AoBlurUpsamplePreMinBlendOutCS.hlsl" />
