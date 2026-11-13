@@ -60,20 +60,36 @@ float3 SampleProbeIrradiance(Texture2D<float4> atlas, SamplerState linearClamp, 
     return atlas.SampleLevel(linearClamp, texel / GetProbeAtlasSize(grid), 0.0).rgb;
 }
 
-float3 SampleIrradianceProbes(Texture2D<float4> atlas, SamplerState linearClamp, IrradianceProbeGrid grid, float3 position, float3 direction)
+static const uint kNumProbeCorners = 8;
+
+struct IrradianceProbeCorner
+{
+    uint3 coordinate;
+    float trilinearWeight;
+};
+
+IrradianceProbeCorner GetIrradianceProbeCorner(IrradianceProbeGrid grid, float3 position, uint corner)
 {
     const float3 local = (position - grid.origin) / grid.spacing;
     const int3 baseCoordinate = clamp(int3(floor(local)), 0, int3(grid.counts) - 2);
     const float3 alpha = saturate(local - float3(baseCoordinate));
+    const uint3 offset = uint3(corner & 1, (corner >> 1) & 1, corner >> 2);
+    const float3 axisWeights = select(offset != 0, alpha, 1.0 - alpha);
 
+    IrradianceProbeCorner probe;
+    probe.coordinate = uint3(baseCoordinate) + offset;
+    probe.trilinearWeight = axisWeights.x * axisWeights.y * axisWeights.z;
+    return probe;
+}
+
+float3 SampleIrradianceProbes(Texture2D<float4> atlas, SamplerState linearClamp, IrradianceProbeGrid grid, float3 position, float3 direction)
+{
     float3 irradiance = 0.0;
     [unroll]
-    for (uint corner = 0; corner < 8; ++corner)
+    for (uint corner = 0; corner < kNumProbeCorners; ++corner)
     {
-        const uint3 offset = uint3(corner & 1, (corner >> 1) & 1, corner >> 2);
-        const float3 axisWeights = select(offset != 0, alpha, 1.0 - alpha);
-        const float weight = axisWeights.x * axisWeights.y * axisWeights.z;
-        irradiance += weight * SampleProbeIrradiance(atlas, linearClamp, grid, uint3(baseCoordinate) + offset, direction);
+        const IrradianceProbeCorner probe = GetIrradianceProbeCorner(grid, position, corner);
+        irradiance += probe.trilinearWeight * SampleProbeIrradiance(atlas, linearClamp, grid, probe.coordinate, direction);
     }
     return irradiance;
 }
