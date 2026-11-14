@@ -341,12 +341,8 @@ void SceneEditor::Update(const Camera& camera)
     if (IconComponent* selectedIcon = selected != nullptr ? selected->FindComponent<IconComponent>() : nullptr)
         EditSelected(camera, *selectedIcon);
 
-    // gizmo나 다른 창 위의 click은 ImGui가 mouse를 가져가므로 object를 고르는 데 쓰지 않는다.
-    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::GetIO().WantCaptureMouse &&
-        !ImGuizmo::IsUsingAny() && !GameInput::IsMouseCapturedByCamera())
-    {
+    if (SceneEditor::IsSceneClicked())
         s_Selected = FindObjectUnderCursor(camera);
-    }
 
     ImGuiLayer::EndSceneGizmo();
 
@@ -379,6 +375,13 @@ void SceneEditor::RegisterCommands(const Camera& camera)
 float SceneEditor::GetIconRadius(void)
 {
     return ImGui::GetFontSize() * 0.75f;
+}
+
+bool SceneEditor::IsSceneClicked(void)
+{
+    // gizmo나 다른 창 위의 click은 ImGui가 mouse를 가져가므로 object를 고르는 데 쓰지 않는다.
+    return ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !ImGui::GetIO().WantCaptureMouse && !ImGuizmo::IsUsingAny() &&
+        !GameInput::IsMouseCapturedByCamera();
 }
 
 bool SceneEditor::ProjectToScene(const Camera& camera, Vector3 position, ImVec2& screenPosition)

@@ -48,6 +48,8 @@ namespace SceneEditor
     // state의 editor로 읽는다. Details panel 대신 명령으로 object의 설정을 읽고 바꾼다. camera는 Update에 넘기는 것과 같은 camera이고 app이 끝날 때까지 살아 있어야 한다. icon의 화면 위치를 이것으로 투영한다.
     void RegisterCommands(const Math::Camera& camera);
 
+    bool IsSceneClicked(void);
+
     // 아래 함수는 IconComponent의 Draw와 Rotate 안에서 쓴다.
     float GetIconRadius(void);
     // camera 뒤에 있으면 false를 반환한다.
