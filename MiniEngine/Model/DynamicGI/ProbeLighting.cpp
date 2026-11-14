@@ -82,11 +82,6 @@ namespace
         IrradianceProbeGrid grid;
     };
 
-    uint32_t GetProbeCount(const IrradianceProbeGrid& grid)
-    {
-        return grid.counts[0] * grid.counts[1] * grid.counts[2];
-    }
-
     IrradianceProbeGrid DescribeGrid(const AxisAlignedBox& bounds, const uint32_t (&counts)[3])
     {
         const Vector3 dimensions = Max(bounds.GetDimensions(), Vector3(1e-3f));

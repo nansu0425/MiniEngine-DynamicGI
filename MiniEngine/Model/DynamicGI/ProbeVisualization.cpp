@@ -79,5 +79,5 @@ void ProbeVisualization::DrawSpheres(GraphicsContext& context, const Camera& cam
     context.SetViewportAndScissor(viewport, scissor);
     context.SetDynamicConstantBufferView(kConstants, sizeof(constants), &constants);
     context.SetDynamicDescriptor(kIrradiance, 0, irradiance.GetSRV());
-    context.DrawInstanced(kVerticesPerQuad, grid.counts[0] * grid.counts[1] * grid.counts[2]);
+    context.DrawInstanced(kVerticesPerQuad, GetProbeCount(grid));
 }
