@@ -36,6 +36,8 @@ namespace ProbeLighting
     ColorBuffer& GetProbesIrradiance(void);
     ColorBuffer& GetProbesDistance(void);
     ColorBuffer& GetRaySamples(void);
+    const Math::Matrix4& GetRaySamplesRotation(void);
+    uint32_t GetRaysPerProbe(void);
     ColorBuffer& GetScreenIrradiance(void);
     const IrradianceProbeGrid& GetGrid(void);
 }

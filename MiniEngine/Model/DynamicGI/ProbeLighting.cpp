@@ -50,6 +50,7 @@ namespace
 
     IrradianceProbeGrid s_Grid = {};
     uint32_t s_RaysPerProbe = 0;
+    Matrix4 s_RaySamplesRotation(kIdentity);
     bool s_ResetRequested = true;
     ProbeLighting::Progress s_Progress = {};
     std::mt19937 s_Random;
@@ -219,6 +220,7 @@ void ProbeLighting::Update(ComputeContext& context, const Settings& settings, co
 
     const uint32_t probeCount = GetProbeCount(s_Grid);
     const ProbeRays rays = { s_Grid, MakeRandomRotation(), s_RaysPerProbe };
+    s_RaySamplesRotation = rays.rotation;
 
     {
         ScopedTimer _traceProf(L"Probe Trace", context);
@@ -312,6 +314,16 @@ ColorBuffer& ProbeLighting::GetProbesDistance(void)
 ColorBuffer& ProbeLighting::GetRaySamples(void)
 {
     return s_RaySamples;
+}
+
+const Matrix4& ProbeLighting::GetRaySamplesRotation(void)
+{
+    return s_RaySamplesRotation;
+}
+
+uint32_t ProbeLighting::GetRaysPerProbe(void)
+{
+    return s_RaysPerProbe;
 }
 
 ColorBuffer& ProbeLighting::GetScreenIrradiance(void)

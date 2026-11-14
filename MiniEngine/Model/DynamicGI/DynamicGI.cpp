@@ -4,6 +4,7 @@
 #include "Model/DynamicGI/ProbeVisualization.h"
 #include "Core/Automation/ControlChannel.h"
 #include "Core/Editor/MeasurementConditions.h"
+#include "Core/Editor/SceneEditor.h"
 #include "Core/Editor/TextureViewer.h"
 #include "Model/Renderer/Renderer.h"
 #include "Core/Graphics/Command/CommandContext.h"
@@ -11,6 +12,8 @@
 
 #include <imgui.h>
 #include <algorithm>
+#include <optional>
+#include <sstream>
 
 using namespace Graphics;
 
@@ -35,10 +38,27 @@ namespace
 
     Settings s_Settings;
     bool s_ProbeStepRequested = false;
+    std::optional<uint32_t> s_SelectedProbe;
 
     bool IsIndirectOn(void)
     {
         return s_Settings.indirect != Source::kOff;
+    }
+
+    std::optional<uint32_t> GetSelectedProbe(void)
+    {
+        if (s_SelectedProbe && *s_SelectedProbe >= GetProbeCount(ProbeLighting::GetGrid()))
+            s_SelectedProbe.reset();
+        return s_SelectedProbe;
+    }
+
+    std::string FormatSelectedProbe(void)
+    {
+        const std::optional<uint32_t> probe = GetSelectedProbe();
+        if (!probe)
+            return "none";
+        const DirectX::XMUINT3 coordinate = GetProbeCoordinate(ProbeLighting::GetGrid(), *probe);
+        return std::to_string(coordinate.x) + " " + std::to_string(coordinate.y) + " " + std::to_string(coordinate.z);
     }
 
     bool ShouldUpdateProbes(void)
@@ -188,6 +208,16 @@ namespace
         ImGui::SliderFloat("Probe Radius", &probeSpheres.radiusPerSpacing, 0.0f, kMaxRadiusPerSpacing);
         ImGui::SetItemTooltip("Radius of the spheres as a fraction of the shortest probe spacing. At 0.5 neighbors touch.");
         TuningSection::MakeItemResettable("Probe Radius");
+        ImGui::Text("Selected Probe: %s", FormatSelectedProbe().c_str());
+        ImGui::SetItemTooltip("Click a probe sphere to select it. Clicking elsewhere in the scene clears the selection.");
+        ImGui::Checkbox("Show Texel Means", &probeSpheres.showTexelMeans);
+        ImGui::SetItemTooltip("Draws a yellow line from the selected probe along the direction of each of its distance texels, "
+            "as long as the mean distance the texel stores.");
+        TuningSection::MakeItemResettable("Show Texel Means");
+        ImGui::Checkbox("Show Ray Samples", &probeSpheres.showRaySamples);
+        ImGui::SetItemTooltip("Draws a line from the selected probe along each ray of its last update, as long as the distance the ray hit. "
+            "Cyan rays hit something closer than the longest distance a probe keeps, and red rays did not.");
+        TuningSection::MakeItemResettable("Show Ray Samples");
         ImGui::EndDisabled();
         ClampSettings();
     }
@@ -220,6 +250,8 @@ namespace
         const ProbeVisualization::Settings& probeSpheres = s_Settings.probeSpheres;
         values["Show Probes"] = FormatFlag(probeSpheres.show);
         values["Probe Radius"] = MeasurementConditions::FormatFloat(probeSpheres.radiusPerSpacing);
+        values["Show Texel Means"] = FormatFlag(probeSpheres.showTexelMeans);
+        values["Show Ray Samples"] = FormatFlag(probeSpheres.showRaySamples);
     }
 
     void ReadUInt(const TuningSection::Values& values, const char* key, uint32_t& value)
@@ -279,6 +311,8 @@ namespace
         ProbeVisualization::Settings& probeSpheres = s_Settings.probeSpheres;
         ReadFlag(values, "Show Probes", probeSpheres.show);
         ReadFloat(values, "Probe Radius", probeSpheres.radiusPerSpacing);
+        ReadFlag(values, "Show Texel Means", probeSpheres.showTexelMeans);
+        ReadFlag(values, "Show Ray Samples", probeSpheres.showRaySamples);
         ClampSettings();
     }
 
@@ -295,14 +329,55 @@ namespace
             .Object("probe", ControlChannel::Fields()
                 .Text("visibility", kVisibilityNames[(int)s_Settings.probe.visibility])
                 .Flag("paused", s_Settings.pauseProbeUpdates)
+                .Text("selected", FormatSelectedProbe())
                 .Integer("updates", ProbeLighting::GetProgress().updates)
                 .Integer("resets", ProbeLighting::GetProgress().resets));
     }
 
     TuningSection s_Section("Dynamic GI", ShowSettings, SaveSettings, LoadSettings);
 
+    void ReplyWithStateAfterFrame(const ControlChannel::Reply& reply)
+    {
+        ControlChannel::AfterFrames(1, [reply] { reply.Ok(ControlChannel::Fields().Object("state", ControlChannel::GetState("gi"))); });
+    }
+
+    void SelectProbe(const std::string& coordinateText, const ControlChannel::Reply& reply)
+    {
+        if (coordinateText == "none")
+        {
+            s_SelectedProbe.reset();
+            ReplyWithStateAfterFrame(reply);
+            return;
+        }
+
+        const IrradianceProbeGrid& grid = ProbeLighting::GetGrid();
+        std::istringstream stream(coordinateText);
+        DirectX::XMUINT3 coordinate;
+        std::string rest;
+        if (!(stream >> coordinate.x >> coordinate.y >> coordinate.z) || stream >> rest)
+        {
+            reply.Error("expected <x> <y> <z> or none: " + coordinateText);
+            return;
+        }
+        if (coordinate.x >= grid.counts[0] || coordinate.y >= grid.counts[1] || coordinate.z >= grid.counts[2])
+        {
+            reply.Error("the probe grid has " + std::to_string(grid.counts[0]) + " " + std::to_string(grid.counts[1]) + " " +
+                std::to_string(grid.counts[2]) + " probes along x y z");
+            return;
+        }
+
+        s_SelectedProbe = GetProbeIndex(grid, coordinate);
+        ReplyWithStateAfterFrame(reply);
+    }
+
     void HandleGICommand(const std::string& arguments, const ControlChannel::Reply& reply)
     {
+        const std::string selectPrefix = "probe select ";
+        if (arguments.rfind(selectPrefix, 0) == 0)
+        {
+            SelectProbe(arguments.substr(selectPrefix.size()), reply);
+            return;
+        }
         if (arguments != "probe step")
         {
             reply.Error("unknown arguments: " + arguments);
@@ -320,7 +395,7 @@ namespace
         }
 
         s_ProbeStepRequested = true;
-        ControlChannel::AfterFrames(1, [reply] { reply.Ok(ControlChannel::Fields().Object("state", ControlChannel::GetState("gi"))); });
+        ReplyWithStateAfterFrame(reply);
     }
 }
 
@@ -337,8 +412,11 @@ void DynamicGI::Initialize(void)
     TextureViewer::AddTexture("Path Traced Indirect Radiance", PathTracedLighting::GetIndirectRadiance());
 
     ControlChannel::RegisterState("gi", DescribeState);
-    ControlChannel::Register("gi", "gi probe step: updates the probes once on the next frame while Pause Updates is on, as the Step button does, "
-        "and replies with state gi after that frame. Fails unless Indirect is Probe and Pause Updates is on", HandleGICommand);
+    ControlChannel::Register("gi", "gi probe step | gi probe select <x> <y> <z>|none. "
+        "step updates the probes once on the next frame while Pause Updates is on, as the Step button does, "
+        "and fails unless Indirect is Probe and Pause Updates is on. "
+        "select selects the probe at a grid coordinate, or clears the selection, as clicking a probe sphere or elsewhere in the scene does. "
+        "The lines of the selected probe are drawn while Show Probes is on. Both reply with state gi after the next frame", HandleGICommand);
 }
 
 void DynamicGI::Shutdown(void)
@@ -391,6 +469,14 @@ void DynamicGI::Update(ComputeContext& context, const GIFrameInputs& inputs, uin
     Renderer::SetShadingOutput(s_Settings.view);
 }
 
+void DynamicGI::UpdateProbeSelection(const Math::Camera& camera)
+{
+    if (s_Settings.indirect != Source::kProbe || !s_Settings.probeSpheres.show || !SceneEditor::IsSceneClicked())
+        return;
+
+    s_SelectedProbe = ProbeVisualization::FindProbeUnderCursor(camera, ProbeLighting::GetGrid(), s_Settings.probeSpheres.radiusPerSpacing);
+}
+
 void DynamicGI::DrawProbes(GraphicsContext& context, const Math::Camera& camera, const D3D12_VIEWPORT& viewport, const D3D12_RECT& scissor)
 {
     if (s_Settings.indirect != Source::kProbe || !s_Settings.probeSpheres.show)
@@ -398,4 +484,10 @@ void DynamicGI::DrawProbes(GraphicsContext& context, const Math::Camera& camera,
 
     ProbeVisualization::DrawSpheres(context, camera, viewport, scissor, ProbeLighting::GetProbesIrradiance(), ProbeLighting::GetGrid(),
         s_Settings.probeSpheres.radiusPerSpacing);
+
+    if (const std::optional<uint32_t> probe = GetSelectedProbe())
+    {
+        ProbeVisualization::DrawDistanceLines(context, camera, viewport, scissor, ProbeLighting::GetProbesDistance(), ProbeLighting::GetRaySamples(),
+            ProbeLighting::GetRaySamplesRotation(), ProbeLighting::GetGrid(), ProbeLighting::GetRaysPerProbe(), *probe, s_Settings.probeSpheres);
+    }
 }

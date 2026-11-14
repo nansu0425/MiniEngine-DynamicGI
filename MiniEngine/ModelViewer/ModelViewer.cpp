@@ -1578,6 +1578,7 @@ void ModelViewer::Update( float deltaT )
     m_CameraController->Update(deltaT);
 
     SceneEditor::Update(m_Camera);
+    DynamicGI::UpdateProbeSelection(m_Camera);
     PathTracerTuning::Update();
 
     GraphicsContext& gfxContext = GraphicsContext::Begin(L"Scene Update");

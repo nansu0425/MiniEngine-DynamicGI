@@ -50,7 +50,7 @@ namespace SceneEditor
 
     bool IsSceneClicked(void);
 
-    // 아래 함수는 IconComponent의 Draw와 Rotate 안에서 쓴다.
+    // 아래 함수는 IconComponent의 Draw와 Rotate 안에서, 그리고 scene 위에 보이는 것을 click으로 고를 때 쓴다.
     float GetIconRadius(void);
     // camera 뒤에 있으면 false를 반환한다.
     bool ProjectToScene(const Math::Camera& camera, Math::Vector3 position, ImVec2& screenPosition);

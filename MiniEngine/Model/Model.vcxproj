@@ -154,6 +154,7 @@
     <None Include="DynamicGI\ProbeRays.hlsli" />
     <None Include="DynamicGI\ProbeVisibility.hlsli" />
     <None Include="DynamicGI\ProbeSphere.hlsli" />
+    <None Include="DynamicGI\ProbeDistanceLine.hlsli" />
     <None Include="Sponza\Lighting.hlsli" />
   </ItemGroup>
   <ItemGroup>
@@ -286,6 +287,12 @@
       <ShaderType>Vertex</ShaderType>
     </FxCompile>
     <FxCompile Include="DynamicGI\ProbeSpherePS.hlsl">
+      <ShaderType>Pixel</ShaderType>
+    </FxCompile>
+    <FxCompile Include="DynamicGI\ProbeDistanceLineVS.hlsl">
+      <ShaderType>Vertex</ShaderType>
+    </FxCompile>
+    <FxCompile Include="DynamicGI\ProbeDistanceLinePS.hlsl">
       <ShaderType>Pixel</ShaderType>
     </FxCompile>
   </ItemGroup>
