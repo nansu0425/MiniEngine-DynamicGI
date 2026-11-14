@@ -49,6 +49,16 @@ uint2 GetProbeTileOrigin(IrradianceProbeGrid grid, uint3 coordinate)
     return uint2(coordinate.x + coordinate.y * grid.counts.x, coordinate.z) * kProbeTileSize;
 }
 
+uint2 GetProbeAtlasTexel(IrradianceProbeGrid grid, uint3 coordinate, uint2 probeTexel)
+{
+    return GetProbeTileOrigin(grid, coordinate) + 1 + probeTexel;
+}
+
+float3 GetProbeTexelDirection(uint2 probeTexel)
+{
+    return DecodeOctahedral((float2(probeTexel) + 0.5) / kProbeTexelsPerSide);
+}
+
 float2 GetProbeAtlasSize(IrradianceProbeGrid grid)
 {
     return float2(grid.counts.x * grid.counts.y, grid.counts.z) * kProbeTileSize;
