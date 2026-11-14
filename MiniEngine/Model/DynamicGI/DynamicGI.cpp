@@ -29,14 +29,21 @@ namespace
         Renderer::ShadingOutput view = Renderer::ShadingOutput::kLit;
         PathTracedLighting::Settings pathTraced;
         ProbeLighting::Settings probe;
+        bool pauseProbeUpdates = false;
         ProbeVisualization::Settings probeSpheres;
     };
 
     Settings s_Settings;
+    bool s_ProbeStepRequested = false;
 
     bool IsIndirectOn(void)
     {
         return s_Settings.indirect != Source::kOff;
+    }
+
+    bool ShouldUpdateProbes(void)
+    {
+        return !s_Settings.pauseProbeUpdates || s_ProbeStepRequested || ProbeLighting::GetProgress().updates == 0;
     }
 
     // --- Engine Tuning과 harness --------------------------------------------------------------------
@@ -161,6 +168,16 @@ namespace
             ProbeLighting::Reset();
         ImGui::SetItemTooltip("Clears the probes. Changing the grid, the rays per probe or the model also clears them.");
         ImGui::Text("Updates: %u", ProbeLighting::GetProgress().updates);
+        ImGui::Checkbox("Pause Updates", &s_Settings.pauseProbeUpdates);
+        ImGui::SetItemTooltip("Stops tracing and updating the probes. The scene keeps using the probes as they are. "
+            "A reset or a grid change waits for the next update.");
+        TuningSection::MakeItemResettable("Pause Updates");
+        ImGui::SameLine();
+        ImGui::BeginDisabled(!s_Settings.pauseProbeUpdates);
+        if (ImGui::Button("Step"))
+            s_ProbeStepRequested = true;
+        ImGui::SetItemTooltip("Updates the probes once on the next frame.");
+        ImGui::EndDisabled();
 
         ProbeVisualization::Settings& probeSpheres = s_Settings.probeSpheres;
         ImGui::BeginDisabled(s_Settings.indirect != Source::kProbe);
@@ -198,6 +215,7 @@ namespace
         values["Rays per Probe"] = std::to_string(probe.raysPerProbe);
         values["Hysteresis"] = MeasurementConditions::FormatFloat(probe.hysteresis);
         values["Visibility"] = kVisibilityNames[(int)probe.visibility];
+        values["Pause Updates"] = FormatFlag(s_Settings.pauseProbeUpdates);
 
         const ProbeVisualization::Settings& probeSpheres = s_Settings.probeSpheres;
         values["Show Probes"] = FormatFlag(probeSpheres.show);
@@ -256,6 +274,7 @@ namespace
         ReadUInt(values, "Rays per Probe", probe.raysPerProbe);
         ReadFloat(values, "Hysteresis", probe.hysteresis);
         ReadName(values, "Visibility", kVisibilityNames, probe.visibility);
+        ReadFlag(values, "Pause Updates", s_Settings.pauseProbeUpdates);
 
         ProbeVisualization::Settings& probeSpheres = s_Settings.probeSpheres;
         ReadFlag(values, "Show Probes", probeSpheres.show);
@@ -275,11 +294,34 @@ namespace
                 .Integer("resets", progress.resets))
             .Object("probe", ControlChannel::Fields()
                 .Text("visibility", kVisibilityNames[(int)s_Settings.probe.visibility])
+                .Flag("paused", s_Settings.pauseProbeUpdates)
                 .Integer("updates", ProbeLighting::GetProgress().updates)
                 .Integer("resets", ProbeLighting::GetProgress().resets));
     }
 
     TuningSection s_Section("Dynamic GI", ShowSettings, SaveSettings, LoadSettings);
+
+    void HandleGICommand(const std::string& arguments, const ControlChannel::Reply& reply)
+    {
+        if (arguments != "probe step")
+        {
+            reply.Error("unknown arguments: " + arguments);
+            return;
+        }
+        if (s_Settings.indirect != Source::kProbe)
+        {
+            reply.Error("Indirect is not Probe");
+            return;
+        }
+        if (!s_Settings.pauseProbeUpdates)
+        {
+            reply.Error("Pause Updates is off");
+            return;
+        }
+
+        s_ProbeStepRequested = true;
+        ControlChannel::AfterFrames(1, [reply] { reply.Ok(ControlChannel::Fields().Object("state", ControlChannel::GetState("gi"))); });
+    }
 }
 
 void DynamicGI::Initialize(void)
@@ -295,6 +337,8 @@ void DynamicGI::Initialize(void)
     TextureViewer::AddTexture("Path Traced Indirect Radiance", PathTracedLighting::GetIndirectRadiance());
 
     ControlChannel::RegisterState("gi", DescribeState);
+    ControlChannel::Register("gi", "gi probe step: updates the probes once on the next frame while Pause Updates is on, as the Step button does, "
+        "and replies with state gi after that frame. Fails unless Indirect is Probe and Pause Updates is on", HandleGICommand);
 }
 
 void DynamicGI::Shutdown(void)
@@ -325,7 +369,11 @@ void DynamicGI::Update(ComputeContext& context, const GIFrameInputs& inputs, uin
         }
         else if (s_Settings.indirect == Source::kProbe)
         {
-            ProbeLighting::Update(context, s_Settings.probe, inputs);
+            if (ShouldUpdateProbes())
+            {
+                ProbeLighting::Update(context, s_Settings.probe, inputs);
+                s_ProbeStepRequested = false;
+            }
             if (s_Settings.probe.visibility != ProbeLighting::Visibility::kNone)
             {
                 ProbeLighting::EstimateScreenIrradiance(context, s_Settings.probe.visibility, inputs, width, height);
