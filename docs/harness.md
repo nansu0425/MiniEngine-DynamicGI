@@ -58,7 +58,7 @@ harness 는 ModelViewer 의 test 와 측정을 자동화하는 도구다. app �
 
 ## 측정 script 와 selftest
 
-- `scripts/measure-*.py` 는 harness 로 app 을 띄워 수치를 잰다. `--record` 를 주면 잰 값을 [측정 기록](reference-path-tracer-measurements.md) 에 덧붙인다. 무엇을 어떻게 재는지는 각 script 의 docstring 에 있다.
+- `scripts/measure-*.py` 는 harness 로 app 을 띄워 수치를 잰다. `--record` 를 주면 잰 값을 그 script 가 정한 측정 기록 ([Reference Path Tracer](reference-path-tracer-measurements.md), [Probe visibility](probe-visibility-measurements.md)) 에 덧붙인다. 무엇을 어떻게 재는지는 각 script 의 docstring 에 있다.
 - `selftest` 는 harness 자체를 확인한다. app 을 여러 번 띄우고 끈다. harness 가 의심될 때 돌리고, rendering 의 회귀 기준으로는 쓰지 않는다.
 
 ## 변경 전후 비교

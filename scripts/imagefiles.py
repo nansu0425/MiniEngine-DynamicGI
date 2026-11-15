@@ -7,6 +7,7 @@
 from pathlib import Path
 
 DXGI_FORMAT_R32G32B32A32_FLOAT = 2
+DXGI_FORMAT_R32G32_FLOAT = 16
 DXGI_FORMAT_R8G8B8A8_UNORM = 28
 DXGI_FORMAT_R8G8B8A8_UNORM_SRGB = 29
 DXGI_FORMAT_R32_FLOAT = 41
@@ -16,6 +17,7 @@ DDPF_ALPHAPIXELS = 0x1
 DDPF_FOURCC = 0x4
 DDPF_RGB = 0x40
 D3DFMT_R32F = 114
+D3DFMT_G32R32F = 115
 D3DFMT_A32B32G32R32F = 116
 RGBA8_MASKS = (0x000000ff, 0x0000ff00, 0x00ff0000, 0xff000000)
 
@@ -42,6 +44,8 @@ def read_dds_header(path):
     # DirectXTex 의 SaveToDDSFile 은 legacy header 로 나타낼 수 있는 DXGI format 을 legacy header 로 쓴다.
     if pixel_format_flags & DDPF_FOURCC and u32(84) == D3DFMT_A32B32G32R32F:
         dxgi_format = DXGI_FORMAT_R32G32B32A32_FLOAT
+    elif pixel_format_flags & DDPF_FOURCC and u32(84) == D3DFMT_G32R32F:
+        dxgi_format = DXGI_FORMAT_R32G32_FLOAT
     elif pixel_format_flags & DDPF_FOURCC and u32(84) == D3DFMT_R32F:
         dxgi_format = DXGI_FORMAT_R32_FLOAT
     elif (pixel_format_flags == DDPF_RGB | DDPF_ALPHAPIXELS and u32(88) == 32
@@ -59,6 +63,14 @@ def read_dds_rgba32f(path):
     if dxgi_format != DXGI_FORMAT_R32G32B32A32_FLOAT:
         raise ImageFileError(f'{path} is not RGBA32F')
     return np.frombuffer(data, dtype='<f4', count=width * height * 4, offset=offset).reshape(height, width, 4)
+
+
+def read_dds_rg32f(path):
+    import numpy as np
+    data, width, height, _, dxgi_format, offset = read_dds_header(path)
+    if dxgi_format != DXGI_FORMAT_R32G32_FLOAT:
+        raise ImageFileError(f'{path} is not RG32F')
+    return np.frombuffer(data, dtype='<f4', count=width * height * 2, offset=offset).reshape(height, width, 2)
 
 
 def read_dds_r32f(path):
