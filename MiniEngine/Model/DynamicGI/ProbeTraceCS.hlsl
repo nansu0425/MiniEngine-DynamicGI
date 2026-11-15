@@ -1,4 +1,4 @@
-#include "Model/DynamicGI/ProbeRays.hlsli"
+#include "Model/DynamicGI/ProbeRayHit.hlsli"
 #include "Model/DynamicGI/ProbeVisibility.hlsli"
 #include "Model/DynamicGI/HitLighting.hlsli"
 
@@ -25,19 +25,11 @@ struct ProbeRaySample
 
 ProbeRaySample TraceProbeRay(float3 origin, float3 direction)
 {
-    RayDesc ray;
-    ray.Origin = origin;
-    ray.Direction = direction;
-    ray.TMin = 0.0;
-    ray.TMax = 1e30;
-
-    const float maxDistance = GetProbeRayMaxDistance(Rays.grid);
     ProbeRaySample sample;
     RayHit rayHit;
-    if (!TraceClosestHit(ray, kCullSingleSidedBackFaces, rayHit))
+    if (!TraceProbeRayHit(Rays.grid, origin, direction, rayHit, sample.distance))
     {
         sample.radiance = Lights.skyRadiance;
-        sample.distance = maxDistance;
         return sample;
     }
 
@@ -51,7 +43,6 @@ ProbeRaySample TraceProbeRay(float3 origin, float3 direction)
     const float3 directRadiance = GetHitDirectRadiance(surface, brdf, Lights, ShadowMap, ShadowMapSampler);
 
     sample.radiance = surface.emissive + directRadiance + indirectRadiance;
-    sample.distance = min(rayHit.t, maxDistance);
     return sample;
 }
 
