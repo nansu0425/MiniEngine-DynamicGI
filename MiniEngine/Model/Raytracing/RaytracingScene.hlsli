@@ -153,6 +153,7 @@ bool IsOpaqueAt(uint instanceIndex, uint geometryIndex, uint primitiveIndex, flo
 // 어느 query가 이 flag로 쏘는지는 docs/policy.md의 "camera 밖에서 본 doubleSided"가 정한다.
 // doubleSided material의 BLAS instance는 RaytracingScene이 culling을 끈다.
 static const uint kCullSingleSidedBackFaces = RAY_FLAG_CULL_BACK_FACING_TRIANGLES;
+static const uint kDoubleSidedInstanceIDBit = 1;
 
 // rayFlags는 kCullSingleSidedBackFaces처럼 query마다 고르는 ray flag다.
 // scene에 procedural primitive가 없으므로 RayQueryType은 RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES를 갖는다.
@@ -181,9 +182,15 @@ struct RayHit
     uint primitiveIndex;
     float2 barycentrics;
     bool frontFace;
+    bool doubleSided;
     float3x4 objectToWorld;
     float3x4 worldToObject;
 };
+
+bool HitsSingleSidedBackFace(RayHit hit)
+{
+    return !hit.frontFace && !hit.doubleSided;
+}
 
 typedef RayQuery<RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> ClosestHitQuery;
 
@@ -201,6 +208,7 @@ bool TraceClosestHit(RayDesc ray, uint rayFlags, out RayHit hit)
     hit.primitiveIndex = query.CommittedPrimitiveIndex();
     hit.barycentrics = query.CommittedTriangleBarycentrics();
     hit.frontFace = query.CommittedTriangleFrontFace();
+    hit.doubleSided = (query.CommittedInstanceID() & kDoubleSidedInstanceIDBit) != 0;
     hit.objectToWorld = query.CommittedObjectToWorld3x4();
     hit.worldToObject = query.CommittedWorldToObject3x4();
     return true;

@@ -16,6 +16,7 @@ class RaytracingScene
 {
 public:
     static const UINT kNumRootParameters = 5;
+    static const UINT kDoubleSidedInstanceIDBit = 1;
 
     static void InitRootParameters(RootSignature& rootSignature, UINT firstRootIndex);
 
