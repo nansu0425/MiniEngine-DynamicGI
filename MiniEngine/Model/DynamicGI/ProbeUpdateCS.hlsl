@@ -3,6 +3,7 @@
 cbuffer Constants : register(b0)
 {
     float BlendWeight;
+    float DistanceSharpness;
     ProbeRays Rays;
 };
 
@@ -17,18 +18,21 @@ void main(uint3 Gid : SV_GroupID, uint3 GTid : SV_GroupThreadID)
     const float3 texelDirection = GetProbeTexelDirection(GTid.xy);
 
     float3 weightedRadiance = 0.0;
+    float radianceWeightSum = 0.0;
     float2 weightedMoments = 0.0;
-    float weightSum = 0.0;
+    float momentWeightSum = 0.0;
     for (uint ray = 0; ray < Rays.raysPerProbe; ++ray)
     {
-        const float weight = max(0.0, dot(texelDirection, GetProbeRayDirection(Rays, ray)));
+        const float radianceWeight = max(0.0, dot(texelDirection, GetProbeRayDirection(Rays, ray)));
+        const float momentWeight = pow(radianceWeight, DistanceSharpness);
         const float4 sample = RaySamples[uint2(ray, probe)];
-        weightedRadiance += weight * sample.rgb;
-        weightedMoments += weight * float2(sample.a, sample.a * sample.a);
-        weightSum += weight;
+        weightedRadiance += radianceWeight * sample.rgb;
+        radianceWeightSum += radianceWeight;
+        weightedMoments += momentWeight * float2(sample.a, sample.a * sample.a);
+        momentWeightSum += momentWeight;
     }
-    const float3 irradiance = weightSum > 0.0 ? weightedRadiance / weightSum : 0.0;
-    const float2 moments = weightSum > 0.0 ? weightedMoments / weightSum : 0.0;
+    const float3 irradiance = radianceWeightSum > 0.0 ? weightedRadiance / radianceWeightSum : 0.0;
+    const float2 moments = momentWeightSum > 0.0 ? weightedMoments / momentWeightSum : 0.0;
 
     const uint2 texel = GetProbeAtlasTexel(Rays.grid, GetProbeCoordinate(Rays.grid, probe), GTid.xy);
     ProbesIrradiance[texel] = float4(lerp(ProbesIrradiance[texel].rgb, irradiance, BlendWeight), 0.0);

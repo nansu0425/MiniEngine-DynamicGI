@@ -72,6 +72,7 @@ namespace
     __declspec(align(16)) struct UpdateConstants
     {
         float blendWeight;
+        float distanceSharpness;
         ProbeRays rays;
     };
 
@@ -247,7 +248,11 @@ void ProbeLighting::Update(ComputeContext& context, const Settings& settings, co
     {
         ScopedTimer _updateProf(L"Probes Update", context);
 
-        const UpdateConstants constants = { std::max(1.0f - settings.hysteresis, 1.0f / (s_Progress.updates + 1)), rays };
+        const UpdateConstants constants = {
+            .blendWeight = std::max(1.0f - settings.hysteresis, 1.0f / (s_Progress.updates + 1)),
+            .distanceSharpness = settings.distanceSharpness,
+            .rays = rays,
+        };
         context.SetRootSignature(s_UpdateRootSignature);
         context.SetPipelineState(s_UpdatePSO);
         context.TransitionResource(s_RaySamples, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);

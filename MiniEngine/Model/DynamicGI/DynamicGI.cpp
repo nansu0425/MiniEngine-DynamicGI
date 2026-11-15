@@ -76,6 +76,7 @@ namespace
     constexpr uint32_t kMaxProbesPerAxis = 64;
     constexpr uint32_t kMaxRaysPerProbe = 1024;
     constexpr float kMaxHysteresis = 0.999f;
+    constexpr float kMaxDistanceSharpness = 100.0f;
     constexpr float kMaxRadiusPerSpacing = 0.5f;
 
     // Source의 순서이고, Engine Tuning의 저장과 settings 명령이 이 이름으로 읽고 쓴다.
@@ -95,6 +96,7 @@ namespace
             count = std::max(2u, std::min(count, kMaxProbesPerAxis));
         probe.raysPerProbe = std::max(1u, std::min(probe.raysPerProbe, kMaxRaysPerProbe));
         probe.hysteresis = std::max(0.0f, std::min(probe.hysteresis, kMaxHysteresis));
+        probe.distanceSharpness = std::max(1.0f, std::min(probe.distanceSharpness, kMaxDistanceSharpness));
 
         ProbeVisualization::Settings& probeSpheres = s_Settings.probeSpheres;
         probeSpheres.radiusPerSpacing = std::max(0.0f, std::min(probeSpheres.radiusPerSpacing, kMaxRadiusPerSpacing));
@@ -175,6 +177,10 @@ namespace
         ImGui::SliderFloat("Hysteresis", &probe.hysteresis, 0.0f, kMaxHysteresis);
         ImGui::SetItemTooltip("How much of the old irradiance each update keeps.");
         TuningSection::MakeItemResettable("Hysteresis");
+        ImGui::SliderFloat("Distance Sharpness", &probe.distanceSharpness, 1.0f, kMaxDistanceSharpness);
+        ImGui::SetItemTooltip("Exponent on the cosine between a distance texel and a ray that weights the ray's distance in the texel. "
+            "Higher values keep only the rays close to the texel direction. The irradiance keeps the cosine itself.");
+        TuningSection::MakeItemResettable("Distance Sharpness");
         int visibility = (int)probe.visibility;
         if (ImGui::Combo("Visibility", &visibility, kVisibilityNames, IM_ARRAYSIZE(kVisibilityNames)))
             probe.visibility = (ProbeLighting::Visibility)visibility;
@@ -244,6 +250,7 @@ namespace
         values["Probes Z"] = std::to_string(probe.probeCounts[2]);
         values["Rays per Probe"] = std::to_string(probe.raysPerProbe);
         values["Hysteresis"] = MeasurementConditions::FormatFloat(probe.hysteresis);
+        values["Distance Sharpness"] = MeasurementConditions::FormatFloat(probe.distanceSharpness);
         values["Visibility"] = kVisibilityNames[(int)probe.visibility];
         values["Pause Updates"] = FormatFlag(s_Settings.pauseProbeUpdates);
 
@@ -305,6 +312,7 @@ namespace
         ReadUInt(values, "Probes Z", probe.probeCounts[2]);
         ReadUInt(values, "Rays per Probe", probe.raysPerProbe);
         ReadFloat(values, "Hysteresis", probe.hysteresis);
+        ReadFloat(values, "Distance Sharpness", probe.distanceSharpness);
         ReadName(values, "Visibility", kVisibilityNames, probe.visibility);
         ReadFlag(values, "Pause Updates", s_Settings.pauseProbeUpdates);
 

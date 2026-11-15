@@ -15,6 +15,7 @@ namespace ProbeLighting
         uint32_t probeCounts[3] = { 16, 8, 8 };
         uint32_t raysPerProbe = 64;
         float hysteresis = 0.95f;
+        float distanceSharpness = 1.0f;
         Visibility visibility = Visibility::kNone;
     };
 
