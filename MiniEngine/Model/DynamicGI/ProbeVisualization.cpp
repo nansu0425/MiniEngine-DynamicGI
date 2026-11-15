@@ -24,7 +24,6 @@ namespace
 {
     constexpr uint32_t kVerticesPerQuad = 6;
     constexpr uint32_t kVerticesPerLine = 2;
-    constexpr uint32_t kTexelsPerProbe = 64;
 
     enum RootParameter { kConstants, kIrradiance, kNumRootParameters };
     enum LineRootParameter { kLineConstants, kLineInputs, kNumLineRootParameters };
@@ -51,6 +50,7 @@ namespace
         uint32_t raysPerProbe;
         uint32_t probe;
         DistanceLines lines;
+        uint32_t distanceTexelsPerSide;
     };
 
     float GetShortestSpacing(const IrradianceProbeGrid& grid)
@@ -97,15 +97,15 @@ void ProbeVisualization::Initialize(void)
 }
 
 void ProbeVisualization::DrawSpheres(GraphicsContext& context, const Camera& camera, const D3D12_VIEWPORT& viewport, const D3D12_RECT& scissor,
-    ColorBuffer& irradiance, const IrradianceProbeGrid& grid, float radiusPerSpacing)
+    const ProbeLighting::Probes& probes, float radiusPerSpacing)
 {
     ScopedTimer _prof(L"Probe Spheres", context);
 
     Constants constants;
     constants.viewProj = camera.GetViewProjMatrix();
-    constants.grid = grid;
+    constants.grid = probes.grid;
     XMStoreFloat3(&constants.cameraPosition, camera.GetPosition());
-    constants.radius = radiusPerSpacing * GetShortestSpacing(grid);
+    constants.radius = radiusPerSpacing * GetShortestSpacing(probes.grid);
 
     context.SetRootSignature(s_RootSignature);
     context.SetPipelineState(s_PSO);
@@ -115,8 +115,8 @@ void ProbeVisualization::DrawSpheres(GraphicsContext& context, const Camera& cam
     context.SetRenderTarget(g_SceneColorBuffer.GetRTV(), g_SceneDepthBuffer.GetDSV());
     context.SetViewportAndScissor(viewport, scissor);
     context.SetDynamicConstantBufferView(kConstants, sizeof(constants), &constants);
-    context.SetDynamicDescriptor(kIrradiance, 0, irradiance.GetSRV());
-    context.DrawInstanced(kVerticesPerQuad, GetProbeCount(grid));
+    context.SetDynamicDescriptor(kIrradiance, 0, probes.irradiance.GetSRV());
+    context.DrawInstanced(kVerticesPerQuad, GetProbeCount(probes.grid));
 }
 
 std::optional<uint32_t> ProbeVisualization::FindProbeUnderCursor(const Camera& camera, const IrradianceProbeGrid& grid, float radiusPerSpacing)
@@ -146,40 +146,40 @@ std::optional<uint32_t> ProbeVisualization::FindProbeUnderCursor(const Camera& c
 }
 
 void ProbeVisualization::DrawDistanceLines(GraphicsContext& context, const Camera& camera, const D3D12_VIEWPORT& viewport, const D3D12_RECT& scissor,
-    ColorBuffer& probesDistance, ColorBuffer& raySamples, const Matrix4& raySamplesRotation, const IrradianceProbeGrid& grid, uint32_t raysPerProbe,
-    uint32_t probe, const Settings& settings)
+    const ProbeLighting::Probes& probes, uint32_t probe, const Settings& settings)
 {
     ScopedTimer _prof(L"Probe Distance Lines", context);
 
     LineConstants constants;
     constants.viewProj = camera.GetViewProjMatrix();
-    constants.grid = grid;
-    constants.rayRotation = raySamplesRotation;
-    constants.raysPerProbe = raysPerProbe;
+    constants.grid = probes.grid;
+    constants.rayRotation = probes.raySamplesRotation;
+    constants.raysPerProbe = probes.raysPerProbe;
     constants.probe = probe;
+    constants.distanceTexelsPerSide = probes.distanceTexelsPerSide;
 
     context.SetRootSignature(s_LineRootSignature);
     context.SetPipelineState(s_LinePSO);
     context.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
-    context.TransitionResource(probesDistance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-    context.TransitionResource(raySamples, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+    context.TransitionResource(probes.distance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+    context.TransitionResource(probes.raySamples, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     context.TransitionResource(g_SceneDepthBuffer, D3D12_RESOURCE_STATE_DEPTH_READ);
     context.TransitionResource(g_SceneColorBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
     context.SetRenderTarget(g_SceneColorBuffer.GetRTV(), g_SceneDepthBuffer.GetDSV_DepthReadOnly());
     context.SetViewportAndScissor(viewport, scissor);
-    context.SetDynamicDescriptor(kLineInputs, 0, probesDistance.GetSRV());
-    context.SetDynamicDescriptor(kLineInputs, 1, raySamples.GetSRV());
+    context.SetDynamicDescriptor(kLineInputs, 0, probes.distance.GetSRV());
+    context.SetDynamicDescriptor(kLineInputs, 1, probes.raySamples.GetSRV());
 
     if (settings.showTexelMeans)
     {
         constants.lines = DistanceLines::kTexelMeans;
         context.SetDynamicConstantBufferView(kLineConstants, sizeof(constants), &constants);
-        context.DrawInstanced(kVerticesPerLine, kTexelsPerProbe);
+        context.DrawInstanced(kVerticesPerLine, probes.distanceTexelsPerSide * probes.distanceTexelsPerSide);
     }
     if (settings.showRaySamples)
     {
         constants.lines = DistanceLines::kRaySamples;
         context.SetDynamicConstantBufferView(kLineConstants, sizeof(constants), &constants);
-        context.DrawInstanced(kVerticesPerLine, raysPerProbe);
+        context.DrawInstanced(kVerticesPerLine, probes.raysPerProbe);
     }
 }

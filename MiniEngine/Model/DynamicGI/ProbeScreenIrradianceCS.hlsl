@@ -6,6 +6,7 @@ cbuffer Constants : register(b0)
     uint Width;
     uint Height;
     uint Visibility;
+    uint DistanceTexelsPerSide;
     IrradianceProbeGrid Grid;
 };
 
@@ -24,6 +25,6 @@ void main(uint2 DTid : SV_DispatchThreadID)
     if (!LoadGBuffer(DTid, surface))
         return;
 
-    ScreenIrradiance[DTid] = float4(SampleVisibleIrradianceProbes(Visibility, ProbesIrradiance, ProbesDistance, LinearClamp, Grid, surface.position,
-        surface.geometryNormal, surface.shadingNormal), 0.0);
+    ScreenIrradiance[DTid] = float4(SampleVisibleIrradianceProbes(Visibility, ProbesIrradiance, MakeProbeDistanceAtlas(ProbesDistance, DistanceTexelsPerSide), LinearClamp, Grid,
+        surface.position, surface.geometryNormal, surface.shadingNormal), 0.0);
 }

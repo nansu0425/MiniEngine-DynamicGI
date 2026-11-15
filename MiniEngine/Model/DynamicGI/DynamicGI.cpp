@@ -47,7 +47,7 @@ namespace
 
     std::optional<uint32_t> GetSelectedProbe(void)
     {
-        if (s_SelectedProbe && *s_SelectedProbe >= GetProbeCount(ProbeLighting::GetGrid()))
+        if (s_SelectedProbe && *s_SelectedProbe >= GetProbeCount(ProbeLighting::GetProbes().grid))
             s_SelectedProbe.reset();
         return s_SelectedProbe;
     }
@@ -57,7 +57,7 @@ namespace
         const std::optional<uint32_t> probe = GetSelectedProbe();
         if (!probe)
             return "none";
-        const DirectX::XMUINT3 coordinate = GetProbeCoordinate(ProbeLighting::GetGrid(), *probe);
+        const DirectX::XMUINT3 coordinate = GetProbeCoordinate(ProbeLighting::GetProbes().grid, *probe);
         return std::to_string(coordinate.x) + " " + std::to_string(coordinate.y) + " " + std::to_string(coordinate.z);
     }
 
@@ -77,6 +77,7 @@ namespace
     constexpr uint32_t kMaxRaysPerProbe = 1024;
     constexpr float kMaxHysteresis = 0.999f;
     constexpr float kMaxDistanceSharpness = 100.0f;
+    constexpr uint32_t kMaxDistanceTexelsPerSide = 32;
     constexpr float kMaxRadiusPerSpacing = 0.5f;
 
     // Source의 순서이고, Engine Tuning의 저장과 settings 명령이 이 이름으로 읽고 쓴다.
@@ -97,6 +98,7 @@ namespace
         probe.raysPerProbe = std::max(1u, std::min(probe.raysPerProbe, kMaxRaysPerProbe));
         probe.hysteresis = std::max(0.0f, std::min(probe.hysteresis, kMaxHysteresis));
         probe.distanceSharpness = std::max(1.0f, std::min(probe.distanceSharpness, kMaxDistanceSharpness));
+        probe.distanceTexelsPerSide = std::max(1u, std::min(probe.distanceTexelsPerSide, kMaxDistanceTexelsPerSide));
 
         ProbeVisualization::Settings& probeSpheres = s_Settings.probeSpheres;
         probeSpheres.radiusPerSpacing = std::max(0.0f, std::min(probeSpheres.radiusPerSpacing, kMaxRadiusPerSpacing));
@@ -181,6 +183,9 @@ namespace
         ImGui::SetItemTooltip("Exponent on the cosine between a distance texel and a ray that weights the ray's distance in the texel. "
             "Higher values keep only the rays close to the texel direction. The irradiance keeps the cosine itself.");
         TuningSection::MakeItemResettable("Distance Sharpness");
+        ImGui::InputScalar("Distance Texels per Side", ImGuiDataType_U32, &probe.distanceTexelsPerSide, &step);
+        ImGui::SetItemTooltip("Texels along each side of a probe's octahedral distance map. The irradiance map keeps 8.");
+        TuningSection::MakeItemResettable("Distance Texels per Side");
         int visibility = (int)probe.visibility;
         if (ImGui::Combo("Visibility", &visibility, kVisibilityNames, IM_ARRAYSIZE(kVisibilityNames)))
             probe.visibility = (ProbeLighting::Visibility)visibility;
@@ -192,7 +197,7 @@ namespace
 
         if (ImGui::Button("Reset Probes"))
             ProbeLighting::Reset();
-        ImGui::SetItemTooltip("Clears the probes. Changing the grid, the rays per probe or the model also clears them.");
+        ImGui::SetItemTooltip("Clears the probes. Changing the grid, the rays per probe, the distance texels per side or the model also clears them.");
         ImGui::Text("Updates: %u", ProbeLighting::GetProgress().updates);
         ImGui::Checkbox("Pause Updates", &s_Settings.pauseProbeUpdates);
         ImGui::SetItemTooltip("Stops tracing and updating the probes. The scene keeps using the probes as they are. "
@@ -251,6 +256,7 @@ namespace
         values["Rays per Probe"] = std::to_string(probe.raysPerProbe);
         values["Hysteresis"] = MeasurementConditions::FormatFloat(probe.hysteresis);
         values["Distance Sharpness"] = MeasurementConditions::FormatFloat(probe.distanceSharpness);
+        values["Distance Texels per Side"] = std::to_string(probe.distanceTexelsPerSide);
         values["Visibility"] = kVisibilityNames[(int)probe.visibility];
         values["Pause Updates"] = FormatFlag(s_Settings.pauseProbeUpdates);
 
@@ -313,6 +319,7 @@ namespace
         ReadUInt(values, "Rays per Probe", probe.raysPerProbe);
         ReadFloat(values, "Hysteresis", probe.hysteresis);
         ReadFloat(values, "Distance Sharpness", probe.distanceSharpness);
+        ReadUInt(values, "Distance Texels per Side", probe.distanceTexelsPerSide);
         ReadName(values, "Visibility", kVisibilityNames, probe.visibility);
         ReadFlag(values, "Pause Updates", s_Settings.pauseProbeUpdates);
 
@@ -358,7 +365,7 @@ namespace
             return;
         }
 
-        const IrradianceProbeGrid& grid = ProbeLighting::GetGrid();
+        const IrradianceProbeGrid& grid = ProbeLighting::GetProbes().grid;
         std::istringstream stream(coordinateText);
         DirectX::XMUINT3 coordinate;
         std::string rest;
@@ -413,9 +420,10 @@ void DynamicGI::Initialize(void)
     ProbeLighting::Initialize();
     ProbeVisualization::Initialize();
 
-    TextureViewer::AddTexture("Probes Irradiance", ProbeLighting::GetProbesIrradiance());
-    TextureViewer::AddTexture("Probes Distance", ProbeLighting::GetProbesDistance());
-    TextureViewer::AddTexture("Probe Ray Samples", ProbeLighting::GetRaySamples());
+    const ProbeLighting::Probes probes = ProbeLighting::GetProbes();
+    TextureViewer::AddTexture("Probes Irradiance", probes.irradiance);
+    TextureViewer::AddTexture("Probes Distance", probes.distance);
+    TextureViewer::AddTexture("Probe Ray Samples", probes.raySamples);
     TextureViewer::AddTexture("Probe Screen Irradiance", ProbeLighting::GetScreenIrradiance());
     TextureViewer::AddTexture("Path Traced Indirect Radiance", PathTracedLighting::GetIndirectRadiance());
 
@@ -467,12 +475,12 @@ void DynamicGI::Update(ComputeContext& context, const GIFrameInputs& inputs, uin
                 context.TransitionResource(*screenIndirectIrradiance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
             }
             else
-                probesIndirectIrradiance = &ProbeLighting::GetProbesIrradiance();
-            context.TransitionResource(ProbeLighting::GetProbesIrradiance(), D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+                probesIndirectIrradiance = &ProbeLighting::GetProbes().irradiance;
+            context.TransitionResource(ProbeLighting::GetProbes().irradiance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         }
     }
     Renderer::SetIndirectRadiance(indirectRadiance);
-    Renderer::SetProbesIndirectIrradiance(probesIndirectIrradiance, ProbeLighting::GetGrid());
+    Renderer::SetProbesIndirectIrradiance(probesIndirectIrradiance, ProbeLighting::GetProbes().grid);
     Renderer::SetScreenIndirectIrradiance(screenIndirectIrradiance);
     Renderer::SetShadingOutput(s_Settings.view);
 }
@@ -482,7 +490,7 @@ void DynamicGI::UpdateProbeSelection(const Math::Camera& camera)
     if (s_Settings.indirect != Source::kProbe || !s_Settings.probeSpheres.show || !SceneEditor::IsSceneClicked())
         return;
 
-    s_SelectedProbe = ProbeVisualization::FindProbeUnderCursor(camera, ProbeLighting::GetGrid(), s_Settings.probeSpheres.radiusPerSpacing);
+    s_SelectedProbe = ProbeVisualization::FindProbeUnderCursor(camera, ProbeLighting::GetProbes().grid, s_Settings.probeSpheres.radiusPerSpacing);
 }
 
 void DynamicGI::DrawProbes(GraphicsContext& context, const Math::Camera& camera, const D3D12_VIEWPORT& viewport, const D3D12_RECT& scissor)
@@ -490,12 +498,9 @@ void DynamicGI::DrawProbes(GraphicsContext& context, const Math::Camera& camera,
     if (s_Settings.indirect != Source::kProbe || !s_Settings.probeSpheres.show)
         return;
 
-    ProbeVisualization::DrawSpheres(context, camera, viewport, scissor, ProbeLighting::GetProbesIrradiance(), ProbeLighting::GetGrid(),
-        s_Settings.probeSpheres.radiusPerSpacing);
+    const ProbeLighting::Probes probes = ProbeLighting::GetProbes();
+    ProbeVisualization::DrawSpheres(context, camera, viewport, scissor, probes, s_Settings.probeSpheres.radiusPerSpacing);
 
     if (const std::optional<uint32_t> probe = GetSelectedProbe())
-    {
-        ProbeVisualization::DrawDistanceLines(context, camera, viewport, scissor, ProbeLighting::GetProbesDistance(), ProbeLighting::GetRaySamples(),
-            ProbeLighting::GetRaySamplesRotation(), ProbeLighting::GetGrid(), ProbeLighting::GetRaysPerProbe(), *probe, s_Settings.probeSpheres);
-    }
+        ProbeVisualization::DrawDistanceLines(context, camera, viewport, scissor, probes, *probe, s_Settings.probeSpheres);
 }

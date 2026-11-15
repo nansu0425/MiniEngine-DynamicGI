@@ -16,7 +16,19 @@ namespace ProbeLighting
         uint32_t raysPerProbe = 64;
         float hysteresis = 0.95f;
         float distanceSharpness = 1.0f;
+        uint32_t distanceTexelsPerSide = 8;
         Visibility visibility = Visibility::kNone;
+    };
+
+    struct Probes
+    {
+        const IrradianceProbeGrid& grid;
+        ColorBuffer& irradiance;
+        ColorBuffer& distance;
+        uint32_t distanceTexelsPerSide;
+        ColorBuffer& raySamples;
+        const Math::Matrix4& raySamplesRotation;
+        uint32_t raysPerProbe;
     };
 
     struct Progress
@@ -34,11 +46,6 @@ namespace ProbeLighting
     void Update(ComputeContext& context, const Settings& settings, const GIFrameInputs& inputs);
     void EstimateScreenIrradiance(ComputeContext& context, Visibility visibility, const GIFrameInputs& inputs, uint32_t width, uint32_t height);
 
-    ColorBuffer& GetProbesIrradiance(void);
-    ColorBuffer& GetProbesDistance(void);
-    ColorBuffer& GetRaySamples(void);
-    const Math::Matrix4& GetRaySamplesRotation(void);
-    uint32_t GetRaysPerProbe(void);
+    Probes GetProbes(void);
     ColorBuffer& GetScreenIrradiance(void);
-    const IrradianceProbeGrid& GetGrid(void);
 }

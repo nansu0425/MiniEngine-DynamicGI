@@ -14,6 +14,7 @@ cbuffer Constants : register(b0)
     uint RaysPerProbe;
     uint Probe;
     uint Lines;
+    uint DistanceTexelsPerSide;
 };
 
 struct ProbeDistanceLineVertex

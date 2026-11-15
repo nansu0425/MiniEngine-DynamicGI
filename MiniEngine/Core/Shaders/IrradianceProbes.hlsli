@@ -1,9 +1,8 @@
 #ifndef __IRRADIANCE_PROBES_HLSLI__
 #define __IRRADIANCE_PROBES_HLSLI__
 
-static const uint kProbeTexelsPerSide = 8;
+static const uint kProbeIrradianceTexelsPerSide = 8;
 static const uint kProbeTileBorderTexels = 1;
-static const uint kProbeTileSize = kProbeTexelsPerSide + 2 * kProbeTileBorderTexels;
 
 struct IrradianceProbeGrid
 {
@@ -79,7 +78,7 @@ float2 GetProbeAtlasUV(IrradianceProbeGrid grid, uint texelsPerSide, uint3 coord
 
 float3 SampleProbeIrradiance(Texture2D<float4> atlas, SamplerState linearClamp, IrradianceProbeGrid grid, uint3 coordinate, float3 direction)
 {
-    return atlas.SampleLevel(linearClamp, GetProbeAtlasUV(grid, kProbeTexelsPerSide, coordinate, direction), 0.0).rgb;
+    return atlas.SampleLevel(linearClamp, GetProbeAtlasUV(grid, kProbeIrradianceTexelsPerSide, coordinate, direction), 0.0).rgb;
 }
 
 static const uint kNumProbeCorners = 8;

@@ -11,7 +11,8 @@
 #include "Core/Graphics/Resource/ShadowBuffer.h"
 
 #include "Output/Model/CompiledShaders/ProbeTraceCS.h"
-#include "Output/Model/CompiledShaders/ProbeUpdateCS.h"
+#include "Output/Model/CompiledShaders/ProbeIrradianceUpdateCS.h"
+#include "Output/Model/CompiledShaders/ProbeDistanceUpdateCS.h"
 #include "Output/Model/CompiledShaders/ProbeBorderCS.h"
 #include "Output/Model/CompiledShaders/ProbeScreenIrradianceCS.h"
 
@@ -23,8 +24,9 @@ using namespace Graphics;
 
 namespace
 {
-    constexpr uint32_t kProbeTexelsPerSide = 8;
-    constexpr uint32_t kProbeTileSize = kProbeTexelsPerSide + 2;
+    constexpr uint32_t kProbeIrradianceTexelsPerSide = 8;
+    constexpr uint32_t kProbeTileBorderTexels = 1;
+    constexpr uint32_t kProbeAtlasGroupSize = 8;
 
     enum TraceRootParameter { kTraceConstants, kTraceScene, kTraceInputs = kTraceScene + RaytracingScene::kNumRootParameters, kTraceOutputs, kNumTraceRootParameters };
     enum UpdateRootParameter { kUpdateConstants, kUpdateInputs, kUpdateOutputs, kNumUpdateRootParameters };
@@ -35,7 +37,8 @@ namespace
     RootSignature s_UpdateRootSignature;
     RootSignature s_ScreenRootSignature;
     ComputePSO s_TracePSO(L"Probe Trace");
-    ComputePSO s_UpdatePSO(L"Probes Update");
+    ComputePSO s_IrradianceUpdatePSO(L"Probes Irradiance Update");
+    ComputePSO s_DistanceUpdatePSO(L"Probes Distance Update");
     ComputePSO s_BorderPSO(L"Probe Border Copy");
     ComputePSO s_ScreenPSO(L"Probe Screen Irradiance");
 
@@ -50,6 +53,7 @@ namespace
 
     IrradianceProbeGrid s_Grid = {};
     uint32_t s_RaysPerProbe = 0;
+    uint32_t s_DistanceTexelsPerSide = 0;
     Matrix4 s_RaySamplesRotation(kIdentity);
     bool s_ResetRequested = true;
     ProbeLighting::Progress s_Progress = {};
@@ -65,15 +69,29 @@ namespace
     __declspec(align(16)) struct TraceConstants
     {
         uint32_t visibility;
+        uint32_t distanceTexelsPerSide;
         GILights lights;
         ProbeRays rays;
     };
 
-    __declspec(align(16)) struct UpdateConstants
+    __declspec(align(16)) struct IrradianceUpdateConstants
+    {
+        float blendWeight;
+        ProbeRays rays;
+    };
+
+    __declspec(align(16)) struct DistanceUpdateConstants
     {
         float blendWeight;
         float distanceSharpness;
+        uint32_t distanceTexelsPerSide;
         ProbeRays rays;
+    };
+
+    __declspec(align(16)) struct BorderConstants
+    {
+        uint32_t texelsPerSide;
+        IrradianceProbeGrid grid;
     };
 
     __declspec(align(16)) struct ScreenConstants
@@ -81,6 +99,7 @@ namespace
         uint32_t width;
         uint32_t height;
         uint32_t visibility;
+        uint32_t distanceTexelsPerSide;
         IrradianceProbeGrid grid;
     };
 
@@ -111,20 +130,39 @@ namespace
         return Matrix4(Matrix3(rotation));
     }
 
-    void FitResourcesTo(const IrradianceProbeGrid& grid, uint32_t raysPerProbe)
+    uint32_t GetProbeTileSize(uint32_t texelsPerSide)
     {
-        if (IsSameGrid(grid, s_Grid) && raysPerProbe == s_RaysPerProbe)
+        return texelsPerSide + 2 * kProbeTileBorderTexels;
+    }
+
+    void CreateProbeAtlas(ColorBuffer& atlas, const wchar_t* name, const IrradianceProbeGrid& grid, uint32_t texelsPerSide, DXGI_FORMAT format)
+    {
+        const uint32_t tileSize = GetProbeTileSize(texelsPerSide);
+        atlas.Create(name, grid.counts[0] * grid.counts[1] * tileSize, grid.counts[2] * tileSize, 1, format);
+    }
+
+    void FitResourcesTo(const IrradianceProbeGrid& grid, uint32_t raysPerProbe, uint32_t distanceTexelsPerSide)
+    {
+        if (IsSameGrid(grid, s_Grid) && raysPerProbe == s_RaysPerProbe && distanceTexelsPerSide == s_DistanceTexelsPerSide)
             return;
 
         g_CommandManager.IdleGPU();
-        s_ProbesIrradiance.Create(L"Probes Irradiance", grid.counts[0] * grid.counts[1] * kProbeTileSize, grid.counts[2] * kProbeTileSize, 1,
-            DXGI_FORMAT_R32G32B32A32_FLOAT);
-        s_ProbesDistance.Create(L"Probes Distance", grid.counts[0] * grid.counts[1] * kProbeTileSize, grid.counts[2] * kProbeTileSize, 1,
-            DXGI_FORMAT_R32G32_FLOAT);
+        CreateProbeAtlas(s_ProbesIrradiance, L"Probes Irradiance", grid, kProbeIrradianceTexelsPerSide, DXGI_FORMAT_R32G32B32A32_FLOAT);
+        CreateProbeAtlas(s_ProbesDistance, L"Probes Distance", grid, distanceTexelsPerSide, DXGI_FORMAT_R32G32_FLOAT);
         s_RaySamples.Create(L"Probe Ray Samples", raysPerProbe, GetProbeCount(grid), 1, DXGI_FORMAT_R32G32B32A32_FLOAT);
         s_Grid = grid;
         s_RaysPerProbe = raysPerProbe;
+        s_DistanceTexelsPerSide = distanceTexelsPerSide;
         s_ResetRequested = true;
+    }
+
+    void CopyProbeTileBorders(ComputeContext& context, ColorBuffer& atlas, uint32_t texelsPerSide)
+    {
+        const BorderConstants constants = { .texelsPerSide = texelsPerSide, .grid = s_Grid };
+        const uint32_t tileSize = GetProbeTileSize(texelsPerSide);
+        context.SetDynamicConstantBufferView(kUpdateConstants, sizeof(constants), &constants);
+        context.SetDynamicDescriptor(kUpdateOutputs, 0, atlas.GetUAV());
+        context.Dispatch3D(tileSize, tileSize, GetProbeCount(s_Grid), kProbeAtlasGroupSize, kProbeAtlasGroupSize, 1);
     }
 
     void FitScreenIrradianceTo(uint32_t width, uint32_t height)
@@ -155,12 +193,16 @@ void ProbeLighting::Initialize(void)
     s_UpdateRootSignature.Reset(kNumUpdateRootParameters, 0);
     s_UpdateRootSignature[kUpdateConstants].InitAsConstantBuffer(0);
     s_UpdateRootSignature[kUpdateInputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 1);
-    s_UpdateRootSignature[kUpdateOutputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 2);
+    s_UpdateRootSignature[kUpdateOutputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 1);
     s_UpdateRootSignature.Finalize(L"Probes Update");
 
-    s_UpdatePSO.SetRootSignature(s_UpdateRootSignature);
-    s_UpdatePSO.SetComputeShader(g_pProbeUpdateCS, sizeof(g_pProbeUpdateCS));
-    s_UpdatePSO.Finalize();
+    s_IrradianceUpdatePSO.SetRootSignature(s_UpdateRootSignature);
+    s_IrradianceUpdatePSO.SetComputeShader(g_pProbeIrradianceUpdateCS, sizeof(g_pProbeIrradianceUpdateCS));
+    s_IrradianceUpdatePSO.Finalize();
+
+    s_DistanceUpdatePSO.SetRootSignature(s_UpdateRootSignature);
+    s_DistanceUpdatePSO.SetComputeShader(g_pProbeDistanceUpdateCS, sizeof(g_pProbeDistanceUpdateCS));
+    s_DistanceUpdatePSO.Finalize();
 
     s_BorderPSO.SetRootSignature(s_UpdateRootSignature);
     s_BorderPSO.SetComputeShader(g_pProbeBorderCS, sizeof(g_pProbeBorderCS));
@@ -206,7 +248,7 @@ void ProbeLighting::Update(ComputeContext& context, const Settings& settings, co
 {
     ScopedTimer _prof(L"Probe Lighting", context);
 
-    FitResourcesTo(DescribeGrid(inputs.modelBounds, settings.probeCounts), settings.raysPerProbe);
+    FitResourcesTo(DescribeGrid(inputs.modelBounds, settings.probeCounts), settings.raysPerProbe, settings.distanceTexelsPerSide);
     if (s_ResetRequested)
     {
         context.TransitionResource(s_ProbesIrradiance, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, true);
@@ -226,7 +268,7 @@ void ProbeLighting::Update(ComputeContext& context, const Settings& settings, co
     {
         ScopedTimer _traceProf(L"Probe Trace", context);
 
-        const TraceConstants constants = { (uint32_t)settings.visibility, DescribeGILights(inputs), rays };
+        const TraceConstants constants = { (uint32_t)settings.visibility, s_DistanceTexelsPerSide, DescribeGILights(inputs), rays };
         s_TraceInputs.PointTo(0, inputs.shadowMap, inputs.shadowMap.GetSRV());
         s_TraceInputs.PointTo(1, s_ProbesIrradiance, s_ProbesIrradiance.GetSRV());
         s_TraceInputs.PointTo(2, s_ProbesDistance, s_ProbesDistance.GetSRV());
@@ -248,31 +290,35 @@ void ProbeLighting::Update(ComputeContext& context, const Settings& settings, co
     {
         ScopedTimer _updateProf(L"Probes Update", context);
 
-        const UpdateConstants constants = {
-            .blendWeight = std::max(1.0f - settings.hysteresis, 1.0f / (s_Progress.updates + 1)),
-            .distanceSharpness = settings.distanceSharpness,
-            .rays = rays,
-        };
+        const float blendWeight = std::max(1.0f - settings.hysteresis, 1.0f / (s_Progress.updates + 1));
         context.SetRootSignature(s_UpdateRootSignature);
-        context.SetPipelineState(s_UpdatePSO);
         context.TransitionResource(s_RaySamples, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
         context.TransitionResource(s_ProbesIrradiance, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
         context.TransitionResource(s_ProbesDistance, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-        context.SetDynamicConstantBufferView(kUpdateConstants, sizeof(constants), &constants);
         context.SetDynamicDescriptor(kUpdateInputs, 0, s_RaySamples.GetSRV());
+
+        const IrradianceUpdateConstants irradianceConstants = { .blendWeight = blendWeight, .rays = rays };
+        context.SetPipelineState(s_IrradianceUpdatePSO);
+        context.SetDynamicConstantBufferView(kUpdateConstants, sizeof(irradianceConstants), &irradianceConstants);
         context.SetDynamicDescriptor(kUpdateOutputs, 0, s_ProbesIrradiance.GetUAV());
-        context.SetDynamicDescriptor(kUpdateOutputs, 1, s_ProbesDistance.GetUAV());
         context.Dispatch(probeCount);
+
+        const DistanceUpdateConstants distanceConstants = {
+            .blendWeight = blendWeight,
+            .distanceSharpness = settings.distanceSharpness,
+            .distanceTexelsPerSide = s_DistanceTexelsPerSide,
+            .rays = rays,
+        };
+        context.SetPipelineState(s_DistanceUpdatePSO);
+        context.SetDynamicConstantBufferView(kUpdateConstants, sizeof(distanceConstants), &distanceConstants);
+        context.SetDynamicDescriptor(kUpdateOutputs, 0, s_ProbesDistance.GetUAV());
+        context.Dispatch3D(s_DistanceTexelsPerSide, s_DistanceTexelsPerSide, probeCount, kProbeAtlasGroupSize, kProbeAtlasGroupSize, 1);
 
         context.InsertUAVBarrier(s_ProbesIrradiance);
         context.InsertUAVBarrier(s_ProbesDistance);
         context.SetPipelineState(s_BorderPSO);
-        context.SetDynamicConstantBufferView(kUpdateConstants, sizeof(s_Grid), &s_Grid);
-        for (ColorBuffer* atlas : { &s_ProbesIrradiance, &s_ProbesDistance })
-        {
-            context.SetDynamicDescriptor(kUpdateOutputs, 0, atlas->GetUAV());
-            context.Dispatch(probeCount);
-        }
+        CopyProbeTileBorders(context, s_ProbesIrradiance, kProbeIrradianceTexelsPerSide);
+        CopyProbeTileBorders(context, s_ProbesDistance, s_DistanceTexelsPerSide);
     }
 
     ++s_Progress.updates;
@@ -291,7 +337,7 @@ void ProbeLighting::EstimateScreenIrradiance(ComputeContext& context, Visibility
     s_ScreenInputs.PointTo(kNumGBufferTargets + 1, s_ProbesDistance, s_ProbesDistance.GetSRV());
     s_ScreenOutputs.PointTo(0, s_ScreenIrradiance, s_ScreenIrradiance.GetUAV());
 
-    const ScreenConstants constants = { width, height, (uint32_t)visibility, s_Grid };
+    const ScreenConstants constants = { width, height, (uint32_t)visibility, s_DistanceTexelsPerSide, s_Grid };
     context.SetRootSignature(s_ScreenRootSignature);
     context.SetPipelineState(s_ScreenPSO);
     for (ColorBuffer& target : g_GBuffer)
@@ -306,37 +352,20 @@ void ProbeLighting::EstimateScreenIrradiance(ComputeContext& context, Visibility
     context.Dispatch2D(width, height);
 }
 
-ColorBuffer& ProbeLighting::GetProbesIrradiance(void)
+ProbeLighting::Probes ProbeLighting::GetProbes(void)
 {
-    return s_ProbesIrradiance;
-}
-
-ColorBuffer& ProbeLighting::GetProbesDistance(void)
-{
-    return s_ProbesDistance;
-}
-
-ColorBuffer& ProbeLighting::GetRaySamples(void)
-{
-    return s_RaySamples;
-}
-
-const Matrix4& ProbeLighting::GetRaySamplesRotation(void)
-{
-    return s_RaySamplesRotation;
-}
-
-uint32_t ProbeLighting::GetRaysPerProbe(void)
-{
-    return s_RaysPerProbe;
+    return {
+        .grid = s_Grid,
+        .irradiance = s_ProbesIrradiance,
+        .distance = s_ProbesDistance,
+        .distanceTexelsPerSide = s_DistanceTexelsPerSide,
+        .raySamples = s_RaySamples,
+        .raySamplesRotation = s_RaySamplesRotation,
+        .raysPerProbe = s_RaysPerProbe,
+    };
 }
 
 ColorBuffer& ProbeLighting::GetScreenIrradiance(void)
 {
     return s_ScreenIrradiance;
-}
-
-const IrradianceProbeGrid& ProbeLighting::GetGrid(void)
-{
-    return s_Grid;
 }

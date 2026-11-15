@@ -5,6 +5,7 @@
 cbuffer Constants : register(b0)
 {
     uint Visibility;
+    uint DistanceTexelsPerSide;
     GILights Lights;
     ProbeRays Rays;
 };
@@ -44,7 +45,7 @@ ProbeRaySample TraceProbeRay(float3 origin, float3 direction)
     const GltfBrdfInput brdf = MakeGltfBrdfInput(surface.baseColor.rgb, surface.metallic, surface.roughness, surface.shadingNormal, -direction);
     const float3 irradiance = Visibility == kProbeVisibilityNone ?
         SampleIrradianceProbes(ProbesIrradiance, LinearClamp, Rays.grid, surface.position, surface.shadingNormal) :
-        SampleVisibleIrradianceProbes(Visibility, ProbesIrradiance, ProbesDistance, LinearClamp, Rays.grid, surface.position, surface.geometryNormal,
+        SampleVisibleIrradianceProbes(Visibility, ProbesIrradiance, MakeProbeDistanceAtlas(ProbesDistance, DistanceTexelsPerSide), LinearClamp, Rays.grid, surface.position, surface.geometryNormal,
             surface.shadingNormal);
     const float3 indirectRadiance = kPi * EvaluateGltfDiffuseLobeForIrradiance(brdf) * irradiance;
     const float3 directRadiance = GetHitDirectRadiance(surface, brdf, Lights, ShadowMap, ShadowMapSampler);

@@ -9,6 +9,20 @@ static const uint kProbeVisibilityNone = 0;
 static const uint kProbeVisibilityShadowRay = 1;
 static const uint kProbeVisibilityChebyshev = 2;
 
+struct ProbeDistanceAtlas
+{
+    Texture2D<float2> moments;
+    uint texelsPerSide;
+};
+
+ProbeDistanceAtlas MakeProbeDistanceAtlas(Texture2D<float2> moments, uint texelsPerSide)
+{
+    ProbeDistanceAtlas atlas;
+    atlas.moments = moments;
+    atlas.texelsPerSide = texelsPerSide;
+    return atlas;
+}
+
 bool CanShadowRayReachProbe(IrradianceProbeGrid grid, uint3 coordinate, float3 position, float3 geometryNormal)
 {
     const float3 toProbe = GetProbePosition(grid, coordinate) - position;
@@ -20,11 +34,12 @@ bool CanShadowRayReachProbe(IrradianceProbeGrid grid, uint3 coordinate, float3 p
     return !IsOccluded(ray, kCullSingleSidedBackFaces);
 }
 
-float GetChebyshevVisibility(Texture2D<float2> distanceAtlas, SamplerState linearClamp, IrradianceProbeGrid grid, uint3 coordinate, float3 position)
+float GetChebyshevVisibility(ProbeDistanceAtlas distanceAtlas, SamplerState linearClamp, IrradianceProbeGrid grid, uint3 coordinate, float3 position)
 {
     const float3 fromProbe = position - GetProbePosition(grid, coordinate);
     const float distance = length(fromProbe);
-    const float2 moments = distanceAtlas.SampleLevel(linearClamp, GetProbeAtlasUV(grid, kProbeTexelsPerSide, coordinate, fromProbe / distance), 0.0);
+    const float2 moments =
+        distanceAtlas.moments.SampleLevel(linearClamp, GetProbeAtlasUV(grid, distanceAtlas.texelsPerSide, coordinate, fromProbe / distance), 0.0);
     if (distance <= moments.x)
         return 1.0;
     const float variance = max(moments.y - moments.x * moments.x, 0.0);
@@ -32,7 +47,7 @@ float GetChebyshevVisibility(Texture2D<float2> distanceAtlas, SamplerState linea
     return variance / (variance + excess * excess);
 }
 
-float GetProbeVisibilityWeight(uint visibility, Texture2D<float2> distanceAtlas, SamplerState linearClamp, IrradianceProbeGrid grid, uint3 coordinate,
+float GetProbeVisibilityWeight(uint visibility, ProbeDistanceAtlas distanceAtlas, SamplerState linearClamp, IrradianceProbeGrid grid, uint3 coordinate,
     float3 position, float3 geometryNormal)
 {
     if (visibility == kProbeVisibilityShadowRay)
@@ -42,7 +57,7 @@ float GetProbeVisibilityWeight(uint visibility, Texture2D<float2> distanceAtlas,
     return 1.0;
 }
 
-float3 SampleVisibleIrradianceProbes(uint visibility, Texture2D<float4> irradianceAtlas, Texture2D<float2> distanceAtlas, SamplerState linearClamp,
+float3 SampleVisibleIrradianceProbes(uint visibility, Texture2D<float4> irradianceAtlas, ProbeDistanceAtlas distanceAtlas, SamplerState linearClamp,
     IrradianceProbeGrid grid, float3 position, float3 geometryNormal, float3 direction)
 {
     float3 irradiance = 0.0;
