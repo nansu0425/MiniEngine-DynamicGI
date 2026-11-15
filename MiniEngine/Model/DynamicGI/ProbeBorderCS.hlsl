@@ -25,6 +25,6 @@ void main(uint3 Gid : SV_GroupID, uint3 GTid : SV_GroupThreadID)
     if (all(and(GTid.xy != 0, GTid.xy != kLast)))
         return;
 
-    const uint2 tileOrigin = GetProbeTileOrigin(Grid, GetProbeCoordinate(Grid, Gid.x));
+    const uint2 tileOrigin = GetProbeTileOrigin(Grid, kProbeTexelsPerSide, GetProbeCoordinate(Grid, Gid.x));
     ProbesAtlas[tileOrigin + GTid.xy] = ProbesAtlas[tileOrigin + GetBorderSource(GTid.xy)];
 }

@@ -24,7 +24,7 @@ float GetChebyshevVisibility(Texture2D<float2> distanceAtlas, SamplerState linea
 {
     const float3 fromProbe = position - GetProbePosition(grid, coordinate);
     const float distance = length(fromProbe);
-    const float2 moments = distanceAtlas.SampleLevel(linearClamp, GetProbeAtlasUV(grid, coordinate, fromProbe / distance), 0.0);
+    const float2 moments = distanceAtlas.SampleLevel(linearClamp, GetProbeAtlasUV(grid, kProbeTexelsPerSide, coordinate, fromProbe / distance), 0.0);
     if (distance <= moments.x)
         return 1.0;
     const float variance = max(moments.y - moments.x * moments.x, 0.0);

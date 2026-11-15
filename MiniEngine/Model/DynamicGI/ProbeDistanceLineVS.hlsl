@@ -16,8 +16,8 @@ ProbeDistanceLineVertex main(uint vertexID : SV_VertexID, uint lineIndex : SV_In
     if (Lines == kProbeDistanceLinesOfTexelMeans)
     {
         const uint2 probeTexel = uint2(lineIndex % kProbeTexelsPerSide, lineIndex / kProbeTexelsPerSide);
-        direction = GetProbeTexelDirection(probeTexel);
-        distance = ProbesDistance[GetProbeAtlasTexel(Grid, coordinate, probeTexel)].x;
+        direction = GetProbeTexelDirection(kProbeTexelsPerSide, probeTexel);
+        distance = ProbesDistance[GetProbeAtlasTexel(Grid, kProbeTexelsPerSide, coordinate, probeTexel)].x;
         vertex.color = kTexelMeanColor;
     }
     else

@@ -2,7 +2,8 @@
 #define __IRRADIANCE_PROBES_HLSLI__
 
 static const uint kProbeTexelsPerSide = 8;
-static const uint kProbeTileSize = kProbeTexelsPerSide + 2;
+static const uint kProbeTileBorderTexels = 1;
+static const uint kProbeTileSize = kProbeTexelsPerSide + 2 * kProbeTileBorderTexels;
 
 struct IrradianceProbeGrid
 {
@@ -44,35 +45,41 @@ float3 GetProbePosition(IrradianceProbeGrid grid, uint3 coordinate)
     return grid.origin + float3(coordinate) * grid.spacing;
 }
 
-uint2 GetProbeTileOrigin(IrradianceProbeGrid grid, uint3 coordinate)
+uint GetProbeTileSize(uint texelsPerSide)
 {
-    return uint2(coordinate.x + coordinate.y * grid.counts.x, coordinate.z) * kProbeTileSize;
+    return texelsPerSide + 2 * kProbeTileBorderTexels;
 }
 
-uint2 GetProbeAtlasTexel(IrradianceProbeGrid grid, uint3 coordinate, uint2 probeTexel)
+uint2 GetProbeTileOrigin(IrradianceProbeGrid grid, uint texelsPerSide, uint3 coordinate)
 {
-    return GetProbeTileOrigin(grid, coordinate) + 1 + probeTexel;
+    return uint2(coordinate.x + coordinate.y * grid.counts.x, coordinate.z) * GetProbeTileSize(texelsPerSide);
 }
 
-float3 GetProbeTexelDirection(uint2 probeTexel)
+uint2 GetProbeAtlasTexel(IrradianceProbeGrid grid, uint texelsPerSide, uint3 coordinate, uint2 probeTexel)
 {
-    return DecodeOctahedral((float2(probeTexel) + 0.5) / kProbeTexelsPerSide);
+    return GetProbeTileOrigin(grid, texelsPerSide, coordinate) + kProbeTileBorderTexels + probeTexel;
 }
 
-float2 GetProbeAtlasSize(IrradianceProbeGrid grid)
+float3 GetProbeTexelDirection(uint texelsPerSide, uint2 probeTexel)
 {
-    return float2(grid.counts.x * grid.counts.y, grid.counts.z) * kProbeTileSize;
+    return DecodeOctahedral((float2(probeTexel) + 0.5) / texelsPerSide);
 }
 
-float2 GetProbeAtlasUV(IrradianceProbeGrid grid, uint3 coordinate, float3 direction)
+float2 GetProbeAtlasSize(IrradianceProbeGrid grid, uint texelsPerSide)
 {
-    const float2 texel = float2(GetProbeTileOrigin(grid, coordinate)) + 1.0 + EncodeOctahedral(direction) * kProbeTexelsPerSide;
-    return texel / GetProbeAtlasSize(grid);
+    return float2(grid.counts.x * grid.counts.y, grid.counts.z) * GetProbeTileSize(texelsPerSide);
+}
+
+float2 GetProbeAtlasUV(IrradianceProbeGrid grid, uint texelsPerSide, uint3 coordinate, float3 direction)
+{
+    const float2 texel = float2(GetProbeTileOrigin(grid, texelsPerSide, coordinate)) + kProbeTileBorderTexels +
+        EncodeOctahedral(direction) * texelsPerSide;
+    return texel / GetProbeAtlasSize(grid, texelsPerSide);
 }
 
 float3 SampleProbeIrradiance(Texture2D<float4> atlas, SamplerState linearClamp, IrradianceProbeGrid grid, uint3 coordinate, float3 direction)
 {
-    return atlas.SampleLevel(linearClamp, GetProbeAtlasUV(grid, coordinate, direction), 0.0).rgb;
+    return atlas.SampleLevel(linearClamp, GetProbeAtlasUV(grid, kProbeTexelsPerSide, coordinate, direction), 0.0).rgb;
 }
 
 static const uint kNumProbeCorners = 8;

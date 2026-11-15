@@ -15,7 +15,7 @@ RWTexture2D<float2> ProbesDistance : register(u1);
 void main(uint3 Gid : SV_GroupID, uint3 GTid : SV_GroupThreadID)
 {
     const uint probe = Gid.x;
-    const float3 texelDirection = GetProbeTexelDirection(GTid.xy);
+    const float3 texelDirection = GetProbeTexelDirection(kProbeTexelsPerSide, GTid.xy);
 
     float3 weightedRadiance = 0.0;
     float radianceWeightSum = 0.0;
@@ -34,7 +34,7 @@ void main(uint3 Gid : SV_GroupID, uint3 GTid : SV_GroupThreadID)
     const float3 irradiance = radianceWeightSum > 0.0 ? weightedRadiance / radianceWeightSum : 0.0;
     const float2 moments = momentWeightSum > 0.0 ? weightedMoments / momentWeightSum : 0.0;
 
-    const uint2 texel = GetProbeAtlasTexel(Rays.grid, GetProbeCoordinate(Rays.grid, probe), GTid.xy);
+    const uint2 texel = GetProbeAtlasTexel(Rays.grid, kProbeTexelsPerSide, GetProbeCoordinate(Rays.grid, probe), GTid.xy);
     ProbesIrradiance[texel] = float4(lerp(ProbesIrradiance[texel].rgb, irradiance, BlendWeight), 0.0);
     ProbesDistance[texel] = lerp(ProbesDistance[texel], moments, BlendWeight);
 }
