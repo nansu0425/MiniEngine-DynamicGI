@@ -27,7 +27,7 @@ namespace
 
     enum RootParameter { kConstants, kIrradiance, kNumRootParameters };
     enum LineRootParameter { kLineConstants, kLineInputs, kNumLineRootParameters };
-    enum class DistanceLines : uint32_t { kTexelMeans, kRaySamples };
+    enum class DistanceLines : uint32_t { kTexelMeans, kRaySamples, kTexelDistances };
 
     RootSignature s_RootSignature;
     GraphicsPSO s_PSO(L"Probe Spheres");
@@ -81,7 +81,7 @@ void ProbeVisualization::Initialize(void)
 
     s_LineRootSignature.Reset(kNumLineRootParameters, 0);
     s_LineRootSignature[kLineConstants].InitAsConstantBuffer(0);
-    s_LineRootSignature[kLineInputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 2, D3D12_SHADER_VISIBILITY_VERTEX);
+    s_LineRootSignature[kLineInputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 3, D3D12_SHADER_VISIBILITY_VERTEX);
     s_LineRootSignature.Finalize(L"Probe Distance Lines");
 
     s_LinePSO.SetRootSignature(s_LineRootSignature);
@@ -163,16 +163,24 @@ void ProbeVisualization::DrawDistanceLines(GraphicsContext& context, const Camer
     context.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
     context.TransitionResource(probes.distance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     context.TransitionResource(probes.raySamples, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+    context.TransitionResource(probes.texelDistance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     context.TransitionResource(g_SceneDepthBuffer, D3D12_RESOURCE_STATE_DEPTH_READ);
     context.TransitionResource(g_SceneColorBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
     context.SetRenderTarget(g_SceneColorBuffer.GetRTV(), g_SceneDepthBuffer.GetDSV_DepthReadOnly());
     context.SetViewportAndScissor(viewport, scissor);
     context.SetDynamicDescriptor(kLineInputs, 0, probes.distance.GetSRV());
     context.SetDynamicDescriptor(kLineInputs, 1, probes.raySamples.GetSRV());
+    context.SetDynamicDescriptor(kLineInputs, 2, probes.texelDistance.GetSRV());
 
     if (settings.showTexelMeans)
     {
         constants.lines = DistanceLines::kTexelMeans;
+        context.SetDynamicConstantBufferView(kLineConstants, sizeof(constants), &constants);
+        context.DrawInstanced(kVerticesPerLine, probes.distanceTexelsPerSide * probes.distanceTexelsPerSide);
+    }
+    if (settings.showTexelDistances)
+    {
+        constants.lines = DistanceLines::kTexelDistances;
         context.SetDynamicConstantBufferView(kLineConstants, sizeof(constants), &constants);
         context.DrawInstanced(kVerticesPerLine, probes.distanceTexelsPerSide * probes.distanceTexelsPerSide);
     }

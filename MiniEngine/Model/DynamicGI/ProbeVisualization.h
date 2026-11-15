@@ -19,6 +19,7 @@ namespace ProbeVisualization
         bool show = false;
         float radiusPerSpacing = 0.15f;
         bool showTexelMeans = true;
+        bool showTexelDistances = true;
         bool showRaySamples = true;
     };
 

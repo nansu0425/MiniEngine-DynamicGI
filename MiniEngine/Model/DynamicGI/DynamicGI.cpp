@@ -225,6 +225,10 @@ namespace
         ImGui::SetItemTooltip("Draws a yellow line from the selected probe along the direction of each of its distance texels, "
             "as long as the mean distance the texel stores.");
         TuningSection::MakeItemResettable("Show Texel Means");
+        ImGui::Checkbox("Show Texel Distances", &probeSpheres.showTexelDistances);
+        ImGui::SetItemTooltip("Draws a magenta line from the selected probe along the direction of each of its distance texels, "
+            "as long as a single ray along that direction hit when the probes were last cleared.");
+        TuningSection::MakeItemResettable("Show Texel Distances");
         ImGui::Checkbox("Show Ray Samples", &probeSpheres.showRaySamples);
         ImGui::SetItemTooltip("Draws a line from the selected probe along each ray of its last update, as long as the distance the ray hit. "
             "Cyan rays hit something closer than the longest distance a probe keeps, and red rays did not.");
@@ -264,6 +268,7 @@ namespace
         values["Show Probes"] = FormatFlag(probeSpheres.show);
         values["Probe Radius"] = MeasurementConditions::FormatFloat(probeSpheres.radiusPerSpacing);
         values["Show Texel Means"] = FormatFlag(probeSpheres.showTexelMeans);
+        values["Show Texel Distances"] = FormatFlag(probeSpheres.showTexelDistances);
         values["Show Ray Samples"] = FormatFlag(probeSpheres.showRaySamples);
     }
 
@@ -327,6 +332,7 @@ namespace
         ReadFlag(values, "Show Probes", probeSpheres.show);
         ReadFloat(values, "Probe Radius", probeSpheres.radiusPerSpacing);
         ReadFlag(values, "Show Texel Means", probeSpheres.showTexelMeans);
+        ReadFlag(values, "Show Texel Distances", probeSpheres.showTexelDistances);
         ReadFlag(values, "Show Ray Samples", probeSpheres.showRaySamples);
         ClampSettings();
     }

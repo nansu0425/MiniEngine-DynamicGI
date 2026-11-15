@@ -5,6 +5,7 @@
 
 static const uint kProbeDistanceLinesOfTexelMeans = 0;
 static const uint kProbeDistanceLinesOfRaySamples = 1;
+static const uint kProbeDistanceLinesOfTexelDistances = 2;
 
 cbuffer Constants : register(b0)
 {
