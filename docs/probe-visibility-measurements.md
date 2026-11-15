@@ -14,6 +14,9 @@ Probe visibility 작업이 잰 값 중 다시 재면 바뀌거나 다시 재기 
 - 1.1 배 초과는 그 비가 1.1 을 넘는 texel 의 비율이다.
 - 변화 p90 은 수렴한 뒤 update 한 번에 바뀐 mean 을 진짜 거리로 나눈 값의 90 백분위다.
 - Probe Trace 와 Probes Update 는 Profiler 의 GPU time 평균이다.
+- 그래프는 `python scripts/plot-probe-distance.py` 가 이 표에서 그린다. 같은 조건의 줄이 여럿이면 가장 아래 줄을 그린다. `--record` 도 줄을 덧붙인 뒤 다시 그린다.
+
+![Distance Sharpness, distance 해상도, ray 수의 sweep 그래프](images/probe-distance-sweep.png)
 
 | 날짜 | 코드 | config | GPU | scene | N | rays | sharpness | p50 | p90 | p99 | 1.1 배 초과 | 변화 p90 | Probe Trace (ms) | Probes Update (ms) |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|

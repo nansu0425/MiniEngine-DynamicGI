@@ -1,5 +1,6 @@
 import argparse
 import itertools
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -13,6 +14,7 @@ from viewer import REPO_ROOT, HarnessError, Session, shots_dir, start_instance, 
 
 RECORD = REPO_ROOT / 'docs' / 'probe-visibility-measurements.md'
 RECORD_SECTION = '## Distance Sharpness, distance 해상도, ray 수'
+PLOT_SCRIPT = Path(__file__).resolve().parent / 'plot-probe-distance.py'
 
 SECTION = 'Engine Tuning'
 KEY_PREFIX = 'Dynamic GI/'
@@ -112,6 +114,7 @@ def measure(args):
         for row in rows:
             append_record_row(RECORD, RECORD_SECTION, row)
         print(f'recorded in {RECORD}')
+        subprocess.run([sys.executable, str(PLOT_SCRIPT)], check=True)
     return 0
 
 
