@@ -13,7 +13,7 @@ bool TraceProbeRayHit(IrradianceProbeGrid grid, float3 origin, float3 direction,
     ray.TMax = 1e30;
 
     const float maxDistance = GetProbeRayMaxDistance(grid);
-    const bool hit = TraceClosestHit(ray, kCullSingleSidedBackFaces, rayHit);
+    const bool hit = TraceClosestHit(ray, RAY_FLAG_NONE, rayHit);
     distance = hit ? min(rayHit.t, maxDistance) : maxDistance;
     return hit;
 }

@@ -17,6 +17,7 @@ namespace ProbeLighting
         float hysteresis = 0.95f;
         float distanceSharpness = 1.0f;
         uint32_t distanceTexelsPerSide = 8;
+        float backFaceDistanceScale = 0.2f;
         Visibility visibility = Visibility::kNone;
     };
 

@@ -6,6 +6,7 @@ cbuffer Constants : register(b0)
 {
     uint Visibility;
     uint DistanceTexelsPerSide;
+    float BackFaceDistanceScale;
     GILights Lights;
     ProbeRays Rays;
 };
@@ -30,6 +31,12 @@ ProbeRaySample TraceProbeRay(float3 origin, float3 direction)
     if (!TraceProbeRayHit(Rays.grid, origin, direction, rayHit, sample.distance))
     {
         sample.radiance = Lights.skyRadiance;
+        return sample;
+    }
+    if (HitsSingleSidedBackFace(rayHit))
+    {
+        sample.radiance = 0.0;
+        sample.distance *= BackFaceDistanceScale;
         return sample;
     }
 

@@ -77,6 +77,7 @@ namespace
     {
         uint32_t visibility;
         uint32_t distanceTexelsPerSide;
+        float backFaceDistanceScale;
         GILights lights;
         ProbeRays rays;
     };
@@ -315,7 +316,13 @@ void ProbeLighting::Update(ComputeContext& context, const Settings& settings, co
     {
         ScopedTimer _traceProf(L"Probe Trace", context);
 
-        const TraceConstants constants = { (uint32_t)settings.visibility, s_DistanceTexelsPerSide, DescribeGILights(inputs), rays };
+        const TraceConstants constants = {
+            .visibility = (uint32_t)settings.visibility,
+            .distanceTexelsPerSide = s_DistanceTexelsPerSide,
+            .backFaceDistanceScale = settings.backFaceDistanceScale,
+            .lights = DescribeGILights(inputs),
+            .rays = rays,
+        };
         s_TraceInputs.PointTo(0, inputs.shadowMap, inputs.shadowMap.GetSRV());
         s_TraceInputs.PointTo(1, s_ProbesIrradiance, s_ProbesIrradiance.GetSRV());
         s_TraceInputs.PointTo(2, s_ProbesDistance, s_ProbesDistance.GetSRV());

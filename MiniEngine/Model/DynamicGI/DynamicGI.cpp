@@ -99,6 +99,7 @@ namespace
         probe.hysteresis = std::max(0.0f, std::min(probe.hysteresis, kMaxHysteresis));
         probe.distanceSharpness = std::max(1.0f, std::min(probe.distanceSharpness, kMaxDistanceSharpness));
         probe.distanceTexelsPerSide = std::max(1u, std::min(probe.distanceTexelsPerSide, kMaxDistanceTexelsPerSide));
+        probe.backFaceDistanceScale = std::max(0.0f, std::min(probe.backFaceDistanceScale, 1.0f));
 
         ProbeVisualization::Settings& probeSpheres = s_Settings.probeSpheres;
         probeSpheres.radiusPerSpacing = std::max(0.0f, std::min(probeSpheres.radiusPerSpacing, kMaxRadiusPerSpacing));
@@ -186,6 +187,10 @@ namespace
         ImGui::InputScalar("Distance Texels per Side", ImGuiDataType_U32, &probe.distanceTexelsPerSide, &step);
         ImGui::SetItemTooltip("Texels along each side of a probe's octahedral distance map. The irradiance map keeps 8.");
         TuningSection::MakeItemResettable("Distance Texels per Side");
+        ImGui::SliderFloat("Back Face Distance Scale", &probe.backFaceDistanceScale, 0.0f, 1.0f);
+        ImGui::SetItemTooltip("A probe ray that first hits the back face of a single-sided material records no radiance "
+            "and this fraction of the distance it hit, so the points beyond that face see the probe as occluded.");
+        TuningSection::MakeItemResettable("Back Face Distance Scale");
         int visibility = (int)probe.visibility;
         if (ImGui::Combo("Visibility", &visibility, kVisibilityNames, IM_ARRAYSIZE(kVisibilityNames)))
             probe.visibility = (ProbeLighting::Visibility)visibility;
@@ -230,7 +235,7 @@ namespace
             "as long as a single ray along that direction hit when the probes were last cleared.");
         TuningSection::MakeItemResettable("Show Texel Distances");
         ImGui::Checkbox("Show Ray Samples", &probeSpheres.showRaySamples);
-        ImGui::SetItemTooltip("Draws a line from the selected probe along each ray of its last update, as long as the distance the ray hit. "
+        ImGui::SetItemTooltip("Draws a line from the selected probe along each ray of its last update, as long as the distance the ray recorded. "
             "Cyan rays hit something closer than the longest distance a probe keeps, and red rays did not.");
         TuningSection::MakeItemResettable("Show Ray Samples");
         ImGui::EndDisabled();
@@ -261,6 +266,7 @@ namespace
         values["Hysteresis"] = MeasurementConditions::FormatFloat(probe.hysteresis);
         values["Distance Sharpness"] = MeasurementConditions::FormatFloat(probe.distanceSharpness);
         values["Distance Texels per Side"] = std::to_string(probe.distanceTexelsPerSide);
+        values["Back Face Distance Scale"] = MeasurementConditions::FormatFloat(probe.backFaceDistanceScale);
         values["Visibility"] = kVisibilityNames[(int)probe.visibility];
         values["Pause Updates"] = FormatFlag(s_Settings.pauseProbeUpdates);
 
@@ -325,6 +331,7 @@ namespace
         ReadFloat(values, "Hysteresis", probe.hysteresis);
         ReadFloat(values, "Distance Sharpness", probe.distanceSharpness);
         ReadUInt(values, "Distance Texels per Side", probe.distanceTexelsPerSide);
+        ReadFloat(values, "Back Face Distance Scale", probe.backFaceDistanceScale);
         ReadName(values, "Visibility", kVisibilityNames, probe.visibility);
         ReadFlag(values, "Pause Updates", s_Settings.pauseProbeUpdates);
 
