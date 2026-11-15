@@ -45,8 +45,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cornellbox
 from imagecompare import bias, relative_noise
 from imagefiles import ImageFileError, read_dds_rgba32f
-from measurement import (BASE, RECORD, SKY_COLOR, SKY_RADIANCE, append_record_row, code_version, describe_machine, path_tracer_settings,
-                         set_path_tracer)
+from measurement import BASE, RECORD, SKY_COLOR, SKY_RADIANCE, path_tracer_settings, set_path_tracer
+from measurementrecord import append_record_row, code_version, describe_machine
 from viewer import (CAMERA_OBJECT, HARNESS_DIR, VIEWER_DIR, HarnessError, Session, baseline_scene, read_scene_file, shots_dir, start_instance,
                     stop_instance)
 
@@ -330,7 +330,7 @@ def record(manifest, results):
     mitsuba = f'{manifest["mitsuba"]["version"]} {manifest["mitsuba"]["variant"]}'
     for label, (result, path_tracer_noise, mitsuba_noise) in results.items():
         bounces = BOUNCES[label]
-        append_record_row(RECORD_SECTION, [
+        append_record_row(RECORD, RECORD_SECTION, [
             today, manifest['code'], *manifest['machine'], f'[{label}]', str(bounces), str(bounces + 1), mitsuba, str(SAMPLES),
             f'{path_tracer_noise:.2e}', f'{mitsuba_noise:.2e}', f'{result.difference:.2e}', f'{result.difference_bound:.2e}',
             f'{result.difference_floor:.2e}', f'{result.rms:.2e}', f'{result.rms_bound:.2e}', f'{result.rms_floor:.2e}'])

@@ -3,12 +3,11 @@
 script 마다 PathTracer 를 설정하는 값과 측정 기록에 덧붙이는 방식이 달라지지 않도록 여기에 모은다.
 """
 
-import subprocess
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from viewer import REPO_ROOT, HarnessError
+from viewer import REPO_ROOT
 
 RECORD = REPO_ROOT / 'docs' / 'reference-path-tracer-measurements.md'
 # PT 의 설정은 Engine Tuning 의 Path Tracer 에 있다. settings 의 key 는 PT 의 설정 이름 앞에 KEY_PREFIX 를 붙인 것이다.
@@ -55,32 +54,3 @@ def set_path_tracer(session, settings):
 def light_by_sky_only(session):
     """directional light 를 끈다. 작업 5, 6 의 측정 기록은 sky 만 비추는 scene 에서 정했다. furnace 는 light 를 스스로 끈다."""
     return session.ask_ok('light set intensity=0')
-
-
-def code_version():
-    """잴 때의 HEAD. commit 하지 않은 변경이 있으면 + 를 붙인다."""
-    def git(*arguments):
-        return subprocess.run(['git', *arguments], cwd=REPO_ROOT, capture_output=True, text=True, check=True).stdout.strip()
-    return git('rev-parse', '--short', 'HEAD') + ('+' if git('status', '--porcelain') else '')
-
-
-def describe_machine(session):
-    """측정 기록의 config, GPU, scene 열."""
-    engine = session.ask_ok('state engine')['state']['engine']
-    scene = session.ask_ok('state ui')['state']['ui']['scene']
-    return [engine['config'], engine['gpu'], f'{scene["width"]}x{scene["height"]}']
-
-
-def append_record_row(section, cells):
-    """RECORD 의 section 에 있는 표의 끝에 한 줄을 추가한다."""
-    lines = RECORD.read_text(encoding='utf-8').splitlines(keepends=True)
-    try:
-        start = next(index for index, line in enumerate(lines) if line.rstrip() == section)
-    except StopIteration:
-        raise HarnessError(f'{RECORD} has no section "{section}"')
-    end = next((index for index in range(start + 1, len(lines)) if lines[index].startswith('## ')), len(lines))
-    table = [index for index in range(start + 1, end) if lines[index].startswith('|')]
-    if not table:
-        raise HarnessError(f'the section "{section}" of {RECORD} has no table')
-    lines.insert(table[-1] + 1, '| ' + ' | '.join(cells) + ' |\n')
-    RECORD.write_text(''.join(lines), encoding='utf-8', newline='\n')

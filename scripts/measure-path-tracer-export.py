@@ -29,8 +29,8 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from imagecompare import agreement
 from imagefiles import ImageFileError, read_dds_rgba32f
-from measurement import (BASE, RECORD, WHITE_FURNACE, append_record_row, code_version, describe_machine, light_by_sky_only,
-                         set_path_tracer)
+from measurement import BASE, RECORD, WHITE_FURNACE, light_by_sky_only, set_path_tracer
+from measurementrecord import append_record_row, code_version, describe_machine
 from viewer import HarnessError, Session, shots_dir, start_instance, stop_instance
 
 SHADING_NORMAL_RECORD_SECTION = '## 작업 6: shading normal 이 잃는 energy'
@@ -114,9 +114,9 @@ def measure(args):
 
 def record(code, machine, shading_normals, russian_roulette):
     date = time.strftime('%Y-%m-%d')
-    append_record_row(SHADING_NORMAL_RECORD_SECTION, [date, code, *machine, str(SHADING_NORMAL_SAMPLES)] +
+    append_record_row(RECORD, SHADING_NORMAL_RECORD_SECTION, [date, code, *machine, str(SHADING_NORMAL_SAMPLES)] +
                       [f'{value:.4g}' for value in shading_normals])
-    append_record_row(RUSSIAN_ROULETTE_RECORD_SECTION, [date, code, *machine, str(SCENE['Max Bounces']), str(SCENE_SAMPLES)] +
+    append_record_row(RECORD, RUSSIAN_ROULETTE_RECORD_SECTION, [date, code, *machine, str(SCENE['Max Bounces']), str(SCENE_SAMPLES)] +
                       [f'{russian_roulette[0]:.5g}', f'{russian_roulette[1]:.3g}', f'{russian_roulette[2]:.3g}'])
 
 

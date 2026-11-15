@@ -16,7 +16,8 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from measurement import BASE, RECORD, append_record_row, code_version, describe_machine, light_by_sky_only, set_path_tracer
+from measurement import BASE, RECORD, light_by_sky_only, set_path_tracer
+from measurementrecord import append_record_row, code_version, describe_machine
 from viewer import HarnessError, Session, start_instance, stop_instance
 
 RECORD_SECTION = '## 작업 5: 1 spp 의 GPU time'
@@ -59,7 +60,7 @@ def measure(args):
         return 1
     if args.record:
         for row in rows:
-            append_record_row(RECORD_SECTION, row)
+            append_record_row(RECORD, RECORD_SECTION, row)
         print(f'recorded in {RECORD}')
     return 0
 

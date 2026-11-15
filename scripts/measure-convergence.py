@@ -61,7 +61,8 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from imagecompare import bias, relative_noise
 from imagefiles import ImageFileError, read_dds_rgba32f
-from measurement import BASE, RECORD, SKY_COLOR, SKY_RADIANCE, append_record_row, code_version, describe_machine, set_path_tracer
+from measurement import BASE, RECORD, SKY_COLOR, SKY_RADIANCE, set_path_tracer
+from measurementrecord import append_record_row, code_version, describe_machine
 from viewer import (HARNESS_DIR, REPO_ROOT, VIEWER_DIR, HarnessError, Session, default_vertical_fov, measurement_scenes, read_scene_file,
                     shots_dir, start_instance, stop_instance)
 
@@ -448,14 +449,14 @@ def record(manifest, rows, ground_truth_samples, biases):
         last = max(errors)
         at_ground_truth = errors.get(ground_truth_samples)
         seconds = entry['exports'].get(str(ground_truth_samples), {}).get('seconds')
-        append_record_row(CONVERGENCE_RECORD_SECTION, [
+        append_record_row(RECORD, CONVERGENCE_RECORD_SECTION, [
             today, entry['code'], *entry['machine'], scene, shading, f'{row["gpu_ms"]:.3f}', f'{errors[1024]:.4g}', str(last),
             f'{errors[last]:.4g}', f'{row["slope"]:.3f}', f'{row["last_slope"]:.3f}', f'{row["share"]:.3f}',
             str(ground_truth_samples) if ground_truth_samples is not None else '-',
             f'{at_ground_truth:.4g}' if at_ground_truth is not None else '-', f'{seconds:.0f}' if seconds is not None else '-'])
     for criterion, scene, comparison, samples, result in biases:
         entry = manifest['runs'][slope_name(scene, 'Lambert', 0)]
-        append_record_row(BIAS_RECORD_SECTION, [
+        append_record_row(RECORD, BIAS_RECORD_SECTION, [
             today, entry['code'], *entry['machine'], f'[{criterion}]', scene, comparison, str(samples), f'{result.difference:.2e}',
             f'{result.difference_bound:.2e}', f'{result.rms:.2e}', f'{result.rms_bound:.2e}'])
 
