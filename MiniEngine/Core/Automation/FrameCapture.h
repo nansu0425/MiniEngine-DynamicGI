@@ -2,8 +2,15 @@
 
 #include "Core/Automation/ControlChannel.h"
 
+#include <functional>
+
 class CommandContext;
 class PixelBuffer;
+
+namespace DirectX
+{
+    struct Image;
+}
 
 // frame이 그려지는 중간의 buffer를 읽기 전용으로 복사해 파일로 쓴다. 쓰는 frame에서만 GPU를 기다린다.
 namespace FrameCapture
@@ -36,4 +43,8 @@ namespace FrameCapture
     void Capture(Target target, PixelBuffer& buffer);
     // context에 기록한 것을 GPU에서 먼저 실행해야 buffer가 다 그려지는 곳에서 쓴다. context는 계속 기록할 수 있다.
     void Capture(Target target, CommandContext& context, PixelBuffer& buffer);
+
+    using ImageWriter = std::function<HRESULT(const DirectX::Image& image, const std::wstring& path)>;
+
+    std::string WriteBuffer(CommandContext& context, PixelBuffer& buffer, const std::string& path, const ImageWriter& write);
 }

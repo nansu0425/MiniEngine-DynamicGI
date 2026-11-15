@@ -132,25 +132,11 @@ void FrameCapture::Capture(Target target, CommandContext& context, PixelBuffer& 
         return;
     }
 
-    ReadbackBuffer readback;
-    const uint32_t rowPitch = context.ReadbackTexture(readback, buffer);
-    context.Flush(true);
-
-    DirectX::Image image = {};
-    image.width = buffer.GetWidth();
-    image.height = buffer.GetHeight();
-    image.format = buffer.GetFormat();
-    image.rowPitch = rowPitch;
-    image.slicePitch = (size_t)rowPitch * buffer.GetHeight();
-    image.pixels = (uint8_t*)readback.Map();
-    const HRESULT hr = Save(target, image, Utility::ToWide(path));
-    readback.Unmap();
-
-    if (FAILED(hr))
+    const std::string error = WriteBuffer(context, buffer, path,
+        [target](const DirectX::Image& image, const std::wstring& widePath) { return Save(target, image, widePath); });
+    if (!error.empty())
     {
-        char hrText[16];
-        sprintf_s(hrText, "0x%08X", (unsigned)hr);
-        reply.Error("cannot write " + path + " (hr " + hrText + ")");
+        reply.Error(error);
         return;
     }
     if (!SaveState(statePath))
@@ -173,4 +159,29 @@ void FrameCapture::Capture(Target target, CommandContext& context, PixelBuffer& 
     }
     fields.Text("conditions", conditionsPath).Text("line", line);
     reply.Ok(fields);
+}
+
+std::string FrameCapture::WriteBuffer(CommandContext& context, PixelBuffer& buffer, const std::string& path, const ImageWriter& write)
+{
+    ReadbackBuffer readback;
+    const uint32_t rowPitch = context.ReadbackTexture(readback, buffer);
+    context.Flush(true);
+
+    DirectX::Image image = {};
+    image.width = buffer.GetWidth();
+    image.height = buffer.GetHeight();
+    image.format = buffer.GetFormat();
+    image.rowPitch = rowPitch;
+    image.slicePitch = (size_t)rowPitch * buffer.GetHeight();
+    image.pixels = (uint8_t*)readback.Map();
+    const HRESULT hr = write(image, Utility::ToWide(path));
+    readback.Unmap();
+
+    if (FAILED(hr))
+    {
+        char hrText[16];
+        sprintf_s(hrText, "0x%08X", (unsigned)hr);
+        return "cannot write " + path + " (hr " + hrText + ")";
+    }
+    return std::string();
 }
