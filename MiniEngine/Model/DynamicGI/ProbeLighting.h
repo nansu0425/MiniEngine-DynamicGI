@@ -25,6 +25,7 @@ namespace ProbeLighting
         const IrradianceProbeGrid& grid;
         ColorBuffer& irradiance;
         ColorBuffer& distance;
+        ColorBuffer& texelDistance;
         uint32_t distanceTexelsPerSide;
         ColorBuffer& raySamples;
         const Math::Matrix4& raySamplesRotation;

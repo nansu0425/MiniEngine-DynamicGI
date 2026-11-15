@@ -279,6 +279,9 @@
     <FxCompile Include="DynamicGI\ProbeTraceCS.hlsl">
       <ShaderModel>6.5</ShaderModel>
     </FxCompile>
+    <FxCompile Include="DynamicGI\ProbeTexelDistanceCS.hlsl">
+      <ShaderModel>6.5</ShaderModel>
+    </FxCompile>
     <FxCompile Include="DynamicGI\ProbeIrradianceUpdateCS.hlsl" />
     <FxCompile Include="DynamicGI\ProbeDistanceUpdateCS.hlsl" />
     <FxCompile Include="DynamicGI\ProbeBorderCS.hlsl" />

@@ -11,6 +11,7 @@
 #include "Core/Graphics/Resource/ShadowBuffer.h"
 
 #include "Output/Model/CompiledShaders/ProbeTraceCS.h"
+#include "Output/Model/CompiledShaders/ProbeTexelDistanceCS.h"
 #include "Output/Model/CompiledShaders/ProbeIrradianceUpdateCS.h"
 #include "Output/Model/CompiledShaders/ProbeDistanceUpdateCS.h"
 #include "Output/Model/CompiledShaders/ProbeBorderCS.h"
@@ -29,14 +30,18 @@ namespace
     constexpr uint32_t kProbeAtlasGroupSize = 8;
 
     enum TraceRootParameter { kTraceConstants, kTraceScene, kTraceInputs = kTraceScene + RaytracingScene::kNumRootParameters, kTraceOutputs, kNumTraceRootParameters };
+    enum TexelDistanceRootParameter { kTexelDistanceConstants, kTexelDistanceScene,
+        kTexelDistanceOutputs = kTexelDistanceScene + RaytracingScene::kNumRootParameters, kNumTexelDistanceRootParameters };
     enum UpdateRootParameter { kUpdateConstants, kUpdateInputs, kUpdateOutputs, kNumUpdateRootParameters };
     enum ScreenRootParameter { kScreenConstants, kScreenScene, kScreenInputs = kScreenScene + RaytracingScene::kNumRootParameters, kScreenOutputs,
         kNumScreenRootParameters };
 
     RootSignature s_TraceRootSignature;
+    RootSignature s_TexelDistanceRootSignature;
     RootSignature s_UpdateRootSignature;
     RootSignature s_ScreenRootSignature;
     ComputePSO s_TracePSO(L"Probe Trace");
+    ComputePSO s_TexelDistancePSO(L"Probes Texel Distance");
     ComputePSO s_IrradianceUpdatePSO(L"Probes Irradiance Update");
     ComputePSO s_DistanceUpdatePSO(L"Probes Distance Update");
     ComputePSO s_BorderPSO(L"Probe Border Copy");
@@ -44,11 +49,13 @@ namespace
 
     SceneHeapTable s_TraceInputs;
     SceneHeapTable s_TraceOutputs;
+    SceneHeapTable s_TexelDistanceOutputs;
     SceneHeapTable s_ScreenInputs;
     SceneHeapTable s_ScreenOutputs;
     ColorBuffer s_RaySamples;
     ColorBuffer s_ProbesIrradiance;
     ColorBuffer s_ProbesDistance;
+    ColorBuffer s_ProbesTexelDistance;
     ColorBuffer s_ScreenIrradiance;
 
     IrradianceProbeGrid s_Grid = {};
@@ -86,6 +93,12 @@ namespace
         float distanceSharpness;
         uint32_t distanceTexelsPerSide;
         ProbeRays rays;
+    };
+
+    __declspec(align(16)) struct TexelDistanceConstants
+    {
+        uint32_t distanceTexelsPerSide;
+        IrradianceProbeGrid grid;
     };
 
     __declspec(align(16)) struct BorderConstants
@@ -149,6 +162,7 @@ namespace
         g_CommandManager.IdleGPU();
         CreateProbeAtlas(s_ProbesIrradiance, L"Probes Irradiance", grid, kProbeIrradianceTexelsPerSide, DXGI_FORMAT_R32G32B32A32_FLOAT);
         CreateProbeAtlas(s_ProbesDistance, L"Probes Distance", grid, distanceTexelsPerSide, DXGI_FORMAT_R32G32_FLOAT);
+        CreateProbeAtlas(s_ProbesTexelDistance, L"Probes Texel Distance", grid, distanceTexelsPerSide, DXGI_FORMAT_R32_FLOAT);
         s_RaySamples.Create(L"Probe Ray Samples", raysPerProbe, GetProbeCount(grid), 1, DXGI_FORMAT_R32G32B32A32_FLOAT);
         s_Grid = grid;
         s_RaysPerProbe = raysPerProbe;
@@ -163,6 +177,26 @@ namespace
         context.SetDynamicConstantBufferView(kUpdateConstants, sizeof(constants), &constants);
         context.SetDynamicDescriptor(kUpdateOutputs, 0, atlas.GetUAV());
         context.Dispatch3D(tileSize, tileSize, GetProbeCount(s_Grid), kProbeAtlasGroupSize, kProbeAtlasGroupSize, 1);
+    }
+
+    void MeasureTexelDistances(ComputeContext& context, const GIFrameInputs& inputs)
+    {
+        ScopedTimer _prof(L"Probes Texel Distance", context);
+
+        const TexelDistanceConstants constants = { .distanceTexelsPerSide = s_DistanceTexelsPerSide, .grid = s_Grid };
+        s_TexelDistanceOutputs.PointTo(0, s_ProbesTexelDistance, s_ProbesTexelDistance.GetUAV());
+        context.SetRootSignature(s_TexelDistanceRootSignature);
+        context.SetPipelineState(s_TexelDistancePSO);
+        context.TransitionResource(s_ProbesTexelDistance, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, true);
+        context.SetDynamicConstantBufferView(kTexelDistanceConstants, sizeof(constants), &constants);
+        inputs.scene.Bind(context, kTexelDistanceScene);
+        s_TexelDistanceOutputs.Bind(context, kTexelDistanceOutputs);
+        context.Dispatch3D(s_DistanceTexelsPerSide, s_DistanceTexelsPerSide, GetProbeCount(s_Grid), kProbeAtlasGroupSize, kProbeAtlasGroupSize, 1);
+
+        context.InsertUAVBarrier(s_ProbesTexelDistance);
+        context.SetRootSignature(s_UpdateRootSignature);
+        context.SetPipelineState(s_BorderPSO);
+        CopyProbeTileBorders(context, s_ProbesTexelDistance, s_DistanceTexelsPerSide);
     }
 
     void FitScreenIrradianceTo(uint32_t width, uint32_t height)
@@ -189,6 +223,16 @@ void ProbeLighting::Initialize(void)
     s_TracePSO.SetRootSignature(s_TraceRootSignature);
     s_TracePSO.SetComputeShader(g_pProbeTraceCS, sizeof(g_pProbeTraceCS));
     s_TracePSO.Finalize();
+
+    s_TexelDistanceRootSignature.Reset(kNumTexelDistanceRootParameters, 0);
+    s_TexelDistanceRootSignature[kTexelDistanceConstants].InitAsConstantBuffer(0);
+    RaytracingScene::InitRootParameters(s_TexelDistanceRootSignature, kTexelDistanceScene);
+    s_TexelDistanceRootSignature[kTexelDistanceOutputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 1);
+    s_TexelDistanceRootSignature.Finalize(L"Probes Texel Distance");
+
+    s_TexelDistancePSO.SetRootSignature(s_TexelDistanceRootSignature);
+    s_TexelDistancePSO.SetComputeShader(g_pProbeTexelDistanceCS, sizeof(g_pProbeTexelDistanceCS));
+    s_TexelDistancePSO.Finalize();
 
     s_UpdateRootSignature.Reset(kNumUpdateRootParameters, 0);
     s_UpdateRootSignature[kUpdateConstants].InitAsConstantBuffer(0);
@@ -222,6 +266,7 @@ void ProbeLighting::Initialize(void)
 
     s_TraceInputs.Create(3);
     s_TraceOutputs.Create(1);
+    s_TexelDistanceOutputs.Create(1);
     s_ScreenInputs.Create(kNumGBufferTargets + 2);
     s_ScreenOutputs.Create(1);
 }
@@ -231,6 +276,7 @@ void ProbeLighting::Shutdown(void)
     s_RaySamples.Destroy();
     s_ProbesIrradiance.Destroy();
     s_ProbesDistance.Destroy();
+    s_ProbesTexelDistance.Destroy();
     s_ScreenIrradiance.Destroy();
 }
 
@@ -255,6 +301,7 @@ void ProbeLighting::Update(ComputeContext& context, const Settings& settings, co
         context.ClearUAV(s_ProbesIrradiance);
         context.TransitionResource(s_ProbesDistance, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, true);
         context.ClearUAV(s_ProbesDistance);
+        MeasureTexelDistances(context, inputs);
         s_Random.seed(0);
         s_Progress.updates = 0;
         ++s_Progress.resets;
@@ -358,6 +405,7 @@ ProbeLighting::Probes ProbeLighting::GetProbes(void)
         .grid = s_Grid,
         .irradiance = s_ProbesIrradiance,
         .distance = s_ProbesDistance,
+        .texelDistance = s_ProbesTexelDistance,
         .distanceTexelsPerSide = s_DistanceTexelsPerSide,
         .raySamples = s_RaySamples,
         .raySamplesRotation = s_RaySamplesRotation,
