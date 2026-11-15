@@ -1,6 +1,7 @@
 #include "Core/pch.h"
 #include "Core/Editor/TextureViewer.h"
 #include "Core/Automation/ControlChannel.h"
+#include "Core/Automation/FrameCapture.h"
 #include "Core/Display/Display.h"
 #include "Core/Editor/MeasurementConditions.h"
 #include "Core/Graphics/GraphicsCore.h"
@@ -17,6 +18,7 @@
 #include "Output/Core/CompiledShaders/ReadTexelCS.h"
 #include "Output/Core/CompiledShaders/TextureViewCS.h"
 
+#include "DirectXTex.h"
 #include <imgui.h>
 #include <algorithm>
 #include <cfloat>
@@ -527,11 +529,45 @@ namespace
         return true;
     }
 
+    void SaveSelectedTexture(const std::string& pathWithoutExtension, const ControlChannel::Reply& reply)
+    {
+        if (pathWithoutExtension.empty())
+        {
+            reply.Error("save takes the path without extension");
+            return;
+        }
+        const RegisteredTexture& registered = s_Textures[s_Selected];
+        ColorBuffer& texture = *registered.texture;
+        if (texture.GetResource() == nullptr)
+        {
+            reply.Error(registered.name + " has not been created yet");
+            return;
+        }
+
+        const std::string path = pathWithoutExtension + ".dds";
+        CommandContext& context = CommandContext::Begin(L"Texture Viewer Save");
+        const std::string error = FrameCapture::WriteBuffer(context, texture, path, [](const DirectX::Image& image, const std::wstring& widePath)
+            { return DirectX::SaveToDDSFile(image, DirectX::DDS_FLAGS_NONE, widePath.c_str()); });
+        context.Finish();
+        if (!error.empty())
+        {
+            reply.Error(error);
+            return;
+        }
+        reply.Ok(ControlChannel::Fields().Text("path", path).Text("texture", registered.name)
+            .Integer("width", texture.GetWidth()).Integer("height", texture.GetHeight()).Text("format", GetFormatName(texture.GetFormat())));
+    }
+
     void ChangeViewByCommand(const std::string& arguments, const ControlChannel::Reply& reply)
     {
         const size_t valueStart = arguments.find(' ');
         const std::string action = arguments.substr(0, valueStart);
         const std::string value = valueStart == std::string::npos ? std::string() : Utility::Trim(arguments.substr(valueStart + 1));
+        if (action == "save")
+        {
+            SaveSelectedTexture(value, reply);
+            return;
+        }
 
         std::string error;
         if (action == "select")
@@ -550,7 +586,7 @@ namespace
             error = SetSummaryInterval(value) ? "" : "interval takes seconds from 0 to 10, not '" + value + "'";
         else
             error = "usage: texture-viewer select <name> | channel RGB|R|G|B|A | ev <value> | zoom <pixels per texel> <x> <y> | fit | inspect <x> <y> "
-                "| interval <seconds>";
+                "| interval <seconds> | save <path without extension>";
 
         if (!error.empty())
         {
@@ -593,7 +629,7 @@ void TextureViewer::Initialize(void)
     s_TexelReadback.Create(L"Texture Viewer Texel Readback", kNumReadbackSlots, sizeof(InspectedTexel::value));
 
     ControlChannel::Register("texture-viewer", "texture-viewer select <name> | channel RGB|R|G|B|A | ev <value> | zoom <pixels per texel> <x> <y> "
-        "| fit | inspect <x> <y> | interval <seconds>: the texture the Texture Viewer panel shows, the channel it shows, its exposure in EV "
+        "| fit | inspect <x> <y> | interval <seconds> | save <path without extension>: the texture the Texture Viewer panel shows, the channel it shows, its exposure in EV "
         "from -16 to 16, its zoom and the seconds from 0 to 10 over which it summarizes a texel's values, as the panel's Texture, Channel, "
         "Exposure (EV), mouse wheel, drag, Fit and Value Interval (s) change them. A channel of R, G, B or A shows that component as gray. "
         "zoom shows each texel as pixels per texel screen pixels, from 1/1024 to 1024, with texel coordinate (x, y) at the center of the view, "
@@ -604,7 +640,8 @@ void TextureViewer::Initialize(void)
         "its owner has created it. Its inspected has the float4 of the last texel read with the texture and texel it came from, a few frames "
         "behind. Its inspected_summary has what the panel shows: the mean, min and max of the values read from one texel over the last "
         "interval, and how many frames they came from. An interval of 0 shows every value. A new texel shows its first value at once "
-        "and starts the interval over", ChangeViewByCommand);
+        "and starts the interval over. save writes the whole selected texture as stored, in its own format, to <path>.dds "
+        "and replies with the path, size and format. It waits for the GPU and works while the panel is closed", ChangeViewByCommand);
     ControlChannel::RegisterState("texture_viewer", DescribeState);
 }
 
