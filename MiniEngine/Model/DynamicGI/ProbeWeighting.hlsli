@@ -43,8 +43,7 @@ struct WeightedProbeCorners
     bool fallsBackToTrilinear;
 };
 
-WeightedProbeCorners GetWeightedProbeCorners(ProbeWeighting weighting, ProbeDistanceAtlas distanceAtlas, SamplerState linearClamp,
-    IrradianceProbeGrid grid, ProbeLookupSurface surface)
+WeightedProbeCorners GetWeightedProbeCorners(ProbeWeighting weighting, ProbeVolume volume, SamplerState linearClamp, ProbeLookupSurface surface)
 {
     const float3 facingNormal = weighting.facingNormal == kProbeFacingNormalShading ? surface.shadingNormal : surface.geometryNormal;
     WeightedProbeCorners probes;
@@ -52,11 +51,11 @@ WeightedProbeCorners GetWeightedProbeCorners(ProbeWeighting weighting, ProbeDist
     [unroll]
     for (uint corner = 0; corner < kNumProbeCorners; ++corner)
     {
-        probes.corners[corner] = GetIrradianceProbeCorner(grid, surface.position, corner);
-        probes.visibilityWeights[corner] = GetProbeVisibilityWeight(weighting.visibility, distanceAtlas, linearClamp, grid,
-            probes.corners[corner].coordinate, surface.position, surface.geometryNormal);
+        probes.corners[corner] = GetIrradianceProbeCorner(volume.grid, surface.position, corner);
+        probes.visibilityWeights[corner] = GetProbeVisibilityWeight(weighting.visibility, volume, linearClamp, probes.corners[corner].coordinate,
+            surface.position, surface.geometryNormal);
         probes.facingWeights[corner] = weighting.facing != 0 ?
-            GetProbeFacingWeight(weighting.minFacingWeight, grid, probes.corners[corner].coordinate, surface.position, facingNormal) : 1.0;
+            GetProbeFacingWeight(weighting.minFacingWeight, volume.grid, probes.corners[corner].coordinate, surface.position, facingNormal) : 1.0;
         probes.weights[corner] = probes.corners[corner].trilinearWeight * probes.visibilityWeights[corner] * probes.facingWeights[corner];
         probes.weightSum += probes.weights[corner];
     }
@@ -72,17 +71,18 @@ WeightedProbeCorners GetWeightedProbeCorners(ProbeWeighting weighting, ProbeDist
     return probes;
 }
 
-float3 SampleWeightedIrradianceProbes(ProbeWeighting weighting, Texture2D<float4> irradianceAtlas, ProbeDistanceAtlas distanceAtlas,
-    SamplerState linearClamp, IrradianceProbeGrid grid, ProbeLookupSurface surface)
+float3 SampleWeightedIrradianceProbes(ProbeWeighting weighting, ProbeVolume volume, SamplerState linearClamp, ProbeLookupSurface surface)
 {
-    const WeightedProbeCorners probes = GetWeightedProbeCorners(weighting, distanceAtlas, linearClamp, grid, surface);
+    const WeightedProbeCorners probes = GetWeightedProbeCorners(weighting, volume, linearClamp, surface);
     float3 irradiance = 0.0;
     [unroll]
     for (uint corner = 0; corner < kNumProbeCorners; ++corner)
     {
         if (probes.weights[corner] == 0.0)
             continue;
-        irradiance += probes.weights[corner] * SampleProbeIrradiance(irradianceAtlas, linearClamp, grid, probes.corners[corner].coordinate, surface.shadingNormal);
+        const float3 probeIrradiance =
+            SampleProbeIrradiance(volume.irradianceAtlas, linearClamp, volume.grid, probes.corners[corner].coordinate, surface.shadingNormal);
+        irradiance += probes.weights[corner] * probeIrradiance;
     }
     return irradiance / probes.weightSum;
 }

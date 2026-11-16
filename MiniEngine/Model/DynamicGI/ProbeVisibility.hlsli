@@ -1,27 +1,13 @@
 #ifndef __PROBE_VISIBILITY_HLSLI__
 #define __PROBE_VISIBILITY_HLSLI__
 
-#include "Core/Shaders/IrradianceProbes.hlsli"
+#include "Model/DynamicGI/ProbeVolume.hlsli"
 #include "Model/Raytracing/RaytracingScene.hlsli"
 #include "Model/Raytracing/SurfaceRay.hlsli"
 
 static const uint kProbeVisibilityNone = 0;
 static const uint kProbeVisibilityShadowRay = 1;
 static const uint kProbeVisibilityChebyshev = 2;
-
-struct ProbeDistanceAtlas
-{
-    Texture2D<float2> moments;
-    uint texelsPerSide;
-};
-
-ProbeDistanceAtlas MakeProbeDistanceAtlas(Texture2D<float2> moments, uint texelsPerSide)
-{
-    ProbeDistanceAtlas atlas;
-    atlas.moments = moments;
-    atlas.texelsPerSide = texelsPerSide;
-    return atlas;
-}
 
 bool CanShadowRayReachProbe(IrradianceProbeGrid grid, uint3 coordinate, float3 position, float3 geometryNormal)
 {
@@ -40,14 +26,13 @@ struct ProbeDistanceSample
     float2 moments;
 };
 
-ProbeDistanceSample SampleProbeDistance(ProbeDistanceAtlas distanceAtlas, SamplerState linearClamp, IrradianceProbeGrid grid, uint3 coordinate,
-    float3 position)
+ProbeDistanceSample SampleProbeDistance(ProbeVolume volume, SamplerState linearClamp, uint3 coordinate, float3 position)
 {
-    const float3 fromProbe = position - GetProbePosition(grid, coordinate);
+    const float3 fromProbe = position - GetProbePosition(volume.grid, coordinate);
     ProbeDistanceSample result;
     result.distance = length(fromProbe);
-    result.moments =
-        distanceAtlas.moments.SampleLevel(linearClamp, GetProbeAtlasUV(grid, distanceAtlas.texelsPerSide, coordinate, fromProbe / result.distance), 0.0);
+    const float2 uv = GetProbeAtlasUV(volume.grid, volume.distanceAtlas.texelsPerSide, coordinate, fromProbe / result.distance);
+    result.moments = volume.distanceAtlas.moments.SampleLevel(linearClamp, uv, 0.0);
     return result;
 }
 
@@ -61,13 +46,13 @@ float GetChebyshevVisibility(ProbeDistanceSample distanceSample)
     return variance / (variance + excess * excess);
 }
 
-float GetProbeVisibilityWeight(uint visibility, ProbeDistanceAtlas distanceAtlas, SamplerState linearClamp, IrradianceProbeGrid grid, uint3 coordinate,
-    float3 position, float3 geometryNormal)
+float GetProbeVisibilityWeight(uint visibility, ProbeVolume volume, SamplerState linearClamp, uint3 coordinate, float3 position,
+    float3 geometryNormal)
 {
     if (visibility == kProbeVisibilityShadowRay)
-        return CanShadowRayReachProbe(grid, coordinate, position, geometryNormal) ? 1.0 : 0.0;
+        return CanShadowRayReachProbe(volume.grid, coordinate, position, geometryNormal) ? 1.0 : 0.0;
     if (visibility == kProbeVisibilityChebyshev)
-        return GetChebyshevVisibility(SampleProbeDistance(distanceAtlas, linearClamp, grid, coordinate, position));
+        return GetChebyshevVisibility(SampleProbeDistance(volume, linearClamp, coordinate, position));
     return 1.0;
 }
 

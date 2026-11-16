@@ -35,8 +35,9 @@ void main()
     }
 
     const ProbeDistanceAtlas distanceAtlas = MakeProbeDistanceAtlas(ProbesDistance, DistanceTexelsPerSide);
+    const ProbeVolume volume = MakeProbeVolume(Grid, ProbesIrradiance, distanceAtlas);
     const ProbeLookupSurface lookupSurface = MakeProbeLookupSurface(result.position, result.geometryNormal, result.shadingNormal);
-    const WeightedProbeCorners probes = GetWeightedProbeCorners(Weighting, distanceAtlas, LinearClamp, Grid, lookupSurface);
+    const WeightedProbeCorners probes = GetWeightedProbeCorners(Weighting, volume, LinearClamp, lookupSurface);
     result.comparesDistance = Weighting.visibility == kProbeVisibilityChebyshev;
     result.fallsBackToTrilinear = probes.fallsBackToTrilinear;
     result.irradiance = 0.0;
@@ -50,7 +51,7 @@ void main()
         contribution.facingWeight = probes.facingWeights[corner];
         contribution.weight = probes.weights[corner] / probes.weightSum;
         contribution.irradiance = SampleProbeIrradiance(ProbesIrradiance, LinearClamp, Grid, contribution.coordinate, result.shadingNormal);
-        const ProbeDistanceSample distanceSample = SampleProbeDistance(distanceAtlas, LinearClamp, Grid, contribution.coordinate, result.position);
+        const ProbeDistanceSample distanceSample = SampleProbeDistance(volume, LinearClamp, contribution.coordinate, result.position);
         contribution.distance = distanceSample.distance;
         contribution.distanceMean = distanceSample.moments.x;
         result.irradiance += contribution.weight * contribution.irradiance;
@@ -59,6 +60,6 @@ void main()
 
     result.shadingIrradiance = InterpolatesTrilinearly(Weighting) ?
         SampleIrradianceProbes(ProbesIrradiance, LinearClamp, Grid, result.position, result.shadingNormal) :
-        SampleWeightedIrradianceProbes(Weighting, ProbesIrradiance, distanceAtlas, LinearClamp, Grid, lookupSurface);
+        SampleWeightedIrradianceProbes(Weighting, volume, LinearClamp, lookupSurface);
     Contribution[0] = result;
 }

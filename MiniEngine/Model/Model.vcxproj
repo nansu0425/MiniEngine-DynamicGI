@@ -156,6 +156,7 @@
     <None Include="DynamicGI\HitLighting.hlsli" />
     <None Include="DynamicGI\ProbeRays.hlsli" />
     <None Include="DynamicGI\ProbeRayHit.hlsli" />
+    <None Include="DynamicGI\ProbeVolume.hlsli" />
     <None Include="DynamicGI\ProbeVisibility.hlsli" />
     <None Include="DynamicGI\ProbeFacing.hlsli" />
     <None Include="DynamicGI\ProbeWeighting.hlsli" />

@@ -46,10 +46,12 @@ ProbeRaySample TraceProbeRay(float3 origin, float3 direction)
 
     const HitSurface surface = GetHitSurface(rayHit, kSharpestTextureLod);
     const GltfBrdfInput brdf = MakeGltfBrdfInput(surface.baseColor.rgb, surface.metallic, surface.roughness, surface.shadingNormal, -direction);
+    const ProbeDistanceAtlas distanceAtlas = MakeProbeDistanceAtlas(ProbesDistance, DistanceTexelsPerSide);
+    const ProbeVolume volume = MakeProbeVolume(Rays.grid, ProbesIrradiance, distanceAtlas);
+    const ProbeLookupSurface lookupSurface = MakeProbeLookupSurface(surface.position, surface.geometryNormal, surface.shadingNormal);
     const float3 irradiance = InterpolatesTrilinearly(Weighting) ?
         SampleIrradianceProbes(ProbesIrradiance, LinearClamp, Rays.grid, surface.position, surface.shadingNormal) :
-        SampleWeightedIrradianceProbes(Weighting, ProbesIrradiance, MakeProbeDistanceAtlas(ProbesDistance, DistanceTexelsPerSide), LinearClamp, Rays.grid,
-            MakeProbeLookupSurface(surface.position, surface.geometryNormal, surface.shadingNormal));
+        SampleWeightedIrradianceProbes(Weighting, volume, LinearClamp, lookupSurface);
     const float3 indirectRadiance = kPi * EvaluateGltfDiffuseLobeForIrradiance(brdf) * irradiance;
     const float3 directRadiance = GetHitDirectRadiance(surface, brdf, Lights, ShadowMap, ShadowMapSampler);
 

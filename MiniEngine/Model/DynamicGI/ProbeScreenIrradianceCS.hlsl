@@ -25,6 +25,8 @@ void main(uint2 DTid : SV_DispatchThreadID)
     if (!LoadGBuffer(DTid, surface))
         return;
 
-    ScreenIrradiance[DTid] = float4(SampleWeightedIrradianceProbes(Weighting, ProbesIrradiance, MakeProbeDistanceAtlas(ProbesDistance, DistanceTexelsPerSide), LinearClamp, Grid,
-        MakeProbeLookupSurface(surface.position, surface.geometryNormal, surface.shadingNormal)), 0.0);
+    const ProbeDistanceAtlas distanceAtlas = MakeProbeDistanceAtlas(ProbesDistance, DistanceTexelsPerSide);
+    const ProbeVolume volume = MakeProbeVolume(Grid, ProbesIrradiance, distanceAtlas);
+    const ProbeLookupSurface lookupSurface = MakeProbeLookupSurface(surface.position, surface.geometryNormal, surface.shadingNormal);
+    ScreenIrradiance[DTid] = float4(SampleWeightedIrradianceProbes(Weighting, volume, LinearClamp, lookupSurface), 0.0);
 }
