@@ -26,5 +26,5 @@ void main(uint2 DTid : SV_DispatchThreadID)
         return;
 
     ScreenIrradiance[DTid] = float4(SampleWeightedIrradianceProbes(Weighting, ProbesIrradiance, MakeProbeDistanceAtlas(ProbesDistance, DistanceTexelsPerSide), LinearClamp, Grid,
-        surface.position, surface.geometryNormal, surface.shadingNormal), 0.0);
+        MakeProbeLookupSurface(surface.position, surface.geometryNormal, surface.shadingNormal)), 0.0);
 }

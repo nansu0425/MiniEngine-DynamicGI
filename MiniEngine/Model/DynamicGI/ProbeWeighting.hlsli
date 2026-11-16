@@ -16,6 +16,22 @@ bool InterpolatesTrilinearly(ProbeWeighting weighting)
     return weighting.visibility == kProbeVisibilityNone && weighting.facing == 0;
 }
 
+struct ProbeLookupSurface
+{
+    float3 position;
+    float3 geometryNormal;
+    float3 shadingNormal;
+};
+
+ProbeLookupSurface MakeProbeLookupSurface(float3 position, float3 geometryNormal, float3 shadingNormal)
+{
+    ProbeLookupSurface surface;
+    surface.position = position;
+    surface.geometryNormal = geometryNormal;
+    surface.shadingNormal = shadingNormal;
+    return surface;
+}
+
 struct WeightedProbeCorners
 {
     IrradianceProbeCorner corners[kNumProbeCorners];
@@ -27,18 +43,18 @@ struct WeightedProbeCorners
 };
 
 WeightedProbeCorners GetWeightedProbeCorners(ProbeWeighting weighting, ProbeDistanceAtlas distanceAtlas, SamplerState linearClamp,
-    IrradianceProbeGrid grid, float3 position, float3 geometryNormal)
+    IrradianceProbeGrid grid, ProbeLookupSurface surface)
 {
     WeightedProbeCorners probes;
     probes.weightSum = 0.0;
     [unroll]
     for (uint corner = 0; corner < kNumProbeCorners; ++corner)
     {
-        probes.corners[corner] = GetIrradianceProbeCorner(grid, position, corner);
+        probes.corners[corner] = GetIrradianceProbeCorner(grid, surface.position, corner);
         probes.visibilityWeights[corner] = GetProbeVisibilityWeight(weighting.visibility, distanceAtlas, linearClamp, grid,
-            probes.corners[corner].coordinate, position, geometryNormal);
+            probes.corners[corner].coordinate, surface.position, surface.geometryNormal);
         probes.facingWeights[corner] = weighting.facing != 0 ?
-            GetProbeFacingWeight(weighting.minFacingWeight, grid, probes.corners[corner].coordinate, position, geometryNormal) : 1.0;
+            GetProbeFacingWeight(weighting.minFacingWeight, grid, probes.corners[corner].coordinate, surface.position, surface.geometryNormal) : 1.0;
         probes.weights[corner] = probes.corners[corner].trilinearWeight * probes.visibilityWeights[corner] * probes.facingWeights[corner];
         probes.weightSum += probes.weights[corner];
     }
@@ -55,16 +71,16 @@ WeightedProbeCorners GetWeightedProbeCorners(ProbeWeighting weighting, ProbeDist
 }
 
 float3 SampleWeightedIrradianceProbes(ProbeWeighting weighting, Texture2D<float4> irradianceAtlas, ProbeDistanceAtlas distanceAtlas,
-    SamplerState linearClamp, IrradianceProbeGrid grid, float3 position, float3 geometryNormal, float3 direction)
+    SamplerState linearClamp, IrradianceProbeGrid grid, ProbeLookupSurface surface)
 {
-    const WeightedProbeCorners probes = GetWeightedProbeCorners(weighting, distanceAtlas, linearClamp, grid, position, geometryNormal);
+    const WeightedProbeCorners probes = GetWeightedProbeCorners(weighting, distanceAtlas, linearClamp, grid, surface);
     float3 irradiance = 0.0;
     [unroll]
     for (uint corner = 0; corner < kNumProbeCorners; ++corner)
     {
         if (probes.weights[corner] == 0.0)
             continue;
-        irradiance += probes.weights[corner] * SampleProbeIrradiance(irradianceAtlas, linearClamp, grid, probes.corners[corner].coordinate, direction);
+        irradiance += probes.weights[corner] * SampleProbeIrradiance(irradianceAtlas, linearClamp, grid, probes.corners[corner].coordinate, surface.shadingNormal);
     }
     return irradiance / probes.weightSum;
 }
