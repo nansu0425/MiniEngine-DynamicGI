@@ -14,6 +14,7 @@
 #include "Output/Model/CompiledShaders/ProbeTexelDistanceCS.h"
 #include "Output/Model/CompiledShaders/ProbeIrradianceUpdateCS.h"
 #include "Output/Model/CompiledShaders/ProbeDistanceUpdateCS.h"
+#include "Output/Model/CompiledShaders/ProbeBackFaceUpdateCS.h"
 #include "Output/Model/CompiledShaders/ProbeBorderCS.h"
 #include "Output/Model/CompiledShaders/ProbeScreenIrradianceCS.h"
 
@@ -44,6 +45,7 @@ namespace
     ComputePSO s_TexelDistancePSO(L"Probes Texel Distance");
     ComputePSO s_IrradianceUpdatePSO(L"Probes Irradiance Update");
     ComputePSO s_DistanceUpdatePSO(L"Probes Distance Update");
+    ComputePSO s_BackFaceUpdatePSO(L"Probes Back Face Update");
     ComputePSO s_BorderPSO(L"Probe Border Copy");
     ComputePSO s_ScreenPSO(L"Probe Screen Irradiance");
 
@@ -53,9 +55,11 @@ namespace
     SceneHeapTable s_ScreenInputs;
     SceneHeapTable s_ScreenOutputs;
     ColorBuffer s_RaySamples;
+    ColorBuffer s_RayBackFaces;
     ColorBuffer s_ProbesIrradiance;
     ColorBuffer s_ProbesDistance;
     ColorBuffer s_ProbesTexelDistance;
+    ColorBuffer s_ProbesBackFaceRatio;
     ColorBuffer s_ScreenIrradiance;
 
     IrradianceProbeGrid s_Grid = {};
@@ -82,7 +86,7 @@ namespace
         ProbeRays rays;
     };
 
-    __declspec(align(16)) struct IrradianceUpdateConstants
+    __declspec(align(16)) struct BlendUpdateConstants
     {
         float blendWeight;
         ProbeRays rays;
@@ -165,6 +169,8 @@ namespace
         CreateProbeAtlas(s_ProbesDistance, L"Probes Distance", grid, distanceTexelsPerSide, DXGI_FORMAT_R32G32_FLOAT);
         CreateProbeAtlas(s_ProbesTexelDistance, L"Probes Texel Distance", grid, distanceTexelsPerSide, DXGI_FORMAT_R32_FLOAT);
         s_RaySamples.Create(L"Probe Ray Samples", raysPerProbe, GetProbeCount(grid), 1, DXGI_FORMAT_R32G32B32A32_FLOAT);
+        s_RayBackFaces.Create(L"Probe Ray Back Faces", raysPerProbe, GetProbeCount(grid), 1, DXGI_FORMAT_R8_UNORM);
+        s_ProbesBackFaceRatio.Create(L"Probes Back Face Ratio", GetProbeCount(grid), 1, 1, DXGI_FORMAT_R32_FLOAT);
         s_Grid = grid;
         s_RaysPerProbe = raysPerProbe;
         s_DistanceTexelsPerSide = distanceTexelsPerSide;
@@ -216,7 +222,7 @@ void ProbeLighting::Initialize(void)
     s_TraceRootSignature[kTraceConstants].InitAsConstantBuffer(0);
     RaytracingScene::InitRootParameters(s_TraceRootSignature, kTraceScene);
     s_TraceRootSignature[kTraceInputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 3);
-    s_TraceRootSignature[kTraceOutputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 1);
+    s_TraceRootSignature[kTraceOutputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 2);
     s_TraceRootSignature.InitStaticSampler(0, SamplerShadowDesc);
     s_TraceRootSignature.InitStaticSampler(1, SamplerLinearClampDesc);
     s_TraceRootSignature.Finalize(L"Probe Trace");
@@ -249,6 +255,10 @@ void ProbeLighting::Initialize(void)
     s_DistanceUpdatePSO.SetComputeShader(g_pProbeDistanceUpdateCS, sizeof(g_pProbeDistanceUpdateCS));
     s_DistanceUpdatePSO.Finalize();
 
+    s_BackFaceUpdatePSO.SetRootSignature(s_UpdateRootSignature);
+    s_BackFaceUpdatePSO.SetComputeShader(g_pProbeBackFaceUpdateCS, sizeof(g_pProbeBackFaceUpdateCS));
+    s_BackFaceUpdatePSO.Finalize();
+
     s_BorderPSO.SetRootSignature(s_UpdateRootSignature);
     s_BorderPSO.SetComputeShader(g_pProbeBorderCS, sizeof(g_pProbeBorderCS));
     s_BorderPSO.Finalize();
@@ -266,7 +276,7 @@ void ProbeLighting::Initialize(void)
     s_ScreenPSO.Finalize();
 
     s_TraceInputs.Create(3);
-    s_TraceOutputs.Create(1);
+    s_TraceOutputs.Create(2);
     s_TexelDistanceOutputs.Create(1);
     s_ScreenInputs.Create(kNumGBufferTargets + 2);
     s_ScreenOutputs.Create(1);
@@ -275,9 +285,11 @@ void ProbeLighting::Initialize(void)
 void ProbeLighting::Shutdown(void)
 {
     s_RaySamples.Destroy();
+    s_RayBackFaces.Destroy();
     s_ProbesIrradiance.Destroy();
     s_ProbesDistance.Destroy();
     s_ProbesTexelDistance.Destroy();
+    s_ProbesBackFaceRatio.Destroy();
     s_ScreenIrradiance.Destroy();
 }
 
@@ -302,6 +314,8 @@ void ProbeLighting::Update(ComputeContext& context, const Settings& settings, co
         context.ClearUAV(s_ProbesIrradiance);
         context.TransitionResource(s_ProbesDistance, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, true);
         context.ClearUAV(s_ProbesDistance);
+        context.TransitionResource(s_ProbesBackFaceRatio, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, true);
+        context.ClearUAV(s_ProbesBackFaceRatio);
         MeasureTexelDistances(context, inputs);
         s_Random.seed(0);
         s_Progress.updates = 0;
@@ -327,6 +341,7 @@ void ProbeLighting::Update(ComputeContext& context, const Settings& settings, co
         s_TraceInputs.PointTo(1, s_ProbesIrradiance, s_ProbesIrradiance.GetSRV());
         s_TraceInputs.PointTo(2, s_ProbesDistance, s_ProbesDistance.GetSRV());
         s_TraceOutputs.PointTo(0, s_RaySamples, s_RaySamples.GetUAV());
+        s_TraceOutputs.PointTo(1, s_RayBackFaces, s_RayBackFaces.GetUAV());
 
         context.SetRootSignature(s_TraceRootSignature);
         context.SetPipelineState(s_TracePSO);
@@ -334,6 +349,7 @@ void ProbeLighting::Update(ComputeContext& context, const Settings& settings, co
         context.TransitionResource(s_ProbesIrradiance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
         context.TransitionResource(s_ProbesDistance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
         context.TransitionResource(s_RaySamples, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+        context.TransitionResource(s_RayBackFaces, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
         context.SetDynamicConstantBufferView(kTraceConstants, sizeof(constants), &constants);
         inputs.scene.Bind(context, kTraceScene);
         s_TraceInputs.Bind(context, kTraceInputs);
@@ -351,9 +367,9 @@ void ProbeLighting::Update(ComputeContext& context, const Settings& settings, co
         context.TransitionResource(s_ProbesDistance, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
         context.SetDynamicDescriptor(kUpdateInputs, 0, s_RaySamples.GetSRV());
 
-        const IrradianceUpdateConstants irradianceConstants = { .blendWeight = blendWeight, .rays = rays };
+        const BlendUpdateConstants blendConstants = { .blendWeight = blendWeight, .rays = rays };
         context.SetPipelineState(s_IrradianceUpdatePSO);
-        context.SetDynamicConstantBufferView(kUpdateConstants, sizeof(irradianceConstants), &irradianceConstants);
+        context.SetDynamicConstantBufferView(kUpdateConstants, sizeof(blendConstants), &blendConstants);
         context.SetDynamicDescriptor(kUpdateOutputs, 0, s_ProbesIrradiance.GetUAV());
         context.Dispatch(probeCount);
 
@@ -367,6 +383,14 @@ void ProbeLighting::Update(ComputeContext& context, const Settings& settings, co
         context.SetDynamicConstantBufferView(kUpdateConstants, sizeof(distanceConstants), &distanceConstants);
         context.SetDynamicDescriptor(kUpdateOutputs, 0, s_ProbesDistance.GetUAV());
         context.Dispatch3D(s_DistanceTexelsPerSide, s_DistanceTexelsPerSide, probeCount, kProbeAtlasGroupSize, kProbeAtlasGroupSize, 1);
+
+        context.TransitionResource(s_RayBackFaces, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+        context.TransitionResource(s_ProbesBackFaceRatio, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+        context.SetPipelineState(s_BackFaceUpdatePSO);
+        context.SetDynamicConstantBufferView(kUpdateConstants, sizeof(blendConstants), &blendConstants);
+        context.SetDynamicDescriptor(kUpdateInputs, 0, s_RayBackFaces.GetSRV());
+        context.SetDynamicDescriptor(kUpdateOutputs, 0, s_ProbesBackFaceRatio.GetUAV());
+        context.Dispatch1D(probeCount, 64);
 
         context.InsertUAVBarrier(s_ProbesIrradiance);
         context.InsertUAVBarrier(s_ProbesDistance);
@@ -419,6 +443,7 @@ ProbeLighting::Probes ProbeLighting::GetProbes(void)
         .irradiance = s_ProbesIrradiance,
         .distance = s_ProbesDistance,
         .texelDistance = s_ProbesTexelDistance,
+        .backFaceRatio = s_ProbesBackFaceRatio,
         .distanceTexelsPerSide = s_DistanceTexelsPerSide,
         .raySamples = s_RaySamples,
         .raySamplesRotation = s_RaySamplesRotation,

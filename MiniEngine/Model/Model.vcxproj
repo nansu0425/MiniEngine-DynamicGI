@@ -291,6 +291,7 @@
     </FxCompile>
     <FxCompile Include="DynamicGI\ProbeIrradianceUpdateCS.hlsl" />
     <FxCompile Include="DynamicGI\ProbeDistanceUpdateCS.hlsl" />
+    <FxCompile Include="DynamicGI\ProbeBackFaceUpdateCS.hlsl" />
     <FxCompile Include="DynamicGI\ProbeBorderCS.hlsl" />
     <FxCompile Include="DynamicGI\ProbeScreenIrradianceCS.hlsl">
       <ShaderModel>6.5</ShaderModel>

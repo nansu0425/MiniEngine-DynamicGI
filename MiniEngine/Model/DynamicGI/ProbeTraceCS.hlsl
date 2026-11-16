@@ -17,16 +17,19 @@ Texture2D<float2> ProbesDistance : register(t2);
 SamplerComparisonState ShadowMapSampler : register(s0);
 SamplerState LinearClamp : register(s1);
 RWTexture2D<float4> RaySamples : register(u0);
+RWTexture2D<float> RayBackFaces : register(u1);
 
 struct ProbeRaySample
 {
     float3 radiance;
     float distance;
+    bool hitsBackFace;
 };
 
 ProbeRaySample TraceProbeRay(float3 origin, float3 direction)
 {
     ProbeRaySample sample;
+    sample.hitsBackFace = false;
     RayHit rayHit;
     if (!TraceProbeRayHit(Rays.grid, origin, direction, rayHit, sample.distance))
     {
@@ -35,6 +38,7 @@ ProbeRaySample TraceProbeRay(float3 origin, float3 direction)
     }
     if (HitsSingleSidedBackFace(rayHit))
     {
+        sample.hitsBackFace = true;
         sample.radiance = 0.0;
         sample.distance *= BackFaceDistanceScale;
         return sample;
@@ -64,4 +68,5 @@ void main(uint2 DTid : SV_DispatchThreadID)
     const float3 origin = GetProbePosition(Rays.grid, GetProbeCoordinate(Rays.grid, probe));
     const ProbeRaySample sample = TraceProbeRay(origin, GetProbeRayDirection(Rays, ray));
     RaySamples[DTid] = float4(sample.radiance, sample.distance);
+    RayBackFaces[DTid] = sample.hitsBackFace ? 1.0 : 0.0;
 }

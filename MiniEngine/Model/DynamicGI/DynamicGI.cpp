@@ -746,6 +746,7 @@ void DynamicGI::Initialize(void)
     TextureViewer::AddTexture("Probes Irradiance", probes.irradiance);
     TextureViewer::AddTexture("Probes Distance", probes.distance);
     TextureViewer::AddTexture("Probes Texel Distance", probes.texelDistance);
+    TextureViewer::AddTexture("Probes Back Face Ratio", probes.backFaceRatio);
     TextureViewer::AddTexture("Probe Ray Samples", probes.raySamples);
     TextureViewer::AddTexture("Probe Screen Irradiance", ProbeLighting::GetScreenIrradiance());
     TextureViewer::AddTexture("Path Traced Indirect Radiance", PathTracedLighting::GetIndirectRadiance());

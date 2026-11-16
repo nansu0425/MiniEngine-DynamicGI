@@ -26,6 +26,7 @@ namespace ProbeLighting
         ColorBuffer& irradiance;
         ColorBuffer& distance;
         ColorBuffer& texelDistance;
+        ColorBuffer& backFaceRatio;
         uint32_t distanceTexelsPerSide;
         ColorBuffer& raySamples;
         const Math::Matrix4& raySamplesRotation;
