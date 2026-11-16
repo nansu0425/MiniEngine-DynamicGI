@@ -3,6 +3,7 @@
 
 #include "Model/DynamicGI/ProbeVisibility.hlsli"
 #include "Model/DynamicGI/ProbeFacing.hlsli"
+#include "Model/DynamicGI/ProbeClassification.hlsli"
 
 struct ProbeWeighting
 {
@@ -10,11 +11,13 @@ struct ProbeWeighting
     uint facing;
     float minFacingWeight;
     uint facingNormal;
+    uint classification;
+    float maxBackFaceRatio;
 };
 
 bool InterpolatesTrilinearly(ProbeWeighting weighting)
 {
-    return weighting.visibility == kProbeVisibilityNone && weighting.facing == 0;
+    return weighting.visibility == kProbeVisibilityNone && weighting.facing == 0 && weighting.classification == 0;
 }
 
 struct ProbeLookupSurface
@@ -36,6 +39,7 @@ ProbeLookupSurface MakeProbeLookupSurface(float3 position, float3 geometryNormal
 struct WeightedProbeCorners
 {
     IrradianceProbeCorner corners[kNumProbeCorners];
+    float activeWeights[kNumProbeCorners];
     float visibilityWeights[kNumProbeCorners];
     float facingWeights[kNumProbeCorners];
     float weights[kNumProbeCorners];
@@ -52,11 +56,14 @@ WeightedProbeCorners GetWeightedProbeCorners(ProbeWeighting weighting, ProbeVolu
     for (uint corner = 0; corner < kNumProbeCorners; ++corner)
     {
         probes.corners[corner] = GetIrradianceProbeCorner(volume.grid, surface.position, corner);
+        probes.activeWeights[corner] = GetProbeActiveWeight(weighting.classification, weighting.maxBackFaceRatio, volume.backFaceRatios, volume.grid,
+            probes.corners[corner].coordinate);
         probes.visibilityWeights[corner] = GetProbeVisibilityWeight(weighting.visibility, volume, linearClamp, probes.corners[corner].coordinate,
             surface.position, surface.geometryNormal);
         probes.facingWeights[corner] = weighting.facing != 0 ?
             GetProbeFacingWeight(weighting.minFacingWeight, volume.grid, probes.corners[corner].coordinate, surface.position, facingNormal) : 1.0;
-        probes.weights[corner] = probes.corners[corner].trilinearWeight * probes.visibilityWeights[corner] * probes.facingWeights[corner];
+        probes.weights[corner] =
+            probes.corners[corner].trilinearWeight * probes.activeWeights[corner] * probes.visibilityWeights[corner] * probes.facingWeights[corner];
         probes.weightSum += probes.weights[corner];
     }
 
@@ -65,8 +72,12 @@ WeightedProbeCorners GetWeightedProbeCorners(ProbeWeighting weighting, ProbeVolu
     {
         [unroll]
         for (uint corner = 0; corner < kNumProbeCorners; ++corner)
-            probes.weights[corner] = probes.corners[corner].trilinearWeight;
-        probes.weightSum = 1.0;
+        {
+            probes.weights[corner] = probes.corners[corner].trilinearWeight * probes.activeWeights[corner];
+            probes.weightSum += probes.weights[corner];
+        }
+        if (probes.weightSum == 0.0)
+            probes.weightSum = 1.0;
     }
     return probes;
 }

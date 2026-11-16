@@ -159,6 +159,7 @@
     <None Include="DynamicGI\ProbeVolume.hlsli" />
     <None Include="DynamicGI\ProbeVisibility.hlsli" />
     <None Include="DynamicGI\ProbeFacing.hlsli" />
+    <None Include="DynamicGI\ProbeClassification.hlsli" />
     <None Include="DynamicGI\ProbeWeighting.hlsli" />
     <None Include="DynamicGI\ProbeSphere.hlsli" />
     <None Include="DynamicGI\ProbeDistanceLine.hlsli" />

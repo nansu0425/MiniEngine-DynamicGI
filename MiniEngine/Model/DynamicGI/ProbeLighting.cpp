@@ -221,7 +221,7 @@ void ProbeLighting::Initialize(void)
     s_TraceRootSignature.Reset(kNumTraceRootParameters, 2);
     s_TraceRootSignature[kTraceConstants].InitAsConstantBuffer(0);
     RaytracingScene::InitRootParameters(s_TraceRootSignature, kTraceScene);
-    s_TraceRootSignature[kTraceInputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 3);
+    s_TraceRootSignature[kTraceInputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 4);
     s_TraceRootSignature[kTraceOutputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 2);
     s_TraceRootSignature.InitStaticSampler(0, SamplerShadowDesc);
     s_TraceRootSignature.InitStaticSampler(1, SamplerLinearClampDesc);
@@ -266,7 +266,7 @@ void ProbeLighting::Initialize(void)
     s_ScreenRootSignature.Reset(kNumScreenRootParameters, 1);
     s_ScreenRootSignature[kScreenConstants].InitAsConstantBuffer(0);
     RaytracingScene::InitRootParameters(s_ScreenRootSignature, kScreenScene);
-    s_ScreenRootSignature[kScreenInputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, kNumGBufferTargets + 2);
+    s_ScreenRootSignature[kScreenInputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, kNumGBufferTargets + 3);
     s_ScreenRootSignature[kScreenOutputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 1);
     s_ScreenRootSignature.InitStaticSampler(0, SamplerLinearClampDesc);
     s_ScreenRootSignature.Finalize(L"Probe Screen Irradiance");
@@ -275,10 +275,10 @@ void ProbeLighting::Initialize(void)
     s_ScreenPSO.SetComputeShader(g_pProbeScreenIrradianceCS, sizeof(g_pProbeScreenIrradianceCS));
     s_ScreenPSO.Finalize();
 
-    s_TraceInputs.Create(3);
+    s_TraceInputs.Create(4);
     s_TraceOutputs.Create(2);
     s_TexelDistanceOutputs.Create(1);
-    s_ScreenInputs.Create(kNumGBufferTargets + 2);
+    s_ScreenInputs.Create(kNumGBufferTargets + 3);
     s_ScreenOutputs.Create(1);
 }
 
@@ -340,6 +340,7 @@ void ProbeLighting::Update(ComputeContext& context, const Settings& settings, co
         s_TraceInputs.PointTo(0, inputs.shadowMap, inputs.shadowMap.GetSRV());
         s_TraceInputs.PointTo(1, s_ProbesIrradiance, s_ProbesIrradiance.GetSRV());
         s_TraceInputs.PointTo(2, s_ProbesDistance, s_ProbesDistance.GetSRV());
+        s_TraceInputs.PointTo(3, s_ProbesBackFaceRatio, s_ProbesBackFaceRatio.GetSRV());
         s_TraceOutputs.PointTo(0, s_RaySamples, s_RaySamples.GetUAV());
         s_TraceOutputs.PointTo(1, s_RayBackFaces, s_RayBackFaces.GetUAV());
 
@@ -348,6 +349,7 @@ void ProbeLighting::Update(ComputeContext& context, const Settings& settings, co
         context.TransitionResource(inputs.shadowMap, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
         context.TransitionResource(s_ProbesIrradiance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
         context.TransitionResource(s_ProbesDistance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+        context.TransitionResource(s_ProbesBackFaceRatio, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
         context.TransitionResource(s_RaySamples, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
         context.TransitionResource(s_RayBackFaces, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
         context.SetDynamicConstantBufferView(kTraceConstants, sizeof(constants), &constants);
@@ -413,6 +415,7 @@ void ProbeLighting::EstimateScreenIrradiance(ComputeContext& context, const Prob
         s_ScreenInputs.PointTo(i, g_GBuffer[i], g_GBuffer[i].GetSRV());
     s_ScreenInputs.PointTo(kNumGBufferTargets, s_ProbesIrradiance, s_ProbesIrradiance.GetSRV());
     s_ScreenInputs.PointTo(kNumGBufferTargets + 1, s_ProbesDistance, s_ProbesDistance.GetSRV());
+    s_ScreenInputs.PointTo(kNumGBufferTargets + 2, s_ProbesBackFaceRatio, s_ProbesBackFaceRatio.GetSRV());
     s_ScreenOutputs.PointTo(0, s_ScreenIrradiance, s_ScreenIrradiance.GetUAV());
 
     const ScreenConstants constants = {
@@ -428,6 +431,7 @@ void ProbeLighting::EstimateScreenIrradiance(ComputeContext& context, const Prob
         context.TransitionResource(target, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     context.TransitionResource(s_ProbesIrradiance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     context.TransitionResource(s_ProbesDistance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+    context.TransitionResource(s_ProbesBackFaceRatio, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     context.TransitionResource(s_ScreenIrradiance, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
     context.SetDynamicConstantBufferView(kScreenConstants, sizeof(constants), &constants);
     inputs.scene.Bind(context, kScreenScene);

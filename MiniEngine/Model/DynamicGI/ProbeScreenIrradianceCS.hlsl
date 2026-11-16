@@ -12,6 +12,7 @@ cbuffer Constants : register(b0)
 
 Texture2D<float4> ProbesIrradiance : register(t5);
 Texture2D<float2> ProbesDistance : register(t6);
+Texture2D<float> ProbesBackFaceRatio : register(t7);
 SamplerState LinearClamp : register(s0);
 RWTexture2D<float4> ScreenIrradiance : register(u0);
 
@@ -26,7 +27,7 @@ void main(uint2 DTid : SV_DispatchThreadID)
         return;
 
     const ProbeDistanceAtlas distanceAtlas = MakeProbeDistanceAtlas(ProbesDistance, DistanceTexelsPerSide);
-    const ProbeVolume volume = MakeProbeVolume(Grid, ProbesIrradiance, distanceAtlas);
+    const ProbeVolume volume = MakeProbeVolume(Grid, ProbesIrradiance, distanceAtlas, ProbesBackFaceRatio);
     const ProbeLookupSurface lookupSurface = MakeProbeLookupSurface(surface.position, surface.geometryNormal, surface.shadingNormal);
     ScreenIrradiance[DTid] = float4(SampleWeightedIrradianceProbes(Weighting, volume, LinearClamp, lookupSurface), 0.0);
 }

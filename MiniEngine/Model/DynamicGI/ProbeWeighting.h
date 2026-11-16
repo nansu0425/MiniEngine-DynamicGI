@@ -13,6 +13,8 @@ namespace ProbeWeighting
         bool facing = true;
         float minFacingWeight = 0.2f;
         FacingNormal facingNormal = FacingNormal::kShading;
+        bool classification = true;
+        float maxBackFaceRatio = 0.25f;
     };
 
     __declspec(align(16)) struct Constants
@@ -21,15 +23,24 @@ namespace ProbeWeighting
         uint32_t facing;
         float minFacingWeight;
         uint32_t facingNormal;
+        uint32_t classification;
+        float maxBackFaceRatio;
     };
 
     inline Constants DescribeConstants(const Settings& settings)
     {
-        return { (uint32_t)settings.visibility, settings.facing ? 1u : 0u, settings.minFacingWeight, (uint32_t)settings.facingNormal };
+        return {
+            .visibility = (uint32_t)settings.visibility,
+            .facing = settings.facing ? 1u : 0u,
+            .minFacingWeight = settings.minFacingWeight,
+            .facingNormal = (uint32_t)settings.facingNormal,
+            .classification = settings.classification ? 1u : 0u,
+            .maxBackFaceRatio = settings.maxBackFaceRatio,
+        };
     }
 
     inline bool InterpolatesTrilinearly(const Settings& settings)
     {
-        return settings.visibility == Visibility::kNone && !settings.facing;
+        return settings.visibility == Visibility::kNone && !settings.facing && !settings.classification;
     }
 }

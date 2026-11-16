@@ -14,6 +14,7 @@ cbuffer Constants : register(b0)
 Texture2D<float> ShadowMap : register(t0);
 Texture2D<float4> ProbesIrradiance : register(t1);
 Texture2D<float2> ProbesDistance : register(t2);
+Texture2D<float> ProbesBackFaceRatio : register(t3);
 SamplerComparisonState ShadowMapSampler : register(s0);
 SamplerState LinearClamp : register(s1);
 RWTexture2D<float4> RaySamples : register(u0);
@@ -47,7 +48,7 @@ ProbeRaySample TraceProbeRay(float3 origin, float3 direction)
     const HitSurface surface = GetHitSurface(rayHit, kSharpestTextureLod);
     const GltfBrdfInput brdf = MakeGltfBrdfInput(surface.baseColor.rgb, surface.metallic, surface.roughness, surface.shadingNormal, -direction);
     const ProbeDistanceAtlas distanceAtlas = MakeProbeDistanceAtlas(ProbesDistance, DistanceTexelsPerSide);
-    const ProbeVolume volume = MakeProbeVolume(Rays.grid, ProbesIrradiance, distanceAtlas);
+    const ProbeVolume volume = MakeProbeVolume(Rays.grid, ProbesIrradiance, distanceAtlas, ProbesBackFaceRatio);
     const ProbeLookupSurface lookupSurface = MakeProbeLookupSurface(surface.position, surface.geometryNormal, surface.shadingNormal);
     const float3 irradiance = InterpolatesTrilinearly(Weighting) ?
         SampleIrradianceProbes(ProbesIrradiance, LinearClamp, Rays.grid, surface.position, surface.shadingNormal) :

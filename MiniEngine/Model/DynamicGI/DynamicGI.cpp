@@ -167,6 +167,7 @@ namespace
         probe.distanceTexelsPerSide = std::max(1u, std::min(probe.distanceTexelsPerSide, kMaxDistanceTexelsPerSide));
         probe.backFaceDistanceScale = std::max(0.0f, std::min(probe.backFaceDistanceScale, 1.0f));
         probe.weighting.minFacingWeight = std::max(0.0f, std::min(probe.weighting.minFacingWeight, 1.0f));
+        probe.weighting.maxBackFaceRatio = std::max(0.0f, std::min(probe.weighting.maxBackFaceRatio, 1.0f));
 
         ProbeVisualization::Settings& probeSpheres = s_Settings.probeSpheres;
         probeSpheres.radiusPerSpacing = std::max(0.0f, std::min(probeSpheres.radiusPerSpacing, kMaxRadiusPerSpacing));
@@ -224,7 +225,8 @@ namespace
             return;
         }
         if (contribution->fallsBackToTrilinear != 0)
-            ImGui::TextWrapped("The visibility and facing weights leave out every probe, so the weights fall back to the trilinear weights as the shading does.");
+            ImGui::TextWrapped("The visibility and facing weights leave out every probe, so the weights fall back to the trilinear weights "
+                "of the active probes as the shading does.");
 
         const IrradianceProbeGrid& grid = ProbeLighting::GetProbes().grid;
         const ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit;
@@ -378,6 +380,15 @@ namespace
         ImGui::SetItemTooltip("The normal the facing weight measures the side of a probe against. "
             "Geometry is the triangle's normal, constant across each face. Shading is the interpolated vertex normal with the normal map applied.");
         TuningSection::MakeItemResettable("Facing Normal");
+        ImGui::Checkbox("Probe Classification", &probe.weighting.classification);
+        ImGui::SetItemTooltip("Leaves out of the interpolation the probes whose rays hit the back faces of single-sided materials more often "
+            "than Max Back Face Ratio, such as the probes under a floor or inside a wall. "
+            "A point with no probe left around it gets no indirect light.");
+        TuningSection::MakeItemResettable("Probe Classification");
+        ImGui::SliderFloat("Max Back Face Ratio", &probe.weighting.maxBackFaceRatio, 0.0f, 1.0f);
+        ImGui::SetItemTooltip("The largest fraction of a probe's rays, averaged over the updates, that may hit back faces "
+            "for the probe to stay in the interpolation.");
+        TuningSection::MakeItemResettable("Max Back Face Ratio");
         ClampSettings();
 
         if (ImGui::Button("Reset Probes"))
@@ -459,6 +470,8 @@ namespace
         values["Facing Weight"] = FormatFlag(probe.weighting.facing);
         values["Min Facing Weight"] = MeasurementConditions::FormatFloat(probe.weighting.minFacingWeight);
         values["Facing Normal"] = kFacingNormalNames[(int)probe.weighting.facingNormal];
+        values["Probe Classification"] = FormatFlag(probe.weighting.classification);
+        values["Max Back Face Ratio"] = MeasurementConditions::FormatFloat(probe.weighting.maxBackFaceRatio);
         values["Pause Updates"] = FormatFlag(s_Settings.pauseProbeUpdates);
 
         const ProbeVisualization::Settings& probeSpheres = s_Settings.probeSpheres;
@@ -528,6 +541,8 @@ namespace
         ReadFlag(values, "Facing Weight", probe.weighting.facing);
         ReadFloat(values, "Min Facing Weight", probe.weighting.minFacingWeight);
         ReadName(values, "Facing Normal", kFacingNormalNames, probe.weighting.facingNormal);
+        ReadFlag(values, "Probe Classification", probe.weighting.classification);
+        ReadFloat(values, "Max Back Face Ratio", probe.weighting.maxBackFaceRatio);
         ReadFlag(values, "Pause Updates", s_Settings.pauseProbeUpdates);
 
         ProbeVisualization::Settings& probeSpheres = s_Settings.probeSpheres;
