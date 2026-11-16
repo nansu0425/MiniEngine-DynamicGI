@@ -353,9 +353,9 @@ namespace
         ImGui::SetItemTooltip("A probe ray that first hits the back face of a single-sided material records no radiance "
             "and this fraction of the distance it hit, so the points beyond that face see the probe as occluded.");
         TuningSection::MakeItemResettable("Back Face Distance Scale");
-        int visibility = (int)probe.visibility;
+        int visibility = (int)probe.weighting.visibility;
         if (ImGui::Combo("Visibility", &visibility, kVisibilityNames, IM_ARRAYSIZE(kVisibilityNames)))
-            probe.visibility = (ProbeLighting::Visibility)visibility;
+            probe.weighting.visibility = (ProbeWeighting::Visibility)visibility;
         ImGui::SetItemTooltip("Which of the probes around a point the interpolation keeps. None keeps all of them. "
             "Shadow Ray traces a ray from the point to each probe and keeps the probes it reaches. "
             "Chebyshev weights each probe by how likely the distances it stored toward the point leave the point visible.");
@@ -437,7 +437,7 @@ namespace
         values["Distance Sharpness"] = MeasurementConditions::FormatFloat(probe.distanceSharpness);
         values["Distance Texels per Side"] = std::to_string(probe.distanceTexelsPerSide);
         values["Back Face Distance Scale"] = MeasurementConditions::FormatFloat(probe.backFaceDistanceScale);
-        values["Visibility"] = kVisibilityNames[(int)probe.visibility];
+        values["Visibility"] = kVisibilityNames[(int)probe.weighting.visibility];
         values["Pause Updates"] = FormatFlag(s_Settings.pauseProbeUpdates);
 
         const ProbeVisualization::Settings& probeSpheres = s_Settings.probeSpheres;
@@ -503,7 +503,7 @@ namespace
         ReadFloat(values, "Distance Sharpness", probe.distanceSharpness);
         ReadUInt(values, "Distance Texels per Side", probe.distanceTexelsPerSide);
         ReadFloat(values, "Back Face Distance Scale", probe.backFaceDistanceScale);
-        ReadName(values, "Visibility", kVisibilityNames, probe.visibility);
+        ReadName(values, "Visibility", kVisibilityNames, probe.weighting.visibility);
         ReadFlag(values, "Pause Updates", s_Settings.pauseProbeUpdates);
 
         ProbeVisualization::Settings& probeSpheres = s_Settings.probeSpheres;
@@ -579,7 +579,7 @@ namespace
                 .Integer("target", s_Settings.pathTraced.targetSamples)
                 .Integer("resets", progress.resets))
             .Object("probe", ControlChannel::Fields()
-                .Text("visibility", kVisibilityNames[(int)s_Settings.probe.visibility])
+                .Text("visibility", kVisibilityNames[(int)s_Settings.probe.weighting.visibility])
                 .Flag("paused", s_Settings.pauseProbeUpdates)
                 .Text("selected", FormatSelectedProbe())
                 .Integer("updates", ProbeLighting::GetProgress().updates)
@@ -775,9 +775,9 @@ void DynamicGI::Update(ComputeContext& context, const GIFrameInputs& inputs, uin
                 ProbeLighting::Update(context, s_Settings.probe, inputs);
                 s_ProbeStepRequested = false;
             }
-            if (s_Settings.probe.visibility != ProbeLighting::Visibility::kNone)
+            if (!ProbeWeighting::InterpolatesTrilinearly(s_Settings.probe.weighting))
             {
-                ProbeLighting::EstimateScreenIrradiance(context, s_Settings.probe.visibility, inputs, width, height);
+                ProbeLighting::EstimateScreenIrradiance(context, s_Settings.probe.weighting, inputs, width, height);
                 screenIndirectIrradiance = &ProbeLighting::GetScreenIrradiance();
                 context.TransitionResource(*screenIndirectIrradiance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
             }
@@ -840,6 +840,6 @@ void DynamicGI::DrawProbeOverlay(GraphicsContext& context, const Math::Camera& c
 void DynamicGI::MeasureProbeContribution(const RaytracingScene& scene)
 {
     if (IsInspectingPixel() && GetProbeCount(ProbeLighting::GetProbes().grid) != 0)
-        ProbeContribution::Measure(s_Settings.probe.visibility, scene);
+        ProbeContribution::Measure(s_Settings.probe.weighting, scene);
     ReplyToMeasuredPixelSelections();
 }

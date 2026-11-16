@@ -31,8 +31,8 @@ namespace
     {
         DirectX::XMUINT2 pixel;
         uint32_t capturesSurface;
-        uint32_t visibility;
         uint32_t distanceTexelsPerSide;
+        ProbeWeighting::Constants weighting;
         IrradianceProbeGrid grid;
     };
 
@@ -92,7 +92,7 @@ uint32_t ProbeContribution::CaptureSurface(DirectX::XMUINT2 scenePixel)
     return ++s_LastCaptureId;
 }
 
-void ProbeContribution::Measure(ProbeLighting::Visibility visibility, const RaytracingScene& scene)
+void ProbeContribution::Measure(const ProbeWeighting::Settings& weighting, const RaytracingScene& scene)
 {
     CollectFinishedReadback();
 
@@ -111,8 +111,8 @@ void ProbeContribution::Measure(ProbeLighting::Visibility visibility, const Rayt
         const Constants constants = {
             .pixel = s_PixelToCapture.value_or(DirectX::XMUINT2(0, 0)),
             .capturesSurface = s_PixelToCapture ? 1u : 0u,
-            .visibility = (uint32_t)visibility,
             .distanceTexelsPerSide = probes.distanceTexelsPerSide,
+            .weighting = ProbeWeighting::DescribeConstants(weighting),
             .grid = probes.grid,
         };
         context.SetRootSignature(s_RootSignature);

@@ -1,13 +1,13 @@
 #include "Model/Renderer/GBufferTextures.hlsli"
-#include "Model/DynamicGI/ProbeVisibility.hlsli"
+#include "Model/DynamicGI/ProbeWeighting.hlsli"
 #include "Model/DynamicGI/ProbeContribution.hlsli"
 
 cbuffer Constants : register(b0)
 {
     uint2 Pixel;
     uint CapturesSurface;
-    uint Visibility;
     uint DistanceTexelsPerSide;
+    ProbeWeighting Weighting;
     IrradianceProbeGrid Grid;
 };
 
@@ -35,8 +35,8 @@ void main()
     }
 
     const ProbeDistanceAtlas distanceAtlas = MakeProbeDistanceAtlas(ProbesDistance, DistanceTexelsPerSide);
-    const VisibleProbeCorners probes = GetVisibleProbeCorners(Visibility, distanceAtlas, LinearClamp, Grid, result.position, result.geometryNormal);
-    result.comparesDistance = Visibility == kProbeVisibilityChebyshev;
+    const WeightedProbeCorners probes = GetWeightedProbeCorners(Weighting, distanceAtlas, LinearClamp, Grid, result.position, result.geometryNormal);
+    result.comparesDistance = Weighting.visibility == kProbeVisibilityChebyshev;
     result.ignoresVisibility = probes.ignoresVisibility;
     result.irradiance = 0.0;
     [unroll]
@@ -55,9 +55,9 @@ void main()
         result.corners[corner] = contribution;
     }
 
-    result.shadingIrradiance = Visibility == kProbeVisibilityNone ?
+    result.shadingIrradiance = InterpolatesTrilinearly(Weighting) ?
         SampleIrradianceProbes(ProbesIrradiance, LinearClamp, Grid, result.position, result.shadingNormal) :
-        SampleVisibleIrradianceProbes(Visibility, ProbesIrradiance, distanceAtlas, LinearClamp, Grid, result.position, result.geometryNormal,
+        SampleWeightedIrradianceProbes(Weighting, ProbesIrradiance, distanceAtlas, LinearClamp, Grid, result.position, result.geometryNormal,
             result.shadingNormal);
     Contribution[0] = result;
 }

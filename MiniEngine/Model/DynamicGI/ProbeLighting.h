@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Model/DynamicGI/GIFrameInputs.h"
+#include "Model/DynamicGI/ProbeWeighting.h"
 #include "Model/Renderer/IrradianceProbeGrid.h"
 
 class ColorBuffer;
@@ -8,8 +9,6 @@ class ComputeContext;
 
 namespace ProbeLighting
 {
-    enum class Visibility { kNone, kShadowRay, kChebyshev };
-
     struct Settings
     {
         uint32_t probeCounts[3] = { 16, 8, 8 };
@@ -18,7 +17,7 @@ namespace ProbeLighting
         float distanceSharpness = 1.0f;
         uint32_t distanceTexelsPerSide = 8;
         float backFaceDistanceScale = 0.2f;
-        Visibility visibility = Visibility::kNone;
+        ProbeWeighting::Settings weighting;
     };
 
     struct Probes
@@ -46,7 +45,7 @@ namespace ProbeLighting
     Progress GetProgress(void);
 
     void Update(ComputeContext& context, const Settings& settings, const GIFrameInputs& inputs);
-    void EstimateScreenIrradiance(ComputeContext& context, Visibility visibility, const GIFrameInputs& inputs, uint32_t width, uint32_t height);
+    void EstimateScreenIrradiance(ComputeContext& context, const ProbeWeighting::Settings& weighting, const GIFrameInputs& inputs, uint32_t width, uint32_t height);
 
     Probes GetProbes(void);
     ColorBuffer& GetScreenIrradiance(void);

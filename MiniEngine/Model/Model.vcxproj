@@ -99,6 +99,7 @@
     <ClInclude Include="DynamicGI\GILights.h" />
     <ClInclude Include="DynamicGI\ProbeContribution.h" />
     <ClInclude Include="DynamicGI\ProbeLighting.h" />
+    <ClInclude Include="DynamicGI\ProbeWeighting.h" />
     <ClInclude Include="DynamicGI\ProbeVisualization.h" />
     <ClInclude Include="Renderer\IrradianceProbeGrid.h" />
     <ClInclude Include="DynamicGI\PathTracedLighting.h" />
@@ -156,6 +157,7 @@
     <None Include="DynamicGI\ProbeRays.hlsli" />
     <None Include="DynamicGI\ProbeRayHit.hlsli" />
     <None Include="DynamicGI\ProbeVisibility.hlsli" />
+    <None Include="DynamicGI\ProbeWeighting.hlsli" />
     <None Include="DynamicGI\ProbeSphere.hlsli" />
     <None Include="DynamicGI\ProbeDistanceLine.hlsli" />
     <None Include="DynamicGI\ProbeContribution.hlsli" />

@@ -1,12 +1,12 @@
 #include "Model/DynamicGI/ProbeRayHit.hlsli"
-#include "Model/DynamicGI/ProbeVisibility.hlsli"
+#include "Model/DynamicGI/ProbeWeighting.hlsli"
 #include "Model/DynamicGI/HitLighting.hlsli"
 
 cbuffer Constants : register(b0)
 {
-    uint Visibility;
     uint DistanceTexelsPerSide;
     float BackFaceDistanceScale;
+    ProbeWeighting Weighting;
     GILights Lights;
     ProbeRays Rays;
 };
@@ -42,9 +42,9 @@ ProbeRaySample TraceProbeRay(float3 origin, float3 direction)
 
     const HitSurface surface = GetHitSurface(rayHit, kSharpestTextureLod);
     const GltfBrdfInput brdf = MakeGltfBrdfInput(surface.baseColor.rgb, surface.metallic, surface.roughness, surface.shadingNormal, -direction);
-    const float3 irradiance = Visibility == kProbeVisibilityNone ?
+    const float3 irradiance = InterpolatesTrilinearly(Weighting) ?
         SampleIrradianceProbes(ProbesIrradiance, LinearClamp, Rays.grid, surface.position, surface.shadingNormal) :
-        SampleVisibleIrradianceProbes(Visibility, ProbesIrradiance, MakeProbeDistanceAtlas(ProbesDistance, DistanceTexelsPerSide), LinearClamp, Rays.grid, surface.position, surface.geometryNormal,
+        SampleWeightedIrradianceProbes(Weighting, ProbesIrradiance, MakeProbeDistanceAtlas(ProbesDistance, DistanceTexelsPerSide), LinearClamp, Rays.grid, surface.position, surface.geometryNormal,
             surface.shadingNormal);
     const float3 indirectRadiance = kPi * EvaluateGltfDiffuseLobeForIrradiance(brdf) * irradiance;
     const float3 directRadiance = GetHitDirectRadiance(surface, brdf, Lights, ShadowMap, ShadowMapSampler);

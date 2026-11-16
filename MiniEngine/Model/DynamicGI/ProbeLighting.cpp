@@ -75,9 +75,9 @@ namespace
 
     __declspec(align(16)) struct TraceConstants
     {
-        uint32_t visibility;
         uint32_t distanceTexelsPerSide;
         float backFaceDistanceScale;
+        ProbeWeighting::Constants weighting;
         GILights lights;
         ProbeRays rays;
     };
@@ -112,8 +112,8 @@ namespace
     {
         uint32_t width;
         uint32_t height;
-        uint32_t visibility;
         uint32_t distanceTexelsPerSide;
+        ProbeWeighting::Constants weighting;
         IrradianceProbeGrid grid;
     };
 
@@ -317,9 +317,9 @@ void ProbeLighting::Update(ComputeContext& context, const Settings& settings, co
         ScopedTimer _traceProf(L"Probe Trace", context);
 
         const TraceConstants constants = {
-            .visibility = (uint32_t)settings.visibility,
             .distanceTexelsPerSide = s_DistanceTexelsPerSide,
             .backFaceDistanceScale = settings.backFaceDistanceScale,
+            .weighting = ProbeWeighting::DescribeConstants(settings.weighting),
             .lights = DescribeGILights(inputs),
             .rays = rays,
         };
@@ -378,7 +378,7 @@ void ProbeLighting::Update(ComputeContext& context, const Settings& settings, co
     ++s_Progress.updates;
 }
 
-void ProbeLighting::EstimateScreenIrradiance(ComputeContext& context, Visibility visibility, const GIFrameInputs& inputs, uint32_t width,
+void ProbeLighting::EstimateScreenIrradiance(ComputeContext& context, const ProbeWeighting::Settings& weighting, const GIFrameInputs& inputs, uint32_t width,
     uint32_t height)
 {
     ScopedTimer _prof(L"Probe Screen Irradiance", context);
@@ -391,7 +391,13 @@ void ProbeLighting::EstimateScreenIrradiance(ComputeContext& context, Visibility
     s_ScreenInputs.PointTo(kNumGBufferTargets + 1, s_ProbesDistance, s_ProbesDistance.GetSRV());
     s_ScreenOutputs.PointTo(0, s_ScreenIrradiance, s_ScreenIrradiance.GetUAV());
 
-    const ScreenConstants constants = { width, height, (uint32_t)visibility, s_DistanceTexelsPerSide, s_Grid };
+    const ScreenConstants constants = {
+        .width = width,
+        .height = height,
+        .distanceTexelsPerSide = s_DistanceTexelsPerSide,
+        .weighting = ProbeWeighting::DescribeConstants(weighting),
+        .grid = s_Grid,
+    };
     context.SetRootSignature(s_ScreenRootSignature);
     context.SetPipelineState(s_ScreenPSO);
     for (ColorBuffer& target : g_GBuffer)

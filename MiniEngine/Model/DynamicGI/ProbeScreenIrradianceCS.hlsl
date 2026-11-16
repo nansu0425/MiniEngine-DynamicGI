@@ -1,12 +1,12 @@
 #include "Model/Renderer/GBufferTextures.hlsli"
-#include "Model/DynamicGI/ProbeVisibility.hlsli"
+#include "Model/DynamicGI/ProbeWeighting.hlsli"
 
 cbuffer Constants : register(b0)
 {
     uint Width;
     uint Height;
-    uint Visibility;
     uint DistanceTexelsPerSide;
+    ProbeWeighting Weighting;
     IrradianceProbeGrid Grid;
 };
 
@@ -25,6 +25,6 @@ void main(uint2 DTid : SV_DispatchThreadID)
     if (!LoadGBuffer(DTid, surface))
         return;
 
-    ScreenIrradiance[DTid] = float4(SampleVisibleIrradianceProbes(Visibility, ProbesIrradiance, MakeProbeDistanceAtlas(ProbesDistance, DistanceTexelsPerSide), LinearClamp, Grid,
+    ScreenIrradiance[DTid] = float4(SampleWeightedIrradianceProbes(Weighting, ProbesIrradiance, MakeProbeDistanceAtlas(ProbesDistance, DistanceTexelsPerSide), LinearClamp, Grid,
         surface.position, surface.geometryNormal, surface.shadingNormal), 0.0);
 }

@@ -50,7 +50,7 @@ namespace ProbeContribution
     void Shutdown(void);
 
     uint32_t CaptureSurface(DirectX::XMUINT2 scenePixel);
-    void Measure(ProbeLighting::Visibility visibility, const RaytracingScene& scene);
+    void Measure(const ProbeWeighting::Settings& weighting, const RaytracingScene& scene);
 
     const std::optional<Readback>& GetReadback(void);
     StructuredBuffer& GetSurfaceBuffer(void);
