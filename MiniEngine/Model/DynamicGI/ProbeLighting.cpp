@@ -315,11 +315,12 @@ ProbeLighting::Progress ProbeLighting::GetProgress(void)
     return s_Progress;
 }
 
-void ProbeLighting::Update(ComputeContext& context, const Settings& settings, const GIFrameInputs& inputs)
+void ProbeLighting::Update(ComputeContext& context, const Volume& volume, const GIFrameInputs& inputs)
 {
     ScopedTimer _prof(L"Probe Lighting", context);
 
-    FitResourcesTo(DescribeGrid(inputs.modelBounds, settings.probeCounts), settings.raysPerProbe, settings.distanceTexelsPerSide);
+    const Settings& settings = volume.settings;
+    FitResourcesTo(DescribeGrid(volume.bounds, settings.probeCounts), settings.raysPerProbe, settings.distanceTexelsPerSide);
     if (s_ResetRequested)
     {
         context.TransitionResource(s_ProbesIrradiance, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, true);

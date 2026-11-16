@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Core/pch.h"
-#include "Core/Math/BoundingBox.h"
 
 class RaytracingScene;
 class ShadowBuffer;
@@ -21,5 +20,4 @@ struct GIFrameInputs
     Math::Vector3 skyRadiance;
     ShadowBuffer& shadowMap;
     Math::Matrix4 shadowMatrix;
-    Math::AxisAlignedBox modelBounds;
 };

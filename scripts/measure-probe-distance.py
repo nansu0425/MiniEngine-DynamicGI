@@ -16,10 +16,11 @@ RECORD = REPO_ROOT / 'docs' / 'probe-visibility-measurements.md'
 RECORD_SECTION = '## Distance Sharpness, distance 해상도, ray 수'
 PLOT_SCRIPT = Path(__file__).resolve().parent / 'plot-probe-distance.py'
 
-SECTION = 'Engine Tuning'
-KEY_PREFIX = 'Dynamic GI/'
-BASE = {'Indirect': 'Probe', 'Visibility': 'Chebyshev', 'Pause Updates': 0, 'Show Probes': 0, 'Hysteresis': 0.95,
-        'Probes X': 16, 'Probes Y': 8, 'Probes Z': 8}
+DEBUG_SECTION = 'Engine Tuning'
+DEBUG_KEY_PREFIX = 'Dynamic GI/'
+VOLUME = 'Dynamic GI Volume'
+BASE_DEBUG = {'Indirect': 'Probe', 'Pause Updates': 0, 'Show Probes': 0}
+BASE_VOLUME = {'Visibility': 'Chebyshev', 'Hysteresis': 0.95, 'Probes X': 16, 'Probes Y': 8, 'Probes Z': 8}
 
 DISTANCE_TEXELS_PER_SIDE = (8, 16)
 RAYS_PER_PROBE = (64, 128, 256)
@@ -31,8 +32,16 @@ OVERSHOOT_RATIO = 1.1
 WAIT_TIMEOUT = 600
 
 
-def set_probe(session, settings):
-    session.ask_ok(f'settings set {SECTION}: ' + '; '.join(f'{KEY_PREFIX}{key}={value}' for key, value in settings.items()))
+def assignments(settings, key_prefix=''):
+    return '; '.join(f'{key_prefix}{key}={value}' for key, value in settings.items())
+
+
+def set_debug(session, settings):
+    session.ask_ok(f'settings set {DEBUG_SECTION}: ' + assignments(settings, DEBUG_KEY_PREFIX))
+
+
+def set_volume(session, settings):
+    session.ask_ok(f'editor set {VOLUME}: ' + assignments(settings))
 
 
 def probe_updates(session):
@@ -59,18 +68,18 @@ def tile_interior(atlas, texels_per_side):
 
 def measure_combination(session, texels_per_side, rays_per_probe, sharpness, folder):
     name = f'n{texels_per_side}-r{rays_per_probe}-s{sharpness}'
-    set_probe(session, {'Distance Texels per Side': texels_per_side, 'Rays per Probe': rays_per_probe, 'Distance Sharpness': sharpness})
+    set_volume(session, {'Distance Texels per Side': texels_per_side, 'Rays per Probe': rays_per_probe, 'Distance Sharpness': sharpness})
     wait_for_updates(session, CONVERGENCE_UPDATES)
 
     trace_ms = float(session.ask_ok(f'profile Probe Trace frames={PROFILE_FRAMES}', timeout=WAIT_TIMEOUT)['gpu_ms']['mean'])
     update_ms = float(session.ask_ok(f'profile Probes Update frames={PROFILE_FRAMES}', timeout=WAIT_TIMEOUT)['gpu_ms']['mean'])
 
-    set_probe(session, {'Pause Updates': 1})
+    set_debug(session, {'Pause Updates': 1})
     truth = tile_interior(read_dds_r32f(save_atlas(session, 'Probes Texel Distance', folder / f'{name}-texel')), texels_per_side)
     before = tile_interior(read_dds_rg32f(save_atlas(session, 'Probes Distance', folder / f'{name}-before')), texels_per_side)[:, 0]
     session.ask_ok('gi probe step')
     after = tile_interior(read_dds_rg32f(save_atlas(session, 'Probes Distance', folder / f'{name}-after')), texels_per_side)[:, 0]
-    set_probe(session, {'Pause Updates': 0})
+    set_debug(session, {'Pause Updates': 0})
 
     ratio = before / truth
     change = np.abs(after - before) / truth
@@ -94,7 +103,8 @@ def measure(args):
         session = Session(instance)
         try:
             session.ask_ok('ui hide')
-            set_probe(session, BASE)
+            set_debug(session, BASE_DEBUG)
+            set_volume(session, BASE_VOLUME)
             machine = describe_machine(session)
             folder = shots_dir(instance)
             print(', '.join(machine), flush=True)

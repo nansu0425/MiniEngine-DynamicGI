@@ -131,6 +131,20 @@ namespace
         ImGui::SetItemTooltip("The rotate rings turn the object about the world axes.");
     }
 
+    void AddOptionalObject(Scene::Object& object)
+    {
+        Scene::AddObject(object);
+        object.LoadSettings(IniFile::Values());
+        s_Selected = &object;
+    }
+
+    void RemoveOptionalObject(Scene::Object& object)
+    {
+        Scene::RemoveObject(object);
+        if (s_Selected == &object)
+            s_Selected = nullptr;
+    }
+
     void ShowHierarchyContent(void)
     {
         const Scene::Object* selected = GetSelected();
@@ -138,6 +152,15 @@ namespace
         {
             if (ImGui::Selectable(object->GetName().c_str(), object == selected))
                 s_Selected = object;
+        }
+
+        for (Scene::Object* object : Scene::GetOptionalObjects())
+        {
+            if (Scene::HasObject(*object))
+                continue;
+            if (ImGui::Button(("Add " + object->GetName()).c_str()))
+                AddOptionalObject(*object);
+            ImGui::SetItemTooltip("Adds the object to the scene with its default settings. Scene > Save keeps it in the scene file.");
         }
     }
 
@@ -164,6 +187,14 @@ namespace
             ImGui::PopID();
         }
         ImGui::PopID();
+
+        if (Scene::IsOptionalObject(*selected))
+        {
+            ImGui::Separator();
+            if (ImGui::Button("Remove"))
+                RemoveOptionalObject(*selected);
+            ImGui::SetItemTooltip("Removes the object from the scene. Scene > Save removes its section from the scene file.");
+        }
     }
 
     ControlChannel::Fields DescribeIcon(const Camera& camera, const SceneEditor::IconComponent& icon)
@@ -231,6 +262,47 @@ namespace
             return false;
         }
         s_Selected = object;
+        return true;
+    }
+
+    Scene::Object* FindOptionalObject(const std::string& name, std::string& error)
+    {
+        std::string names;
+        for (Scene::Object* object : Scene::GetOptionalObjects())
+        {
+            if (name == object->GetName())
+                return object;
+            names += std::string(names.empty() ? "" : ", ") + object->GetName();
+        }
+        error = "no optional object '" + name + "'. Optional objects: " + names;
+        return nullptr;
+    }
+
+    bool AddByName(const std::string& name, std::string& error)
+    {
+        Scene::Object* object = FindOptionalObject(name, error);
+        if (object == nullptr)
+            return false;
+        if (Scene::HasObject(*object))
+        {
+            error = "'" + name + "' is already in the scene";
+            return false;
+        }
+        AddOptionalObject(*object);
+        return true;
+    }
+
+    bool RemoveByName(const std::string& name, std::string& error)
+    {
+        Scene::Object* object = FindOptionalObject(name, error);
+        if (object == nullptr)
+            return false;
+        if (!Scene::HasObject(*object))
+        {
+            error = "'" + name + "' is not in the scene";
+            return false;
+        }
+        RemoveOptionalObject(*object);
         return true;
     }
 
@@ -316,12 +388,14 @@ namespace
             SetObjectSettings(value, reply);
             return;
         }
-        std::string error = "usage: editor select <name>|none | editor mode translate|rotate|scale | editor axes local|world | editor get <name> | "
+        std::string error = "usage: editor select <name>|none | editor mode translate|rotate|scale | editor axes local|world | editor add <name> | editor remove <name> | editor get <name> | "
             "editor set <name>: <key>=<value>; <key>=<value>";
         const bool done =
             action == "select" ? SelectByName(value, error) :
             action == "mode" ? SetGizmoMode(value, error) :
             action == "axes" ? SetRotateAxes(value, error) :
+            action == "add" ? AddByName(value, error) :
+            action == "remove" ? RemoveByName(value, error) :
             false;
         if (!done)
         {
@@ -330,6 +404,11 @@ namespace
         }
         reply.Ok(ControlChannel::Fields().Object("state", ControlChannel::GetState("editor")));
     }
+}
+
+const Scene::Object* SceneEditor::GetSelectedObject(void)
+{
+    return GetSelected();
 }
 
 void SceneEditor::RegisterComponentDetails(const std::type_info& componentType, std::function<void(Scene::Component&)> show)
@@ -374,7 +453,7 @@ void SceneEditor::RegisterCommands(const Camera& camera)
 {
     const Camera* projection = &camera;
     ControlChannel::RegisterState("editor", [projection] { return DescribeEditor(*projection); });
-    ControlChannel::Register("editor", "editor select <name>|none | editor mode translate|rotate|scale | editor axes local|world | editor get <name> | "
+    ControlChannel::Register("editor", "editor select <name>|none | editor mode translate|rotate|scale | editor axes local|world | editor add <name> | editor remove <name> | editor get <name> | "
         "editor set <name>: <key>=<value>; <key>=<value>: the selected object, "
         "whose settings the Details panel shows and which the gizmo edits, the gizmo mode and the axes the rotate rings follow, "
         "as clicking an object in the Scene Hierarchy panel or its icon, pressing W, E or R and the toolbar at the top right of the scene do. "
@@ -385,7 +464,10 @@ void SceneEditor::RegisterCommands(const Camera& camera)
         "such as the Camera, the Sky or the Model, has neither and no gizmo. Icons and the gizmo are drawn only while the UI is shown. "
         "get gives the settings of an object as its Details panel changes them, which the scene file keeps in the section of the object's name. "
         "set changes them as the Details panel does, and changes nothing and fails if a value does not read back as given. "
-        "scene save writes them to the scene file. An object without settings, such as the Model, gives none",
+        "scene save writes them to the scene file. An object without settings, such as the Model, gives none. "
+        "add puts an optional object that is not in the scene into it with its default settings and selects it, "
+        "as its Add button in the Scene Hierarchy panel does, and remove takes it out as the Remove button in its Details panel does. "
+        "An optional object is in the scene only while the scene file has its section, which scene save writes or removes",
         HandleEditorCommand);
 }
 

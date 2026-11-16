@@ -47,7 +47,7 @@ IniFile::Sections IniFile::Read(const std::wstring& path)
     return sections;
 }
 
-bool IniFile::WriteSections(const std::wstring& path, const Sections& sections)
+bool IniFile::WriteSections(const std::wstring& path, const Sections& sections, const std::set<std::string>& removedSections)
 {
     std::ifstream input(path, std::ios::binary);
     if (!input)
@@ -62,6 +62,7 @@ bool IniFile::WriteSections(const std::wstring& path, const Sections& sections)
     const Values* section = nullptr;
     std::set<std::string> writtenKeys;
     size_t missingKeysAt = 0;
+    bool inRemovedSection = false;
     const auto addMissingKeys = [&]()
     {
         if (section == nullptr)
@@ -88,6 +89,9 @@ bool IniFile::WriteSections(const std::wstring& path, const Sections& sections)
         if (ReadSectionName(line, name))
         {
             addMissingKeys();
+            inRemovedSection = removedSections.count(name) != 0;
+            if (inRemovedSection)
+                continue;
             lines.push_back(line);
             const auto found = sections.find(name);
             if (found != sections.end())
@@ -99,6 +103,9 @@ bool IniFile::WriteSections(const std::wstring& path, const Sections& sections)
             }
             continue;
         }
+
+        if (inRemovedSection)
+            continue;
 
         const size_t separator = FindSeparator(line);
         if (section != nullptr && separator != std::string::npos)

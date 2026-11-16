@@ -1,6 +1,7 @@
 #pragma once
 
 #include <map>
+#include <set>
 #include <string>
 
 // "[section]" 줄 아래에 "key=value" 줄을 두는 text 파일. ';'로 시작하는 줄은 주석이고, '='가 없는 줄은 읽지 않는다.
@@ -14,7 +15,7 @@ namespace IniFile
     Sections Read(const std::wstring& path);
 
     // path의 파일에서 sections에 있는 section의 key 줄만 그 값으로 바꾸고, 주석과 다른 section은 그대로 둔다. 파일에 없던 key는 그
-    // section의 마지막 key 뒤에, 없던 section은 파일 끝에 둔다. sections의 section에 없는 key의 줄은 지운다. 줄 끝은 파일의 것을 따른다.
-    // 파일을 읽거나 쓸 수 없으면 false를 돌려준다.
-    bool WriteSections(const std::wstring& path, const Sections& sections);
+    // section의 마지막 key 뒤에, 없던 section은 파일 끝에 둔다. sections의 section에 없는 key의 줄은 지운다. removedSections의 section은
+    // 이름 줄부터 다음 section 앞까지 지운다. 줄 끝은 파일의 것을 따른다. 파일을 읽거나 쓸 수 없으면 false를 돌려준다.
+    bool WriteSections(const std::wstring& path, const Sections& sections, const std::set<std::string>& removedSections = {});
 }

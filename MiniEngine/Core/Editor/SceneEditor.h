@@ -35,6 +35,8 @@ namespace SceneEditor
     // show는 T와 type이 같은 component만 그린다. T를 상속한 type의 component는 그리지 않는다.
     // Details panel에서 바꾸는 scene 설정은 component의 setting key로 둔다. harness의 editor get, set 명령은 Details panel을 거치지 않고
     // setting key로 object의 설정을 읽고 바꾸기 때문이다.
+    const Scene::Object* GetSelectedObject(void);
+
     void RegisterComponentDetails(const std::type_info& componentType, std::function<void(Scene::Component&)> show);
     template<class T> void RegisterComponentDetails(std::function<void(T&)> show)
     {

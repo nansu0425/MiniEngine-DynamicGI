@@ -3,6 +3,7 @@
 #include "Core/Utility/IniFile.h"
 
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -81,8 +82,16 @@ namespace Scene
     void AddObject(Object& object);
     void RemoveObject(Object& object);
     const std::vector<Object*>& GetObjects(void);
+    bool HasObject(const Object& object);
+
+    void RegisterOptionalObject(Object& object);
+    void UnregisterOptionalObject(Object& object);
+    bool IsOptionalObject(const Object& object);
+    const std::vector<Object*>& GetOptionalObjects(void);
+    std::set<std::string> GetAbsentOptionalObjectNames(void);
 
     // scene을 열 때 부른다. object마다 sections에서 그 이름의 section을 넘기고, 없으면 빈 section을 넘긴다.
+    // optional object는 sections에 그 이름의 section이 있을 때만 scene에 등록한다.
     void LoadObjectSettings(const IniFile::Sections& sections);
     // scene을 저장할 때 부른다. 설정이 있는 object마다 그 이름의 section을 채운다.
     IniFile::Sections SaveObjectSettings(void);

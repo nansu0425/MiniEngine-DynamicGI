@@ -1,4 +1,6 @@
 #include "Model/DynamicGI/DynamicGI.h"
+#include "Model/DynamicGI/DynamicGIVolume.h"
+#include "Model/DynamicGI/DynamicGIVolumeBox.h"
 #include "Model/DynamicGI/PathTracedLighting.h"
 #include "Model/DynamicGI/ProbeContribution.h"
 #include "Model/DynamicGI/ProbeLighting.h"
@@ -35,7 +37,6 @@ namespace
         Source indirect = Source::kOff;
         Renderer::ShadingOutput view = Renderer::ShadingOutput::kLit;
         PathTracedLighting::Settings pathTraced;
-        ProbeLighting::Settings probe;
         bool pauseProbeUpdates = false;
         ProbeVisualization::Settings probeSpheres;
         bool inspectPixel = false;
@@ -64,6 +65,14 @@ namespace
     bool IsIndirectOn(void)
     {
         return s_Settings.indirect != Source::kOff;
+    }
+
+    const ProbeLighting::Volume* FindProbeVolume(void)
+    {
+        if (s_Settings.indirect != Source::kProbe)
+            return nullptr;
+        const DynamicGIVolumeComponent* volume = FindDynamicGIVolume();
+        return volume != nullptr ? &volume->GetVolume() : nullptr;
     }
 
     std::optional<uint32_t> GetSelectedProbe(void)
@@ -105,7 +114,7 @@ namespace
 
     bool IsInspectingPixel(void)
     {
-        return s_Settings.indirect == Source::kProbe && s_Settings.inspectPixel && s_InspectedPixel;
+        return FindProbeVolume() != nullptr && s_Settings.inspectPixel && s_InspectedPixel;
     }
 
     const ProbeContribution::Surface* GetInspectedContribution(void)
@@ -116,6 +125,15 @@ namespace
         if (!readback || readback->captureId != s_InspectedPixel->captureId)
             return nullptr;
         return &readback->surface;
+    }
+
+    std::optional<std::string> FindWhyProbesAreOff(void)
+    {
+        if (s_Settings.indirect != Source::kProbe)
+            return "Indirect is not Probe";
+        if (FindDynamicGIVolume() == nullptr)
+            return "the scene has no Dynamic GI Volume";
+        return std::nullopt;
     }
 
     std::optional<std::string> InspectPixel(int x, int y)
@@ -156,20 +174,10 @@ namespace
     constexpr uint32_t kMaxTargetSamples = 1u << 20;
     // albedo가 1에 가까운 scene에서도 한 dispatch가 끝나는 시간을 이 상한이 정한다.
     constexpr uint32_t kMaxHits = 1u << 10;
-    constexpr uint32_t kMaxProbesPerAxis = 64;
-    constexpr uint32_t kMaxRaysPerProbe = 1024;
-    constexpr float kMaxHysteresis = 0.999f;
-    constexpr float kMaxDistanceSharpness = 100.0f;
-    constexpr uint32_t kMaxDistanceTexelsPerSide = 32;
     constexpr float kMaxRadiusPerSpacing = 0.5f;
-    constexpr float kMaxSelfShadowBias = 0.5f;
-    constexpr float kMaxChebyshevExponent = 8.0f;
-
     // Source의 순서이고, Engine Tuning의 저장과 settings 명령이 이 이름으로 읽고 쓴다.
     const char* kSourceNames[] = { "Off", "Path Traced", "Probe" };
     const char* kViewNames[] = { "Lit", "Indirect Irradiance", "Indirect Radiance" };
-    const char* kVisibilityNames[] = { "None", "Shadow Ray", "Chebyshev" };
-    const char* kFacingNormalNames[] = { "Geometry", "Shading" };
 
     void ClampSettings(void)
     {
@@ -177,20 +185,6 @@ namespace
         pathTraced.samplesPerFrame = std::max(1u, std::min(pathTraced.samplesPerFrame, kMaxSamplesPerFrame));
         pathTraced.targetSamples = std::max(1u, std::min(pathTraced.targetSamples, kMaxTargetSamples));
         pathTraced.maxHits = std::max(1u, std::min(pathTraced.maxHits, kMaxHits));
-
-        ProbeLighting::Settings& probe = s_Settings.probe;
-        for (uint32_t& count : probe.probeCounts)
-            count = std::max(2u, std::min(count, kMaxProbesPerAxis));
-        probe.raysPerProbe = std::max(1u, std::min(probe.raysPerProbe, kMaxRaysPerProbe));
-        probe.hysteresis = std::max(0.0f, std::min(probe.hysteresis, kMaxHysteresis));
-        probe.distanceSharpness = std::max(1.0f, std::min(probe.distanceSharpness, kMaxDistanceSharpness));
-        probe.distanceTexelsPerSide = std::max(1u, std::min(probe.distanceTexelsPerSide, kMaxDistanceTexelsPerSide));
-        probe.backFaceDistanceScale = std::max(0.0f, std::min(probe.backFaceDistanceScale, 1.0f));
-        probe.weighting.selfShadowBias = std::max(0.0f, std::min(probe.weighting.selfShadowBias, kMaxSelfShadowBias));
-        probe.weighting.chebyshevExponent = std::max(1.0f, std::min(probe.weighting.chebyshevExponent, kMaxChebyshevExponent));
-        probe.weighting.weightCrushThreshold = std::max(0.0f, std::min(probe.weighting.weightCrushThreshold, 1.0f));
-        probe.weighting.minFacingWeight = std::max(0.0f, std::min(probe.weighting.minFacingWeight, 1.0f));
-        probe.weighting.maxBackFaceRatio = std::max(0.0f, std::min(probe.weighting.maxBackFaceRatio, 1.0f));
 
         ProbeVisualization::Settings& probeSpheres = s_Settings.probeSpheres;
         probeSpheres.radiusPerSpacing = std::max(0.0f, std::min(probeSpheres.radiusPerSpacing, kMaxRadiusPerSpacing));
@@ -370,78 +364,12 @@ namespace
         ImGui::Text("Samples: %u / %u", progress.samples, pathTraced.targetSamples);
 
         ImGui::SeparatorText("Probe");
-        ProbeLighting::Settings& probe = s_Settings.probe;
-        const char* axisNames[] = { "Probes X", "Probes Y", "Probes Z" };
-        for (uint32_t axis = 0; axis < 3; ++axis)
-        {
-            ImGui::InputScalar(axisNames[axis], ImGuiDataType_U32, &probe.probeCounts[axis], &step);
-            ImGui::SetItemTooltip("Probes along this axis of a uniform grid over the model's bounds. Each probe sits at the center of its cell.");
-            TuningSection::MakeItemResettable(axisNames[axis]);
-        }
-        ImGui::InputScalar("Rays per Probe", ImGuiDataType_U32, &probe.raysPerProbe, &step);
-        TuningSection::MakeItemResettable("Rays per Probe");
-        ImGui::SliderFloat("Hysteresis", &probe.hysteresis, 0.0f, kMaxHysteresis);
-        ImGui::SetItemTooltip("How much of the old irradiance each update keeps.");
-        TuningSection::MakeItemResettable("Hysteresis");
-        ImGui::SliderFloat("Distance Sharpness", &probe.distanceSharpness, 1.0f, kMaxDistanceSharpness);
-        ImGui::SetItemTooltip("Exponent on the cosine between a distance texel and a ray that weights the ray's distance in the texel. "
-            "Higher values keep only the rays close to the texel direction. The irradiance keeps the cosine itself.");
-        TuningSection::MakeItemResettable("Distance Sharpness");
-        ImGui::InputScalar("Distance Texels per Side", ImGuiDataType_U32, &probe.distanceTexelsPerSide, &step);
-        ImGui::SetItemTooltip("Texels along each side of a probe's octahedral distance map. The irradiance map keeps 8.");
-        TuningSection::MakeItemResettable("Distance Texels per Side");
-        ImGui::SliderFloat("Back Face Distance Scale", &probe.backFaceDistanceScale, 0.0f, 1.0f);
-        ImGui::SetItemTooltip("A probe ray that first hits the back face of a single-sided material records no radiance "
-            "and this fraction of the distance it hit, so the points beyond that face see the probe as occluded.");
-        TuningSection::MakeItemResettable("Back Face Distance Scale");
-        int visibility = (int)probe.weighting.visibility;
-        if (ImGui::Combo("Visibility", &visibility, kVisibilityNames, IM_ARRAYSIZE(kVisibilityNames)))
-            probe.weighting.visibility = (ProbeWeighting::Visibility)visibility;
-        ImGui::SetItemTooltip("Which of the probes around a point the interpolation keeps. None keeps all of them. "
-            "Shadow Ray traces a ray from the point to each probe and keeps the probes it reaches. "
-            "Chebyshev weights each probe by how likely the distances it stored toward the point leave the point visible.");
-        TuningSection::MakeItemResettable("Visibility");
-        ImGui::SliderFloat("Self Shadow Bias", &probe.weighting.selfShadowBias, 0.0f, kMaxSelfShadowBias);
-        ImGui::SetItemTooltip("While Visibility is Chebyshev, compares the distances the probes stored with a point this far off the surface "
-            "along its geometry normal, as a fraction of the shortest probe spacing, instead of the surface point. "
-            "A probe the surface faces then sees the point in front of the distances it stored, and a probe behind the surface beyond them.");
-        TuningSection::MakeItemResettable("Self Shadow Bias");
-        ImGui::SliderFloat("Chebyshev Exponent", &probe.weighting.chebyshevExponent, 1.0f, kMaxChebyshevExponent);
-        ImGui::SetItemTooltip("While Visibility is Chebyshev, raises the visibility weight of each probe to this power. "
-            "A point within the distances a probe stored keeps the weight 1, and a point beyond them loses weight faster than with 1.");
-        TuningSection::MakeItemResettable("Chebyshev Exponent");
-        ImGui::SliderFloat("Weight Crush Threshold", &probe.weighting.weightCrushThreshold, 0.0f, 1.0f);
-        ImGui::SetItemTooltip("Shrinks the weight of a probe below this threshold, before the trilinear weight, by its square over the threshold's square. "
-            "The weight is the product of the classification, visibility, and facing weights. "
-            "A probe these weights mark as hidden then gives far less than the probes they keep, even after the weights are normalized. 0 turns it off.");
-        TuningSection::MakeItemResettable("Weight Crush Threshold");
-        ImGui::Checkbox("Facing Weight", &probe.weighting.facing);
-        ImGui::SetItemTooltip("Weights each probe by how far it lies in front of the surface, along the normal Facing Normal picks, "
-            "so the probes behind a thin wall or cloth give less than the ones the surface faces.");
-        TuningSection::MakeItemResettable("Facing Weight");
-        ImGui::SliderFloat("Min Facing Weight", &probe.weighting.minFacingWeight, 0.0f, 1.0f);
-        ImGui::SetItemTooltip("The facing weight of a probe right behind the surface. A probe the surface faces head-on gets 1 more than this.");
-        TuningSection::MakeItemResettable("Min Facing Weight");
-        int facingNormal = (int)probe.weighting.facingNormal;
-        if (ImGui::Combo("Facing Normal", &facingNormal, kFacingNormalNames, IM_ARRAYSIZE(kFacingNormalNames)))
-            probe.weighting.facingNormal = (ProbeWeighting::FacingNormal)facingNormal;
-        ImGui::SetItemTooltip("The normal the facing weight measures the side of a probe against. "
-            "Geometry is the triangle's normal, constant across each face. Shading is the interpolated vertex normal with the normal map applied.");
-        TuningSection::MakeItemResettable("Facing Normal");
-        ImGui::Checkbox("Probe Classification", &probe.weighting.classification);
-        ImGui::SetItemTooltip("Leaves out of the interpolation the probes whose rays hit the back faces of single-sided materials more often "
-            "than Max Back Face Ratio, such as the probes under a floor or inside a wall. "
-            "A point with no probe left around it gets no indirect light.");
-        TuningSection::MakeItemResettable("Probe Classification");
-        ImGui::SliderFloat("Max Back Face Ratio", &probe.weighting.maxBackFaceRatio, 0.0f, 1.0f);
-        ImGui::SetItemTooltip("The largest fraction of a probe's rays, averaged over the updates, that may hit back faces "
-            "for the probe to stay in the interpolation.");
-        TuningSection::MakeItemResettable("Max Back Face Ratio");
-        ClampSettings();
-
+        if (FindDynamicGIVolume() == nullptr)
+            ImGui::TextDisabled("No Dynamic GI Volume in the scene, so the Probe source gives no indirect light.");
         if (ImGui::Button("Reset Probes"))
             ProbeLighting::Reset();
-        ImGui::SetItemTooltip("Clears the probes. Changing the grid, the rays per probe, the distance texels per side or the model also clears them.");
+        ImGui::SetItemTooltip("Clears the probes. Moving or resizing the Dynamic GI Volume, changing its probe counts, rays per probe "
+            "or distance texels per side, or changing the model also clears them.");
         ImGui::Text("Updates: %u", ProbeLighting::GetProgress().updates);
         ImGui::Checkbox("Pause Updates", &s_Settings.pauseProbeUpdates);
         ImGui::SetItemTooltip("Stops tracing and updating the probes. The scene keeps using the probes as they are. "
@@ -455,7 +383,7 @@ namespace
         ImGui::EndDisabled();
 
         ProbeVisualization::Settings& probeSpheres = s_Settings.probeSpheres;
-        ImGui::BeginDisabled(s_Settings.indirect != Source::kProbe);
+        ImGui::BeginDisabled(FindProbeVolume() == nullptr);
         ImGui::Checkbox("Show Probes", &probeSpheres.show);
         ImGui::SetItemTooltip("Draws a sphere at each probe. Each point of a sphere shows the probe's irradiance from its normal, "
             "as the radiance of a white diffuse sphere there lit by the indirect light only.");
@@ -504,24 +432,6 @@ namespace
         values["Max Hits"] = std::to_string(pathTraced.maxHits);
         values["Russian Roulette"] = SettingValues::FormatFlag(pathTraced.russianRoulette);
 
-        const ProbeLighting::Settings& probe = s_Settings.probe;
-        values["Probes X"] = std::to_string(probe.probeCounts[0]);
-        values["Probes Y"] = std::to_string(probe.probeCounts[1]);
-        values["Probes Z"] = std::to_string(probe.probeCounts[2]);
-        values["Rays per Probe"] = std::to_string(probe.raysPerProbe);
-        values["Hysteresis"] = MeasurementConditions::FormatFloat(probe.hysteresis);
-        values["Distance Sharpness"] = MeasurementConditions::FormatFloat(probe.distanceSharpness);
-        values["Distance Texels per Side"] = std::to_string(probe.distanceTexelsPerSide);
-        values["Back Face Distance Scale"] = MeasurementConditions::FormatFloat(probe.backFaceDistanceScale);
-        values["Visibility"] = kVisibilityNames[(int)probe.weighting.visibility];
-        values["Self Shadow Bias"] = MeasurementConditions::FormatFloat(probe.weighting.selfShadowBias);
-        values["Chebyshev Exponent"] = MeasurementConditions::FormatFloat(probe.weighting.chebyshevExponent);
-        values["Weight Crush Threshold"] = MeasurementConditions::FormatFloat(probe.weighting.weightCrushThreshold);
-        values["Facing Weight"] = SettingValues::FormatFlag(probe.weighting.facing);
-        values["Min Facing Weight"] = MeasurementConditions::FormatFloat(probe.weighting.minFacingWeight);
-        values["Facing Normal"] = kFacingNormalNames[(int)probe.weighting.facingNormal];
-        values["Probe Classification"] = SettingValues::FormatFlag(probe.weighting.classification);
-        values["Max Back Face Ratio"] = MeasurementConditions::FormatFloat(probe.weighting.maxBackFaceRatio);
         values["Pause Updates"] = SettingValues::FormatFlag(s_Settings.pauseProbeUpdates);
 
         const ProbeVisualization::Settings& probeSpheres = s_Settings.probeSpheres;
@@ -544,24 +454,6 @@ namespace
         SettingValues::ReadUInt(values, "Max Hits", pathTraced.maxHits);
         SettingValues::ReadFlag(values, "Russian Roulette", pathTraced.russianRoulette);
 
-        ProbeLighting::Settings& probe = s_Settings.probe;
-        SettingValues::ReadUInt(values, "Probes X", probe.probeCounts[0]);
-        SettingValues::ReadUInt(values, "Probes Y", probe.probeCounts[1]);
-        SettingValues::ReadUInt(values, "Probes Z", probe.probeCounts[2]);
-        SettingValues::ReadUInt(values, "Rays per Probe", probe.raysPerProbe);
-        SettingValues::ReadFloat(values, "Hysteresis", probe.hysteresis);
-        SettingValues::ReadFloat(values, "Distance Sharpness", probe.distanceSharpness);
-        SettingValues::ReadUInt(values, "Distance Texels per Side", probe.distanceTexelsPerSide);
-        SettingValues::ReadFloat(values, "Back Face Distance Scale", probe.backFaceDistanceScale);
-        SettingValues::ReadName(values, "Visibility", kVisibilityNames, probe.weighting.visibility);
-        SettingValues::ReadFloat(values, "Self Shadow Bias", probe.weighting.selfShadowBias);
-        SettingValues::ReadFloat(values, "Chebyshev Exponent", probe.weighting.chebyshevExponent);
-        SettingValues::ReadFloat(values, "Weight Crush Threshold", probe.weighting.weightCrushThreshold);
-        SettingValues::ReadFlag(values, "Facing Weight", probe.weighting.facing);
-        SettingValues::ReadFloat(values, "Min Facing Weight", probe.weighting.minFacingWeight);
-        SettingValues::ReadName(values, "Facing Normal", kFacingNormalNames, probe.weighting.facingNormal);
-        SettingValues::ReadFlag(values, "Probe Classification", probe.weighting.classification);
-        SettingValues::ReadFloat(values, "Max Back Face Ratio", probe.weighting.maxBackFaceRatio);
         SettingValues::ReadFlag(values, "Pause Updates", s_Settings.pauseProbeUpdates);
 
         ProbeVisualization::Settings& probeSpheres = s_Settings.probeSpheres;
@@ -641,10 +533,7 @@ namespace
                 .Integer("target", s_Settings.pathTraced.targetSamples)
                 .Integer("resets", progress.resets))
             .Object("probe", ControlChannel::Fields()
-                .Text("visibility", kVisibilityNames[(int)s_Settings.probe.weighting.visibility])
-                .Float("self_shadow_bias", s_Settings.probe.weighting.selfShadowBias)
-                .Float("chebyshev_exponent", s_Settings.probe.weighting.chebyshevExponent)
-                .Float("weight_crush_threshold", s_Settings.probe.weighting.weightCrushThreshold)
+                .Flag("volume", FindDynamicGIVolume() != nullptr)
                 .Flag("paused", s_Settings.pauseProbeUpdates)
                 .Text("selected", FormatSelectedProbe())
                 .Integer("updates", ProbeLighting::GetProgress().updates)
@@ -696,9 +585,9 @@ namespace
             ReplyWithStateAfterFrame(reply);
             return;
         }
-        if (s_Settings.indirect != Source::kProbe)
+        if (std::optional<std::string> error = FindWhyProbesAreOff())
         {
-            reply.Error("Indirect is not Probe");
+            reply.Error(*error);
             return;
         }
         if (!s_Settings.inspectPixel)
@@ -759,9 +648,9 @@ namespace
             reply.Error("unknown arguments: " + arguments);
             return;
         }
-        if (s_Settings.indirect != Source::kProbe)
+        if (std::optional<std::string> error = FindWhyProbesAreOff())
         {
-            reply.Error("Indirect is not Probe");
+            reply.Error(*error);
             return;
         }
         if (!s_Settings.pauseProbeUpdates)
@@ -781,6 +670,7 @@ void DynamicGI::Initialize(void)
     ProbeLighting::Initialize();
     ProbeVisualization::Initialize();
     ProbeContribution::Initialize();
+    DynamicGIVolumeBox::Initialize();
 
     const ProbeLighting::Probes probes = ProbeLighting::GetProbes();
     TextureViewer::AddTexture("Probes Irradiance", probes.irradiance);
@@ -795,14 +685,16 @@ void DynamicGI::Initialize(void)
     TextureViewer::AddTexture("Probe Screen Irradiance", ProbeLighting::GetScreenIrradiance());
     TextureViewer::AddTexture("Path Traced Indirect Radiance", PathTracedLighting::GetIndirectRadiance());
 
+    SceneEditor::RegisterComponentDetails<DynamicGIVolumeComponent>(ShowDynamicGIVolumeDetails);
+
     ControlChannel::RegisterState("gi", DescribeState);
     ControlChannel::Register("gi", "gi probe step | gi probe select <x> <y> <z>|none | gi pixel select <x> <y>|none. "
         "step updates the probes once on the next frame while Pause Updates is on, as the Step button does, "
-        "and fails unless Indirect is Probe and Pause Updates is on. "
+        "and fails unless Indirect is Probe, the scene has a Dynamic GI Volume and Pause Updates is on. "
         "probe select selects the probe at a grid coordinate, or clears the selection, as clicking a probe sphere or elsewhere in the scene does. "
         "The lines of the selected probe are drawn while Show Probes is on. Both reply with state gi after the next frame. "
         "pixel select inspects the surface at a client pixel, as clicking the scene off the probe spheres does while Inspect Pixel is on, "
-        "and fails unless Indirect is Probe and Inspect Pixel is on. The pixel must be in the scene, not under the UI. "
+        "and fails unless Indirect is Probe, the scene has a Dynamic GI Volume and Inspect Pixel is on. The pixel must be in the scene, not under the UI. "
         "It replies with state gi once the surface is measured: probe.pixel has the eight probes the irradiance of the surface interpolates, "
         "named A to H as the letters in the scene, each with its grid coordinate, trilinear weight, back face ratio, whether Probe Classification keeps it in the interpolation (always while Probe Classification is off), visibility weight, facing weight (1 while Facing Weight is off), "
         "the distance from the probe to distance_lookup_position and the distance mean the probe stores toward it while Visibility is Chebyshev, "
@@ -830,6 +722,8 @@ void DynamicGI::Update(ComputeContext& context, const GIFrameInputs& inputs, uin
     ColorBuffer* indirectRadiance = nullptr;
     ColorBuffer* probesIndirectIrradiance = nullptr;
     ColorBuffer* screenIndirectIrradiance = nullptr;
+    if (FindDynamicGIVolume() == nullptr)
+        ProbeLighting::Reset();
     if (IsIndirectOn())
     {
         ScopedTimer _prof(L"Dynamic GI", context);
@@ -839,16 +733,16 @@ void DynamicGI::Update(ComputeContext& context, const GIFrameInputs& inputs, uin
             indirectRadiance = &PathTracedLighting::GetIndirectRadiance();
             context.TransitionResource(*indirectRadiance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         }
-        else if (s_Settings.indirect == Source::kProbe)
+        else if (const ProbeLighting::Volume* volume = FindProbeVolume())
         {
             if (ShouldUpdateProbes())
             {
-                ProbeLighting::Update(context, s_Settings.probe, inputs);
+                ProbeLighting::Update(context, *volume, inputs);
                 s_ProbeStepRequested = false;
             }
-            if (!ProbeWeighting::InterpolatesTrilinearly(s_Settings.probe.weighting))
+            if (!ProbeWeighting::InterpolatesTrilinearly(volume->settings.weighting))
             {
-                ProbeLighting::EstimateScreenIrradiance(context, s_Settings.probe.weighting, inputs, width, height);
+                ProbeLighting::EstimateScreenIrradiance(context, volume->settings.weighting, inputs, width, height);
                 screenIndirectIrradiance = &ProbeLighting::GetScreenIrradiance();
                 context.TransitionResource(*screenIndirectIrradiance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
             }
@@ -865,7 +759,7 @@ void DynamicGI::Update(ComputeContext& context, const GIFrameInputs& inputs, uin
 
 void DynamicGI::UpdateSceneInspection(const Math::Camera& camera)
 {
-    if (s_Settings.indirect != Source::kProbe)
+    if (FindProbeVolume() == nullptr)
         return;
 
     const IrradianceProbeGrid& grid = ProbeLighting::GetProbes().grid;
@@ -890,17 +784,20 @@ void DynamicGI::UpdateSceneInspection(const Math::Camera& camera)
 
 void DynamicGI::DrawProbes(GraphicsContext& context, const Math::Camera& camera, const D3D12_VIEWPORT& viewport, const D3D12_RECT& scissor)
 {
-    if (s_Settings.indirect != Source::kProbe || !s_Settings.probeSpheres.show)
+    const ProbeLighting::Volume* volume = FindProbeVolume();
+    if (volume == nullptr || !s_Settings.probeSpheres.show)
         return;
 
-    ProbeVisualization::DrawSpheres(context, camera, viewport, scissor, ProbeLighting::GetProbes(), s_Settings.probe.weighting,
+    ProbeVisualization::DrawSpheres(context, camera, viewport, scissor, ProbeLighting::GetProbes(), volume->settings.weighting,
         s_Settings.probeSpheres.radiusPerSpacing);
 }
 
-void DynamicGI::DrawProbeOverlay(GraphicsContext& context, const Math::Camera& camera)
+void DynamicGI::DrawOverlay(GraphicsContext& context, const Math::Camera& camera)
 {
+    DrawSelectedDynamicGIVolume(context, camera);
+
     const std::optional<uint32_t> probe = GetSelectedProbe();
-    if (s_Settings.indirect == Source::kProbe && s_Settings.probeSpheres.show && probe)
+    if (FindProbeVolume() != nullptr && s_Settings.probeSpheres.show && probe)
         ProbeVisualization::DrawDistanceLines(context, camera, ProbeLighting::GetProbes(), *probe, s_Settings.probeSpheres, FindInspectedRayOfSelectedProbe());
 
     const ProbeContribution::Surface* contribution = GetInspectedContribution();
@@ -912,6 +809,6 @@ void DynamicGI::DrawProbeOverlay(GraphicsContext& context, const Math::Camera& c
 void DynamicGI::MeasureProbeContribution(const RaytracingScene& scene)
 {
     if (IsInspectingPixel() && GetProbeCount(ProbeLighting::GetProbes().grid) != 0)
-        ProbeContribution::Measure(s_Settings.probe.weighting, scene);
+        ProbeContribution::Measure(FindProbeVolume()->settings.weighting, scene);
     ReplyToMeasuredPixelSelections();
 }

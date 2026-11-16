@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Core/Math/BoundingBox.h"
 #include "Model/DynamicGI/GIFrameInputs.h"
 #include "Model/DynamicGI/ProbeWeighting.h"
 #include "Model/Renderer/IrradianceProbeGrid.h"
@@ -18,6 +19,12 @@ namespace ProbeLighting
         uint32_t distanceTexelsPerSide = 8;
         float backFaceDistanceScale = 0.2f;
         ProbeWeighting::Settings weighting;
+    };
+
+    struct Volume
+    {
+        Math::AxisAlignedBox bounds;
+        Settings settings;
     };
 
     struct Probes
@@ -45,7 +52,7 @@ namespace ProbeLighting
     void Reset(void);
     Progress GetProgress(void);
 
-    void Update(ComputeContext& context, const Settings& settings, const GIFrameInputs& inputs);
+    void Update(ComputeContext& context, const Volume& volume, const GIFrameInputs& inputs);
     void EstimateScreenIrradiance(ComputeContext& context, const ProbeWeighting::Settings& weighting, const GIFrameInputs& inputs, uint32_t width, uint32_t height);
 
     Probes GetProbes(void);

@@ -6,6 +6,7 @@
 namespace
 {
     std::vector<Scene::Object*> s_Objects;
+    std::vector<Scene::Object*> s_OptionalObjects;
 
     bool HasSettingKey(const Scene::Component& component, const std::string& key)
     {
@@ -72,8 +73,52 @@ const std::vector<Scene::Object*>& Scene::GetObjects(void)
     return s_Objects;
 }
 
+bool Scene::HasObject(const Object& object)
+{
+    return std::find(s_Objects.begin(), s_Objects.end(), &object) != s_Objects.end();
+}
+
+void Scene::RegisterOptionalObject(Object& object)
+{
+    s_OptionalObjects.push_back(&object);
+}
+
+void Scene::UnregisterOptionalObject(Object& object)
+{
+    s_OptionalObjects.erase(std::remove(s_OptionalObjects.begin(), s_OptionalObjects.end(), &object), s_OptionalObjects.end());
+}
+
+bool Scene::IsOptionalObject(const Object& object)
+{
+    return std::find(s_OptionalObjects.begin(), s_OptionalObjects.end(), &object) != s_OptionalObjects.end();
+}
+
+const std::vector<Scene::Object*>& Scene::GetOptionalObjects(void)
+{
+    return s_OptionalObjects;
+}
+
+std::set<std::string> Scene::GetAbsentOptionalObjectNames(void)
+{
+    std::set<std::string> names;
+    for (const Object* object : s_OptionalObjects)
+    {
+        if (!HasObject(*object))
+            names.insert(object->GetName());
+    }
+    return names;
+}
+
 void Scene::LoadObjectSettings(const IniFile::Sections& sections)
 {
+    for (Object* object : s_OptionalObjects)
+    {
+        const bool inFile = sections.find(object->GetName()) != sections.end();
+        if (inFile && !HasObject(*object))
+            AddObject(*object);
+        else if (!inFile)
+            RemoveObject(*object);
+    }
     for (Object* object : s_Objects)
     {
         const auto section = sections.find(object->GetName());

@@ -34,6 +34,7 @@
 #include "Model/PathTracer/PathTracerTuning.h"
 #include "Model/PathTracer/BrdfTest.h"
 #include "Model/DynamicGI/DynamicGI.h"
+#include "Model/DynamicGI/DynamicGIVolume.h"
 #include "Model/Loader/glTF.h"
 #include "Model/Renderer/Renderer.h"
 #include "Model/Model.h"
@@ -280,6 +281,7 @@ private:
     LightComponent& m_Light = AssembleLight(m_LightObject);
     Scene::Object m_SkyObject{ "Sky" };
     SkyComponent& m_Sky = m_SkyObject.AddComponent<SkyComponent>();
+    Scene::Object m_GIVolumeObject{ kDynamicGIVolumeName };
 };
 
 CREATE_APPLICATION( ModelViewer )
@@ -1299,7 +1301,7 @@ bool ModelViewer::SaveScene(std::string& error)
         error = "is not open";
         return false;
     }
-    if (!IniFile::WriteSections(Utility::UTF8ToWideString(m_SceneName), Scene::SaveObjectSettings()))
+    if (!IniFile::WriteSections(Utility::UTF8ToWideString(m_SceneName), Scene::SaveObjectSettings(), Scene::GetAbsentOptionalObjectNames()))
     {
         error = "cannot be written";
         return false;
@@ -1476,6 +1478,8 @@ void ModelViewer::Startup( void )
     Scene::AddObject(m_CameraObject);
     Scene::AddObject(m_LightObject);
     Scene::AddObject(m_SkyObject);
+    AssembleDynamicGIVolume(m_GIVolumeObject, [this] { return m_ModelInst.GetAxisAlignedBox(); });
+    Scene::RegisterOptionalObject(m_GIVolumeObject);
 #ifdef LEGACY_RENDERER
     // LEGACY_RENDERER는 scene file을 읽지 않으므로 Sponza::Startup이 정한 camera를 그대로 둔다.
     m_SceneName = GetSceneName(scenePath);
@@ -1510,6 +1514,8 @@ void ModelViewer::Startup( void )
 void ModelViewer::Cleanup( void )
 {
     UnregisterMeasurementConditions();
+    Scene::RemoveObject(m_GIVolumeObject);
+    Scene::UnregisterOptionalObject(m_GIVolumeObject);
     Scene::RemoveObject(m_SkyObject);
     Scene::RemoveObject(m_LightObject);
     Scene::RemoveObject(m_CameraObject);
@@ -1667,7 +1673,6 @@ void ModelViewer::RenderScene( void )
                 .skyRadiance = m_Sky.GetRadiance(),
                 .shadowMap = g_ShadowBuffer,
                 .shadowMatrix = m_ShadowCamera.GetShadowMatrix(),
-                .modelBounds = m_ModelInst.GetAxisAlignedBox(),
             };
             DynamicGI::Update(gfxContext.GetComputeContext(), giInputs, g_SceneColorBuffer.GetWidth(), g_SceneColorBuffer.GetHeight());
 
@@ -1714,5 +1719,5 @@ void ModelViewer::RenderScene( void )
 void ModelViewer::RenderSceneOverlay( GraphicsContext& gfxContext )
 {
     RaytracingView::Render(gfxContext.GetComputeContext(), m_Camera, m_MainViewport, m_RaytracingScene, m_Light.GetDirection(), g_SceneOverlayBuffer);
-    DynamicGI::DrawProbeOverlay(gfxContext, m_Camera);
+    DynamicGI::DrawOverlay(gfxContext, m_Camera);
 }
