@@ -44,6 +44,7 @@
 #include "Core/Editor/EditorCameraController.h"
 #include "Core/Editor/SceneEditor.h"
 #include "Core/Scene/Scene.h"
+#include "Core/Scene/SettingValues.h"
 #include "Core/Automation/ControlChannel.h"
 #include "Core/Editor/MeasurementConditions.h"
 #include "Core/UI/ImGuiLayer.h"
@@ -360,37 +361,6 @@ bool IsColor(Vector3 color)
     return XMVector3Equal(color, clamped);
 }
 
-// count개의 숫자를 ','로 이은 text. 끝에 다른 글자가 있거나 유한하지 않은 숫자는 받지 않는다.
-bool ReadNumbers(const std::string& text, float* numbers, int count)
-{
-    std::istringstream stream(text);
-    for (int i = 0; i < count; ++i)
-    {
-        if (i > 0 && stream.get() != ',')
-            return false;
-        if (!(stream >> numbers[i]) || !std::isfinite(numbers[i]))
-            return false;
-    }
-    return stream.peek() == std::char_traits<char>::eof();
-}
-
-bool ReadVector(const std::string& text, Vector3& vector)
-{
-    float numbers[3];
-    if (!ReadNumbers(text, numbers, 3))
-        return false;
-    vector = Vector3(numbers[0], numbers[1], numbers[2]);
-    return true;
-}
-
-// 다시 읽으면 같은 float가 되는 자릿수로 쓴다.
-std::string FormatVector(Vector3 vector)
-{
-    char text[96];
-    sprintf_s(text, "%.9g,%.9g,%.9g", (float)vector.GetX(), (float)vector.GetY(), (float)vector.GetZ());
-    return text;
-}
-
 // scene file의 Type이 쓰는 이름. LightComponent::Type에 type을 추가하면 kLightTypeNames에도 추가한 type의 이름을 넣는다.
 const std::pair<LightComponent::Type, const char*> kLightTypeNames[] = { { LightComponent::Type::Directional, "Directional" } };
 
@@ -422,10 +392,10 @@ bool ReadLightType(const std::string& text, LightComponent::Type& type)
 void LightComponent::SaveSettings(IniFile::Values& values) const
 {
     values["Type"] = GetLightTypeName(m_Type);
-    values["Direction"] = FormatVector(m_Properties.rotation.GetZ());
-    values["Up"] = FormatVector(m_Properties.rotation.GetY());
-    values["Position"] = FormatVector(m_Properties.position);
-    values["Color"] = FormatVector(m_Properties.color);
+    values["Direction"] = SettingValues::FormatVector(m_Properties.rotation.GetZ());
+    values["Up"] = SettingValues::FormatVector(m_Properties.rotation.GetY());
+    values["Position"] = SettingValues::FormatVector(m_Properties.position);
+    values["Color"] = SettingValues::FormatVector(m_Properties.color);
     char text[32];
     sprintf_s(text, "%.9g", m_Properties.intensity);
     values["Intensity"] = text;
@@ -436,7 +406,7 @@ void LightComponent::LoadSettings(const IniFile::Values& values)
     const auto read = [&values](const char* key, Vector3& vector)
     {
         const auto text = values.find(key);
-        return text != values.end() && ReadVector(text->second, vector);
+        return text != values.end() && SettingValues::ReadVector(text->second, vector);
     };
 
     Type type = kDefaultLightType;
@@ -454,7 +424,7 @@ void LightComponent::LoadSettings(const IniFile::Values& values)
         properties.color = color;
     const auto intensity = values.find("Intensity");
     float number = 0.0f;
-    if (intensity != values.end() && ReadNumbers(intensity->second, &number, 1) && number >= 0.0f)
+    if (intensity != values.end() && SettingValues::ReadNumbers(intensity->second, &number, 1) && number >= 0.0f)
         properties.intensity = number;
     m_Type = type;
     m_Properties = properties;
@@ -474,7 +444,7 @@ SkyComponent::SkyComponent() : Component({ "Color", "Intensity" }), m_Properties
 
 void SkyComponent::SaveSettings(IniFile::Values& values) const
 {
-    values["Color"] = FormatVector(m_Properties.color);
+    values["Color"] = SettingValues::FormatVector(m_Properties.color);
     char text[32];
     sprintf_s(text, "%.9g", m_Properties.intensity);
     values["Intensity"] = text;
@@ -486,7 +456,7 @@ void SkyComponent::LoadSettings(const IniFile::Values& values)
     Properties properties = GetDefaultProperties();
     const auto color = values.find("Color");
     Vector3 readColor;
-    if (color != values.end() && ReadVector(color->second, readColor) && IsColor(readColor))
+    if (color != values.end() && SettingValues::ReadVector(color->second, readColor) && IsColor(readColor))
         properties.color = readColor;
     const auto intensity = values.find("Intensity");
     float number = 0.0f;
@@ -556,7 +526,7 @@ using MeasurementConditions::ReadValue;
 void DescribeCameraConditions(const CameraComponent& camera, MeasurementConditions::Values& values)
 {
     const EditorCameraController::Pose pose = camera.GetPose();
-    values["camera"] = FormatVector(pose.position);
+    values["camera"] = SettingValues::FormatVector(pose.position);
     values["heading"] = FormatFloat(pose.heading);
     values["pitch"] = FormatFloat(pose.pitch);
     values["vertical fov"] = FormatFloat(camera.GetVerticalFov());
@@ -566,15 +536,15 @@ void DescribeCameraConditions(const CameraComponent& camera, MeasurementConditio
 void ReadCameraConditions(CameraComponent& camera, const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading)
 {
     EditorCameraController::Pose pose = camera.GetPose();
-    ReadValue(values, "camera", reading, [&pose](const std::string& text) { return ReadVector(text, pose.position); });
-    ReadValue(values, "heading", reading, [&pose](const std::string& text) { return ReadNumbers(text, &pose.heading, 1); });
-    ReadValue(values, "pitch", reading, [&pose](const std::string& text) { return ReadNumbers(text, &pose.pitch, 1); });
+    ReadValue(values, "camera", reading, [&pose](const std::string& text) { return SettingValues::ReadVector(text, pose.position); });
+    ReadValue(values, "heading", reading, [&pose](const std::string& text) { return SettingValues::ReadNumbers(text, &pose.heading, 1); });
+    ReadValue(values, "pitch", reading, [&pose](const std::string& text) { return SettingValues::ReadNumbers(text, &pose.pitch, 1); });
     float verticalFov = kDefaultCameraVerticalFov;
     if (values.count("vertical fov") != 0)
     {
         ReadValue(values, "vertical fov", reading, [&verticalFov](const std::string& text)
         {
-            return ReadNumbers(text, &verticalFov, 1) && IsVerticalFov(verticalFov);
+            return SettingValues::ReadNumbers(text, &verticalFov, 1) && IsVerticalFov(verticalFov);
         });
     }
     reading.applies.push_back([&camera, pose, verticalFov]
@@ -630,9 +600,9 @@ void ReadTaa(const MeasurementConditions::Values& values, MeasurementConditions:
 void DescribeLightConditions(const LightComponent& light, MeasurementConditions::Values& values)
 {
     const LightComponent::Properties& properties = light.GetProperties();
-    values["light direction"] = FormatVector(properties.rotation.GetZ());
-    values["light up"] = FormatVector(properties.rotation.GetY());
-    values["light color"] = FormatVector(properties.color);
+    values["light direction"] = SettingValues::FormatVector(properties.rotation.GetZ());
+    values["light up"] = SettingValues::FormatVector(properties.rotation.GetY());
+    values["light color"] = SettingValues::FormatVector(properties.color);
     values["light intensity"] = FormatFloat(properties.intensity);
 }
 
@@ -640,17 +610,17 @@ void ReadLightConditions(LightComponent& light, const MeasurementConditions::Val
 {
     LightComponent::Properties properties = light.GetProperties();
     Vector3 direction, up;
-    const bool hasDirection = ReadValue(values, "light direction", reading, [&direction](const std::string& text) { return ReadVector(text, direction); });
-    const bool hasUp = ReadValue(values, "light up", reading, [&up](const std::string& text) { return ReadVector(text, up); });
+    const bool hasDirection = ReadValue(values, "light direction", reading, [&direction](const std::string& text) { return SettingValues::ReadVector(text, direction); });
+    const bool hasUp = ReadValue(values, "light up", reading, [&up](const std::string& text) { return SettingValues::ReadVector(text, up); });
     if (hasDirection && hasUp && !MakeRotation(direction, up, properties.rotation))
     {
         reading.unread.push_back("light direction");
         reading.unread.push_back("light up");
     }
-    ReadValue(values, "light color", reading, [&properties](const std::string& text) { return ReadVector(text, properties.color) && IsColor(properties.color); });
+    ReadValue(values, "light color", reading, [&properties](const std::string& text) { return SettingValues::ReadVector(text, properties.color) && IsColor(properties.color); });
     ReadValue(values, "light intensity", reading, [&properties](const std::string& text)
     {
-        return ReadNumbers(text, &properties.intensity, 1) && properties.intensity >= 0.0f;
+        return SettingValues::ReadNumbers(text, &properties.intensity, 1) && properties.intensity >= 0.0f;
     });
     reading.applies.push_back([&light, properties] { light.SetProperties(properties); });
 }
@@ -658,7 +628,7 @@ void ReadLightConditions(LightComponent& light, const MeasurementConditions::Val
 void DescribeSkyConditions(const SkyComponent& sky, MeasurementConditions::Values& values)
 {
     const SkyComponent::Properties& properties = sky.GetProperties();
-    values["sky color"] = FormatVector(properties.color);
+    values["sky color"] = SettingValues::FormatVector(properties.color);
     values["sky intensity"] = FormatFloat(properties.intensity);
 }
 
@@ -666,7 +636,7 @@ void DescribeSkyConditions(const SkyComponent& sky, MeasurementConditions::Value
 void ReadSkyConditions(SkyComponent& sky, const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading)
 {
     SkyComponent::Properties properties = sky.GetProperties();
-    ReadValue(values, "sky color", reading, [&properties](const std::string& text) { return ReadVector(text, properties.color) && IsColor(properties.color); });
+    ReadValue(values, "sky color", reading, [&properties](const std::string& text) { return SettingValues::ReadVector(text, properties.color) && IsColor(properties.color); });
     ReadValue(values, "sky intensity", reading, [&properties](const std::string& text)
     {
         return MeasurementConditions::ReadFloat(text, properties.intensity) && !std::isnan(properties.intensity) && properties.intensity >= 0.0f;
@@ -862,7 +832,7 @@ void SetLight(LightComponent& light, const std::string& arguments, const Control
             return;
         }
         float numbers[4];
-        if (!ReadNumbers(token.substr(separator + 1), numbers, count->second))
+        if (!SettingValues::ReadNumbers(token.substr(separator + 1), numbers, count->second))
         {
             reply.Error(key + " takes " + std::to_string(count->second) + " numbers joined by ','. Nothing was set. " + usage);
             return;
@@ -1162,9 +1132,9 @@ bool ReadCameraSection(const IniFile::Values& values, CameraSection& camera)
     const std::string* pitch = FindValue(values, "Pitch");
     const std::string* verticalFov = FindValue(values, "Vertical FOV");
     camera.fitModel = fit != nullptr && *fit == "Model";
-    const bool hasPose = position != nullptr && heading != nullptr && pitch != nullptr && ReadVector(*position, camera.pose.position) &&
-        ReadNumbers(*heading, &camera.pose.heading, 1) && ReadNumbers(*pitch, &camera.pose.pitch, 1);
-    const bool readsVerticalFov = verticalFov == nullptr || (ReadNumbers(*verticalFov, &camera.verticalFov, 1) && IsVerticalFov(camera.verticalFov));
+    const bool hasPose = position != nullptr && heading != nullptr && pitch != nullptr && SettingValues::ReadVector(*position, camera.pose.position) &&
+        SettingValues::ReadNumbers(*heading, &camera.pose.heading, 1) && SettingValues::ReadNumbers(*pitch, &camera.pose.pitch, 1);
+    const bool readsVerticalFov = verticalFov == nullptr || (SettingValues::ReadNumbers(*verticalFov, &camera.verticalFov, 1) && IsVerticalFov(camera.verticalFov));
     return readsVerticalFov && camera.fitModel != hasPose && (fit == nullptr || camera.fitModel);
 }
 
@@ -1185,7 +1155,7 @@ bool ReadSceneFile(const std::wstring& path, SceneFile& scene, std::string& erro
 
     const std::string* scale = FindValue(model, "Scale");
     const std::string* radius = FindValue(model, "Radius");
-    if ((scale == nullptr) == (radius == nullptr) || !ReadNumbers(scale != nullptr ? *scale : *radius, scale != nullptr ? &scene.scale : &scene.radius, 1) ||
+    if ((scale == nullptr) == (radius == nullptr) || !SettingValues::ReadNumbers(scale != nullptr ? *scale : *radius, scale != nullptr ? &scene.scale : &scene.radius, 1) ||
         scene.scale < 0.0f || scene.radius < 0.0f || scene.scale + scene.radius == 0.0f)
     {
         error = "needs either [Model] Scale or Radius as a number above 0";
@@ -1218,7 +1188,7 @@ EditorCameraController::Pose CameraComponent::GetDefaultPose()
 void CameraComponent::SaveSettings(IniFile::Values& values) const
 {
     const EditorCameraController::Pose pose = m_Controller.GetPose();
-    values["Position"] = FormatVector(pose.position);
+    values["Position"] = SettingValues::FormatVector(pose.position);
     values["Heading"] = FormatFloat(pose.heading);
     values["Pitch"] = FormatFloat(pose.pitch);
     values["Vertical FOV"] = FormatFloat(GetVerticalFov());

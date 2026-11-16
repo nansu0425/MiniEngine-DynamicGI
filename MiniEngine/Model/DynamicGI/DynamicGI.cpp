@@ -7,6 +7,7 @@
 #include "Core/Editor/MeasurementConditions.h"
 #include "Core/Editor/SceneEditor.h"
 #include "Core/Editor/TextureViewer.h"
+#include "Core/Scene/SettingValues.h"
 #include "Model/Renderer/Renderer.h"
 #include "Core/Graphics/Command/CommandContext.h"
 #include "Core/Graphics/Resource/ColorBuffer.h"
@@ -492,11 +493,6 @@ namespace
         ClampSettings();
     }
 
-    std::string FormatFlag(bool value)
-    {
-        return value ? "1" : "0";
-    }
-
     void SaveSettings(TuningSection::Values& values)
     {
         const PathTracedLighting::Settings& pathTraced = s_Settings.pathTraced;
@@ -506,7 +502,7 @@ namespace
         values["Target Samples"] = std::to_string(pathTraced.targetSamples);
         values["Seed"] = std::to_string(pathTraced.seed);
         values["Max Hits"] = std::to_string(pathTraced.maxHits);
-        values["Russian Roulette"] = FormatFlag(pathTraced.russianRoulette);
+        values["Russian Roulette"] = SettingValues::FormatFlag(pathTraced.russianRoulette);
 
         const ProbeLighting::Settings& probe = s_Settings.probe;
         values["Probes X"] = std::to_string(probe.probeCounts[0]);
@@ -521,94 +517,60 @@ namespace
         values["Self Shadow Bias"] = MeasurementConditions::FormatFloat(probe.weighting.selfShadowBias);
         values["Chebyshev Exponent"] = MeasurementConditions::FormatFloat(probe.weighting.chebyshevExponent);
         values["Weight Crush Threshold"] = MeasurementConditions::FormatFloat(probe.weighting.weightCrushThreshold);
-        values["Facing Weight"] = FormatFlag(probe.weighting.facing);
+        values["Facing Weight"] = SettingValues::FormatFlag(probe.weighting.facing);
         values["Min Facing Weight"] = MeasurementConditions::FormatFloat(probe.weighting.minFacingWeight);
         values["Facing Normal"] = kFacingNormalNames[(int)probe.weighting.facingNormal];
-        values["Probe Classification"] = FormatFlag(probe.weighting.classification);
+        values["Probe Classification"] = SettingValues::FormatFlag(probe.weighting.classification);
         values["Max Back Face Ratio"] = MeasurementConditions::FormatFloat(probe.weighting.maxBackFaceRatio);
-        values["Pause Updates"] = FormatFlag(s_Settings.pauseProbeUpdates);
+        values["Pause Updates"] = SettingValues::FormatFlag(s_Settings.pauseProbeUpdates);
 
         const ProbeVisualization::Settings& probeSpheres = s_Settings.probeSpheres;
-        values["Show Probes"] = FormatFlag(probeSpheres.show);
+        values["Show Probes"] = SettingValues::FormatFlag(probeSpheres.show);
         values["Probe Radius"] = MeasurementConditions::FormatFloat(probeSpheres.radiusPerSpacing);
-        values["Show Texel Means"] = FormatFlag(probeSpheres.showTexelMeans);
-        values["Show Texel Distances"] = FormatFlag(probeSpheres.showTexelDistances);
-        values["Show Ray Samples"] = FormatFlag(probeSpheres.showRaySamples);
-        values["Inspect Pixel"] = FormatFlag(s_Settings.inspectPixel);
-    }
-
-    void ReadUInt(const TuningSection::Values& values, const char* key, uint32_t& value)
-    {
-        const auto text = values.find(key);
-        uint32_t read = 0;
-        if (text != values.end() && MeasurementConditions::ReadUInt(text->second, read))
-            value = read;
-    }
-
-    void ReadFloat(const TuningSection::Values& values, const char* key, float& value)
-    {
-        const auto text = values.find(key);
-        float read = 0.0f;
-        if (text != values.end() && MeasurementConditions::ReadFloat(text->second, read))
-            value = read;
-    }
-
-    void ReadFlag(const TuningSection::Values& values, const char* key, bool& value)
-    {
-        const auto text = values.find(key);
-        if (text != values.end() && (text->second == "0" || text->second == "1"))
-            value = text->second == "1";
-    }
-
-    template <typename Enum, size_t NumNames>
-    void ReadName(const TuningSection::Values& values, const char* key, const char* const (&names)[NumNames], Enum& value)
-    {
-        const auto text = values.find(key);
-        if (text == values.end())
-            return;
-        const auto name = std::find(std::begin(names), std::end(names), text->second);
-        if (name != std::end(names))
-            value = (Enum)(name - std::begin(names));
+        values["Show Texel Means"] = SettingValues::FormatFlag(probeSpheres.showTexelMeans);
+        values["Show Texel Distances"] = SettingValues::FormatFlag(probeSpheres.showTexelDistances);
+        values["Show Ray Samples"] = SettingValues::FormatFlag(probeSpheres.showRaySamples);
+        values["Inspect Pixel"] = SettingValues::FormatFlag(s_Settings.inspectPixel);
     }
 
     void LoadSettings(const TuningSection::Values& values)
     {
         PathTracedLighting::Settings& pathTraced = s_Settings.pathTraced;
-        ReadName(values, "Indirect", kSourceNames, s_Settings.indirect);
-        ReadName(values, "View", kViewNames, s_Settings.view);
-        ReadUInt(values, "Samples per Frame", pathTraced.samplesPerFrame);
-        ReadUInt(values, "Target Samples", pathTraced.targetSamples);
-        ReadUInt(values, "Seed", pathTraced.seed);
-        ReadUInt(values, "Max Hits", pathTraced.maxHits);
-        ReadFlag(values, "Russian Roulette", pathTraced.russianRoulette);
+        SettingValues::ReadName(values, "Indirect", kSourceNames, s_Settings.indirect);
+        SettingValues::ReadName(values, "View", kViewNames, s_Settings.view);
+        SettingValues::ReadUInt(values, "Samples per Frame", pathTraced.samplesPerFrame);
+        SettingValues::ReadUInt(values, "Target Samples", pathTraced.targetSamples);
+        SettingValues::ReadUInt(values, "Seed", pathTraced.seed);
+        SettingValues::ReadUInt(values, "Max Hits", pathTraced.maxHits);
+        SettingValues::ReadFlag(values, "Russian Roulette", pathTraced.russianRoulette);
 
         ProbeLighting::Settings& probe = s_Settings.probe;
-        ReadUInt(values, "Probes X", probe.probeCounts[0]);
-        ReadUInt(values, "Probes Y", probe.probeCounts[1]);
-        ReadUInt(values, "Probes Z", probe.probeCounts[2]);
-        ReadUInt(values, "Rays per Probe", probe.raysPerProbe);
-        ReadFloat(values, "Hysteresis", probe.hysteresis);
-        ReadFloat(values, "Distance Sharpness", probe.distanceSharpness);
-        ReadUInt(values, "Distance Texels per Side", probe.distanceTexelsPerSide);
-        ReadFloat(values, "Back Face Distance Scale", probe.backFaceDistanceScale);
-        ReadName(values, "Visibility", kVisibilityNames, probe.weighting.visibility);
-        ReadFloat(values, "Self Shadow Bias", probe.weighting.selfShadowBias);
-        ReadFloat(values, "Chebyshev Exponent", probe.weighting.chebyshevExponent);
-        ReadFloat(values, "Weight Crush Threshold", probe.weighting.weightCrushThreshold);
-        ReadFlag(values, "Facing Weight", probe.weighting.facing);
-        ReadFloat(values, "Min Facing Weight", probe.weighting.minFacingWeight);
-        ReadName(values, "Facing Normal", kFacingNormalNames, probe.weighting.facingNormal);
-        ReadFlag(values, "Probe Classification", probe.weighting.classification);
-        ReadFloat(values, "Max Back Face Ratio", probe.weighting.maxBackFaceRatio);
-        ReadFlag(values, "Pause Updates", s_Settings.pauseProbeUpdates);
+        SettingValues::ReadUInt(values, "Probes X", probe.probeCounts[0]);
+        SettingValues::ReadUInt(values, "Probes Y", probe.probeCounts[1]);
+        SettingValues::ReadUInt(values, "Probes Z", probe.probeCounts[2]);
+        SettingValues::ReadUInt(values, "Rays per Probe", probe.raysPerProbe);
+        SettingValues::ReadFloat(values, "Hysteresis", probe.hysteresis);
+        SettingValues::ReadFloat(values, "Distance Sharpness", probe.distanceSharpness);
+        SettingValues::ReadUInt(values, "Distance Texels per Side", probe.distanceTexelsPerSide);
+        SettingValues::ReadFloat(values, "Back Face Distance Scale", probe.backFaceDistanceScale);
+        SettingValues::ReadName(values, "Visibility", kVisibilityNames, probe.weighting.visibility);
+        SettingValues::ReadFloat(values, "Self Shadow Bias", probe.weighting.selfShadowBias);
+        SettingValues::ReadFloat(values, "Chebyshev Exponent", probe.weighting.chebyshevExponent);
+        SettingValues::ReadFloat(values, "Weight Crush Threshold", probe.weighting.weightCrushThreshold);
+        SettingValues::ReadFlag(values, "Facing Weight", probe.weighting.facing);
+        SettingValues::ReadFloat(values, "Min Facing Weight", probe.weighting.minFacingWeight);
+        SettingValues::ReadName(values, "Facing Normal", kFacingNormalNames, probe.weighting.facingNormal);
+        SettingValues::ReadFlag(values, "Probe Classification", probe.weighting.classification);
+        SettingValues::ReadFloat(values, "Max Back Face Ratio", probe.weighting.maxBackFaceRatio);
+        SettingValues::ReadFlag(values, "Pause Updates", s_Settings.pauseProbeUpdates);
 
         ProbeVisualization::Settings& probeSpheres = s_Settings.probeSpheres;
-        ReadFlag(values, "Show Probes", probeSpheres.show);
-        ReadFloat(values, "Probe Radius", probeSpheres.radiusPerSpacing);
-        ReadFlag(values, "Show Texel Means", probeSpheres.showTexelMeans);
-        ReadFlag(values, "Show Texel Distances", probeSpheres.showTexelDistances);
-        ReadFlag(values, "Show Ray Samples", probeSpheres.showRaySamples);
-        ReadFlag(values, "Inspect Pixel", s_Settings.inspectPixel);
+        SettingValues::ReadFlag(values, "Show Probes", probeSpheres.show);
+        SettingValues::ReadFloat(values, "Probe Radius", probeSpheres.radiusPerSpacing);
+        SettingValues::ReadFlag(values, "Show Texel Means", probeSpheres.showTexelMeans);
+        SettingValues::ReadFlag(values, "Show Texel Distances", probeSpheres.showTexelDistances);
+        SettingValues::ReadFlag(values, "Show Ray Samples", probeSpheres.showRaySamples);
+        SettingValues::ReadFlag(values, "Inspect Pixel", s_Settings.inspectPixel);
         ClampSettings();
     }
 

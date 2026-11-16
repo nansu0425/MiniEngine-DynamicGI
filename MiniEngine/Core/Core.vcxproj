@@ -139,6 +139,7 @@
     <ClInclude Include="Editor\SceneEditor.h" />
     <ClInclude Include="Editor\TextureViewer.h" />
     <ClInclude Include="Scene\Scene.h" />
+    <ClInclude Include="Scene\SettingValues.h" />
     <ClInclude Include="Utility\IniFile.h" />
     <ClInclude Include="UI\EngineTuning.h" />
     <ClInclude Include="UI\ImGuiLayer.h" />
@@ -188,6 +189,7 @@
     <ClCompile Include="Editor\SceneEditor.cpp" />
     <ClCompile Include="Editor\TextureViewer.cpp" />
     <ClCompile Include="Scene\Scene.cpp" />
+    <ClCompile Include="Scene\SettingValues.cpp" />
     <ClCompile Include="Utility\IniFile.cpp" />
     <ClCompile Include="UI\EngineTuning.cpp" />
     <ClCompile Include="UI\ImGuiLayer.cpp" />
