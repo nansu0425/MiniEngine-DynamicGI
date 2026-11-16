@@ -131,9 +131,14 @@ namespace
         return grid;
     }
 
-    bool IsSameGrid(const IrradianceProbeGrid& a, const IrradianceProbeGrid& b)
+    bool IsSamePlacement(const IrradianceProbeGrid& a, const IrradianceProbeGrid& b)
     {
-        return XMVector3Equal(a.origin, b.origin) && XMVector3Equal(a.spacing, b.spacing) && std::equal(std::begin(a.counts), std::end(a.counts), b.counts);
+        return XMVector3Equal(a.origin, b.origin) && XMVector3Equal(a.spacing, b.spacing);
+    }
+
+    bool HasSameCounts(const IrradianceProbeGrid& a, const IrradianceProbeGrid& b)
+    {
+        return std::equal(std::begin(a.counts), std::end(a.counts), b.counts);
     }
 
     Matrix4 MakeRandomRotation(void)
@@ -161,8 +166,15 @@ namespace
 
     void FitResourcesTo(const IrradianceProbeGrid& grid, uint32_t raysPerProbe, uint32_t distanceTexelsPerSide)
     {
-        if (IsSameGrid(grid, s_Grid) && raysPerProbe == s_RaysPerProbe && distanceTexelsPerSide == s_DistanceTexelsPerSide)
+        if (HasSameCounts(grid, s_Grid) && raysPerProbe == s_RaysPerProbe && distanceTexelsPerSide == s_DistanceTexelsPerSide)
+        {
+            if (!IsSamePlacement(grid, s_Grid))
+            {
+                s_Grid = grid;
+                s_ResetRequested = true;
+            }
             return;
+        }
 
         g_CommandManager.IdleGPU();
         CreateProbeAtlas(s_ProbesIrradiance, L"Probes Irradiance", grid, kProbeIrradianceTexelsPerSide, DXGI_FORMAT_R32G32B32A32_FLOAT);
