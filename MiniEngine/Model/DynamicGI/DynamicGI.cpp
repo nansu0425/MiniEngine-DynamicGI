@@ -888,15 +888,16 @@ void DynamicGI::DrawProbes(GraphicsContext& context, const Math::Camera& camera,
     if (s_Settings.indirect != Source::kProbe || !s_Settings.probeSpheres.show)
         return;
 
-    const ProbeLighting::Probes probes = ProbeLighting::GetProbes();
-    ProbeVisualization::DrawSpheres(context, camera, viewport, scissor, probes, s_Settings.probe.weighting, s_Settings.probeSpheres.radiusPerSpacing);
-
-    if (const std::optional<uint32_t> probe = GetSelectedProbe())
-        ProbeVisualization::DrawDistanceLines(context, camera, viewport, scissor, probes, *probe, s_Settings.probeSpheres);
+    ProbeVisualization::DrawSpheres(context, camera, viewport, scissor, ProbeLighting::GetProbes(), s_Settings.probe.weighting,
+        s_Settings.probeSpheres.radiusPerSpacing);
 }
 
 void DynamicGI::DrawProbeOverlay(GraphicsContext& context, const Math::Camera& camera)
 {
+    const std::optional<uint32_t> probe = GetSelectedProbe();
+    if (s_Settings.indirect == Source::kProbe && s_Settings.probeSpheres.show && probe)
+        ProbeVisualization::DrawDistanceLines(context, camera, ProbeLighting::GetProbes(), *probe, s_Settings.probeSpheres);
+
     const ProbeContribution::Surface* contribution = GetInspectedContribution();
     if (contribution != nullptr && contribution->hasSurface != 0)
         ProbeVisualization::DrawContribution(context, camera, ProbeLighting::GetProbes().grid, ProbeContribution::GetSurfaceBuffer(), s_HoveredCorner);

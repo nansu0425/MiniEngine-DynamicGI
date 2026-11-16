@@ -115,7 +115,8 @@ void ProbeVisualization::Initialize(void)
     s_LinePSO.SetDepthStencilState(DepthStateReadOnly);
     s_LinePSO.SetInputLayout(0, nullptr);
     s_LinePSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE);
-    s_LinePSO.SetRenderTargetFormats(1, &colorFormat, g_SceneDepthBuffer.GetFormat());
+    const DXGI_FORMAT overlayFormat = g_SceneOverlayBuffer.GetFormat();
+    s_LinePSO.SetRenderTargetFormats(1, &overlayFormat, g_SceneDepthBuffer.GetFormat());
     s_LinePSO.SetVertexShader(g_pProbeDistanceLineVS, sizeof(g_pProbeDistanceLineVS));
     s_LinePSO.SetPixelShader(g_pProbeDistanceLinePS, sizeof(g_pProbeDistanceLinePS));
     s_LinePSO.Finalize();
@@ -189,8 +190,8 @@ std::optional<uint32_t> ProbeVisualization::FindProbeUnderCursor(const Camera& c
     return nearest;
 }
 
-void ProbeVisualization::DrawDistanceLines(GraphicsContext& context, const Camera& camera, const D3D12_VIEWPORT& viewport, const D3D12_RECT& scissor,
-    const ProbeLighting::Probes& probes, uint32_t probe, const Settings& settings)
+void ProbeVisualization::DrawDistanceLines(GraphicsContext& context, const Camera& camera, const ProbeLighting::Probes& probes, uint32_t probe,
+    const Settings& settings)
 {
     ScopedTimer _prof(L"Probe Distance Lines", context);
 
@@ -209,9 +210,9 @@ void ProbeVisualization::DrawDistanceLines(GraphicsContext& context, const Camer
     context.TransitionResource(probes.raySamples, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     context.TransitionResource(probes.texelDistance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     context.TransitionResource(g_SceneDepthBuffer, D3D12_RESOURCE_STATE_DEPTH_READ);
-    context.TransitionResource(g_SceneColorBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
-    context.SetRenderTarget(g_SceneColorBuffer.GetRTV(), g_SceneDepthBuffer.GetDSV_DepthReadOnly());
-    context.SetViewportAndScissor(viewport, scissor);
+    context.TransitionResource(g_SceneOverlayBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
+    context.SetRenderTarget(g_SceneOverlayBuffer.GetRTV(), g_SceneDepthBuffer.GetDSV_DepthReadOnly());
+    context.SetViewportAndScissor(0, 0, g_SceneOverlayBuffer.GetWidth(), g_SceneOverlayBuffer.GetHeight());
     context.SetDynamicDescriptor(kLineInputs, 0, probes.distance.GetSRV());
     context.SetDynamicDescriptor(kLineInputs, 1, probes.raySamples.GetSRV());
     context.SetDynamicDescriptor(kLineInputs, 2, probes.texelDistance.GetSRV());
