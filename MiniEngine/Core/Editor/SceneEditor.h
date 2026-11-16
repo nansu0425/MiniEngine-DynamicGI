@@ -13,7 +13,7 @@
 // icon이 있는 object는 scene 위에 icon으로도 보여 주고, icon을 클릭해 고른 object를 gizmo로 바꾼다.
 namespace SceneEditor
 {
-    // 스스로는 보이지 않는 object를 scene 위에 icon으로 표시한다. 고르면 gizmo로 옮기고 돌린다. 이 component가 없는 object는
+    // 스스로는 보이지 않는 object를 scene 위에 icon으로 표시한다. 고르면 gizmo로 옮기고 돌리고 크기를 바꾼다. 이 component가 없는 object는
     // Scene Hierarchy로만 고르고 gizmo로 바꾸지 않는다.
     class IconComponent : public Scene::Component
     {
@@ -28,6 +28,7 @@ namespace SceneEditor
         // rotate mode에서 고른 object를 Manipulate로 돌린다. axes는 gizmo의 ring이 object의 축(LOCAL)과 world의 축(WORLD) 중
         // 어느 것을 따르는지다. 돌릴 수 없는 object는 아무것도 하지 않는다.
         virtual void Rotate(const Math::Camera& camera, ImGuizmo::MODE axes) = 0;
+        virtual void Scale(const Math::Camera& camera) = 0;
     };
 
     // Details panel은 고른 object의 이름 아래에, show를 등록한 type의 component를 component 순서대로 표시한다.
@@ -44,7 +45,7 @@ namespace SceneEditor
     // scene 위의 gizmo toolbar도 그린다.
     void Update(const Math::Camera& camera);
 
-    // harness가 icon click, Scene Hierarchy panel, W, E key와 gizmo toolbar 대신 명령으로 고른 object, gizmo mode, rotate의 축을 정하고,
+    // harness가 icon click, Scene Hierarchy panel, W, E, R key와 gizmo toolbar 대신 명령으로 고른 object, gizmo mode, rotate의 축을 정하고,
     // state의 editor로 읽는다. Details panel 대신 명령으로 object의 설정을 읽고 바꾼다. camera는 Update에 넘기는 것과 같은 camera이고 app이 끝날 때까지 살아 있어야 한다. icon의 화면 위치를 이것으로 투영한다.
     void RegisterCommands(const Math::Camera& camera);
 

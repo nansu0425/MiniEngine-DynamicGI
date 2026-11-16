@@ -123,6 +123,7 @@ public:
     virtual void SetPosition(Vector3 position) override;
     virtual void Draw(const Camera& camera, bool selected) const override;
     virtual void Rotate(const Camera& camera, ImGuizmo::MODE axes) override;
+    virtual void Scale(const Camera&) override {}
 
 private:
     LightComponent& m_Light;

@@ -13,7 +13,7 @@ using namespace Math;
 
 namespace
 {
-    enum class GizmoMode { Translate, Rotate };
+    enum class GizmoMode { Translate, Rotate, Scale };
 
     // 고른 object는 GetSelected로 읽는다.
     Scene::Object* s_Selected = nullptr;
@@ -43,6 +43,8 @@ namespace
             s_GizmoMode = GizmoMode::Translate;
         else if (GameInput::IsFirstPressed(GameInput::kKey_e))
             s_GizmoMode = GizmoMode::Rotate;
+        else if (GameInput::IsFirstPressed(GameInput::kKey_r))
+            s_GizmoMode = GizmoMode::Scale;
     }
 
     void EditSelected(const Camera& camera, SceneEditor::IconComponent& selected)
@@ -50,6 +52,11 @@ namespace
         if (s_GizmoMode == GizmoMode::Rotate)
         {
             selected.Rotate(camera, s_RotateAxes);
+            return;
+        }
+        if (s_GizmoMode == GizmoMode::Scale)
+        {
+            selected.Scale(camera);
             return;
         }
 
@@ -86,7 +93,12 @@ namespace
 
     const char* GetGizmoModeName(GizmoMode mode)
     {
-        return mode == GizmoMode::Rotate ? "rotate" : "translate";
+        switch (mode)
+        {
+        case GizmoMode::Rotate: return "rotate";
+        case GizmoMode::Scale: return "scale";
+        default: return "translate";
+        }
     }
 
     const char* GetAxesName(ImGuizmo::MODE axes)
@@ -102,6 +114,10 @@ namespace
         ImGui::SameLine();
         if (ImGui::RadioButton("Rotate (E)", s_GizmoMode == GizmoMode::Rotate))
             s_GizmoMode = GizmoMode::Rotate;
+        ImGui::SameLine();
+        if (ImGui::RadioButton("Scale (R)", s_GizmoMode == GizmoMode::Scale))
+            s_GizmoMode = GizmoMode::Scale;
+        ImGui::SetItemTooltip("Resizes the selected object along its axes. Objects that cannot be resized ignore it.");
 
         ImGui::SameLine();
         ImGui::TextDisabled("|");
@@ -220,7 +236,7 @@ namespace
 
     bool SetGizmoMode(const std::string& name, std::string& error)
     {
-        for (GizmoMode mode : { GizmoMode::Translate, GizmoMode::Rotate })
+        for (GizmoMode mode : { GizmoMode::Translate, GizmoMode::Rotate, GizmoMode::Scale })
         {
             if (name == GetGizmoModeName(mode))
             {
@@ -228,7 +244,7 @@ namespace
                 return true;
             }
         }
-        error = "usage: editor mode translate|rotate";
+        error = "usage: editor mode translate|rotate|scale";
         return false;
     }
 
@@ -300,7 +316,7 @@ namespace
             SetObjectSettings(value, reply);
             return;
         }
-        std::string error = "usage: editor select <name>|none | editor mode translate|rotate | editor axes local|world | editor get <name> | "
+        std::string error = "usage: editor select <name>|none | editor mode translate|rotate|scale | editor axes local|world | editor get <name> | "
             "editor set <name>: <key>=<value>; <key>=<value>";
         const bool done =
             action == "select" ? SelectByName(value, error) :
@@ -358,11 +374,12 @@ void SceneEditor::RegisterCommands(const Camera& camera)
 {
     const Camera* projection = &camera;
     ControlChannel::RegisterState("editor", [projection] { return DescribeEditor(*projection); });
-    ControlChannel::Register("editor", "editor select <name>|none | editor mode translate|rotate | editor axes local|world | editor get <name> | "
+    ControlChannel::Register("editor", "editor select <name>|none | editor mode translate|rotate|scale | editor axes local|world | editor get <name> | "
         "editor set <name>: <key>=<value>; <key>=<value>: the selected object, "
         "whose settings the Details panel shows and which the gizmo edits, the gizmo mode and the axes the rotate rings follow, "
-        "as clicking an object in the Scene Hierarchy panel or its icon, pressing W or E and the toolbar at the top right of the scene do. "
+        "as clicking an object in the Scene Hierarchy panel or its icon, pressing W, E or R and the toolbar at the top right of the scene do. "
         "local turns the object about its own axes and world about the world axes. translate always follows the world axes. "
+        "scale resizes the object along its own axes, and an object that cannot be resized ignores it. "
         "state editor has them, and the objects in the order of the Scene Hierarchy panel, each with its world position and, in front of the camera, "
         "its icon's center in client pixels. on_screen is whether that center is in the scene. An object without an icon, "
         "such as the Camera, the Sky or the Model, has neither and no gizmo. Icons and the gizmo are drawn only while the UI is shown. "
