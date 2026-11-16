@@ -165,6 +165,7 @@ namespace
         probe.distanceSharpness = std::max(1.0f, std::min(probe.distanceSharpness, kMaxDistanceSharpness));
         probe.distanceTexelsPerSide = std::max(1u, std::min(probe.distanceTexelsPerSide, kMaxDistanceTexelsPerSide));
         probe.backFaceDistanceScale = std::max(0.0f, std::min(probe.backFaceDistanceScale, 1.0f));
+        probe.weighting.minFacingWeight = std::max(0.0f, std::min(probe.weighting.minFacingWeight, 1.0f));
 
         ProbeVisualization::Settings& probeSpheres = s_Settings.probeSpheres;
         probeSpheres.radiusPerSpacing = std::max(0.0f, std::min(probeSpheres.radiusPerSpacing, kMaxRadiusPerSpacing));
@@ -221,8 +222,8 @@ namespace
             ImGui::TextDisabled("No surface at the pixel.");
             return;
         }
-        if (contribution->ignoresVisibility != 0)
-            ImGui::TextWrapped("The visibility leaves out every probe, so the weights fall back to the trilinear weights as the shading does.");
+        if (contribution->fallsBackToTrilinear != 0)
+            ImGui::TextWrapped("The visibility and facing weights leave out every probe, so the weights fall back to the trilinear weights as the shading does.");
 
         const IrradianceProbeGrid& grid = ProbeLighting::GetProbes().grid;
         const ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit;
@@ -360,6 +361,13 @@ namespace
             "Shadow Ray traces a ray from the point to each probe and keeps the probes it reaches. "
             "Chebyshev weights each probe by how likely the distances it stored toward the point leave the point visible.");
         TuningSection::MakeItemResettable("Visibility");
+        ImGui::Checkbox("Facing Weight", &probe.weighting.facing);
+        ImGui::SetItemTooltip("Weights each probe by how far it lies in front of the surface, along the geometry normal, "
+            "so the probes behind a thin wall or cloth give less than the ones the surface faces.");
+        TuningSection::MakeItemResettable("Facing Weight");
+        ImGui::SliderFloat("Min Facing Weight", &probe.weighting.minFacingWeight, 0.0f, 1.0f);
+        ImGui::SetItemTooltip("The facing weight of a probe right behind the surface. A probe the surface faces head-on gets 1 more than this.");
+        TuningSection::MakeItemResettable("Min Facing Weight");
         ClampSettings();
 
         if (ImGui::Button("Reset Probes"))
@@ -438,6 +446,8 @@ namespace
         values["Distance Texels per Side"] = std::to_string(probe.distanceTexelsPerSide);
         values["Back Face Distance Scale"] = MeasurementConditions::FormatFloat(probe.backFaceDistanceScale);
         values["Visibility"] = kVisibilityNames[(int)probe.weighting.visibility];
+        values["Facing Weight"] = FormatFlag(probe.weighting.facing);
+        values["Min Facing Weight"] = MeasurementConditions::FormatFloat(probe.weighting.minFacingWeight);
         values["Pause Updates"] = FormatFlag(s_Settings.pauseProbeUpdates);
 
         const ProbeVisualization::Settings& probeSpheres = s_Settings.probeSpheres;
@@ -504,6 +514,8 @@ namespace
         ReadUInt(values, "Distance Texels per Side", probe.distanceTexelsPerSide);
         ReadFloat(values, "Back Face Distance Scale", probe.backFaceDistanceScale);
         ReadName(values, "Visibility", kVisibilityNames, probe.weighting.visibility);
+        ReadFlag(values, "Facing Weight", probe.weighting.facing);
+        ReadFloat(values, "Min Facing Weight", probe.weighting.minFacingWeight);
         ReadFlag(values, "Pause Updates", s_Settings.pauseProbeUpdates);
 
         ProbeVisualization::Settings& probeSpheres = s_Settings.probeSpheres;
@@ -562,7 +574,7 @@ namespace
             .Object("position", DescribeVector(contribution->position))
             .Object("geometry_normal", DescribeVector(contribution->geometryNormal))
             .Object("shading_normal", DescribeVector(contribution->shadingNormal))
-            .Flag("ignores_visibility", contribution->ignoresVisibility != 0)
+            .Flag("falls_back_to_trilinear", contribution->fallsBackToTrilinear != 0)
             .Object("irradiance", DescribeColor(contribution->irradiance))
             .Object("shading_irradiance", DescribeColor(contribution->shadingIrradiance))
             .Object("probes", probes);

@@ -37,7 +37,7 @@ void main()
     const ProbeDistanceAtlas distanceAtlas = MakeProbeDistanceAtlas(ProbesDistance, DistanceTexelsPerSide);
     const WeightedProbeCorners probes = GetWeightedProbeCorners(Weighting, distanceAtlas, LinearClamp, Grid, result.position, result.geometryNormal);
     result.comparesDistance = Weighting.visibility == kProbeVisibilityChebyshev;
-    result.ignoresVisibility = probes.ignoresVisibility;
+    result.fallsBackToTrilinear = probes.fallsBackToTrilinear;
     result.irradiance = 0.0;
     [unroll]
     for (uint corner = 0; corner < kNumProbeCorners; ++corner)

@@ -29,7 +29,7 @@ namespace ProbeContribution
         DirectX::XMFLOAT3 geometryNormal;
         DirectX::XMFLOAT3 shadingNormal;
         uint32_t comparesDistance;
-        uint32_t ignoresVisibility;
+        uint32_t fallsBackToTrilinear;
         DirectX::XMFLOAT3 irradiance;
         DirectX::XMFLOAT3 shadingIrradiance;
         Corner corners[kNumCorners];

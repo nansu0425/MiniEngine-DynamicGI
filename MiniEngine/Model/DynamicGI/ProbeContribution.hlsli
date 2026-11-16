@@ -21,7 +21,7 @@ struct SurfaceProbeContribution
     float3 geometryNormal;
     float3 shadingNormal;
     uint comparesDistance;
-    uint ignoresVisibility;
+    uint fallsBackToTrilinear;
     float3 irradiance;
     float3 shadingIrradiance;
     ProbeCornerContribution corners[kNumProbeCorners];

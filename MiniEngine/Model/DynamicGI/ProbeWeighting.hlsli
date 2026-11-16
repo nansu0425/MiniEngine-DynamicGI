@@ -2,24 +2,28 @@
 #define __PROBE_WEIGHTING_HLSLI__
 
 #include "Model/DynamicGI/ProbeVisibility.hlsli"
+#include "Model/DynamicGI/ProbeFacing.hlsli"
 
 struct ProbeWeighting
 {
     uint visibility;
+    uint facing;
+    float minFacingWeight;
 };
 
 bool InterpolatesTrilinearly(ProbeWeighting weighting)
 {
-    return weighting.visibility == kProbeVisibilityNone;
+    return weighting.visibility == kProbeVisibilityNone && weighting.facing == 0;
 }
 
 struct WeightedProbeCorners
 {
     IrradianceProbeCorner corners[kNumProbeCorners];
     float visibilityWeights[kNumProbeCorners];
+    float facingWeights[kNumProbeCorners];
     float weights[kNumProbeCorners];
     float weightSum;
-    bool ignoresVisibility;
+    bool fallsBackToTrilinear;
 };
 
 WeightedProbeCorners GetWeightedProbeCorners(ProbeWeighting weighting, ProbeDistanceAtlas distanceAtlas, SamplerState linearClamp,
@@ -33,12 +37,14 @@ WeightedProbeCorners GetWeightedProbeCorners(ProbeWeighting weighting, ProbeDist
         probes.corners[corner] = GetIrradianceProbeCorner(grid, position, corner);
         probes.visibilityWeights[corner] = GetProbeVisibilityWeight(weighting.visibility, distanceAtlas, linearClamp, grid,
             probes.corners[corner].coordinate, position, geometryNormal);
-        probes.weights[corner] = probes.corners[corner].trilinearWeight * probes.visibilityWeights[corner];
+        probes.facingWeights[corner] = weighting.facing != 0 ?
+            GetProbeFacingWeight(weighting.minFacingWeight, grid, probes.corners[corner].coordinate, position, geometryNormal) : 1.0;
+        probes.weights[corner] = probes.corners[corner].trilinearWeight * probes.visibilityWeights[corner] * probes.facingWeights[corner];
         probes.weightSum += probes.weights[corner];
     }
 
-    probes.ignoresVisibility = probes.weightSum == 0.0;
-    if (probes.ignoresVisibility)
+    probes.fallsBackToTrilinear = probes.weightSum == 0.0;
+    if (probes.fallsBackToTrilinear)
     {
         [unroll]
         for (uint corner = 0; corner < kNumProbeCorners; ++corner)
