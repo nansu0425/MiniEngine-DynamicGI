@@ -1578,7 +1578,7 @@ void ModelViewer::Update( float deltaT )
     m_CameraController->Update(deltaT);
 
     SceneEditor::Update(m_Camera);
-    DynamicGI::UpdateProbeSelection(m_Camera);
+    DynamicGI::UpdateSceneInspection(m_Camera);
     PathTracerTuning::Update();
 
     GraphicsContext& gfxContext = GraphicsContext::Begin(L"Scene Update");
@@ -1736,10 +1736,12 @@ void ModelViewer::RenderScene( void )
 
     gfxContext.Finish();
 
+    DynamicGI::MeasureProbeContribution(m_RaytracingScene);
     RayPick::Render(m_Camera, m_MainViewport, g_SceneDepthBuffer, m_RaytracingScene);
 }
 
 void ModelViewer::RenderSceneOverlay( GraphicsContext& gfxContext )
 {
     RaytracingView::Render(gfxContext.GetComputeContext(), m_Camera, m_MainViewport, m_RaytracingScene, m_Light.GetDirection(), g_SceneOverlayBuffer);
+    DynamicGI::DrawProbeOverlay(gfxContext, m_Camera);
 }

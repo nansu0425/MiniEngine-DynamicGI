@@ -1,11 +1,13 @@
 #pragma once
 
+#include "Model/DynamicGI/ProbeContribution.h"
 #include "Model/DynamicGI/ProbeLighting.h"
 
 #include <optional>
 
 class ColorBuffer;
 class GraphicsContext;
+class StructuredBuffer;
 
 namespace Math
 {
@@ -32,4 +34,10 @@ namespace ProbeVisualization
 
     void DrawDistanceLines(GraphicsContext& context, const Math::Camera& camera, const D3D12_VIEWPORT& viewport, const D3D12_RECT& scissor,
         const ProbeLighting::Probes& probes, uint32_t probe, const Settings& settings);
+
+    void DrawContribution(GraphicsContext& context, const Math::Camera& camera, const IrradianceProbeGrid& grid, StructuredBuffer& contribution,
+        std::optional<uint32_t> hoveredCorner);
+
+    void AnnotateContribution(const Math::Camera& camera, const IrradianceProbeGrid& grid, const ProbeContribution::Surface& contribution,
+        std::optional<uint32_t> hoveredCorner);
 }

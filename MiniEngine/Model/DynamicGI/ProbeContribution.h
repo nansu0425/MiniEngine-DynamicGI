@@ -1,0 +1,54 @@
+#pragma once
+
+#include "Model/DynamicGI/ProbeLighting.h"
+
+#include <optional>
+
+class RaytracingScene;
+class StructuredBuffer;
+
+namespace ProbeContribution
+{
+    constexpr uint32_t kNumCorners = 8;
+
+    struct Corner
+    {
+        DirectX::XMUINT3 coordinate;
+        float trilinearWeight;
+        float visibilityWeight;
+        float weight;
+        DirectX::XMFLOAT3 irradiance;
+    };
+
+    struct Surface
+    {
+        uint32_t hasSurface;
+        DirectX::XMFLOAT3 position;
+        DirectX::XMFLOAT3 geometryNormal;
+        DirectX::XMFLOAT3 shadingNormal;
+        uint32_t ignoresVisibility;
+        DirectX::XMFLOAT3 irradiance;
+        DirectX::XMFLOAT3 shadingIrradiance;
+        Corner corners[kNumCorners];
+    };
+
+    struct Readback
+    {
+        uint32_t captureId;
+        Surface surface;
+    };
+
+    inline char GetCornerLetter(uint32_t corner)
+    {
+        return (char)('A' + corner);
+    }
+
+    void Initialize(void);
+    void Shutdown(void);
+
+    uint32_t CaptureSurface(DirectX::XMUINT2 scenePixel);
+    void Measure(ProbeLighting::Visibility visibility, const RaytracingScene& scene);
+
+    const std::optional<Readback>& GetReadback(void);
+    StructuredBuffer& GetSurfaceBuffer(void);
+}

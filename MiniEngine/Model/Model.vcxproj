@@ -97,6 +97,7 @@
     <ClInclude Include="DynamicGI\DynamicGI.h" />
     <ClInclude Include="DynamicGI\GIFrameInputs.h" />
     <ClInclude Include="DynamicGI\GILights.h" />
+    <ClInclude Include="DynamicGI\ProbeContribution.h" />
     <ClInclude Include="DynamicGI\ProbeLighting.h" />
     <ClInclude Include="DynamicGI\ProbeVisualization.h" />
     <ClInclude Include="Renderer\IrradianceProbeGrid.h" />
@@ -130,6 +131,7 @@
     <ClCompile Include="PathTracer\BrdfTest.cpp" />
     <ClCompile Include="DynamicGI\DynamicGI.cpp" />
     <ClCompile Include="DynamicGI\PathTracedLighting.cpp" />
+    <ClCompile Include="DynamicGI\ProbeContribution.cpp" />
     <ClCompile Include="DynamicGI\ProbeLighting.cpp" />
     <ClCompile Include="DynamicGI\ProbeVisualization.cpp" />
     <ClCompile Include="Renderer\Renderer.cpp" />
@@ -156,6 +158,8 @@
     <None Include="DynamicGI\ProbeVisibility.hlsli" />
     <None Include="DynamicGI\ProbeSphere.hlsli" />
     <None Include="DynamicGI\ProbeDistanceLine.hlsli" />
+    <None Include="DynamicGI\ProbeContribution.hlsli" />
+    <None Include="DynamicGI\ProbeContributionRibbon.hlsli" />
     <None Include="Sponza\Lighting.hlsli" />
   </ItemGroup>
   <ItemGroup>
@@ -298,6 +302,15 @@
       <ShaderType>Vertex</ShaderType>
     </FxCompile>
     <FxCompile Include="DynamicGI\ProbeDistanceLinePS.hlsl">
+      <ShaderType>Pixel</ShaderType>
+    </FxCompile>
+    <FxCompile Include="DynamicGI\ProbeContributionCS.hlsl">
+      <ShaderModel>6.5</ShaderModel>
+    </FxCompile>
+    <FxCompile Include="DynamicGI\ProbeContributionRibbonVS.hlsl">
+      <ShaderType>Vertex</ShaderType>
+    </FxCompile>
+    <FxCompile Include="DynamicGI\ProbeContributionRibbonPS.hlsl">
       <ShaderType>Pixel</ShaderType>
     </FxCompile>
   </ItemGroup>

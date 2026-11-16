@@ -7,11 +7,15 @@
 #include "Core/Graphics/Pipeline/RootSignature.h"
 #include "Core/Graphics/Resource/BufferManager.h"
 #include "Core/Graphics/Resource/ColorBuffer.h"
+#include "Core/Graphics/Resource/GpuBuffer.h"
+#include "Core/UI/ImGuiLayer.h"
 
 #include "Output/Model/CompiledShaders/ProbeSphereVS.h"
 #include "Output/Model/CompiledShaders/ProbeSpherePS.h"
 #include "Output/Model/CompiledShaders/ProbeDistanceLineVS.h"
 #include "Output/Model/CompiledShaders/ProbeDistanceLinePS.h"
+#include "Output/Model/CompiledShaders/ProbeContributionRibbonVS.h"
+#include "Output/Model/CompiledShaders/ProbeContributionRibbonPS.h"
 
 #include <imgui.h>
 #include <algorithm>
@@ -24,15 +28,24 @@ namespace
 {
     constexpr uint32_t kVerticesPerQuad = 6;
     constexpr uint32_t kVerticesPerLine = 2;
+    constexpr uint32_t kVerticesPerArrow = 9;
 
     enum RootParameter { kConstants, kIrradiance, kNumRootParameters };
     enum LineRootParameter { kLineConstants, kLineInputs, kNumLineRootParameters };
     enum class DistanceLines : uint32_t { kTexelMeans, kRaySamples, kTexelDistances };
+    enum RibbonRootParameter { kRibbonConstants, kRibbonContribution, kNumRibbonRootParameters };
+
+    constexpr uint32_t kNumCellEdges = 12;
+    constexpr uint32_t kNumContributionRibbons = ProbeContribution::kNumCorners + kNumCellEdges + 1;
+    constexpr uint32_t kNoHoveredCorner = 0xffffffff;
+    constexpr float kNormalLengthPerSpacing = 0.5f;
 
     RootSignature s_RootSignature;
     GraphicsPSO s_PSO(L"Probe Spheres");
     RootSignature s_LineRootSignature;
     GraphicsPSO s_LinePSO(L"Probe Distance Lines");
+    RootSignature s_RibbonRootSignature;
+    GraphicsPSO s_RibbonPSO(L"Probe Contribution Ribbons");
 
     __declspec(align(16)) struct Constants
     {
@@ -51,6 +64,16 @@ namespace
         uint32_t probe;
         DistanceLines lines;
         uint32_t distanceTexelsPerSide;
+    };
+
+    __declspec(align(16)) struct RibbonConstants
+    {
+        Matrix4 viewProj;
+        IrradianceProbeGrid grid;
+        XMFLOAT2 viewportSize;
+        float nearClip;
+        float normalLength;
+        uint32_t hoveredCorner;
     };
 
     float GetShortestSpacing(const IrradianceProbeGrid& grid)
@@ -94,6 +117,22 @@ void ProbeVisualization::Initialize(void)
     s_LinePSO.SetVertexShader(g_pProbeDistanceLineVS, sizeof(g_pProbeDistanceLineVS));
     s_LinePSO.SetPixelShader(g_pProbeDistanceLinePS, sizeof(g_pProbeDistanceLinePS));
     s_LinePSO.Finalize();
+
+    s_RibbonRootSignature.Reset(kNumRibbonRootParameters, 0);
+    s_RibbonRootSignature[kRibbonConstants].InitAsConstantBuffer(0);
+    s_RibbonRootSignature[kRibbonContribution].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 1, D3D12_SHADER_VISIBILITY_VERTEX);
+    s_RibbonRootSignature.Finalize(L"Probe Contribution Ribbons");
+
+    s_RibbonPSO.SetRootSignature(s_RibbonRootSignature);
+    s_RibbonPSO.SetRasterizerState(RasterizerTwoSided);
+    s_RibbonPSO.SetBlendState(BlendDisable);
+    s_RibbonPSO.SetDepthStencilState(DepthStateDisabled);
+    s_RibbonPSO.SetInputLayout(0, nullptr);
+    s_RibbonPSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+    s_RibbonPSO.SetRenderTargetFormat(g_SceneOverlayBuffer.GetFormat(), DXGI_FORMAT_UNKNOWN);
+    s_RibbonPSO.SetVertexShader(g_pProbeContributionRibbonVS, sizeof(g_pProbeContributionRibbonVS));
+    s_RibbonPSO.SetPixelShader(g_pProbeContributionRibbonPS, sizeof(g_pProbeContributionRibbonPS));
+    s_RibbonPSO.Finalize();
 }
 
 void ProbeVisualization::DrawSpheres(GraphicsContext& context, const Camera& camera, const D3D12_VIEWPORT& viewport, const D3D12_RECT& scissor,
@@ -190,4 +229,76 @@ void ProbeVisualization::DrawDistanceLines(GraphicsContext& context, const Camer
         context.SetDynamicConstantBufferView(kLineConstants, sizeof(constants), &constants);
         context.DrawInstanced(kVerticesPerLine, probes.raysPerProbe);
     }
+}
+
+void ProbeVisualization::DrawContribution(GraphicsContext& context, const Camera& camera, const IrradianceProbeGrid& grid, StructuredBuffer& contribution,
+    std::optional<uint32_t> hoveredCorner)
+{
+    ScopedTimer _prof(L"Probe Contribution Ribbons", context);
+
+    RibbonConstants constants;
+    constants.viewProj = camera.GetViewProjMatrix();
+    constants.grid = grid;
+    const uint32_t width = g_SceneOverlayBuffer.GetWidth();
+    const uint32_t height = g_SceneOverlayBuffer.GetHeight();
+    constants.viewportSize = XMFLOAT2((float)width, (float)height);
+    constants.nearClip = camera.GetNearClip();
+    constants.normalLength = kNormalLengthPerSpacing * GetShortestSpacing(grid);
+    constants.hoveredCorner = hoveredCorner.value_or(kNoHoveredCorner);
+
+    context.SetRootSignature(s_RibbonRootSignature);
+    context.SetPipelineState(s_RibbonPSO);
+    context.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    context.TransitionResource(contribution, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+    context.TransitionResource(g_SceneOverlayBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
+    context.SetRenderTarget(g_SceneOverlayBuffer.GetRTV());
+    context.SetViewportAndScissor(0, 0, width, height);
+    context.SetDynamicConstantBufferView(kRibbonConstants, sizeof(constants), &constants);
+    context.SetDynamicDescriptor(kRibbonContribution, 0, contribution.GetSRV());
+    context.DrawInstanced(kVerticesPerArrow, kNumContributionRibbons);
+}
+
+void ProbeVisualization::AnnotateContribution(const Camera& camera, const IrradianceProbeGrid& grid, const ProbeContribution::Surface& contribution,
+    std::optional<uint32_t> hoveredCorner)
+{
+    const ImU32 textColor = IM_COL32(255, 255, 255, 255);
+    const ImU32 backgroundColor = IM_COL32(0, 0, 0, 160);
+    const ImU32 hoveredBorderColor = IM_COL32(255, 140, 26, 255);
+    const float letterSize = ImGui::GetFontSize() * 1.5f;
+    const ImVec2 padding(4.0f, 2.0f);
+
+    const RECT scene = ImGuiLayer::GetSceneViewport();
+    ImDrawList* drawList = ImGui::GetBackgroundDrawList();
+    drawList->PushClipRect(ImVec2((float)scene.left, (float)scene.top), ImVec2((float)scene.right, (float)scene.bottom));
+    for (uint32_t corner = 0; corner < ProbeContribution::kNumCorners; ++corner)
+    {
+        const ProbeContribution::Corner& probe = contribution.corners[corner];
+        ImVec2 center;
+        if (!SceneEditor::ProjectToScene(camera, GetProbePosition(grid, GetProbeIndex(grid, probe.coordinate)), center))
+            continue;
+
+        const char letter[] = { ProbeContribution::GetCornerLetter(corner), '\0' };
+        char weight[16];
+        sprintf_s(weight, " %.1f%%", probe.weight * 100.0f);
+        const ImVec2 letterExtent = ImGui::GetFont()->CalcTextSizeA(letterSize, FLT_MAX, 0.0f, letter);
+        const ImVec2 weightExtent = ImGui::CalcTextSize(weight);
+        const ImVec2 origin(center.x + padding.x, center.y - letterExtent.y - padding.y);
+        const ImVec2 end(origin.x + letterExtent.x + weightExtent.x + 2.0f * padding.x, origin.y + letterExtent.y + 2.0f * padding.y);
+
+        drawList->AddRectFilled(origin, end, backgroundColor);
+        if (hoveredCorner == corner)
+            drawList->AddRect(origin, end, hoveredBorderColor, 0.0f, 0, 2.0f);
+        const ImVec2 letterPosition(origin.x + padding.x, origin.y + padding.y);
+        drawList->AddText(ImGui::GetFont(), letterSize, letterPosition, textColor, letter);
+        drawList->AddText(ImVec2(letterPosition.x + letterExtent.x, letterPosition.y + letterExtent.y - weightExtent.y), textColor, weight);
+    }
+
+    ImVec2 point;
+    if (SceneEditor::ProjectToScene(camera, Vector3(contribution.position.x, contribution.position.y, contribution.position.z), point))
+    {
+        const float pointRadius = 5.0f;
+        drawList->AddCircleFilled(point, pointRadius, IM_COL32(255, 255, 255, 255));
+        drawList->AddCircle(point, pointRadius, IM_COL32(0, 0, 0, 255), 0, 2.0f);
+    }
+    drawList->PopClipRect();
 }

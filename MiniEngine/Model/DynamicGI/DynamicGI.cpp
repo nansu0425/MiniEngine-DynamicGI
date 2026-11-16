@@ -1,5 +1,6 @@
 #include "Model/DynamicGI/DynamicGI.h"
 #include "Model/DynamicGI/PathTracedLighting.h"
+#include "Model/DynamicGI/ProbeContribution.h"
 #include "Model/DynamicGI/ProbeLighting.h"
 #include "Model/DynamicGI/ProbeVisualization.h"
 #include "Core/Automation/ControlChannel.h"
@@ -9,11 +10,13 @@
 #include "Model/Renderer/Renderer.h"
 #include "Core/Graphics/Command/CommandContext.h"
 #include "Core/Graphics/Resource/ColorBuffer.h"
+#include "Core/UI/ImGuiLayer.h"
 
 #include <imgui.h>
 #include <algorithm>
 #include <optional>
 #include <sstream>
+#include <vector>
 
 using namespace Graphics;
 
@@ -34,11 +37,28 @@ namespace
         ProbeLighting::Settings probe;
         bool pauseProbeUpdates = false;
         ProbeVisualization::Settings probeSpheres;
+        bool inspectPixel = false;
+    };
+
+    struct InspectedPixel
+    {
+        int x;
+        int y;
+        uint32_t captureId;
+    };
+
+    struct PendingPixelReply
+    {
+        uint32_t captureId;
+        ControlChannel::Reply reply;
     };
 
     Settings s_Settings;
     bool s_ProbeStepRequested = false;
     std::optional<uint32_t> s_SelectedProbe;
+    std::optional<InspectedPixel> s_InspectedPixel;
+    std::vector<PendingPixelReply> s_PendingPixelReplies;
+    std::optional<uint32_t> s_HoveredCorner;
 
     bool IsIndirectOn(void)
     {
@@ -52,13 +72,58 @@ namespace
         return s_SelectedProbe;
     }
 
+    std::string FormatCoordinate(const DirectX::XMUINT3& coordinate)
+    {
+        return std::to_string(coordinate.x) + " " + std::to_string(coordinate.y) + " " + std::to_string(coordinate.z);
+    }
+
     std::string FormatSelectedProbe(void)
     {
         const std::optional<uint32_t> probe = GetSelectedProbe();
         if (!probe)
             return "none";
-        const DirectX::XMUINT3 coordinate = GetProbeCoordinate(ProbeLighting::GetProbes().grid, *probe);
-        return std::to_string(coordinate.x) + " " + std::to_string(coordinate.y) + " " + std::to_string(coordinate.z);
+        return FormatCoordinate(GetProbeCoordinate(ProbeLighting::GetProbes().grid, *probe));
+    }
+
+    bool IsInspectingPixel(void)
+    {
+        return s_Settings.indirect == Source::kProbe && s_Settings.inspectPixel && s_InspectedPixel;
+    }
+
+    const ProbeContribution::Surface* GetInspectedContribution(void)
+    {
+        if (!IsInspectingPixel())
+            return nullptr;
+        const std::optional<ProbeContribution::Readback>& readback = ProbeContribution::GetReadback();
+        if (!readback || readback->captureId != s_InspectedPixel->captureId)
+            return nullptr;
+        return &readback->surface;
+    }
+
+    std::optional<std::string> InspectPixel(int x, int y)
+    {
+        const RECT scene = ImGuiLayer::GetSceneViewport();
+        if (x < scene.left || y < scene.top || x >= scene.right || y >= scene.bottom)
+        {
+            return "the pixel is not in the scene, which covers x from " + std::to_string(scene.left) + " to " + std::to_string(scene.right - 1) +
+                " and y from " + std::to_string(scene.top) + " to " + std::to_string(scene.bottom - 1) + " in client pixels";
+        }
+
+        const uint32_t captureId = ProbeContribution::CaptureSurface(DirectX::XMUINT2((uint32_t)(x - scene.left), (uint32_t)(y - scene.top)));
+        s_InspectedPixel = InspectedPixel{ x, y, captureId };
+        return std::nullopt;
+    }
+
+    std::string FormatRGB(const DirectX::XMFLOAT3& color)
+    {
+        char text[64];
+        sprintf_s(text, "%.4f %.4f %.4f", color.x, color.y, color.z);
+        return text;
+    }
+
+    DirectX::XMFLOAT3 Scale(const DirectX::XMFLOAT3& color, float scale)
+    {
+        return DirectX::XMFLOAT3(color.x * scale, color.y * scale, color.z * scale);
     }
 
     bool ShouldUpdateProbes(void)
@@ -125,6 +190,83 @@ namespace
             "Indirect Irradiance shows the probe irradiance from the shading normal, the same way Show Probes does, and needs the Probe source. "
             "Indirect Radiance shows the indirect light reflected toward the camera only. Without indirect light both views are black.");
         TuningSection::MakeItemResettable("View");
+    }
+
+    void ShowContributionTable(void)
+    {
+        if (!s_InspectedPixel)
+        {
+            ImGui::TextDisabled("Inspected Pixel: none");
+            return;
+        }
+        ImGui::Text("Inspected Pixel: %d %d", s_InspectedPixel->x, s_InspectedPixel->y);
+        const ProbeContribution::Surface* contribution = GetInspectedContribution();
+        if (contribution == nullptr)
+        {
+            ImGui::TextDisabled("Measuring the pixel.");
+            return;
+        }
+        if (contribution->hasSurface == 0)
+        {
+            ImGui::TextDisabled("No surface at the pixel.");
+            return;
+        }
+        if (contribution->ignoresVisibility != 0)
+            ImGui::TextWrapped("The visibility leaves out every probe, so the weights fall back to the trilinear weights as the shading does.");
+
+        const IrradianceProbeGrid& grid = ProbeLighting::GetProbes().grid;
+        const ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit;
+        if (!ImGui::BeginTable("Probe Contribution", 7, flags))
+            return;
+
+        ImGui::TableSetupColumn("Probe");
+        ImGui::TableSetupColumn("Weight");
+        ImGui::TableSetupColumn("Trilinear");
+        ImGui::TableSetupColumn("Visibility");
+        ImGui::TableSetupColumn("Irradiance");
+        ImGui::TableSetupColumn("Contribution");
+        ImGui::TableSetupColumn("Coordinate");
+        ImGui::TableHeadersRow();
+
+        float weightSum = 0.0f;
+        for (uint32_t corner = 0; corner < ProbeContribution::kNumCorners; ++corner)
+        {
+            const ProbeContribution::Corner& probe = contribution->corners[corner];
+            const uint32_t probeIndex = GetProbeIndex(grid, probe.coordinate);
+            weightSum += probe.weight;
+
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            const char letter[] = { ProbeContribution::GetCornerLetter(corner), '\0' };
+            if (ImGui::Selectable(letter, GetSelectedProbe() == probeIndex, ImGuiSelectableFlags_SpanAllColumns))
+                s_SelectedProbe = probeIndex;
+            if (ImGui::IsItemHovered())
+                s_HoveredCorner = corner;
+            ImGui::TableNextColumn();
+            ImGui::Text("%.1f%%", probe.weight * 100.0f);
+            ImGui::TableNextColumn();
+            ImGui::Text("%.3f", probe.trilinearWeight);
+            ImGui::TableNextColumn();
+            ImGui::Text("%.3f", probe.visibilityWeight);
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(FormatRGB(probe.irradiance).c_str());
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(FormatRGB(Scale(probe.irradiance, probe.weight)).c_str());
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(FormatCoordinate(probe.coordinate).c_str());
+        }
+
+        ImGui::TableNextRow();
+        ImGui::TableNextColumn();
+        ImGui::TextUnformatted("Sum");
+        ImGui::TableNextColumn();
+        ImGui::Text("%.1f%%", weightSum * 100.0f);
+        ImGui::TableSetColumnIndex(5);
+        ImGui::TextUnformatted(FormatRGB(contribution->irradiance).c_str());
+        ImGui::EndTable();
+
+        ImGui::Text("Shading Irradiance: %s", FormatRGB(contribution->shadingIrradiance).c_str());
+        ImGui::SetItemTooltip("The irradiance the shading function gives at the same point. It matches the sum of the contributions up to rounding.");
     }
 
     void ShowSettings(void)
@@ -238,6 +380,14 @@ namespace
         ImGui::SetItemTooltip("Draws a line from the selected probe along each ray of its last update, as long as the distance the ray recorded. "
             "Cyan rays hit something closer than the longest distance a probe keeps, and red rays did not.");
         TuningSection::MakeItemResettable("Show Ray Samples");
+        ImGui::Checkbox("Inspect Pixel", &s_Settings.inspectPixel);
+        ImGui::SetItemTooltip("Click a point of the scene other than a probe sphere to see the probes its irradiance interpolates. "
+            "A line from the point to each probe is as thick as the probe's weight, and dashed where the weight is 0. "
+            "A letter by each probe names its row in the table below. Hover a row to pick out its line, and click it to select its probe. "
+            "The gray lines are the cell of the probes and the green line is the shading normal. The point stays as the camera moves.");
+        TuningSection::MakeItemResettable("Inspect Pixel");
+        if (s_Settings.inspectPixel)
+            ShowContributionTable();
         ImGui::EndDisabled();
         ClampSettings();
     }
@@ -276,6 +426,7 @@ namespace
         values["Show Texel Means"] = FormatFlag(probeSpheres.showTexelMeans);
         values["Show Texel Distances"] = FormatFlag(probeSpheres.showTexelDistances);
         values["Show Ray Samples"] = FormatFlag(probeSpheres.showRaySamples);
+        values["Inspect Pixel"] = FormatFlag(s_Settings.inspectPixel);
     }
 
     void ReadUInt(const TuningSection::Values& values, const char* key, uint32_t& value)
@@ -341,7 +492,56 @@ namespace
         ReadFlag(values, "Show Texel Means", probeSpheres.showTexelMeans);
         ReadFlag(values, "Show Texel Distances", probeSpheres.showTexelDistances);
         ReadFlag(values, "Show Ray Samples", probeSpheres.showRaySamples);
+        ReadFlag(values, "Inspect Pixel", s_Settings.inspectPixel);
         ClampSettings();
+    }
+
+    ControlChannel::Fields DescribeVector(const DirectX::XMFLOAT3& vector)
+    {
+        return ControlChannel::Fields().Float("x", vector.x).Float("y", vector.y).Float("z", vector.z);
+    }
+
+    ControlChannel::Fields DescribeColor(const DirectX::XMFLOAT3& color)
+    {
+        return ControlChannel::Fields().Float("r", color.x).Float("g", color.y).Float("b", color.z);
+    }
+
+    ControlChannel::Fields DescribePixel(void)
+    {
+        ControlChannel::Fields fields;
+        fields.Flag("inspect", s_Settings.inspectPixel);
+        if (!s_InspectedPixel)
+            return fields.Text("selected", "none");
+
+        fields.Object("selected", ControlChannel::Fields().Integer("x", s_InspectedPixel->x).Integer("y", s_InspectedPixel->y));
+        const ProbeContribution::Surface* contribution = GetInspectedContribution();
+        fields.Flag("measured", contribution != nullptr);
+        if (contribution == nullptr)
+            return fields;
+        fields.Flag("surface", contribution->hasSurface != 0);
+        if (contribution->hasSurface == 0)
+            return fields;
+
+        ControlChannel::Fields probes;
+        for (uint32_t corner = 0; corner < ProbeContribution::kNumCorners; ++corner)
+        {
+            const ProbeContribution::Corner& probe = contribution->corners[corner];
+            probes.Object(std::string(1, ProbeContribution::GetCornerLetter(corner)), ControlChannel::Fields()
+                .Text("coordinate", FormatCoordinate(probe.coordinate))
+                .Float("trilinear", probe.trilinearWeight)
+                .Float("visibility", probe.visibilityWeight)
+                .Float("weight", probe.weight)
+                .Object("irradiance", DescribeColor(probe.irradiance))
+                .Object("contribution", DescribeColor(Scale(probe.irradiance, probe.weight))));
+        }
+        return fields
+            .Object("position", DescribeVector(contribution->position))
+            .Object("geometry_normal", DescribeVector(contribution->geometryNormal))
+            .Object("shading_normal", DescribeVector(contribution->shadingNormal))
+            .Flag("ignores_visibility", contribution->ignoresVisibility != 0)
+            .Object("irradiance", DescribeColor(contribution->irradiance))
+            .Object("shading_irradiance", DescribeColor(contribution->shadingIrradiance))
+            .Object("probes", probes);
     }
 
     ControlChannel::Fields DescribeState(void)
@@ -359,7 +559,8 @@ namespace
                 .Flag("paused", s_Settings.pauseProbeUpdates)
                 .Text("selected", FormatSelectedProbe())
                 .Integer("updates", ProbeLighting::GetProgress().updates)
-                .Integer("resets", ProbeLighting::GetProgress().resets));
+                .Integer("resets", ProbeLighting::GetProgress().resets)
+                .Object("pixel", DescribePixel()));
     }
 
     TuningSection s_Section("Dynamic GI", ShowSettings, SaveSettings, LoadSettings);
@@ -398,12 +599,70 @@ namespace
         ReplyWithStateAfterFrame(reply);
     }
 
+    void SelectPixel(const std::string& pixelText, const ControlChannel::Reply& reply)
+    {
+        if (pixelText == "none")
+        {
+            s_InspectedPixel.reset();
+            ReplyWithStateAfterFrame(reply);
+            return;
+        }
+        if (s_Settings.indirect != Source::kProbe)
+        {
+            reply.Error("Indirect is not Probe");
+            return;
+        }
+        if (!s_Settings.inspectPixel)
+        {
+            reply.Error("Inspect Pixel is off");
+            return;
+        }
+
+        std::istringstream stream(pixelText);
+        int x = 0, y = 0;
+        std::string rest;
+        if (!(stream >> x >> y) || stream >> rest)
+        {
+            reply.Error("expected <x> <y> or none: " + pixelText);
+            return;
+        }
+        if (const std::optional<std::string> error = InspectPixel(x, y))
+        {
+            reply.Error(*error);
+            return;
+        }
+        s_PendingPixelReplies.push_back({ s_InspectedPixel->captureId, reply });
+    }
+
+    void ReplyToMeasuredPixelSelections(void)
+    {
+        const std::optional<ProbeContribution::Readback>& readback = ProbeContribution::GetReadback();
+        std::erase_if(s_PendingPixelReplies, [&readback](const PendingPixelReply& pending)
+        {
+            if (!IsInspectingPixel())
+            {
+                pending.reply.Error("the pixel stopped being inspected before it was measured");
+                return true;
+            }
+            if (!readback || readback->captureId < pending.captureId)
+                return false;
+            pending.reply.Ok(ControlChannel::Fields().Object("state", ControlChannel::GetState("gi")));
+            return true;
+        });
+    }
+
     void HandleGICommand(const std::string& arguments, const ControlChannel::Reply& reply)
     {
         const std::string selectPrefix = "probe select ";
         if (arguments.rfind(selectPrefix, 0) == 0)
         {
             SelectProbe(arguments.substr(selectPrefix.size()), reply);
+            return;
+        }
+        const std::string pixelPrefix = "pixel select ";
+        if (arguments.rfind(pixelPrefix, 0) == 0)
+        {
+            SelectPixel(arguments.substr(pixelPrefix.size()), reply);
             return;
         }
         if (arguments != "probe step")
@@ -432,6 +691,7 @@ void DynamicGI::Initialize(void)
     PathTracedLighting::Initialize();
     ProbeLighting::Initialize();
     ProbeVisualization::Initialize();
+    ProbeContribution::Initialize();
 
     const ProbeLighting::Probes probes = ProbeLighting::GetProbes();
     TextureViewer::AddTexture("Probes Irradiance", probes.irradiance);
@@ -442,15 +702,23 @@ void DynamicGI::Initialize(void)
     TextureViewer::AddTexture("Path Traced Indirect Radiance", PathTracedLighting::GetIndirectRadiance());
 
     ControlChannel::RegisterState("gi", DescribeState);
-    ControlChannel::Register("gi", "gi probe step | gi probe select <x> <y> <z>|none. "
+    ControlChannel::Register("gi", "gi probe step | gi probe select <x> <y> <z>|none | gi pixel select <x> <y>|none. "
         "step updates the probes once on the next frame while Pause Updates is on, as the Step button does, "
         "and fails unless Indirect is Probe and Pause Updates is on. "
-        "select selects the probe at a grid coordinate, or clears the selection, as clicking a probe sphere or elsewhere in the scene does. "
-        "The lines of the selected probe are drawn while Show Probes is on. Both reply with state gi after the next frame", HandleGICommand);
+        "probe select selects the probe at a grid coordinate, or clears the selection, as clicking a probe sphere or elsewhere in the scene does. "
+        "The lines of the selected probe are drawn while Show Probes is on. Both reply with state gi after the next frame. "
+        "pixel select inspects the surface at a client pixel, as clicking the scene off the probe spheres does while Inspect Pixel is on, "
+        "and fails unless Indirect is Probe and Inspect Pixel is on. The pixel must be in the scene, not under the UI. "
+        "It replies with state gi once the surface is measured: probe.pixel has the eight probes the irradiance of the surface interpolates, "
+        "named A to H as the letters in the scene, each with its grid coordinate, trilinear weight, visibility weight, the weight the interpolation "
+        "gives it after the visibility, its irradiance toward the shading normal and that irradiance times the weight. "
+        "irradiance is the sum of those and shading_irradiance what the shading reads there. "
+        "pixel select none clears the pixel and replies after the next frame", HandleGICommand);
 }
 
 void DynamicGI::Shutdown(void)
 {
+    ProbeContribution::Shutdown();
     ProbeLighting::Shutdown();
     PathTracedLighting::Shutdown();
 }
@@ -499,12 +767,29 @@ void DynamicGI::Update(ComputeContext& context, const GIFrameInputs& inputs, uin
     Renderer::SetShadingOutput(s_Settings.view);
 }
 
-void DynamicGI::UpdateProbeSelection(const Math::Camera& camera)
+void DynamicGI::UpdateSceneInspection(const Math::Camera& camera)
 {
-    if (s_Settings.indirect != Source::kProbe || !s_Settings.probeSpheres.show || !SceneEditor::IsSceneClicked())
+    if (s_Settings.indirect != Source::kProbe)
         return;
 
-    s_SelectedProbe = ProbeVisualization::FindProbeUnderCursor(camera, ProbeLighting::GetProbes().grid, s_Settings.probeSpheres.radiusPerSpacing);
+    const IrradianceProbeGrid& grid = ProbeLighting::GetProbes().grid;
+    if (SceneEditor::IsSceneClicked())
+    {
+        const bool showsProbes = s_Settings.probeSpheres.show;
+        const std::optional<uint32_t> probe =
+            showsProbes ? ProbeVisualization::FindProbeUnderCursor(camera, grid, s_Settings.probeSpheres.radiusPerSpacing) : std::nullopt;
+        if (s_Settings.inspectPixel && !probe)
+        {
+            const ImVec2 cursor = ImGui::GetMousePos();
+            InspectPixel((int)floorf(cursor.x), (int)floorf(cursor.y));
+        }
+        else if (showsProbes)
+            s_SelectedProbe = probe;
+    }
+
+    const ProbeContribution::Surface* contribution = GetInspectedContribution();
+    if (contribution != nullptr && contribution->hasSurface != 0)
+        ProbeVisualization::AnnotateContribution(camera, grid, *contribution, s_HoveredCorner);
 }
 
 void DynamicGI::DrawProbes(GraphicsContext& context, const Math::Camera& camera, const D3D12_VIEWPORT& viewport, const D3D12_RECT& scissor)
@@ -517,4 +802,19 @@ void DynamicGI::DrawProbes(GraphicsContext& context, const Math::Camera& camera,
 
     if (const std::optional<uint32_t> probe = GetSelectedProbe())
         ProbeVisualization::DrawDistanceLines(context, camera, viewport, scissor, probes, *probe, s_Settings.probeSpheres);
+}
+
+void DynamicGI::DrawProbeOverlay(GraphicsContext& context, const Math::Camera& camera)
+{
+    const ProbeContribution::Surface* contribution = GetInspectedContribution();
+    if (contribution != nullptr && contribution->hasSurface != 0)
+        ProbeVisualization::DrawContribution(context, camera, ProbeLighting::GetProbes().grid, ProbeContribution::GetSurfaceBuffer(), s_HoveredCorner);
+    s_HoveredCorner.reset();
+}
+
+void DynamicGI::MeasureProbeContribution(const RaytracingScene& scene)
+{
+    if (IsInspectingPixel() && GetProbeCount(ProbeLighting::GetProbes().grid) != 0)
+        ProbeContribution::Measure(s_Settings.probe.visibility, scene);
+    ReplyToMeasuredPixelSelections();
 }
