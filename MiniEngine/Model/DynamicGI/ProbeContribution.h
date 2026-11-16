@@ -16,6 +16,7 @@ namespace ProbeContribution
         DirectX::XMUINT3 coordinate;
         float trilinearWeight;
         float visibilityWeight;
+        float facingWeight;
         float weight;
         DirectX::XMFLOAT3 irradiance;
         float distance;

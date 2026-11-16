@@ -46,6 +46,7 @@ void main()
         contribution.coordinate = probes.corners[corner].coordinate;
         contribution.trilinearWeight = probes.corners[corner].trilinearWeight;
         contribution.visibilityWeight = probes.visibilityWeights[corner];
+        contribution.facingWeight = probes.facingWeights[corner];
         contribution.weight = probes.weights[corner] / probes.weightSum;
         contribution.irradiance = SampleProbeIrradiance(ProbesIrradiance, LinearClamp, Grid, contribution.coordinate, result.shadingNormal);
         const ProbeDistanceSample distanceSample = SampleProbeDistance(distanceAtlas, LinearClamp, Grid, contribution.coordinate, result.position);
