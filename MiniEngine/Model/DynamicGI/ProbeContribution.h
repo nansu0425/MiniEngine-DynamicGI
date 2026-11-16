@@ -29,6 +29,7 @@ namespace ProbeContribution
     {
         uint32_t hasSurface;
         DirectX::XMFLOAT3 position;
+        DirectX::XMFLOAT3 distanceLookupPosition;
         DirectX::XMFLOAT3 geometryNormal;
         DirectX::XMFLOAT3 shadingNormal;
         uint32_t comparesDistance;

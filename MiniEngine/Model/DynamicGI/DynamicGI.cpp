@@ -161,6 +161,7 @@ namespace
     constexpr float kMaxDistanceSharpness = 100.0f;
     constexpr uint32_t kMaxDistanceTexelsPerSide = 32;
     constexpr float kMaxRadiusPerSpacing = 0.5f;
+    constexpr float kMaxSelfShadowBias = 0.5f;
 
     // Source의 순서이고, Engine Tuning의 저장과 settings 명령이 이 이름으로 읽고 쓴다.
     const char* kSourceNames[] = { "Off", "Path Traced", "Probe" };
@@ -183,6 +184,7 @@ namespace
         probe.distanceSharpness = std::max(1.0f, std::min(probe.distanceSharpness, kMaxDistanceSharpness));
         probe.distanceTexelsPerSide = std::max(1u, std::min(probe.distanceTexelsPerSide, kMaxDistanceTexelsPerSide));
         probe.backFaceDistanceScale = std::max(0.0f, std::min(probe.backFaceDistanceScale, 1.0f));
+        probe.weighting.selfShadowBias = std::max(0.0f, std::min(probe.weighting.selfShadowBias, kMaxSelfShadowBias));
         probe.weighting.minFacingWeight = std::max(0.0f, std::min(probe.weighting.minFacingWeight, 1.0f));
         probe.weighting.maxBackFaceRatio = std::max(0.0f, std::min(probe.weighting.maxBackFaceRatio, 1.0f));
 
@@ -395,6 +397,11 @@ namespace
             "Shadow Ray traces a ray from the point to each probe and keeps the probes it reaches. "
             "Chebyshev weights each probe by how likely the distances it stored toward the point leave the point visible.");
         TuningSection::MakeItemResettable("Visibility");
+        ImGui::SliderFloat("Self Shadow Bias", &probe.weighting.selfShadowBias, 0.0f, kMaxSelfShadowBias);
+        ImGui::SetItemTooltip("While Visibility is Chebyshev, compares the distances the probes stored with a point this far off the surface "
+            "along its geometry normal, as a fraction of the shortest probe spacing, instead of the surface point. "
+            "A probe the surface faces then sees the point in front of the distances it stored, and a probe behind the surface beyond them.");
+        TuningSection::MakeItemResettable("Self Shadow Bias");
         ImGui::Checkbox("Facing Weight", &probe.weighting.facing);
         ImGui::SetItemTooltip("Weights each probe by how far it lies in front of the surface, along the normal Facing Normal picks, "
             "so the probes behind a thin wall or cloth give less than the ones the surface faces.");
@@ -463,7 +470,9 @@ namespace
         ImGui::SetItemTooltip("Click a point of the scene other than a probe sphere to see the probes its irradiance interpolates. "
             "A line from the point to each probe is as thick as the probe's weight, and dashed where the weight is 0. "
             "A letter by each probe names its row in the table below. Hover a row to pick out its line, and click it to select its probe. "
-            "The gray lines are the cell of the probes and the green line is the shading normal. The point stays as the camera moves.");
+            "The gray lines are the cell of the probes and the light blue arrow is the shading normal. "
+            "While Visibility is Chebyshev, the lines to the probes start from the point Self Shadow Bias moves off the surface, "
+            "which a green arrow from the surface points to. The point stays as the camera moves.");
         TuningSection::MakeItemResettable("Inspect Pixel");
         if (s_Settings.inspectPixel)
             ShowContributionTable();
@@ -497,6 +506,7 @@ namespace
         values["Distance Texels per Side"] = std::to_string(probe.distanceTexelsPerSide);
         values["Back Face Distance Scale"] = MeasurementConditions::FormatFloat(probe.backFaceDistanceScale);
         values["Visibility"] = kVisibilityNames[(int)probe.weighting.visibility];
+        values["Self Shadow Bias"] = MeasurementConditions::FormatFloat(probe.weighting.selfShadowBias);
         values["Facing Weight"] = FormatFlag(probe.weighting.facing);
         values["Min Facing Weight"] = MeasurementConditions::FormatFloat(probe.weighting.minFacingWeight);
         values["Facing Normal"] = kFacingNormalNames[(int)probe.weighting.facingNormal];
@@ -568,6 +578,7 @@ namespace
         ReadUInt(values, "Distance Texels per Side", probe.distanceTexelsPerSide);
         ReadFloat(values, "Back Face Distance Scale", probe.backFaceDistanceScale);
         ReadName(values, "Visibility", kVisibilityNames, probe.weighting.visibility);
+        ReadFloat(values, "Self Shadow Bias", probe.weighting.selfShadowBias);
         ReadFlag(values, "Facing Weight", probe.weighting.facing);
         ReadFloat(values, "Min Facing Weight", probe.weighting.minFacingWeight);
         ReadName(values, "Facing Normal", kFacingNormalNames, probe.weighting.facingNormal);
@@ -632,6 +643,7 @@ namespace
         }
         return fields
             .Object("position", DescribeVector(contribution->position))
+            .Object("distance_lookup_position", DescribeVector(contribution->distanceLookupPosition))
             .Object("geometry_normal", DescribeVector(contribution->geometryNormal))
             .Object("shading_normal", DescribeVector(contribution->shadingNormal))
             .Flag("falls_back_to_trilinear", contribution->fallsBackToTrilinear != 0)
@@ -652,6 +664,7 @@ namespace
                 .Integer("resets", progress.resets))
             .Object("probe", ControlChannel::Fields()
                 .Text("visibility", kVisibilityNames[(int)s_Settings.probe.weighting.visibility])
+                .Float("self_shadow_bias", s_Settings.probe.weighting.selfShadowBias)
                 .Flag("paused", s_Settings.pauseProbeUpdates)
                 .Text("selected", FormatSelectedProbe())
                 .Integer("updates", ProbeLighting::GetProgress().updates)
@@ -812,8 +825,9 @@ void DynamicGI::Initialize(void)
         "and fails unless Indirect is Probe and Inspect Pixel is on. The pixel must be in the scene, not under the UI. "
         "It replies with state gi once the surface is measured: probe.pixel has the eight probes the irradiance of the surface interpolates, "
         "named A to H as the letters in the scene, each with its grid coordinate, trilinear weight, back face ratio, whether Probe Classification keeps it in the interpolation (always while Probe Classification is off), visibility weight, facing weight (1 while Facing Weight is off), "
-        "the distance from the probe to the surface and the distance mean the probe stores toward the surface while Visibility is Chebyshev, "
+        "the distance from the probe to distance_lookup_position and the distance mean the probe stores toward it while Visibility is Chebyshev, "
         "the weight the interpolation gives it after the classification, visibility and facing weights, its irradiance toward the shading normal and that irradiance times the weight. "
+        "distance_lookup_position is the point Self Shadow Bias moves off the surface while Visibility is Chebyshev, and the surface point otherwise. "
         "irradiance is the sum of those and shading_irradiance what the shading reads there. "
         "pixel select none clears the pixel and replies after the next frame", HandleGICommand);
 }

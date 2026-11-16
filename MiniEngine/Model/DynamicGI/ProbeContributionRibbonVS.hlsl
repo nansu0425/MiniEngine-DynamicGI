@@ -6,6 +6,7 @@ static const float3 kCornerColor = float3(1.0, 0.55, 0.1);
 static const float3 kCellEdgeColor = float3(0.6, 0.6, 0.6);
 static const float3 kNormalColor = float3(0.3, 0.75, 1.0);
 static const float3 kDistanceMeanColor = float3(1.0, 0.2, 1.0);
+static const float3 kDistanceLookupColor = float3(0.3, 1.0, 0.4);
 static const float kUnhoveredCornerBrightness = 0.25;
 static const float kOccludedCornerPixels = 1.5;
 static const float kMinCornerPixels = 2.0;
@@ -13,6 +14,7 @@ static const float kMaxCornerPixels = 12.0;
 static const float kCellEdgePixels = 1.0;
 static const float kNormalPixels = 2.0;
 static const float kDistanceMeanPixels = 2.0;
+static const float kDistanceLookupPixels = 2.0;
 static const float kArrowHeadLengthPixels = 12.0;
 static const float kArrowHeadWidthPixels = 10.0;
 static const float kDistanceMeanGapPixels = 3.0;
@@ -64,7 +66,7 @@ Ribbon DescribeRibbon(SurfaceProbeContribution contribution, uint index)
     if (index < kFirstCellEdgeRibbon)
     {
         const float weight = contribution.corners[index].weight;
-        ribbon.start = contribution.position;
+        ribbon.start = contribution.distanceLookupPosition;
         ribbon.end = GetCornerPosition(contribution, index);
         ribbon.dashed = weight == 0.0;
         ribbon.pixels = GetCornerPixels(weight);
@@ -88,17 +90,26 @@ Ribbon DescribeRibbon(SurfaceProbeContribution contribution, uint index)
         ribbon.color = kNormalColor;
         ribbon.head = kArrowHead;
     }
-    else
+    else if (index < kDistanceLookupRibbon)
     {
         const uint corner = index - kFirstDistanceMeanRibbon;
         const ProbeCornerContribution probe = contribution.corners[corner];
         ribbon.start = GetCornerPosition(contribution, corner);
-        ribbon.end = ribbon.start + normalize(contribution.position - ribbon.start) * probe.distanceMean;
+        ribbon.end = ribbon.start + normalize(contribution.distanceLookupPosition - ribbon.start) * probe.distanceMean;
         ribbon.pixels = kDistanceMeanPixels;
         ribbon.sidePixels = 0.5 * GetCornerPixels(probe.weight) + kDistanceMeanGapPixels + 0.5 * kDistanceMeanPixels;
         ribbon.color = kDistanceMeanColor;
         ribbon.head = kPointerHead;
         ribbon.hidden = contribution.comparesDistance == 0 || (HoveredCorner != kNoHoveredCorner && HoveredCorner != corner);
+    }
+    else
+    {
+        ribbon.start = contribution.position;
+        ribbon.end = contribution.distanceLookupPosition;
+        ribbon.pixels = kDistanceLookupPixels;
+        ribbon.color = kDistanceLookupColor;
+        ribbon.head = kArrowHead;
+        ribbon.hidden = all(ribbon.start == ribbon.end);
     }
     return ribbon;
 }

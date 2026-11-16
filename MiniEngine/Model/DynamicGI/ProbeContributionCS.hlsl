@@ -39,6 +39,7 @@ void main()
     const ProbeVolume volume = MakeProbeVolume(Grid, ProbesIrradiance, distanceAtlas, ProbesBackFaceRatio);
     const ProbeLookupSurface lookupSurface = MakeProbeLookupSurface(result.position, result.geometryNormal, result.shadingNormal);
     const WeightedProbeCorners probes = GetWeightedProbeCorners(Weighting, volume, LinearClamp, lookupSurface);
+    result.distanceLookupPosition = probes.distanceLookupPosition;
     result.comparesDistance = Weighting.visibility == kProbeVisibilityChebyshev;
     result.fallsBackToTrilinear = probes.fallsBackToTrilinear;
     result.irradiance = 0.0;
@@ -54,7 +55,7 @@ void main()
         contribution.facingWeight = probes.facingWeights[corner];
         contribution.weight = probes.weights[corner] / probes.weightSum;
         contribution.irradiance = SampleProbeIrradiance(ProbesIrradiance, LinearClamp, Grid, contribution.coordinate, result.shadingNormal);
-        const ProbeDistanceSample distanceSample = SampleProbeDistance(volume, LinearClamp, contribution.coordinate, result.position);
+        const ProbeDistanceSample distanceSample = SampleProbeDistance(volume, LinearClamp, contribution.coordinate, result.distanceLookupPosition);
         contribution.distance = distanceSample.distance;
         contribution.distanceMean = distanceSample.moments.x;
         result.irradiance += contribution.weight * contribution.irradiance;

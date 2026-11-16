@@ -8,6 +8,7 @@
 struct ProbeWeighting
 {
     uint visibility;
+    float selfShadowBias;
     uint facing;
     float minFacingWeight;
     uint facingNormal;
@@ -22,6 +23,7 @@ bool InterpolatesTrilinearly(ProbeWeighting weighting)
 
 struct WeightedProbeCorners
 {
+    float3 distanceLookupPosition;
     IrradianceProbeCorner corners[kNumProbeCorners];
     float activeWeights[kNumProbeCorners];
     float visibilityWeights[kNumProbeCorners];
@@ -35,6 +37,8 @@ WeightedProbeCorners GetWeightedProbeCorners(ProbeWeighting weighting, ProbeVolu
 {
     const float3 facingNormal = weighting.facingNormal == kProbeFacingNormalShading ? surface.shadingNormal : surface.geometryNormal;
     WeightedProbeCorners probes;
+    probes.distanceLookupPosition = weighting.visibility == kProbeVisibilityChebyshev ?
+        GetDistanceLookupPosition(weighting.selfShadowBias, volume.grid, surface) : surface.position;
     probes.weightSum = 0.0;
     [unroll]
     for (uint corner = 0; corner < kNumProbeCorners; ++corner)
@@ -42,7 +46,8 @@ WeightedProbeCorners GetWeightedProbeCorners(ProbeWeighting weighting, ProbeVolu
         probes.corners[corner] = GetIrradianceProbeCorner(volume.grid, surface.position, corner);
         probes.activeWeights[corner] = GetProbeActiveWeight(weighting.classification, weighting.maxBackFaceRatio, volume.backFaceRatios, volume.grid,
             probes.corners[corner].coordinate);
-        probes.visibilityWeights[corner] = GetProbeVisibilityWeight(weighting.visibility, volume, linearClamp, probes.corners[corner].coordinate, surface);
+        probes.visibilityWeights[corner] = GetProbeVisibilityWeight(weighting.visibility, volume, linearClamp, probes.corners[corner].coordinate, surface,
+            probes.distanceLookupPosition);
         probes.facingWeights[corner] = weighting.facing != 0 ?
             GetProbeFacingWeight(weighting.minFacingWeight, volume.grid, probes.corners[corner].coordinate, surface.position, facingNormal) : 1.0;
         probes.weights[corner] =

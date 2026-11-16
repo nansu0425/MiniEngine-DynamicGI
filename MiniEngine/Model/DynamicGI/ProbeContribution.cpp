@@ -16,7 +16,7 @@ using namespace Graphics;
 
 namespace
 {
-    static_assert(sizeof(ProbeContribution::Surface) == 520, "ProbeContribution.hlsli의 SurfaceProbeContribution과 크기가 다르다");
+    static_assert(sizeof(ProbeContribution::Surface) == 532, "ProbeContribution.hlsli의 SurfaceProbeContribution과 크기가 다르다");
 
     enum RootParameter { kConstants, kScene, kInputs = kScene + RaytracingScene::kNumRootParameters, kOutputs, kNumRootParameters };
 

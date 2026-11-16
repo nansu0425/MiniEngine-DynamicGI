@@ -10,6 +10,7 @@ namespace ProbeWeighting
     struct Settings
     {
         Visibility visibility = Visibility::kNone;
+        float selfShadowBias = 0.0f;
         bool facing = true;
         float minFacingWeight = 0.2f;
         FacingNormal facingNormal = FacingNormal::kShading;
@@ -20,6 +21,7 @@ namespace ProbeWeighting
     __declspec(align(16)) struct Constants
     {
         uint32_t visibility;
+        float selfShadowBias;
         uint32_t facing;
         float minFacingWeight;
         uint32_t facingNormal;
@@ -31,6 +33,7 @@ namespace ProbeWeighting
     {
         return {
             .visibility = (uint32_t)settings.visibility,
+            .selfShadowBias = settings.selfShadowBias,
             .facing = settings.facing ? 1u : 0u,
             .minFacingWeight = settings.minFacingWeight,
             .facingNormal = (uint32_t)settings.facingNormal,

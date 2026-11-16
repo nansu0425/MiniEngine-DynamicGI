@@ -47,12 +47,19 @@ float GetChebyshevVisibility(ProbeDistanceSample distanceSample)
     return variance / (variance + excess * excess);
 }
 
-float GetProbeVisibilityWeight(uint visibility, ProbeVolume volume, SamplerState linearClamp, uint3 coordinate, ProbeLookupSurface surface)
+float3 GetDistanceLookupPosition(float selfShadowBias, IrradianceProbeGrid grid, ProbeLookupSurface surface)
+{
+    const float shortestSpacing = min(grid.spacing.x, min(grid.spacing.y, grid.spacing.z));
+    return surface.position + surface.geometryNormal * (selfShadowBias * shortestSpacing);
+}
+
+float GetProbeVisibilityWeight(uint visibility, ProbeVolume volume, SamplerState linearClamp, uint3 coordinate, ProbeLookupSurface surface,
+    float3 distanceLookupPosition)
 {
     if (visibility == kProbeVisibilityShadowRay)
         return CanShadowRayReachProbe(volume.grid, coordinate, surface.position, surface.geometryNormal) ? 1.0 : 0.0;
     if (visibility == kProbeVisibilityChebyshev)
-        return GetChebyshevVisibility(SampleProbeDistance(volume, linearClamp, coordinate, surface.position));
+        return GetChebyshevVisibility(SampleProbeDistance(volume, linearClamp, coordinate, distanceLookupPosition));
     return 1.0;
 }
 

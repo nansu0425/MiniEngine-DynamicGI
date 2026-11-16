@@ -21,6 +21,7 @@ struct SurfaceProbeContribution
 {
     uint hasSurface;
     float3 position;
+    float3 distanceLookupPosition;
     float3 geometryNormal;
     float3 shadingNormal;
     uint comparesDistance;
