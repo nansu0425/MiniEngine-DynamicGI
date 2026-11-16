@@ -11,6 +11,7 @@ namespace ProbeWeighting
     {
         Visibility visibility = Visibility::kNone;
         float selfShadowBias = 0.0f;
+        float chebyshevExponent = 1.0f;
         bool facing = true;
         float minFacingWeight = 0.2f;
         FacingNormal facingNormal = FacingNormal::kShading;
@@ -22,6 +23,7 @@ namespace ProbeWeighting
     {
         uint32_t visibility;
         float selfShadowBias;
+        float chebyshevExponent;
         uint32_t facing;
         float minFacingWeight;
         uint32_t facingNormal;
@@ -34,6 +36,7 @@ namespace ProbeWeighting
         return {
             .visibility = (uint32_t)settings.visibility,
             .selfShadowBias = settings.selfShadowBias,
+            .chebyshevExponent = settings.chebyshevExponent,
             .facing = settings.facing ? 1u : 0u,
             .minFacingWeight = settings.minFacingWeight,
             .facingNormal = (uint32_t)settings.facingNormal,

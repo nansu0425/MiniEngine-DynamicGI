@@ -162,6 +162,7 @@ namespace
     constexpr uint32_t kMaxDistanceTexelsPerSide = 32;
     constexpr float kMaxRadiusPerSpacing = 0.5f;
     constexpr float kMaxSelfShadowBias = 0.5f;
+    constexpr float kMaxChebyshevExponent = 8.0f;
 
     // Source의 순서이고, Engine Tuning의 저장과 settings 명령이 이 이름으로 읽고 쓴다.
     const char* kSourceNames[] = { "Off", "Path Traced", "Probe" };
@@ -185,6 +186,7 @@ namespace
         probe.distanceTexelsPerSide = std::max(1u, std::min(probe.distanceTexelsPerSide, kMaxDistanceTexelsPerSide));
         probe.backFaceDistanceScale = std::max(0.0f, std::min(probe.backFaceDistanceScale, 1.0f));
         probe.weighting.selfShadowBias = std::max(0.0f, std::min(probe.weighting.selfShadowBias, kMaxSelfShadowBias));
+        probe.weighting.chebyshevExponent = std::max(1.0f, std::min(probe.weighting.chebyshevExponent, kMaxChebyshevExponent));
         probe.weighting.minFacingWeight = std::max(0.0f, std::min(probe.weighting.minFacingWeight, 1.0f));
         probe.weighting.maxBackFaceRatio = std::max(0.0f, std::min(probe.weighting.maxBackFaceRatio, 1.0f));
 
@@ -402,6 +404,10 @@ namespace
             "along its geometry normal, as a fraction of the shortest probe spacing, instead of the surface point. "
             "A probe the surface faces then sees the point in front of the distances it stored, and a probe behind the surface beyond them.");
         TuningSection::MakeItemResettable("Self Shadow Bias");
+        ImGui::SliderFloat("Chebyshev Exponent", &probe.weighting.chebyshevExponent, 1.0f, kMaxChebyshevExponent);
+        ImGui::SetItemTooltip("While Visibility is Chebyshev, raises the visibility weight of each probe to this power. "
+            "A point within the distances a probe stored keeps the weight 1, and a point beyond them loses weight faster than with 1.");
+        TuningSection::MakeItemResettable("Chebyshev Exponent");
         ImGui::Checkbox("Facing Weight", &probe.weighting.facing);
         ImGui::SetItemTooltip("Weights each probe by how far it lies in front of the surface, along the normal Facing Normal picks, "
             "so the probes behind a thin wall or cloth give less than the ones the surface faces.");
@@ -507,6 +513,7 @@ namespace
         values["Back Face Distance Scale"] = MeasurementConditions::FormatFloat(probe.backFaceDistanceScale);
         values["Visibility"] = kVisibilityNames[(int)probe.weighting.visibility];
         values["Self Shadow Bias"] = MeasurementConditions::FormatFloat(probe.weighting.selfShadowBias);
+        values["Chebyshev Exponent"] = MeasurementConditions::FormatFloat(probe.weighting.chebyshevExponent);
         values["Facing Weight"] = FormatFlag(probe.weighting.facing);
         values["Min Facing Weight"] = MeasurementConditions::FormatFloat(probe.weighting.minFacingWeight);
         values["Facing Normal"] = kFacingNormalNames[(int)probe.weighting.facingNormal];
@@ -579,6 +586,7 @@ namespace
         ReadFloat(values, "Back Face Distance Scale", probe.backFaceDistanceScale);
         ReadName(values, "Visibility", kVisibilityNames, probe.weighting.visibility);
         ReadFloat(values, "Self Shadow Bias", probe.weighting.selfShadowBias);
+        ReadFloat(values, "Chebyshev Exponent", probe.weighting.chebyshevExponent);
         ReadFlag(values, "Facing Weight", probe.weighting.facing);
         ReadFloat(values, "Min Facing Weight", probe.weighting.minFacingWeight);
         ReadName(values, "Facing Normal", kFacingNormalNames, probe.weighting.facingNormal);
@@ -665,6 +673,7 @@ namespace
             .Object("probe", ControlChannel::Fields()
                 .Text("visibility", kVisibilityNames[(int)s_Settings.probe.weighting.visibility])
                 .Float("self_shadow_bias", s_Settings.probe.weighting.selfShadowBias)
+                .Float("chebyshev_exponent", s_Settings.probe.weighting.chebyshevExponent)
                 .Flag("paused", s_Settings.pauseProbeUpdates)
                 .Text("selected", FormatSelectedProbe())
                 .Integer("updates", ProbeLighting::GetProgress().updates)
