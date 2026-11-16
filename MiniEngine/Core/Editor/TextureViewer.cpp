@@ -821,6 +821,13 @@ void TextureViewer::AddTexture(const std::string& name, ColorBuffer& texture, co
     s_Textures.push_back({ name, &texture, annotation });
 }
 
+std::optional<DirectX::XMUINT2> TextureViewer::GetInspectedTexel(const ColorBuffer& texture)
+{
+    if (!s_ShowPanel || s_Textures.empty() || s_Textures[s_Selected].texture != &texture || !s_InspectTarget || !IsInside(texture, *s_InspectTarget))
+        return std::nullopt;
+    return DirectX::XMUINT2((uint32_t)s_InspectTarget->x, (uint32_t)s_InspectTarget->y);
+}
+
 void TextureViewer::Show(void)
 {
     ImGuiLayer::ShowPanel("Texture Viewer", s_ShowPanel, ShowContent);

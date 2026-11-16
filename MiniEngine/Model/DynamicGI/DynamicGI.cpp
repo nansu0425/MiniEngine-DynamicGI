@@ -93,6 +93,15 @@ namespace
         return "probe " + FormatCoordinate(GetProbeCoordinate(grid, texel.y)) + ", ray " + std::to_string(texel.x);
     }
 
+    std::optional<uint32_t> FindInspectedRayOfSelectedProbe(void)
+    {
+        const std::optional<uint32_t> probe = GetSelectedProbe();
+        const std::optional<DirectX::XMUINT2> texel = TextureViewer::GetInspectedTexel(ProbeLighting::GetProbes().raySamples);
+        if (!probe || !texel || texel->y != *probe)
+            return std::nullopt;
+        return texel->x;
+    }
+
     bool IsInspectingPixel(void)
     {
         return s_Settings.indirect == Source::kProbe && s_Settings.inspectPixel && s_InspectedPixel;
@@ -446,7 +455,9 @@ namespace
         TuningSection::MakeItemResettable("Show Texel Distances");
         ImGui::Checkbox("Show Ray Samples", &probeSpheres.showRaySamples);
         ImGui::SetItemTooltip("Draws a line from the selected probe along each ray of its last update, as long as the distance the ray recorded. "
-            "Cyan rays hit something closer than the longest distance a probe keeps, and red rays did not.");
+            "Cyan rays hit something closer than the longest distance a probe keeps, and red rays did not. "
+            "While the Texture Viewer shows Probe Ray Samples with a texel of the selected probe's row inspected, "
+            "the ray of that texel is white and the other lines are faint.");
         TuningSection::MakeItemResettable("Show Ray Samples");
         ImGui::Checkbox("Inspect Pixel", &s_Settings.inspectPixel);
         ImGui::SetItemTooltip("Click a point of the scene other than a probe sphere to see the probes its irradiance interpolates. "
@@ -896,7 +907,7 @@ void DynamicGI::DrawProbeOverlay(GraphicsContext& context, const Math::Camera& c
 {
     const std::optional<uint32_t> probe = GetSelectedProbe();
     if (s_Settings.indirect == Source::kProbe && s_Settings.probeSpheres.show && probe)
-        ProbeVisualization::DrawDistanceLines(context, camera, ProbeLighting::GetProbes(), *probe, s_Settings.probeSpheres);
+        ProbeVisualization::DrawDistanceLines(context, camera, ProbeLighting::GetProbes(), *probe, s_Settings.probeSpheres, FindInspectedRayOfSelectedProbe());
 
     const ProbeContribution::Surface* contribution = GetInspectedContribution();
     if (contribution != nullptr && contribution->hasSurface != 0)

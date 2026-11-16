@@ -16,12 +16,16 @@ cbuffer Constants : register(b0)
     uint Probe;
     uint Lines;
     uint DistanceTexelsPerSide;
+    uint HighlightedRay;
 };
+
+static const uint kNoHighlightedRay = 0xffffffff;
 
 struct ProbeDistanceLineVertex
 {
     float4 position : SV_Position;
     nointerpolation float3 color : Color;
+    nointerpolation float opacity : Opacity;
 };
 
 #endif

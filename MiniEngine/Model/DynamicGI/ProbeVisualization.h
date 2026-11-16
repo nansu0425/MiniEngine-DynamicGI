@@ -33,7 +33,7 @@ namespace ProbeVisualization
     std::optional<uint32_t> FindProbeUnderCursor(const Math::Camera& camera, const IrradianceProbeGrid& grid, float radiusPerSpacing);
 
     void DrawDistanceLines(GraphicsContext& context, const Math::Camera& camera, const ProbeLighting::Probes& probes, uint32_t probe,
-        const Settings& settings);
+        const Settings& settings, std::optional<uint32_t> highlightedRay);
 
     void DrawContribution(GraphicsContext& context, const Math::Camera& camera, const IrradianceProbeGrid& grid, StructuredBuffer& contribution,
         std::optional<uint32_t> hoveredCorner);

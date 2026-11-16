@@ -2,5 +2,5 @@
 
 float4 main(ProbeDistanceLineVertex vertex) : SV_Target0
 {
-    return float4(vertex.color, 1.0);
+    return float4(vertex.color * vertex.opacity, vertex.opacity);
 }

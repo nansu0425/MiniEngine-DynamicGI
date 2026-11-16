@@ -21,5 +21,7 @@ namespace TextureViewer
 
     void AddTexture(const std::string& name, ColorBuffer& texture, const Annotation& annotation = {});
 
+    std::optional<DirectX::XMUINT2> GetInspectedTexel(const ColorBuffer& texture);
+
     void Show(void);
 }

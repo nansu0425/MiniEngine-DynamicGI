@@ -8,6 +8,25 @@ static const float3 kTexelMeanColor = float3(1.0, 0.85, 0.0);
 static const float3 kTexelDistanceColor = float3(1.0, 0.0, 1.0);
 static const float3 kRaySampleColor = float3(0.0, 0.8, 1.0);
 static const float3 kRaySampleAtMaxDistanceColor = float3(1.0, 0.0, 0.0);
+static const float3 kHighlightedRaySampleColor = float3(1.0, 1.0, 1.0);
+static const float kOpacityBesideHighlightedRay = 0.2;
+
+float3 GetRaySampleColor(uint ray, float distance)
+{
+    if (ray == HighlightedRay)
+        return kHighlightedRaySampleColor;
+    return distance >= GetProbeRayMaxDistance(Grid) ? kRaySampleAtMaxDistanceColor : kRaySampleColor;
+}
+
+bool IsHighlightedRay(uint lineIndex)
+{
+    return Lines == kProbeDistanceLinesOfRaySamples && lineIndex == HighlightedRay;
+}
+
+float GetLineOpacity(uint lineIndex)
+{
+    return HighlightedRay == kNoHighlightedRay || IsHighlightedRay(lineIndex) ? 1.0 : kOpacityBesideHighlightedRay;
+}
 
 ProbeDistanceLineVertex main(uint vertexID : SV_VertexID, uint lineIndex : SV_InstanceID)
 {
@@ -32,8 +51,10 @@ ProbeDistanceLineVertex main(uint vertexID : SV_VertexID, uint lineIndex : SV_In
         rays.raysPerProbe = RaysPerProbe;
         direction = GetProbeRayDirection(rays, lineIndex);
         distance = RaySamples[uint2(lineIndex, Probe)].a;
-        vertex.color = distance >= GetProbeRayMaxDistance(Grid) ? kRaySampleAtMaxDistanceColor : kRaySampleColor;
+        vertex.color = GetRaySampleColor(lineIndex, distance);
     }
+
+    vertex.opacity = GetLineOpacity(lineIndex);
 
     const float3 position = GetProbePosition(Grid, coordinate) + direction * distance * vertexID;
     vertex.position = mul(ViewProj, float4(position, 1.0));

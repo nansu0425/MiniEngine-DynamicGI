@@ -38,6 +38,7 @@ namespace
     constexpr uint32_t kNumCellEdges = 12;
     constexpr uint32_t kNumContributionRibbons = ProbeContribution::kNumCorners + kNumCellEdges + 1 + ProbeContribution::kNumCorners;
     constexpr uint32_t kNoHoveredCorner = 0xffffffff;
+    constexpr uint32_t kNoHighlightedRay = 0xffffffff;
     constexpr float kNormalLengthPerSpacing = 0.5f;
 
     RootSignature s_RootSignature;
@@ -66,6 +67,7 @@ namespace
         uint32_t probe;
         DistanceLines lines;
         uint32_t distanceTexelsPerSide;
+        uint32_t highlightedRay;
     };
 
     __declspec(align(16)) struct RibbonConstants
@@ -111,7 +113,7 @@ void ProbeVisualization::Initialize(void)
 
     s_LinePSO.SetRootSignature(s_LineRootSignature);
     s_LinePSO.SetRasterizerState(RasterizerTwoSided);
-    s_LinePSO.SetBlendState(BlendDisable);
+    s_LinePSO.SetBlendState(BlendPreMultiplied);
     s_LinePSO.SetDepthStencilState(DepthStateReadOnly);
     s_LinePSO.SetInputLayout(0, nullptr);
     s_LinePSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE);
@@ -191,7 +193,7 @@ std::optional<uint32_t> ProbeVisualization::FindProbeUnderCursor(const Camera& c
 }
 
 void ProbeVisualization::DrawDistanceLines(GraphicsContext& context, const Camera& camera, const ProbeLighting::Probes& probes, uint32_t probe,
-    const Settings& settings)
+    const Settings& settings, std::optional<uint32_t> highlightedRay)
 {
     ScopedTimer _prof(L"Probe Distance Lines", context);
 
@@ -202,6 +204,7 @@ void ProbeVisualization::DrawDistanceLines(GraphicsContext& context, const Camer
     constants.raysPerProbe = probes.raysPerProbe;
     constants.probe = probe;
     constants.distanceTexelsPerSide = probes.distanceTexelsPerSide;
+    constants.highlightedRay = highlightedRay.value_or(kNoHighlightedRay);
 
     context.SetRootSignature(s_LineRootSignature);
     context.SetPipelineState(s_LinePSO);
