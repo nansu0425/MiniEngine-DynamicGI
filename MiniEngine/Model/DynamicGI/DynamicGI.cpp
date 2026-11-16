@@ -128,6 +128,12 @@ namespace
         return &readback->surface;
     }
 
+    const ProbeContribution::Surface* FindLastMeasuredContribution(void)
+    {
+        const std::optional<ProbeContribution::Readback>& readback = ProbeContribution::GetReadback();
+        return readback ? &readback->surface : nullptr;
+    }
+
     std::optional<std::string> FindWhyProbesAreOff(void)
     {
         if (s_Settings.indirect != Source::kProbe)
@@ -234,8 +240,11 @@ namespace
         const ProbeContribution::Surface* contribution = GetInspectedContribution();
         if (contribution == nullptr)
         {
-            ImGui::TextDisabled("Measuring the pixel.");
-            return;
+            ImGui::SameLine();
+            ImGui::TextDisabled("(measuring, the table shows the last measured pixel)");
+            contribution = FindLastMeasuredContribution();
+            if (contribution == nullptr)
+                return;
         }
         if (contribution->hasSurface == 0)
         {
