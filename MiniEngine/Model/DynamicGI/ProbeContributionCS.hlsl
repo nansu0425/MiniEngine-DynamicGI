@@ -48,6 +48,8 @@ void main()
         ProbeCornerContribution contribution;
         contribution.coordinate = probes.corners[corner].coordinate;
         contribution.trilinearWeight = probes.corners[corner].trilinearWeight;
+        contribution.backFaceRatio = GetProbeBackFaceRatio(ProbesBackFaceRatio, Grid, contribution.coordinate);
+        contribution.activeWeight = probes.activeWeights[corner];
         contribution.visibilityWeight = probes.visibilityWeights[corner];
         contribution.facingWeight = probes.facingWeights[corner];
         contribution.weight = probes.weights[corner] / probes.weightSum;

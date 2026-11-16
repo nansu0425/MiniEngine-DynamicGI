@@ -28,7 +28,7 @@ namespace ProbeVisualization
     void Initialize(void);
 
     void DrawSpheres(GraphicsContext& context, const Math::Camera& camera, const D3D12_VIEWPORT& viewport, const D3D12_RECT& scissor,
-        const ProbeLighting::Probes& probes, float radiusPerSpacing);
+        const ProbeLighting::Probes& probes, const ProbeWeighting::Settings& weighting, float radiusPerSpacing);
 
     std::optional<uint32_t> FindProbeUnderCursor(const Math::Camera& camera, const IrradianceProbeGrid& grid, float radiusPerSpacing);
 

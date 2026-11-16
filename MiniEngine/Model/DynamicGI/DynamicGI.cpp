@@ -196,6 +196,7 @@ namespace
     }
 
     const ImVec4 kOccludingMeanColor(1.0f, 0.4f, 0.3f, 1.0f);
+    const ImVec4 kInactiveProbeColor(1.0f, 0.2f, 0.2f, 1.0f);
 
     void ShowDistanceCell(bool comparesDistance, float distance)
     {
@@ -224,19 +225,24 @@ namespace
             ImGui::TextDisabled("No surface at the pixel.");
             return;
         }
-        if (contribution->fallsBackToTrilinear != 0)
+        const bool hasActiveProbe = std::any_of(std::begin(contribution->corners), std::end(contribution->corners),
+            [](const ProbeContribution::Corner& probe) { return probe.activeWeight != 0.0f; });
+        if (!hasActiveProbe)
+            ImGui::TextWrapped("No probe around the point is active, so the point gets no indirect light.");
+        else if (contribution->fallsBackToTrilinear != 0)
             ImGui::TextWrapped("The visibility and facing weights leave out every probe, so the weights fall back to the trilinear weights "
                 "of the active probes as the shading does.");
 
         const IrradianceProbeGrid& grid = ProbeLighting::GetProbes().grid;
         const ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit;
         const bool comparesDistance = contribution->comparesDistance != 0;
-        if (!ImGui::BeginTable("Probe Contribution", 10, flags))
+        if (!ImGui::BeginTable("Probe Contribution", 11, flags))
             return;
 
         ImGui::TableSetupColumn("Probe");
         ImGui::TableSetupColumn("Weight");
         ImGui::TableSetupColumn("Trilinear");
+        ImGui::TableSetupColumn("Back Face");
         ImGui::TableSetupColumn("Visibility");
         ImGui::TableSetupColumn("Facing");
         ImGui::TableSetupColumn("Distance");
@@ -265,6 +271,11 @@ namespace
             ImGui::TableNextColumn();
             ImGui::Text("%.3f", probe.trilinearWeight);
             ImGui::TableNextColumn();
+            if (probe.activeWeight == 0.0f)
+                ImGui::TextColored(kInactiveProbeColor, "%.3f", probe.backFaceRatio);
+            else
+                ImGui::Text("%.3f", probe.backFaceRatio);
+            ImGui::TableNextColumn();
             ImGui::Text("%.3f", probe.visibilityWeight);
             ImGui::TableNextColumn();
             ImGui::Text("%.3f", probe.facingWeight);
@@ -288,7 +299,7 @@ namespace
         ImGui::TextUnformatted("Sum");
         ImGui::TableNextColumn();
         ImGui::Text("%.1f%%", weightSum * 100.0f);
-        ImGui::TableSetColumnIndex(8);
+        ImGui::TableSetColumnIndex(9);
         ImGui::TextUnformatted(FormatRGB(contribution->irradiance).c_str());
         ImGui::EndTable();
 
@@ -588,6 +599,8 @@ namespace
             ControlChannel::Fields fieldsOfProbe = ControlChannel::Fields()
                 .Text("coordinate", FormatCoordinate(probe.coordinate))
                 .Float("trilinear", probe.trilinearWeight)
+                .Float("back_face_ratio", probe.backFaceRatio)
+                .Flag("active", probe.activeWeight != 0.0f)
                 .Float("visibility", probe.visibilityWeight)
                 .Float("facing", probe.facingWeight);
             if (contribution->comparesDistance != 0)
@@ -775,9 +788,9 @@ void DynamicGI::Initialize(void)
         "pixel select inspects the surface at a client pixel, as clicking the scene off the probe spheres does while Inspect Pixel is on, "
         "and fails unless Indirect is Probe and Inspect Pixel is on. The pixel must be in the scene, not under the UI. "
         "It replies with state gi once the surface is measured: probe.pixel has the eight probes the irradiance of the surface interpolates, "
-        "named A to H as the letters in the scene, each with its grid coordinate, trilinear weight, visibility weight, facing weight (1 while Facing Weight is off), "
+        "named A to H as the letters in the scene, each with its grid coordinate, trilinear weight, back face ratio, whether Probe Classification keeps it in the interpolation (always while Probe Classification is off), visibility weight, facing weight (1 while Facing Weight is off), "
         "the distance from the probe to the surface and the distance mean the probe stores toward the surface while Visibility is Chebyshev, "
-        "the weight the interpolation gives it after the visibility and facing weights, its irradiance toward the shading normal and that irradiance times the weight. "
+        "the weight the interpolation gives it after the classification, visibility and facing weights, its irradiance toward the shading normal and that irradiance times the weight. "
         "irradiance is the sum of those and shading_irradiance what the shading reads there. "
         "pixel select none clears the pixel and replies after the next frame", HandleGICommand);
 }
@@ -864,7 +877,7 @@ void DynamicGI::DrawProbes(GraphicsContext& context, const Math::Camera& camera,
         return;
 
     const ProbeLighting::Probes probes = ProbeLighting::GetProbes();
-    ProbeVisualization::DrawSpheres(context, camera, viewport, scissor, probes, s_Settings.probeSpheres.radiusPerSpacing);
+    ProbeVisualization::DrawSpheres(context, camera, viewport, scissor, probes, s_Settings.probe.weighting, s_Settings.probeSpheres.radiusPerSpacing);
 
     if (const std::optional<uint32_t> probe = GetSelectedProbe())
         ProbeVisualization::DrawDistanceLines(context, camera, viewport, scissor, probes, *probe, s_Settings.probeSpheres);

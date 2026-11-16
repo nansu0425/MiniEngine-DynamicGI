@@ -1,6 +1,10 @@
 #include "Model/DynamicGI/ProbeSphere.hlsli"
+#include "Model/DynamicGI/ProbeClassification.hlsli"
+
+static const float kInactiveRingCosine = 0.35;
 
 Texture2D<float4> ProbesIrradiance : register(t0);
+Texture2D<float> ProbesBackFaceRatio : register(t1);
 SamplerState LinearClamp : register(s0);
 
 struct ProbeQuadPixel
@@ -28,7 +32,9 @@ ProbeQuadPixel main(ProbeQuadVertex vertex)
     
     // probe의 normal 방향 irradiance를 구하고, quad 뒤에 있는 교점의 depth를 구한다
     ProbeQuadPixel pixel;
-    pixel.color = float4(SampleProbeIrradiance(ProbesIrradiance, LinearClamp, Grid, vertex.probeCoordinate, normal), 1.0);
+    const bool inactive = GetProbeActiveWeight(Classification, MaxBackFaceRatio, ProbesBackFaceRatio, Grid, vertex.probeCoordinate) == 0.0;
+    pixel.color = inactive && dot(normal, -direction) < kInactiveRingCosine ?
+        float4(1.0, 0.0, 0.0, 1.0) : float4(SampleProbeIrradiance(ProbesIrradiance, LinearClamp, Grid, vertex.probeCoordinate, normal), 1.0);
     pixel.depth = min(clipPosition.z / clipPosition.w, vertex.position.z);
     
     return pixel;

@@ -7,6 +7,8 @@ struct ProbeCornerContribution
 {
     uint3 coordinate;
     float trilinearWeight;
+    float backFaceRatio;
+    float activeWeight;
     float visibilityWeight;
     float facingWeight;
     float weight;

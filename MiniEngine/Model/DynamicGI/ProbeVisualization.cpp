@@ -53,6 +53,8 @@ namespace
         IrradianceProbeGrid grid;
         XMFLOAT3 cameraPosition;
         float radius;
+        uint32_t classification;
+        float maxBackFaceRatio;
     };
 
     __declspec(align(16)) struct LineConstants
@@ -86,7 +88,7 @@ void ProbeVisualization::Initialize(void)
 {
     s_RootSignature.Reset(kNumRootParameters, 1);
     s_RootSignature[kConstants].InitAsConstantBuffer(0);
-    s_RootSignature[kIrradiance].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 1, D3D12_SHADER_VISIBILITY_PIXEL);
+    s_RootSignature[kIrradiance].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 2, D3D12_SHADER_VISIBILITY_PIXEL);
     s_RootSignature.InitStaticSampler(0, SamplerLinearClampDesc, D3D12_SHADER_VISIBILITY_PIXEL);
     s_RootSignature.Finalize(L"Probe Spheres");
 
@@ -136,7 +138,7 @@ void ProbeVisualization::Initialize(void)
 }
 
 void ProbeVisualization::DrawSpheres(GraphicsContext& context, const Camera& camera, const D3D12_VIEWPORT& viewport, const D3D12_RECT& scissor,
-    const ProbeLighting::Probes& probes, float radiusPerSpacing)
+    const ProbeLighting::Probes& probes, const ProbeWeighting::Settings& weighting, float radiusPerSpacing)
 {
     ScopedTimer _prof(L"Probe Spheres", context);
 
@@ -145,6 +147,8 @@ void ProbeVisualization::DrawSpheres(GraphicsContext& context, const Camera& cam
     constants.grid = probes.grid;
     XMStoreFloat3(&constants.cameraPosition, camera.GetPosition());
     constants.radius = radiusPerSpacing * GetShortestSpacing(probes.grid);
+    constants.classification = weighting.classification ? 1u : 0u;
+    constants.maxBackFaceRatio = weighting.maxBackFaceRatio;
 
     context.SetRootSignature(s_RootSignature);
     context.SetPipelineState(s_PSO);
@@ -155,6 +159,7 @@ void ProbeVisualization::DrawSpheres(GraphicsContext& context, const Camera& cam
     context.SetViewportAndScissor(viewport, scissor);
     context.SetDynamicConstantBufferView(kConstants, sizeof(constants), &constants);
     context.SetDynamicDescriptor(kIrradiance, 0, probes.irradiance.GetSRV());
+    context.SetDynamicDescriptor(kIrradiance, 1, probes.backFaceRatio.GetSRV());
     context.DrawInstanced(kVerticesPerQuad, GetProbeCount(probes.grid));
 }
 

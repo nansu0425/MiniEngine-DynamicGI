@@ -9,6 +9,8 @@ cbuffer Constants : register(b0)
     IrradianceProbeGrid Grid;
     float3 CameraPosition;
     float Radius;
+    uint Classification;
+    float MaxBackFaceRatio;
 };
 
 struct ProbeQuadVertex
