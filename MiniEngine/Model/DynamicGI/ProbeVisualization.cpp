@@ -36,7 +36,7 @@ namespace
     enum RibbonRootParameter { kRibbonConstants, kRibbonContribution, kNumRibbonRootParameters };
 
     constexpr uint32_t kNumCellEdges = 12;
-    constexpr uint32_t kNumContributionRibbons = ProbeContribution::kNumCorners + kNumCellEdges + 1;
+    constexpr uint32_t kNumContributionRibbons = ProbeContribution::kNumCorners + kNumCellEdges + 1 + ProbeContribution::kNumCorners;
     constexpr uint32_t kNoHoveredCorner = 0xffffffff;
     constexpr float kNormalLengthPerSpacing = 0.5f;
 

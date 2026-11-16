@@ -5,25 +5,40 @@ StructuredBuffer<SurfaceProbeContribution> Contribution : register(t0);
 static const float3 kCornerColor = float3(1.0, 0.55, 0.1);
 static const float3 kCellEdgeColor = float3(0.6, 0.6, 0.6);
 static const float3 kNormalColor = float3(0.3, 0.75, 1.0);
+static const float3 kDistanceMeanColor = float3(1.0, 0.2, 1.0);
 static const float kUnhoveredCornerBrightness = 0.25;
 static const float kOccludedCornerPixels = 1.5;
 static const float kMinCornerPixels = 2.0;
 static const float kMaxCornerPixels = 12.0;
 static const float kCellEdgePixels = 1.0;
 static const float kNormalPixels = 2.0;
+static const float kDistanceMeanPixels = 2.0;
 static const float kArrowHeadLengthPixels = 12.0;
 static const float kArrowHeadWidthPixels = 10.0;
+static const float kDistanceMeanGapPixels = 3.0;
+static const float kPointerWidthPixels = 8.0;
 static const uint kNumShaftVertices = 6;
+
+static const uint kNoHead = 0;
+static const uint kArrowHead = 1;
+static const uint kPointerHead = 2;
 
 struct Ribbon
 {
     float3 start;
     float3 end;
     float pixels;
+    float sidePixels;
     float3 color;
     bool dashed;
-    bool arrow;
+    uint head;
+    bool hidden;
 };
+
+float GetCornerPixels(float weight)
+{
+    return weight == 0.0 ? kOccludedCornerPixels : lerp(kMinCornerPixels, kMaxCornerPixels, weight);
+}
 
 float3 GetCornerPosition(SurfaceProbeContribution contribution, uint corner)
 {
@@ -42,15 +57,17 @@ uint2 GetCellEdgeCorners(uint edge)
 Ribbon DescribeRibbon(SurfaceProbeContribution contribution, uint index)
 {
     Ribbon ribbon;
+    ribbon.sidePixels = 0.0;
     ribbon.dashed = false;
-    ribbon.arrow = false;
+    ribbon.head = kNoHead;
+    ribbon.hidden = false;
     if (index < kFirstCellEdgeRibbon)
     {
         const float weight = contribution.corners[index].weight;
         ribbon.start = contribution.position;
         ribbon.end = GetCornerPosition(contribution, index);
         ribbon.dashed = weight == 0.0;
-        ribbon.pixels = ribbon.dashed ? kOccludedCornerPixels : lerp(kMinCornerPixels, kMaxCornerPixels, weight);
+        ribbon.pixels = GetCornerPixels(weight);
         ribbon.color = kCornerColor;
         if (HoveredCorner != kNoHoveredCorner && HoveredCorner != index)
             ribbon.color *= kUnhoveredCornerBrightness;
@@ -63,13 +80,25 @@ Ribbon DescribeRibbon(SurfaceProbeContribution contribution, uint index)
         ribbon.pixels = kCellEdgePixels;
         ribbon.color = kCellEdgeColor;
     }
-    else
+    else if (index < kFirstDistanceMeanRibbon)
     {
         ribbon.start = contribution.position;
         ribbon.end = contribution.position + contribution.shadingNormal * NormalLength;
         ribbon.pixels = kNormalPixels;
         ribbon.color = kNormalColor;
-        ribbon.arrow = true;
+        ribbon.head = kArrowHead;
+    }
+    else
+    {
+        const uint corner = index - kFirstDistanceMeanRibbon;
+        const ProbeCornerContribution probe = contribution.corners[corner];
+        ribbon.start = GetCornerPosition(contribution, corner);
+        ribbon.end = ribbon.start + normalize(contribution.position - ribbon.start) * probe.distanceMean;
+        ribbon.pixels = kDistanceMeanPixels;
+        ribbon.sidePixels = 0.5 * GetCornerPixels(probe.weight) + kDistanceMeanGapPixels + 0.5 * kDistanceMeanPixels;
+        ribbon.color = kDistanceMeanColor;
+        ribbon.head = kPointerHead;
+        ribbon.hidden = contribution.comparesDistance == 0 || (HoveredCorner != kNoHoveredCorner && HoveredCorner != corner);
     }
     return ribbon;
 }
@@ -102,7 +131,7 @@ ProbeContributionRibbonVertex main(uint vertexID : SV_VertexID, uint index : SV_
 
     float4 start = mul(ViewProj, float4(ribbon.start, 1.0));
     float4 end = mul(ViewProj, float4(ribbon.end, 1.0));
-    if (!ClipToNearPlane(start, end) || (vertexID >= kNumShaftVertices && !ribbon.arrow))
+    if (ribbon.hidden || !ClipToNearPlane(start, end) || (vertexID >= kNumShaftVertices && ribbon.head == kNoHead))
         return vertex;
 
     const float2 startPixel = start.xy / start.w * 0.5 * ViewportSize;
@@ -110,14 +139,18 @@ ProbeContributionRibbonVertex main(uint vertexID : SV_VertexID, uint index : SV_
     const float pixelLength = length(endPixel - startPixel);
     const float2 along = pixelLength > 0.0 ? (endPixel - startPixel) / pixelLength : float2(1.0, 0.0);
     const float2 across = float2(-along.y, along.x);
-    const float headLength = ribbon.arrow ? min(kArrowHeadLengthPixels, pixelLength) : 0.0;
+    const float headLength = ribbon.head == kArrowHead ? min(kArrowHeadLengthPixels, pixelLength) : 0.0;
 
     if (vertexID >= kNumShaftVertices)
     {
         const float headSide[3] = { 0.0, -1.0, 1.0 };
         const uint headVertex = vertexID - kNumShaftVertices;
-        vertex.position = headVertex == 0 ? end :
-            OffsetByPixels(end, -along * headLength + across * headSide[headVertex] * kArrowHeadWidthPixels * 0.5);
+        if (headVertex == 0)
+            vertex.position = end;
+        else if (ribbon.head == kArrowHead)
+            vertex.position = OffsetByPixels(end, -along * headLength + across * headSide[headVertex] * kArrowHeadWidthPixels * 0.5);
+        else
+            vertex.position = OffsetByPixels(end, across * ribbon.sidePixels + along * headSide[headVertex] * kPointerWidthPixels * 0.5);
         return vertex;
     }
 
@@ -125,7 +158,7 @@ ProbeContributionRibbonVertex main(uint vertexID : SV_VertexID, uint index : SV_
     const float shaftSide[6] = { -1.0, -1.0, 1.0, 1.0, -1.0, 1.0 };
     const bool atEnd = shaftAtEnd[vertexID] != 0;
     const float4 shaftEnd = OffsetByPixels(end, -along * headLength);
-    vertex.position = OffsetByPixels(atEnd ? shaftEnd : start, across * shaftSide[vertexID] * ribbon.pixels * 0.5);
+    vertex.position = OffsetByPixels(atEnd ? shaftEnd : start, across * (ribbon.sidePixels + shaftSide[vertexID] * ribbon.pixels * 0.5));
     vertex.pixelsAlong = atEnd ? pixelLength - headLength : 0.0;
     return vertex;
 }

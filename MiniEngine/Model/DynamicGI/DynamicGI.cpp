@@ -192,6 +192,16 @@ namespace
         TuningSection::MakeItemResettable("View");
     }
 
+    const ImVec4 kOccludingMeanColor(1.0f, 0.4f, 0.3f, 1.0f);
+
+    void ShowDistanceCell(bool comparesDistance, float distance)
+    {
+        if (comparesDistance)
+            ImGui::Text("%.3f", distance);
+        else
+            ImGui::TextDisabled("-");
+    }
+
     void ShowContributionTable(void)
     {
         if (!s_InspectedPixel)
@@ -216,13 +226,16 @@ namespace
 
         const IrradianceProbeGrid& grid = ProbeLighting::GetProbes().grid;
         const ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit;
-        if (!ImGui::BeginTable("Probe Contribution", 7, flags))
+        const bool comparesDistance = contribution->comparesDistance != 0;
+        if (!ImGui::BeginTable("Probe Contribution", 9, flags))
             return;
 
         ImGui::TableSetupColumn("Probe");
         ImGui::TableSetupColumn("Weight");
         ImGui::TableSetupColumn("Trilinear");
         ImGui::TableSetupColumn("Visibility");
+        ImGui::TableSetupColumn("Distance");
+        ImGui::TableSetupColumn("Mean");
         ImGui::TableSetupColumn("Irradiance");
         ImGui::TableSetupColumn("Contribution");
         ImGui::TableSetupColumn("Coordinate");
@@ -249,6 +262,13 @@ namespace
             ImGui::TableNextColumn();
             ImGui::Text("%.3f", probe.visibilityWeight);
             ImGui::TableNextColumn();
+            ShowDistanceCell(comparesDistance, probe.distance);
+            ImGui::TableNextColumn();
+            if (comparesDistance && probe.distance > probe.distanceMean)
+                ImGui::TextColored(kOccludingMeanColor, "%.3f", probe.distanceMean);
+            else
+                ShowDistanceCell(comparesDistance, probe.distanceMean);
+            ImGui::TableNextColumn();
             ImGui::TextUnformatted(FormatRGB(probe.irradiance).c_str());
             ImGui::TableNextColumn();
             ImGui::TextUnformatted(FormatRGB(Scale(probe.irradiance, probe.weight)).c_str());
@@ -261,7 +281,7 @@ namespace
         ImGui::TextUnformatted("Sum");
         ImGui::TableNextColumn();
         ImGui::Text("%.1f%%", weightSum * 100.0f);
-        ImGui::TableSetColumnIndex(5);
+        ImGui::TableSetColumnIndex(7);
         ImGui::TextUnformatted(FormatRGB(contribution->irradiance).c_str());
         ImGui::EndTable();
 
@@ -526,13 +546,17 @@ namespace
         for (uint32_t corner = 0; corner < ProbeContribution::kNumCorners; ++corner)
         {
             const ProbeContribution::Corner& probe = contribution->corners[corner];
-            probes.Object(std::string(1, ProbeContribution::GetCornerLetter(corner)), ControlChannel::Fields()
+            ControlChannel::Fields fieldsOfProbe = ControlChannel::Fields()
                 .Text("coordinate", FormatCoordinate(probe.coordinate))
                 .Float("trilinear", probe.trilinearWeight)
-                .Float("visibility", probe.visibilityWeight)
+                .Float("visibility", probe.visibilityWeight);
+            if (contribution->comparesDistance != 0)
+                fieldsOfProbe.Float("distance", probe.distance).Float("distance_mean", probe.distanceMean);
+            fieldsOfProbe
                 .Float("weight", probe.weight)
                 .Object("irradiance", DescribeColor(probe.irradiance))
-                .Object("contribution", DescribeColor(Scale(probe.irradiance, probe.weight))));
+                .Object("contribution", DescribeColor(Scale(probe.irradiance, probe.weight)));
+            probes.Object(std::string(1, ProbeContribution::GetCornerLetter(corner)), fieldsOfProbe);
         }
         return fields
             .Object("position", DescribeVector(contribution->position))
@@ -710,8 +734,9 @@ void DynamicGI::Initialize(void)
         "pixel select inspects the surface at a client pixel, as clicking the scene off the probe spheres does while Inspect Pixel is on, "
         "and fails unless Indirect is Probe and Inspect Pixel is on. The pixel must be in the scene, not under the UI. "
         "It replies with state gi once the surface is measured: probe.pixel has the eight probes the irradiance of the surface interpolates, "
-        "named A to H as the letters in the scene, each with its grid coordinate, trilinear weight, visibility weight, the weight the interpolation "
-        "gives it after the visibility, its irradiance toward the shading normal and that irradiance times the weight. "
+        "named A to H as the letters in the scene, each with its grid coordinate, trilinear weight, visibility weight, "
+        "the distance from the probe to the surface and the distance mean the probe stores toward the surface while Visibility is Chebyshev, "
+        "the weight the interpolation gives it after the visibility, its irradiance toward the shading normal and that irradiance times the weight. "
         "irradiance is the sum of those and shading_irradiance what the shading reads there. "
         "pixel select none clears the pixel and replies after the next frame", HandleGICommand);
 }

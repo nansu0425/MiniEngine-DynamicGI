@@ -10,6 +10,8 @@ struct ProbeCornerContribution
     float visibilityWeight;
     float weight;
     float3 irradiance;
+    float distance;
+    float distanceMean;
 };
 
 struct SurfaceProbeContribution
@@ -18,6 +20,7 @@ struct SurfaceProbeContribution
     float3 position;
     float3 geometryNormal;
     float3 shadingNormal;
+    uint comparesDistance;
     uint ignoresVisibility;
     float3 irradiance;
     float3 shadingIrradiance;

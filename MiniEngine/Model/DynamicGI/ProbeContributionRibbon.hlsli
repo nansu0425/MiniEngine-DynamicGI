@@ -7,7 +7,8 @@ static const uint kNoHoveredCorner = 0xffffffff;
 static const uint kNumCellEdges = 12;
 static const uint kFirstCellEdgeRibbon = kNumProbeCorners;
 static const uint kNormalRibbon = kFirstCellEdgeRibbon + kNumCellEdges;
-static const uint kNumRibbons = kNormalRibbon + 1;
+static const uint kFirstDistanceMeanRibbon = kNormalRibbon + 1;
+static const uint kNumRibbons = kFirstDistanceMeanRibbon + kNumProbeCorners;
 
 cbuffer Constants : register(b0)
 {

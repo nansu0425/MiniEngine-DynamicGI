@@ -36,6 +36,7 @@ void main()
 
     const ProbeDistanceAtlas distanceAtlas = MakeProbeDistanceAtlas(ProbesDistance, DistanceTexelsPerSide);
     const VisibleProbeCorners probes = GetVisibleProbeCorners(Visibility, distanceAtlas, LinearClamp, Grid, result.position, result.geometryNormal);
+    result.comparesDistance = Visibility == kProbeVisibilityChebyshev;
     result.ignoresVisibility = probes.ignoresVisibility;
     result.irradiance = 0.0;
     [unroll]
@@ -47,6 +48,9 @@ void main()
         contribution.visibilityWeight = probes.visibilityWeights[corner];
         contribution.weight = probes.weights[corner] / probes.weightSum;
         contribution.irradiance = SampleProbeIrradiance(ProbesIrradiance, LinearClamp, Grid, contribution.coordinate, result.shadingNormal);
+        const ProbeDistanceSample distanceSample = SampleProbeDistance(distanceAtlas, LinearClamp, Grid, contribution.coordinate, result.position);
+        contribution.distance = distanceSample.distance;
+        contribution.distanceMean = distanceSample.moments.x;
         result.irradiance += contribution.weight * contribution.irradiance;
         result.corners[corner] = contribution;
     }
