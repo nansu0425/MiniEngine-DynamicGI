@@ -57,25 +57,54 @@ float GetProbeVisibilityWeight(uint visibility, ProbeDistanceAtlas distanceAtlas
     return 1.0;
 }
 
-float3 SampleVisibleIrradianceProbes(uint visibility, Texture2D<float4> irradianceAtlas, ProbeDistanceAtlas distanceAtlas, SamplerState linearClamp,
-    IrradianceProbeGrid grid, float3 position, float3 geometryNormal, float3 direction)
+struct VisibleProbeCorners
 {
-    float3 irradiance = 0.0;
-    float weightSum = 0.0;
+    IrradianceProbeCorner corners[kNumProbeCorners];
+    float visibilityWeights[kNumProbeCorners];
+    float weights[kNumProbeCorners];
+    float weightSum;
+    bool ignoresVisibility;
+};
+
+VisibleProbeCorners GetVisibleProbeCorners(uint visibility, ProbeDistanceAtlas distanceAtlas, SamplerState linearClamp, IrradianceProbeGrid grid,
+    float3 position, float3 geometryNormal)
+{
+    VisibleProbeCorners probes;
+    probes.weightSum = 0.0;
     [unroll]
     for (uint corner = 0; corner < kNumProbeCorners; ++corner)
     {
-        const IrradianceProbeCorner probe = GetIrradianceProbeCorner(grid, position, corner);
-        const float weight = probe.trilinearWeight *
-            GetProbeVisibilityWeight(visibility, distanceAtlas, linearClamp, grid, probe.coordinate, position, geometryNormal);
-        if (weight == 0.0)
-            continue;
-        irradiance += weight * SampleProbeIrradiance(irradianceAtlas, linearClamp, grid, probe.coordinate, direction);
-        weightSum += weight;
+        probes.corners[corner] = GetIrradianceProbeCorner(grid, position, corner);
+        probes.visibilityWeights[corner] =
+            GetProbeVisibilityWeight(visibility, distanceAtlas, linearClamp, grid, probes.corners[corner].coordinate, position, geometryNormal);
+        probes.weights[corner] = probes.corners[corner].trilinearWeight * probes.visibilityWeights[corner];
+        probes.weightSum += probes.weights[corner];
     }
-    if (weightSum == 0.0)
-        return SampleIrradianceProbes(irradianceAtlas, linearClamp, grid, position, direction);
-    return irradiance / weightSum;
+
+    probes.ignoresVisibility = probes.weightSum == 0.0;
+    if (probes.ignoresVisibility)
+    {
+        [unroll]
+        for (uint corner = 0; corner < kNumProbeCorners; ++corner)
+            probes.weights[corner] = probes.corners[corner].trilinearWeight;
+        probes.weightSum = 1.0;
+    }
+    return probes;
+}
+
+float3 SampleVisibleIrradianceProbes(uint visibility, Texture2D<float4> irradianceAtlas, ProbeDistanceAtlas distanceAtlas, SamplerState linearClamp,
+    IrradianceProbeGrid grid, float3 position, float3 geometryNormal, float3 direction)
+{
+    const VisibleProbeCorners probes = GetVisibleProbeCorners(visibility, distanceAtlas, linearClamp, grid, position, geometryNormal);
+    float3 irradiance = 0.0;
+    [unroll]
+    for (uint corner = 0; corner < kNumProbeCorners; ++corner)
+    {
+        if (probes.weights[corner] == 0.0)
+            continue;
+        irradiance += probes.weights[corner] * SampleProbeIrradiance(irradianceAtlas, linearClamp, grid, probes.corners[corner].coordinate, direction);
+    }
+    return irradiance / probes.weightSum;
 }
 
 #endif
