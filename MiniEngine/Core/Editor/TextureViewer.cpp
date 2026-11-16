@@ -109,6 +109,7 @@ namespace
     ImVec2 s_ViewOrigin;
     ImVec2 s_ViewSize;
     std::optional<TexelCoordinate> s_InspectTarget;
+    bool s_Pinned = false;
     std::optional<InspectedTexel> s_Inspected;
     std::optional<TexelSummary> s_Summarizing;
     double s_SummarizingSince = 0.0;
@@ -215,6 +216,20 @@ namespace
         ImGui::EndCombo();
     }
 
+    void ShowPin(void)
+    {
+        ImGui::BeginDisabled(!s_Pinned);
+        if (ImGui::Button("Unpin"))
+            s_Pinned = false;
+        ImGui::EndDisabled();
+        ImGui::SetItemTooltip("Lets hovering the view choose the texel again. Clicking the pinned texel also unpins it.");
+        ImGui::SameLine();
+        if (s_Pinned && s_InspectTarget)
+            ImGui::Text("Pinned texel (%d, %d)", s_InspectTarget->x, s_InspectTarget->y);
+        else
+            ImGui::TextDisabled("Click a texel to pin it");
+    }
+
     void ShowDisplayControls(void)
     {
         const auto getChannelName = [](void*, int index) { return kChannels[index].name; };
@@ -229,6 +244,8 @@ namespace
             ImGui::Text("x%.3g", s_PixelsPerTexel);
         else
             ImGui::Text("x1/%.3g", 1.0f / s_PixelsPerTexel);
+        ImGui::SameLine();
+        ShowPin();
     }
 
     void FitView(const ColorBuffer& texture, const ImVec2& region)
@@ -413,21 +430,50 @@ namespace
             regionOrigin.y + region.y * 0.5f + (texel.y - s_CenterTexel.y) * s_PixelsPerTexel);
     }
 
+    void OutlineTexels(const ImVec2& minTexel, const ImVec2& maxTexel, ImU32 color, const ImVec2& regionOrigin, const ImVec2& region)
+    {
+        const float outlineThickness = 2.0f;
+        const ImVec2 minPixel = GetPixelAt(minTexel, regionOrigin, region);
+        const ImVec2 maxPixel = GetPixelAt(maxTexel, regionOrigin, region);
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        drawList->PushClipRect(regionOrigin, ImVec2(regionOrigin.x + region.x, regionOrigin.y + region.y), true);
+        drawList->AddRect(ImVec2(minPixel.x - outlineThickness, minPixel.y - outlineThickness),
+            ImVec2(maxPixel.x + outlineThickness, maxPixel.y + outlineThickness), color, 0.0f, 0, outlineThickness);
+        drawList->PopClipRect();
+    }
+
     void OutlineMarkedRow(const ColorBuffer& texture, const ImVec2& regionOrigin, const ImVec2& region)
     {
         const std::optional<uint32_t> row = FindMarkedRow(s_Textures[s_Selected]);
         if (!row)
             return;
 
-        const ImU32 outlineColor = IM_COL32(255, 140, 26, 255);
-        const float outlineThickness = 2.0f;
-        const ImVec2 rowMin = GetPixelAt(ImVec2(0.0f, (float)*row), regionOrigin, region);
-        const ImVec2 rowMax = GetPixelAt(ImVec2((float)texture.GetWidth(), (float)(*row + 1)), regionOrigin, region);
-        ImDrawList* drawList = ImGui::GetWindowDrawList();
-        drawList->PushClipRect(regionOrigin, ImVec2(regionOrigin.x + region.x, regionOrigin.y + region.y), true);
-        drawList->AddRect(ImVec2(rowMin.x - outlineThickness, rowMin.y - outlineThickness),
-            ImVec2(rowMax.x + outlineThickness, rowMax.y + outlineThickness), outlineColor, 0.0f, 0, outlineThickness);
-        drawList->PopClipRect();
+        const ImU32 markedRowColor = IM_COL32(255, 140, 26, 255);
+        OutlineTexels(ImVec2(0.0f, (float)*row), ImVec2((float)texture.GetWidth(), (float)(*row + 1)), markedRowColor, regionOrigin, region);
+    }
+
+    void OutlinePinnedTexel(const ColorBuffer& texture, const ImVec2& regionOrigin, const ImVec2& region)
+    {
+        if (!s_Pinned || !s_InspectTarget || !IsInside(texture, *s_InspectTarget))
+            return;
+
+        const ImU32 pinnedTexelColor = IM_COL32(255, 255, 255, 255);
+        const ImVec2 texel((float)s_InspectTarget->x, (float)s_InspectTarget->y);
+        OutlineTexels(texel, ImVec2(texel.x + 1.0f, texel.y + 1.0f), pinnedTexelColor, regionOrigin, region);
+    }
+
+    bool IsViewClicked(void)
+    {
+        const ImGuiIO& io = ImGui::GetIO();
+        return ImGui::IsItemDeactivated() && ImGui::IsItemHovered() &&
+            io.MouseDragMaxDistanceSqr[ImGuiMouseButton_Left] <= io.MouseDragThreshold * io.MouseDragThreshold;
+    }
+
+    void TogglePin(const TexelCoordinate& texel)
+    {
+        const bool isPinnedTexel = s_Pinned && s_InspectTarget && s_InspectTarget->x == texel.x && s_InspectTarget->y == texel.y;
+        s_InspectTarget = texel;
+        s_Pinned = !isPinnedTexel;
     }
 
     void ShowView(ColorBuffer& texture)
@@ -448,7 +494,9 @@ namespace
         ImGui::InvisibleButton("##View", region);
         ImGui::SetItemKeyOwner(ImGuiKey_MouseWheelY);
         ZoomAndPanByMouse(origin, region);
-        if (ImGui::IsItemHovered())
+        if (IsViewClicked())
+            TogglePin(GetTexelUnderMouse(origin, region));
+        else if (ImGui::IsItemHovered() && !s_Pinned)
             s_InspectTarget = GetTexelUnderMouse(origin, region);
 
         ColorBuffer& display = RenderView(texture, region);
@@ -456,6 +504,7 @@ namespace
         ImGui::GetWindowDrawList()->AddImage(ImGuiLayer::BindTexture(display), origin, ImVec2(origin.x + region.x, origin.y + region.y),
             ImVec2(0.0f, 0.0f), uvMax);
         OutlineMarkedRow(texture, origin, region);
+        OutlinePinnedTexel(texture, origin, region);
     }
 
     void ShowInspectedTexel(const ColorBuffer& texture)
@@ -552,7 +601,7 @@ namespace
             }
         }
         fields.Text("channel", kChannels[s_Channel].name).Float("exposure_value", s_ExposureValue).Float("value_interval", s_SummaryInterval)
-            .Flag("fit", s_Fit).Float("pixels_per_texel", s_PixelsPerTexel)
+            .Flag("fit", s_Fit).Float("pixels_per_texel", s_PixelsPerTexel).Flag("pinned", s_Pinned)
             .Object("center", ControlChannel::Fields().Float("x", s_CenterTexel.x).Float("y", s_CenterTexel.y))
             .Object("view", ControlChannel::Fields().Integer("left", (int64_t)s_ViewOrigin.x).Integer("top", (int64_t)s_ViewOrigin.y)
                 .Integer("width", (int64_t)s_ViewSize.x).Integer("height", (int64_t)s_ViewSize.y))
@@ -617,13 +666,20 @@ namespace
         return true;
     }
 
-    bool SetInspectTarget(const std::string& text)
+    bool PinInspectTarget(const std::string& text)
     {
+        if (text == "none")
+        {
+            s_Pinned = false;
+            return true;
+        }
+
         TexelCoordinate texel = {};
         char extra = 0;
         if (sscanf_s(text.c_str(), "%d %d %c", &texel.x, &texel.y, &extra, 1) != 2)
             return false;
         s_InspectTarget = texel;
+        s_Pinned = true;
         return true;
     }
 
@@ -682,11 +738,11 @@ namespace
             error = FocusMarkedRow() ? "" : "focus needs a marked row in the selected texture, as state texture_viewer.marked_row shows, "
                 "and the panel open with its view drawn";
         else if (action == "inspect")
-            error = SetInspectTarget(value) ? "" : "inspect takes the texel coordinates as two integers, not '" + value + "'";
+            error = PinInspectTarget(value) ? "" : "inspect takes the texel coordinates as two integers or none, not '" + value + "'";
         else if (action == "interval")
             error = SetSummaryInterval(value) ? "" : "interval takes seconds from 0 to 10, not '" + value + "'";
         else
-            error = "usage: texture-viewer select <name> | channel RGB|R|G|B|A | ev <value> | zoom <pixels per texel> <x> <y> | fit | focus | inspect <x> <y> "
+            error = "usage: texture-viewer select <name> | channel RGB|R|G|B|A | ev <value> | zoom <pixels per texel> <x> <y> | fit | focus | inspect <x> <y>|none "
                 "| interval <seconds> | save <path without extension>";
 
         if (!error.empty())
@@ -730,7 +786,7 @@ void TextureViewer::Initialize(void)
     s_TexelReadback.Create(L"Texture Viewer Texel Readback", kNumReadbackSlots, sizeof(InspectedTexel::value));
 
     ControlChannel::Register("texture-viewer", "texture-viewer select <name> | channel RGB|R|G|B|A | ev <value> | zoom <pixels per texel> <x> <y> "
-        "| fit | focus | inspect <x> <y> | interval <seconds> | save <path without extension>: the texture the Texture Viewer panel shows, the channel it shows, its exposure in EV "
+        "| fit | focus | inspect <x> <y>|none | interval <seconds> | save <path without extension>: the texture the Texture Viewer panel shows, the channel it shows, its exposure in EV "
         "from -16 to 16, its zoom and the seconds from 0 to 10 over which it summarizes a texel's values, as the panel's Texture, Channel, "
         "Exposure (EV), mouse wheel, drag, Fit, Focus and Value Interval (s) change them. A channel of R, G, B or A shows that component as gray. "
         "zoom shows each texel as pixels per texel screen pixels, from 1/1024 to 1024, with texel coordinate (x, y) at the center of the view, "
@@ -738,8 +794,10 @@ void TextureViewer::Initialize(void)
         "fits the whole texture in the view while the panel is open, until zoom, the wheel or a drag. "
         "Some textures mark a row, as Probe Ray Samples marks the row of the selected probe, and the view outlines the row. "
         "focus zooms the view, at the size the panel last drew it, so that the marked row spans its width with the row at the center, "
-        "as the Focus button does, and fails unless the selected texture marks a row and the panel has drawn its view. inspect reads texel (x, y) of the texture "
-        "every frame while the panel is open, as hovering the view does, without waiting for the GPU. state texture_viewer has them, "
+        "as the Focus button does, and fails unless the selected texture marks a row and the panel has drawn its view. Hovering the view reads the texel under the mouse every frame while the panel is open, "
+        "and clicking a texel without dragging pins it, so that hovering no longer changes the texel until the pinned texel is clicked again or Unpin is pressed. "
+        "inspect <x> <y> pins texel (x, y) as clicking it does, without waiting for the GPU, and inspect none unpins it as Unpin does. "
+        "state texture_viewer has them, whether a texel is pinned, "
         "the view where the panel last drew the texture in client pixels, the marked_row of the selected texture with its name and its row "
         "or none while the texture can mark a row, and the textures it can show, each with its size and format once "
         "its owner has created it. Its inspected has the float4 of the last texel read with the texture and texel it came from, a few frames "
