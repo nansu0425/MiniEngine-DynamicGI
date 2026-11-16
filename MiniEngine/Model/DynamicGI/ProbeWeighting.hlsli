@@ -9,6 +9,7 @@ struct ProbeWeighting
     uint visibility;
     uint facing;
     float minFacingWeight;
+    uint facingNormal;
 };
 
 bool InterpolatesTrilinearly(ProbeWeighting weighting)
@@ -45,6 +46,7 @@ struct WeightedProbeCorners
 WeightedProbeCorners GetWeightedProbeCorners(ProbeWeighting weighting, ProbeDistanceAtlas distanceAtlas, SamplerState linearClamp,
     IrradianceProbeGrid grid, ProbeLookupSurface surface)
 {
+    const float3 facingNormal = weighting.facingNormal == kProbeFacingNormalShading ? surface.shadingNormal : surface.geometryNormal;
     WeightedProbeCorners probes;
     probes.weightSum = 0.0;
     [unroll]
@@ -54,7 +56,7 @@ WeightedProbeCorners GetWeightedProbeCorners(ProbeWeighting weighting, ProbeDist
         probes.visibilityWeights[corner] = GetProbeVisibilityWeight(weighting.visibility, distanceAtlas, linearClamp, grid,
             probes.corners[corner].coordinate, surface.position, surface.geometryNormal);
         probes.facingWeights[corner] = weighting.facing != 0 ?
-            GetProbeFacingWeight(weighting.minFacingWeight, grid, probes.corners[corner].coordinate, surface.position, surface.geometryNormal) : 1.0;
+            GetProbeFacingWeight(weighting.minFacingWeight, grid, probes.corners[corner].coordinate, surface.position, facingNormal) : 1.0;
         probes.weights[corner] = probes.corners[corner].trilinearWeight * probes.visibilityWeights[corner] * probes.facingWeights[corner];
         probes.weightSum += probes.weights[corner];
     }

@@ -149,6 +149,7 @@ namespace
     const char* kSourceNames[] = { "Off", "Path Traced", "Probe" };
     const char* kViewNames[] = { "Lit", "Indirect Irradiance", "Indirect Radiance" };
     const char* kVisibilityNames[] = { "None", "Shadow Ray", "Chebyshev" };
+    const char* kFacingNormalNames[] = { "Geometry", "Shading" };
 
     void ClampSettings(void)
     {
@@ -365,12 +366,18 @@ namespace
             "Chebyshev weights each probe by how likely the distances it stored toward the point leave the point visible.");
         TuningSection::MakeItemResettable("Visibility");
         ImGui::Checkbox("Facing Weight", &probe.weighting.facing);
-        ImGui::SetItemTooltip("Weights each probe by how far it lies in front of the surface, along the geometry normal, "
+        ImGui::SetItemTooltip("Weights each probe by how far it lies in front of the surface, along the normal Facing Normal picks, "
             "so the probes behind a thin wall or cloth give less than the ones the surface faces.");
         TuningSection::MakeItemResettable("Facing Weight");
         ImGui::SliderFloat("Min Facing Weight", &probe.weighting.minFacingWeight, 0.0f, 1.0f);
         ImGui::SetItemTooltip("The facing weight of a probe right behind the surface. A probe the surface faces head-on gets 1 more than this.");
         TuningSection::MakeItemResettable("Min Facing Weight");
+        int facingNormal = (int)probe.weighting.facingNormal;
+        if (ImGui::Combo("Facing Normal", &facingNormal, kFacingNormalNames, IM_ARRAYSIZE(kFacingNormalNames)))
+            probe.weighting.facingNormal = (ProbeWeighting::FacingNormal)facingNormal;
+        ImGui::SetItemTooltip("The normal the facing weight measures the side of a probe against. "
+            "Geometry is the triangle's normal, constant across each face. Shading is the interpolated vertex normal with the normal map applied.");
+        TuningSection::MakeItemResettable("Facing Normal");
         ClampSettings();
 
         if (ImGui::Button("Reset Probes"))
@@ -451,6 +458,7 @@ namespace
         values["Visibility"] = kVisibilityNames[(int)probe.weighting.visibility];
         values["Facing Weight"] = FormatFlag(probe.weighting.facing);
         values["Min Facing Weight"] = MeasurementConditions::FormatFloat(probe.weighting.minFacingWeight);
+        values["Facing Normal"] = kFacingNormalNames[(int)probe.weighting.facingNormal];
         values["Pause Updates"] = FormatFlag(s_Settings.pauseProbeUpdates);
 
         const ProbeVisualization::Settings& probeSpheres = s_Settings.probeSpheres;
@@ -519,6 +527,7 @@ namespace
         ReadName(values, "Visibility", kVisibilityNames, probe.weighting.visibility);
         ReadFlag(values, "Facing Weight", probe.weighting.facing);
         ReadFloat(values, "Min Facing Weight", probe.weighting.minFacingWeight);
+        ReadName(values, "Facing Normal", kFacingNormalNames, probe.weighting.facingNormal);
         ReadFlag(values, "Pause Updates", s_Settings.pauseProbeUpdates);
 
         ProbeVisualization::Settings& probeSpheres = s_Settings.probeSpheres;
