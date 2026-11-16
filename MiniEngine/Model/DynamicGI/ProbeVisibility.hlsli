@@ -2,6 +2,7 @@
 #define __PROBE_VISIBILITY_HLSLI__
 
 #include "Model/DynamicGI/ProbeVolume.hlsli"
+#include "Model/DynamicGI/ProbeLookupSurface.hlsli"
 #include "Model/Raytracing/RaytracingScene.hlsli"
 #include "Model/Raytracing/SurfaceRay.hlsli"
 
@@ -46,13 +47,12 @@ float GetChebyshevVisibility(ProbeDistanceSample distanceSample)
     return variance / (variance + excess * excess);
 }
 
-float GetProbeVisibilityWeight(uint visibility, ProbeVolume volume, SamplerState linearClamp, uint3 coordinate, float3 position,
-    float3 geometryNormal)
+float GetProbeVisibilityWeight(uint visibility, ProbeVolume volume, SamplerState linearClamp, uint3 coordinate, ProbeLookupSurface surface)
 {
     if (visibility == kProbeVisibilityShadowRay)
-        return CanShadowRayReachProbe(volume.grid, coordinate, position, geometryNormal) ? 1.0 : 0.0;
+        return CanShadowRayReachProbe(volume.grid, coordinate, surface.position, surface.geometryNormal) ? 1.0 : 0.0;
     if (visibility == kProbeVisibilityChebyshev)
-        return GetChebyshevVisibility(SampleProbeDistance(volume, linearClamp, coordinate, position));
+        return GetChebyshevVisibility(SampleProbeDistance(volume, linearClamp, coordinate, surface.position));
     return 1.0;
 }
 
