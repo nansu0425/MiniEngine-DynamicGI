@@ -187,6 +187,7 @@ namespace
         probe.backFaceDistanceScale = std::max(0.0f, std::min(probe.backFaceDistanceScale, 1.0f));
         probe.weighting.selfShadowBias = std::max(0.0f, std::min(probe.weighting.selfShadowBias, kMaxSelfShadowBias));
         probe.weighting.chebyshevExponent = std::max(1.0f, std::min(probe.weighting.chebyshevExponent, kMaxChebyshevExponent));
+        probe.weighting.weightCrushThreshold = std::max(0.0f, std::min(probe.weighting.weightCrushThreshold, 1.0f));
         probe.weighting.minFacingWeight = std::max(0.0f, std::min(probe.weighting.minFacingWeight, 1.0f));
         probe.weighting.maxBackFaceRatio = std::max(0.0f, std::min(probe.weighting.maxBackFaceRatio, 1.0f));
 
@@ -408,6 +409,11 @@ namespace
         ImGui::SetItemTooltip("While Visibility is Chebyshev, raises the visibility weight of each probe to this power. "
             "A point within the distances a probe stored keeps the weight 1, and a point beyond them loses weight faster than with 1.");
         TuningSection::MakeItemResettable("Chebyshev Exponent");
+        ImGui::SliderFloat("Weight Crush Threshold", &probe.weighting.weightCrushThreshold, 0.0f, 1.0f);
+        ImGui::SetItemTooltip("Shrinks the weight of a probe below this threshold, before the trilinear weight, by its square over the threshold's square. "
+            "The weight is the product of the classification, visibility, and facing weights. "
+            "A probe these weights mark as hidden then gives far less than the probes they keep, even after the weights are normalized. 0 turns it off.");
+        TuningSection::MakeItemResettable("Weight Crush Threshold");
         ImGui::Checkbox("Facing Weight", &probe.weighting.facing);
         ImGui::SetItemTooltip("Weights each probe by how far it lies in front of the surface, along the normal Facing Normal picks, "
             "so the probes behind a thin wall or cloth give less than the ones the surface faces.");
@@ -514,6 +520,7 @@ namespace
         values["Visibility"] = kVisibilityNames[(int)probe.weighting.visibility];
         values["Self Shadow Bias"] = MeasurementConditions::FormatFloat(probe.weighting.selfShadowBias);
         values["Chebyshev Exponent"] = MeasurementConditions::FormatFloat(probe.weighting.chebyshevExponent);
+        values["Weight Crush Threshold"] = MeasurementConditions::FormatFloat(probe.weighting.weightCrushThreshold);
         values["Facing Weight"] = FormatFlag(probe.weighting.facing);
         values["Min Facing Weight"] = MeasurementConditions::FormatFloat(probe.weighting.minFacingWeight);
         values["Facing Normal"] = kFacingNormalNames[(int)probe.weighting.facingNormal];
@@ -587,6 +594,7 @@ namespace
         ReadName(values, "Visibility", kVisibilityNames, probe.weighting.visibility);
         ReadFloat(values, "Self Shadow Bias", probe.weighting.selfShadowBias);
         ReadFloat(values, "Chebyshev Exponent", probe.weighting.chebyshevExponent);
+        ReadFloat(values, "Weight Crush Threshold", probe.weighting.weightCrushThreshold);
         ReadFlag(values, "Facing Weight", probe.weighting.facing);
         ReadFloat(values, "Min Facing Weight", probe.weighting.minFacingWeight);
         ReadName(values, "Facing Normal", kFacingNormalNames, probe.weighting.facingNormal);
@@ -674,6 +682,7 @@ namespace
                 .Text("visibility", kVisibilityNames[(int)s_Settings.probe.weighting.visibility])
                 .Float("self_shadow_bias", s_Settings.probe.weighting.selfShadowBias)
                 .Float("chebyshev_exponent", s_Settings.probe.weighting.chebyshevExponent)
+                .Float("weight_crush_threshold", s_Settings.probe.weighting.weightCrushThreshold)
                 .Flag("paused", s_Settings.pauseProbeUpdates)
                 .Text("selected", FormatSelectedProbe())
                 .Integer("updates", ProbeLighting::GetProgress().updates)

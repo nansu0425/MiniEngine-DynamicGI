@@ -10,6 +10,7 @@ struct ProbeWeighting
     uint visibility;
     float selfShadowBias;
     float chebyshevExponent;
+    float weightCrushThreshold;
     uint facing;
     float minFacingWeight;
     uint facingNormal;
@@ -20,6 +21,13 @@ struct ProbeWeighting
 bool InterpolatesTrilinearly(ProbeWeighting weighting)
 {
     return weighting.visibility == kProbeVisibilityNone && weighting.facing == 0 && weighting.classification == 0;
+}
+
+float CrushWeakProbeWeight(float threshold, float weight)
+{
+    if (weight >= threshold)
+        return weight;
+    return weight * weight * weight / (threshold * threshold);
 }
 
 struct WeightedProbeCorners
@@ -51,8 +59,9 @@ WeightedProbeCorners GetWeightedProbeCorners(ProbeWeighting weighting, ProbeVolu
             probes.corners[corner].coordinate, surface, probes.distanceLookupPosition);
         probes.facingWeights[corner] = weighting.facing != 0 ?
             GetProbeFacingWeight(weighting.minFacingWeight, volume.grid, probes.corners[corner].coordinate, surface.position, facingNormal) : 1.0;
-        probes.weights[corner] =
-            probes.corners[corner].trilinearWeight * probes.activeWeights[corner] * probes.visibilityWeights[corner] * probes.facingWeights[corner];
+        const float occlusionWeight = CrushWeakProbeWeight(weighting.weightCrushThreshold,
+            probes.activeWeights[corner] * probes.visibilityWeights[corner] * probes.facingWeights[corner]);
+        probes.weights[corner] = probes.corners[corner].trilinearWeight * occlusionWeight;
         probes.weightSum += probes.weights[corner];
     }
 
