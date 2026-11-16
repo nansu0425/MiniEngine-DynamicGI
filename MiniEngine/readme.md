@@ -12,7 +12,7 @@
 * movement speed: mouse wheel while holding the right mouse button
 * pan: drag with the middle mouse button
 * toggle ImGui: F1
-* engine tuning, profiler, scene overlay, scene hierarchy, details: ImGui View menu
+* engine tuning, profiler, scene overlay, scene hierarchy, details, Dynamic GI debug: ImGui View menu
 * default of an engine tuning setting: right-click the setting and pick Reset to Default, or right-click a group and pick Reset to Defaults to reset every setting under it. Reset All at the top of Engine Tuning resets them all. The default is the value the setting has when user.ini does not have it
 * scene: the Scene menu lists the scene files of the Scenes folder by name and marks the one open. Picking one opens it while running: the model changes, the objects in the Scene Hierarchy take their settings in the scene file, so the camera takes the scene file's pose and vertical field of view and the lights change, and the path tracer starts over. Changes to the objects not saved, such as a camera moved since, are lost. The settings, camera movement speed and UI stay. Save at the top of the menu writes the settings of the objects, the camera's pose and field of view among them, to the open scene file and leaves its other lines
 * ray tracing debug view: pick one as View under Ray Tracing in Engine Tuning. Off shows the raster image
@@ -23,11 +23,12 @@
 * camera: the Camera in the Scene Hierarchy is the camera you look through, so it has no icon or gizmo. Move it with the controls above, or set its position, heading, pitch and vertical field of view in its Details panel
 * directional light: select its icon and rotate it with the rotate gizmo. It is a KHR_lights_punctual light whose type is Directional, the only type for now, so the light goes along its local -Z, as the arrow shows, and turning it about its local Z (the blue ring with Local axes) leaves the light as it is. Its Details panel shows the type, which the scene file keeps as Type, and has its color and intensity (lux) and Reset Transform, which sets the transform to no rotation at the origin, so the light goes along world -Z
 * Dynamic GI Volume: the box the probe grid of Dynamic GI covers, shown as an icon at its center. While it is selected, its box is drawn with translucent faces that the scene hides where it is in front of them, and with edges that stay visible, faint where the scene hides them. A scene has at most one, and only while its scene file has a Dynamic GI Volume section. Add Dynamic GI Volume in the Scene Hierarchy panel adds one over the model's bounds, and Remove in its Details panel takes it out; Scene > Save writes or removes the section. Move it with the translate gizmo and resize it along the world axes with the scale gizmo. It does not rotate. Its Details panel has its position, size, Fit to Model and the probe and weighting settings. The probe counts stay as it is resized, so the probe spacing follows the size, and moving or resizing it clears the probes. Without a volume the Probe source gives no indirect light
+* Dynamic GI debug: the Dynamic GI Debug panel picks the indirect light source (Off, Path Traced, Probe) and the view, has the path traced reference's settings, pauses and steps the probe updates, and shows the probes and the probes a pixel interpolates
 
 ## User settings:
 On exit, ModelViewer saves these settings in the working directory, or in the folder given by -settings_dir, and restores them on the next start.
 * imgui.ini: panel layout, written by ImGui. Delete it to reset the layout
-* user.ini: window size and position, open panels, engine tuning values (with the ray tracing view and the path tracer settings), editor camera movement speed. Delete it to reset them. The camera's position, direction and field of view are not saved here, as they belong to the scene: Scene > Save writes them to the scene file
+* user.ini: window size and position, open panels, engine tuning values (with the ray tracing view and the path tracer settings), Dynamic GI Debug panel settings, editor camera movement speed. Delete it to reset them. The camera's position, direction and field of view are not saved here, as they belong to the scene: Scene > Save writes them to the scene file
 
 ## Command line options for automation:
 scripts/viewer.py starts ModelViewer with these options. They change nothing when omitted.

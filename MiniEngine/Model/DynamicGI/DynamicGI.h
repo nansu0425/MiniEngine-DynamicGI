@@ -14,7 +14,7 @@ namespace DynamicGI
     void Reset(void);
 
     void Update(ComputeContext& context, const GIFrameInputs& inputs, uint32_t width, uint32_t height);
-    void UpdateSceneInspection(const Math::Camera& camera);
+    void UpdateEditor(const Math::Camera& camera);
     void DrawProbes(GraphicsContext& context, const Math::Camera& camera, const D3D12_VIEWPORT& viewport, const D3D12_RECT& scissor);
     void DrawOverlay(GraphicsContext& context, const Math::Camera& camera);
     void MeasureProbeContribution(const RaytracingScene& scene);

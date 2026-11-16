@@ -16,8 +16,7 @@ RECORD = REPO_ROOT / 'docs' / 'probe-visibility-measurements.md'
 RECORD_SECTION = '## Distance Sharpness, distance 해상도, ray 수'
 PLOT_SCRIPT = Path(__file__).resolve().parent / 'plot-probe-distance.py'
 
-DEBUG_SECTION = 'Engine Tuning'
-DEBUG_KEY_PREFIX = 'Dynamic GI/'
+DEBUG_SECTION = 'Dynamic GI Debug'
 VOLUME = 'Dynamic GI Volume'
 BASE_DEBUG = {'Indirect': 'Probe', 'Pause Updates': 0, 'Show Probes': 0}
 BASE_VOLUME = {'Visibility': 'Chebyshev', 'Hysteresis': 0.95, 'Probes X': 16, 'Probes Y': 8, 'Probes Z': 8}
@@ -32,12 +31,12 @@ OVERSHOOT_RATIO = 1.1
 WAIT_TIMEOUT = 600
 
 
-def assignments(settings, key_prefix=''):
-    return '; '.join(f'{key_prefix}{key}={value}' for key, value in settings.items())
+def assignments(settings):
+    return '; '.join(f'{key}={value}' for key, value in settings.items())
 
 
 def set_debug(session, settings):
-    session.ask_ok(f'settings set {DEBUG_SECTION}: ' + assignments(settings, DEBUG_KEY_PREFIX))
+    session.ask_ok(f'settings set {DEBUG_SECTION}: ' + assignments(settings))
 
 
 def set_volume(session, settings):

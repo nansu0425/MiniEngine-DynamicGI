@@ -5,6 +5,7 @@
 #include "Model/DynamicGI/ProbeContribution.h"
 #include "Model/DynamicGI/ProbeLighting.h"
 #include "Model/DynamicGI/ProbeVisualization.h"
+#include "Core/App/UserSettings.h"
 #include "Core/Automation/ControlChannel.h"
 #include "Core/Editor/MeasurementConditions.h"
 #include "Core/Editor/SceneEditor.h"
@@ -167,7 +168,7 @@ namespace
         return !s_Settings.pauseProbeUpdates || s_ProbeStepRequested || ProbeLighting::GetProgress().updates == 0;
     }
 
-    // --- Engine Tuning과 harness --------------------------------------------------------------------
+    // --- Dynamic GI Debug panel과 harness --------------------------------------------------------------------
 
     constexpr uint32_t kMaxSamplesPerFrame = 256;
     // 누적 buffer가 sample 수를 float로 세므로 1씩 더해도 정확한 2^24보다 작게 둔다.
@@ -175,7 +176,7 @@ namespace
     // albedo가 1에 가까운 scene에서도 한 dispatch가 끝나는 시간을 이 상한이 정한다.
     constexpr uint32_t kMaxHits = 1u << 10;
     constexpr float kMaxRadiusPerSpacing = 0.5f;
-    // Source의 순서이고, Engine Tuning의 저장과 settings 명령이 이 이름으로 읽고 쓴다.
+    // Source의 순서이고, user.ini의 저장과 settings 명령이 이 이름으로 읽고 쓴다.
     const char* kSourceNames[] = { "Off", "Path Traced", "Probe" };
     const char* kViewNames[] = { "Lit", "Indirect Irradiance", "Indirect Radiance" };
 
@@ -209,7 +210,6 @@ namespace
         ImGui::SetItemTooltip("What the raster writes for the opaque surfaces. Lit adds the emission, the directional light and the indirect light. "
             "Indirect Irradiance shows the probe irradiance from the shading normal, the same way Show Probes does, and needs the Probe source. "
             "Indirect Radiance shows the indirect light reflected toward the camera only. Without indirect light both views are black.");
-        TuningSection::MakeItemResettable("View");
     }
 
     const ImVec4 kOccludingMeanColor(1.0f, 0.4f, 0.3f, 1.0f);
@@ -324,7 +324,7 @@ namespace
         ImGui::SetItemTooltip("The irradiance the shading function gives at the same point. It matches the sum of the contributions up to rounding.");
     }
 
-    void ShowSettings(void)
+    void ShowDebugPanelContent(void)
     {
         int indirect = (int)s_Settings.indirect;
         if (ImGui::Combo("Indirect", &indirect, kSourceNames, IM_ARRAYSIZE(kSourceNames)))
@@ -332,7 +332,6 @@ namespace
         ImGui::SetItemTooltip("How the raster finds the light reflected from indirect light at the surface it samples. "
             "Path Traced accumulates it over frames with the whole glTF BRDF. Probe interpolates the irradiance of a probe grid updated every frame "
             "and reflects it with the diffuse lobe only.");
-        TuningSection::MakeItemResettable("Indirect");
 
         ShowViewCombo();
 
@@ -340,20 +339,15 @@ namespace
         PathTracedLighting::Settings& pathTraced = s_Settings.pathTraced;
         const uint32_t step = 1;
         ImGui::InputScalar("Samples per Frame", ImGuiDataType_U32, &pathTraced.samplesPerFrame, &step);
-        TuningSection::MakeItemResettable("Samples per Frame");
         ImGui::InputScalar("Target Samples", ImGuiDataType_U32, &pathTraced.targetSamples);
         ImGui::SetItemTooltip("Stops tracing at this many samples per pixel and keeps the average.");
-        TuningSection::MakeItemResettable("Target Samples");
         ImGui::InputScalar("Seed", ImGuiDataType_U32, &pathTraced.seed, &step);
         ImGui::SetItemTooltip("Accumulations that differ only in the seed are independent estimates of the same image.");
-        TuningSection::MakeItemResettable("Seed");
         ImGui::InputScalar("Max Hits", ImGuiDataType_U32, &pathTraced.maxHits, &step);
         ImGui::SetItemTooltip("Most points a path from the surface hits. 1 sees only the emission and the directional light at the first hit, "
             "the single bounce of DDGI.");
-        TuningSection::MakeItemResettable("Max Hits");
         ImGui::Checkbox("Russian Roulette", &pathTraced.russianRoulette);
         ImGui::SetItemTooltip("After the first few hits, ends paths at random by their throughput and weights the survivors up. Unbiased.");
-        TuningSection::MakeItemResettable("Russian Roulette");
         ClampSettings();
 
         if (ImGui::Button("Reset"))
@@ -365,7 +359,11 @@ namespace
 
         ImGui::SeparatorText("Probe");
         if (FindDynamicGIVolume() == nullptr)
-            ImGui::TextDisabled("No Dynamic GI Volume in the scene, so the Probe source gives no indirect light.");
+        {
+            ImGui::BeginDisabled();
+            ImGui::TextWrapped("No Dynamic GI Volume in the scene, so the Probe source gives no indirect light.");
+            ImGui::EndDisabled();
+        }
         if (ImGui::Button("Reset Probes"))
             ProbeLighting::Reset();
         ImGui::SetItemTooltip("Clears the probes. Moving or resizing the Dynamic GI Volume, changing its probe counts, rays per probe "
@@ -374,7 +372,6 @@ namespace
         ImGui::Checkbox("Pause Updates", &s_Settings.pauseProbeUpdates);
         ImGui::SetItemTooltip("Stops tracing and updating the probes. The scene keeps using the probes as they are. "
             "A reset or a grid change waits for the next update.");
-        TuningSection::MakeItemResettable("Pause Updates");
         ImGui::SameLine();
         ImGui::BeginDisabled(!s_Settings.pauseProbeUpdates);
         if (ImGui::Button("Step"))
@@ -387,26 +384,21 @@ namespace
         ImGui::Checkbox("Show Probes", &probeSpheres.show);
         ImGui::SetItemTooltip("Draws a sphere at each probe. Each point of a sphere shows the probe's irradiance from its normal, "
             "as the radiance of a white diffuse sphere there lit by the indirect light only.");
-        TuningSection::MakeItemResettable("Show Probes");
         ImGui::SliderFloat("Probe Radius", &probeSpheres.radiusPerSpacing, 0.0f, kMaxRadiusPerSpacing);
         ImGui::SetItemTooltip("Radius of the spheres as a fraction of the shortest probe spacing. At 0.5 neighbors touch.");
-        TuningSection::MakeItemResettable("Probe Radius");
         ImGui::Text("Selected Probe: %s", FormatSelectedProbe().c_str());
         ImGui::SetItemTooltip("Click a probe sphere to select it. Clicking elsewhere in the scene clears the selection.");
         ImGui::Checkbox("Show Texel Means", &probeSpheres.showTexelMeans);
         ImGui::SetItemTooltip("Draws a yellow line from the selected probe along the direction of each of its distance texels, "
             "as long as the mean distance the texel stores.");
-        TuningSection::MakeItemResettable("Show Texel Means");
         ImGui::Checkbox("Show Texel Distances", &probeSpheres.showTexelDistances);
         ImGui::SetItemTooltip("Draws a magenta line from the selected probe along the direction of each of its distance texels, "
             "as long as a single ray along that direction hit when the probes were last cleared.");
-        TuningSection::MakeItemResettable("Show Texel Distances");
         ImGui::Checkbox("Show Ray Samples", &probeSpheres.showRaySamples);
         ImGui::SetItemTooltip("Draws a line from the selected probe along each ray of its last update, as long as the distance the ray recorded. "
             "Cyan rays hit something closer than the longest distance a probe keeps, and red rays did not. "
             "While the Texture Viewer shows Probe Ray Samples with a texel of the selected probe's row inspected, "
             "the ray of that texel is white and the other lines are faint.");
-        TuningSection::MakeItemResettable("Show Ray Samples");
         ImGui::Checkbox("Inspect Pixel", &s_Settings.inspectPixel);
         ImGui::SetItemTooltip("Click a point of the scene other than a probe sphere to see the probes its irradiance interpolates. "
             "A line from the point to each probe is as thick as the probe's weight, and dashed where the weight is 0. "
@@ -414,14 +406,13 @@ namespace
             "The gray lines are the cell of the probes and the light blue arrow is the shading normal. "
             "While Visibility is Chebyshev, the lines to the probes start from the point Self Shadow Bias moves off the surface, "
             "which a green arrow from the surface points to. The point stays as the camera moves.");
-        TuningSection::MakeItemResettable("Inspect Pixel");
         if (s_Settings.inspectPixel)
             ShowContributionTable();
         ImGui::EndDisabled();
         ClampSettings();
     }
 
-    void SaveSettings(TuningSection::Values& values)
+    void SaveSettings(UserSettings::Values& values)
     {
         const PathTracedLighting::Settings& pathTraced = s_Settings.pathTraced;
         values["Indirect"] = kSourceNames[(int)s_Settings.indirect];
@@ -443,7 +434,7 @@ namespace
         values["Inspect Pixel"] = SettingValues::FormatFlag(s_Settings.inspectPixel);
     }
 
-    void LoadSettings(const TuningSection::Values& values)
+    void LoadSettings(const UserSettings::Values& values)
     {
         PathTracedLighting::Settings& pathTraced = s_Settings.pathTraced;
         SettingValues::ReadName(values, "Indirect", kSourceNames, s_Settings.indirect);
@@ -541,7 +532,8 @@ namespace
                 .Object("pixel", DescribePixel()));
     }
 
-    TuningSection s_Section("Dynamic GI", ShowSettings, SaveSettings, LoadSettings);
+    const char kDebugPanelName[] = "Dynamic GI Debug";
+    bool s_ShowDebugPanel = false;
 
     void ReplyWithStateAfterFrame(const ControlChannel::Reply& reply)
     {
@@ -686,6 +678,7 @@ void DynamicGI::Initialize(void)
     TextureViewer::AddTexture("Path Traced Indirect Radiance", PathTracedLighting::GetIndirectRadiance());
 
     SceneEditor::RegisterComponentDetails<DynamicGIVolumeComponent>(ShowDynamicGIVolumeDetails);
+    UserSettings::Register(kDebugPanelName, SaveSettings, LoadSettings);
 
     ControlChannel::RegisterState("gi", DescribeState);
     ControlChannel::Register("gi", "gi probe step | gi probe select <x> <y> <z>|none | gi pixel select <x> <y>|none. "
@@ -706,6 +699,7 @@ void DynamicGI::Initialize(void)
 
 void DynamicGI::Shutdown(void)
 {
+    UserSettings::Unregister(kDebugPanelName);
     ProbeContribution::Shutdown();
     ProbeLighting::Shutdown();
     PathTracedLighting::Shutdown();
@@ -757,8 +751,10 @@ void DynamicGI::Update(ComputeContext& context, const GIFrameInputs& inputs, uin
     Renderer::SetShadingOutput(s_Settings.view);
 }
 
-void DynamicGI::UpdateSceneInspection(const Math::Camera& camera)
+void DynamicGI::UpdateEditor(const Math::Camera& camera)
 {
+    ImGuiLayer::ShowPanel(kDebugPanelName, s_ShowDebugPanel, ShowDebugPanelContent);
+
     if (FindProbeVolume() == nullptr)
         return;
 
