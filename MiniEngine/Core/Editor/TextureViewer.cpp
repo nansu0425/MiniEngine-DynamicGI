@@ -64,6 +64,7 @@ namespace
     {
         std::string name;
         ColorBuffer* texture;
+        TextureViewer::Annotation annotation;
     };
 
     struct TexelCoordinate
@@ -146,6 +147,56 @@ namespace
     bool IsZoomInRange(float pixelsPerTexel)
     {
         return pixelsPerTexel >= exp2f(-kMaxZoomLevel) && pixelsPerTexel <= exp2f(kMaxZoomLevel);
+    }
+
+    std::optional<uint32_t> FindMarkedRow(const RegisteredTexture& registered)
+    {
+        const TextureViewer::Annotation& annotation = registered.annotation;
+        if (!annotation.findMarkedRow)
+            return std::nullopt;
+        const std::optional<uint32_t> row = annotation.findMarkedRow();
+        if (!row || *row >= registered.texture->GetHeight())
+            return std::nullopt;
+        return row;
+    }
+
+    std::string DescribeTexel(const RegisteredTexture& registered, const TexelCoordinate& texel)
+    {
+        const TextureViewer::Annotation& annotation = registered.annotation;
+        if (!annotation.describeTexel)
+            return std::string();
+        return annotation.describeTexel(DirectX::XMUINT2((uint32_t)texel.x, (uint32_t)texel.y));
+    }
+
+    bool FocusMarkedRow(void)
+    {
+        const RegisteredTexture& registered = s_Textures[s_Selected];
+        const std::optional<uint32_t> row = FindMarkedRow(registered);
+        if (!row || s_ViewSize.x < 1.0f)
+            return false;
+        s_PixelsPerTexel = std::clamp(s_ViewSize.x / registered.texture->GetWidth(), exp2f(-kMaxZoomLevel), exp2f(kMaxZoomLevel));
+        s_CenterTexel = ImVec2(registered.texture->GetWidth() * 0.5f, *row + 0.5f);
+        s_Fit = false;
+        return true;
+    }
+
+    void ShowMarkedRow(const RegisteredTexture& registered)
+    {
+        const std::string& name = registered.annotation.markedRowName;
+        if (name.empty())
+            return;
+        const std::optional<uint32_t> row = FindMarkedRow(registered);
+        const std::string buttonLabel = "Focus " + name;
+        ImGui::BeginDisabled(!row);
+        if (ImGui::Button(buttonLabel.c_str()))
+            FocusMarkedRow();
+        ImGui::EndDisabled();
+        ImGui::SetItemTooltip("Zooms the view so that the row of the %s spans the width of the view, with the row at the center.", name.c_str());
+        ImGui::SameLine();
+        if (row)
+            ImGui::Text("%s: row %u", name.c_str(), *row);
+        else
+            ImGui::TextDisabled("%s: none", name.c_str());
     }
 
     void ShowTextureCombo(void)
@@ -356,6 +407,29 @@ namespace
         return s_Display;
     }
 
+    ImVec2 GetPixelAt(const ImVec2& texel, const ImVec2& regionOrigin, const ImVec2& region)
+    {
+        return ImVec2(regionOrigin.x + region.x * 0.5f + (texel.x - s_CenterTexel.x) * s_PixelsPerTexel,
+            regionOrigin.y + region.y * 0.5f + (texel.y - s_CenterTexel.y) * s_PixelsPerTexel);
+    }
+
+    void OutlineMarkedRow(const ColorBuffer& texture, const ImVec2& regionOrigin, const ImVec2& region)
+    {
+        const std::optional<uint32_t> row = FindMarkedRow(s_Textures[s_Selected]);
+        if (!row)
+            return;
+
+        const ImU32 outlineColor = IM_COL32(255, 140, 26, 255);
+        const float outlineThickness = 2.0f;
+        const ImVec2 rowMin = GetPixelAt(ImVec2(0.0f, (float)*row), regionOrigin, region);
+        const ImVec2 rowMax = GetPixelAt(ImVec2((float)texture.GetWidth(), (float)(*row + 1)), regionOrigin, region);
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        drawList->PushClipRect(regionOrigin, ImVec2(regionOrigin.x + region.x, regionOrigin.y + region.y), true);
+        drawList->AddRect(ImVec2(rowMin.x - outlineThickness, rowMin.y - outlineThickness),
+            ImVec2(rowMax.x + outlineThickness, rowMax.y + outlineThickness), outlineColor, 0.0f, 0, outlineThickness);
+        drawList->PopClipRect();
+    }
+
     void ShowView(ColorBuffer& texture)
     {
         const ImVec2 cursor = ImGui::GetCursorScreenPos();
@@ -381,6 +455,7 @@ namespace
         const ImVec2 uvMax(region.x / display.GetWidth(), region.y / display.GetHeight());
         ImGui::GetWindowDrawList()->AddImage(ImGuiLayer::BindTexture(display), origin, ImVec2(origin.x + region.x, origin.y + region.y),
             ImVec2(0.0f, 0.0f), uvMax);
+        OutlineMarkedRow(texture, origin, region);
     }
 
     void ShowInspectedTexel(const ColorBuffer& texture)
@@ -397,7 +472,11 @@ namespace
         float mean[4];
         for (int channel = 0; channel < 4; ++channel)
             mean[channel] = (float)(summary.sum[channel] / summary.frames);
-        ImGui::Text("texel (%d, %d), %u frames", summary.texel.x, summary.texel.y, summary.frames);
+        const std::string description = DescribeTexel(s_Textures[summary.textureIndex], summary.texel);
+        if (description.empty())
+            ImGui::Text("texel (%d, %d), %u frames", summary.texel.x, summary.texel.y, summary.frames);
+        else
+            ImGui::Text("texel (%d, %d), %u frames, %s", summary.texel.x, summary.texel.y, summary.frames, description.c_str());
         ImGui::Text("mean   r %.4g  g %.4g  b %.4g  a %.4g", mean[0], mean[1], mean[2], mean[3]);
         ImGui::Text("range  r %.4g ~ %.4g  g %.4g ~ %.4g  b %.4g ~ %.4g  a %.4g ~ %.4g", summary.min[0], summary.max[0],
             summary.min[1], summary.max[1], summary.min[2], summary.max[2], summary.min[3], summary.max[3]);
@@ -413,9 +492,14 @@ namespace
         float mean[4];
         for (int channel = 0; channel < 4; ++channel)
             mean[channel] = (float)(summary.sum[channel] / summary.frames);
-        return ControlChannel::Fields().Text("texture", s_Textures[summary.textureIndex].name)
+        const RegisteredTexture& registered = s_Textures[summary.textureIndex];
+        ControlChannel::Fields fields = ControlChannel::Fields().Text("texture", registered.name)
             .Integer("x", summary.texel.x).Integer("y", summary.texel.y).Integer("frames", summary.frames)
             .Object("mean", DescribeChannels(mean)).Object("min", DescribeChannels(summary.min)).Object("max", DescribeChannels(summary.max));
+        const std::string description = DescribeTexel(registered, summary.texel);
+        if (!description.empty())
+            fields.Text("description", description);
+        return fields;
     }
 
     void ShowSelectedTexture(void)
@@ -431,6 +515,7 @@ namespace
 
         ImGui::Text("%u x %u, %s", texture.GetWidth(), texture.GetHeight(), GetFormatName(texture.GetFormat()));
         ShowDisplayControls();
+        ShowMarkedRow(s_Textures[s_Selected]);
         ShowInspectedTexel(texture);
         ShowView(texture);
     }
@@ -452,7 +537,20 @@ namespace
 
         ControlChannel::Fields fields;
         if (!s_Textures.empty())
-            fields.Text("texture", s_Textures[s_Selected].name);
+        {
+            const RegisteredTexture& selected = s_Textures[s_Selected];
+            fields.Text("texture", selected.name);
+            if (!selected.annotation.markedRowName.empty())
+            {
+                const std::optional<uint32_t> row = FindMarkedRow(selected);
+                ControlChannel::Fields markedRow = ControlChannel::Fields().Text("name", selected.annotation.markedRowName);
+                if (row)
+                    markedRow.Integer("row", *row);
+                else
+                    markedRow.Text("row", "none");
+                fields.Object("marked_row", markedRow);
+            }
+        }
         fields.Text("channel", kChannels[s_Channel].name).Float("exposure_value", s_ExposureValue).Float("value_interval", s_SummaryInterval)
             .Flag("fit", s_Fit).Float("pixels_per_texel", s_PixelsPerTexel)
             .Object("center", ControlChannel::Fields().Float("x", s_CenterTexel.x).Float("y", s_CenterTexel.y))
@@ -580,12 +678,15 @@ namespace
             error = SetZoom(value) ? "" : "zoom takes pixels per texel from 1/1024 to 1024 and the texel at the center, not '" + value + "'";
         else if (action == "fit" && value.empty())
             s_Fit = true;
+        else if (action == "focus" && value.empty())
+            error = FocusMarkedRow() ? "" : "focus needs a marked row in the selected texture, as state texture_viewer.marked_row shows, "
+                "and the panel open with its view drawn";
         else if (action == "inspect")
             error = SetInspectTarget(value) ? "" : "inspect takes the texel coordinates as two integers, not '" + value + "'";
         else if (action == "interval")
             error = SetSummaryInterval(value) ? "" : "interval takes seconds from 0 to 10, not '" + value + "'";
         else
-            error = "usage: texture-viewer select <name> | channel RGB|R|G|B|A | ev <value> | zoom <pixels per texel> <x> <y> | fit | inspect <x> <y> "
+            error = "usage: texture-viewer select <name> | channel RGB|R|G|B|A | ev <value> | zoom <pixels per texel> <x> <y> | fit | focus | inspect <x> <y> "
                 "| interval <seconds> | save <path without extension>";
 
         if (!error.empty())
@@ -629,17 +730,22 @@ void TextureViewer::Initialize(void)
     s_TexelReadback.Create(L"Texture Viewer Texel Readback", kNumReadbackSlots, sizeof(InspectedTexel::value));
 
     ControlChannel::Register("texture-viewer", "texture-viewer select <name> | channel RGB|R|G|B|A | ev <value> | zoom <pixels per texel> <x> <y> "
-        "| fit | inspect <x> <y> | interval <seconds> | save <path without extension>: the texture the Texture Viewer panel shows, the channel it shows, its exposure in EV "
+        "| fit | focus | inspect <x> <y> | interval <seconds> | save <path without extension>: the texture the Texture Viewer panel shows, the channel it shows, its exposure in EV "
         "from -16 to 16, its zoom and the seconds from 0 to 10 over which it summarizes a texel's values, as the panel's Texture, Channel, "
-        "Exposure (EV), mouse wheel, drag, Fit and Value Interval (s) change them. A channel of R, G, B or A shows that component as gray. "
+        "Exposure (EV), mouse wheel, drag, Fit, Focus and Value Interval (s) change them. A channel of R, G, B or A shows that component as gray. "
         "zoom shows each texel as pixels per texel screen pixels, from 1/1024 to 1024, with texel coordinate (x, y) at the center of the view, "
         "where texel (i, j) covers [i, i + 1) x [j, j + 1). Each screen pixel shows the one texel at its center. fit, and selecting a texture, "
-        "fits the whole texture in the view while the panel is open, until zoom, the wheel or a drag. inspect reads texel (x, y) of the texture "
+        "fits the whole texture in the view while the panel is open, until zoom, the wheel or a drag. "
+        "Some textures mark a row, as Probe Ray Samples marks the row of the selected probe, and the view outlines the row. "
+        "focus zooms the view, at the size the panel last drew it, so that the marked row spans its width with the row at the center, "
+        "as the Focus button does, and fails unless the selected texture marks a row and the panel has drawn its view. inspect reads texel (x, y) of the texture "
         "every frame while the panel is open, as hovering the view does, without waiting for the GPU. state texture_viewer has them, "
-        "the view where the panel last drew the texture in client pixels, and the textures it can show, each with its size and format once "
+        "the view where the panel last drew the texture in client pixels, the marked_row of the selected texture with its name and its row "
+        "or none while the texture can mark a row, and the textures it can show, each with its size and format once "
         "its owner has created it. Its inspected has the float4 of the last texel read with the texture and texel it came from, a few frames "
         "behind. Its inspected_summary has what the panel shows: the mean, min and max of the values read from one texel over the last "
-        "interval, and how many frames they came from. An interval of 0 shows every value. A new texel shows its first value at once "
+        "interval, how many frames they came from, and the description of the texel where the texture has one, "
+        "such as the probe and the ray of a texel of Probe Ray Samples. An interval of 0 shows every value. A new texel shows its first value at once "
         "and starts the interval over. save writes the whole selected texture as stored, in its own format, to <path>.dds "
         "and replies with the path, size and format. It waits for the GPU and works while the panel is closed", ChangeViewByCommand);
     ControlChannel::RegisterState("texture_viewer", DescribeState);
@@ -652,9 +758,9 @@ void TextureViewer::Shutdown(void)
     s_TexelReadback.Destroy();
 }
 
-void TextureViewer::AddTexture(const std::string& name, ColorBuffer& texture)
+void TextureViewer::AddTexture(const std::string& name, ColorBuffer& texture, const Annotation& annotation)
 {
-    s_Textures.push_back({ name, &texture });
+    s_Textures.push_back({ name, &texture, annotation });
 }
 
 void TextureViewer::Show(void)
