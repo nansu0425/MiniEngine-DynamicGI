@@ -8,11 +8,16 @@ float GetProbeBackFaceRatio(Texture2D<float> backFaceRatios, IrradianceProbeGrid
     return backFaceRatios[uint2(GetProbeIndex(grid, coordinate), 0)];
 }
 
+bool IsProbeInsideGeometry(float maxBackFaceRatio, float backFaceRatio)
+{
+    return backFaceRatio > maxBackFaceRatio;
+}
+
 float GetProbeActiveWeight(uint classification, float maxBackFaceRatio, Texture2D<float> backFaceRatios, IrradianceProbeGrid grid, uint3 coordinate)
 {
     if (classification == 0)
         return 1.0;
-    return GetProbeBackFaceRatio(backFaceRatios, grid, coordinate) <= maxBackFaceRatio ? 1.0 : 0.0;
+    return IsProbeInsideGeometry(maxBackFaceRatio, GetProbeBackFaceRatio(backFaceRatios, grid, coordinate)) ? 0.0 : 1.0;
 }
 
 #endif
