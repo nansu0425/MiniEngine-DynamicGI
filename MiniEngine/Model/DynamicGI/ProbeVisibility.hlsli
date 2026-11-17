@@ -10,9 +10,9 @@ static const uint kProbeVisibilityNone = 0;
 static const uint kProbeVisibilityShadowRay = 1;
 static const uint kProbeVisibilityChebyshev = 2;
 
-bool CanShadowRayReachProbe(IrradianceProbeGrid grid, uint3 coordinate, float3 position, float3 geometryNormal)
+bool CanShadowRayReachProbe(ProbePositions positions, uint3 coordinate, float3 position, float3 geometryNormal)
 {
-    const float3 toProbe = GetProbePosition(grid, coordinate) - position;
+    const float3 toProbe = GetProbePosition(positions, coordinate) - position;
     const float distance = length(toProbe);
     RayDesc ray;
     if (!DescribeSurfaceRay(position, geometryNormal, toProbe / distance, ray))
@@ -29,10 +29,10 @@ struct ProbeDistanceSample
 
 ProbeDistanceSample SampleProbeDistance(ProbeVolume volume, SamplerState linearClamp, uint3 coordinate, float3 position)
 {
-    const float3 fromProbe = position - GetProbePosition(volume.grid, coordinate);
+    const float3 fromProbe = position - GetProbePosition(volume.positions, coordinate);
     ProbeDistanceSample result;
     result.distance = length(fromProbe);
-    const float2 uv = GetProbeAtlasUV(volume.grid, volume.distanceAtlas.texelsPerSide, coordinate, fromProbe / result.distance);
+    const float2 uv = GetProbeAtlasUV(volume.positions.grid, volume.distanceAtlas.texelsPerSide, coordinate, fromProbe / result.distance);
     result.moments = volume.distanceAtlas.moments.SampleLevel(linearClamp, uv, 0.0);
     return result;
 }
@@ -57,7 +57,7 @@ float GetProbeVisibilityWeight(uint visibility, float chebyshevExponent, ProbeVo
     ProbeLookupSurface surface, float3 distanceLookupPosition)
 {
     if (visibility == kProbeVisibilityShadowRay)
-        return CanShadowRayReachProbe(volume.grid, coordinate, surface.position, surface.geometryNormal) ? 1.0 : 0.0;
+        return CanShadowRayReachProbe(volume.positions, coordinate, surface.position, surface.geometryNormal) ? 1.0 : 0.0;
     if (visibility == kProbeVisibilityChebyshev)
         return GetChebyshevVisibility(chebyshevExponent, SampleProbeDistance(volume, linearClamp, coordinate, distanceLookupPosition));
     return 1.0;

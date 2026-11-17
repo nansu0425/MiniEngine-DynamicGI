@@ -47,18 +47,18 @@ WeightedProbeCorners GetWeightedProbeCorners(ProbeWeighting weighting, ProbeVolu
     const float3 facingNormal = weighting.facingNormal == kProbeFacingNormalShading ? surface.shadingNormal : surface.geometryNormal;
     WeightedProbeCorners probes;
     probes.distanceLookupPosition = weighting.visibility == kProbeVisibilityChebyshev ?
-        GetDistanceLookupPosition(weighting.selfShadowBias, volume.grid, surface) : surface.position;
+        GetDistanceLookupPosition(weighting.selfShadowBias, volume.positions.grid, surface) : surface.position;
     probes.weightSum = 0.0;
     [unroll]
     for (uint corner = 0; corner < kNumProbeCorners; ++corner)
     {
-        probes.corners[corner] = GetIrradianceProbeCorner(volume.grid, surface.position, corner);
-        probes.activeWeights[corner] = GetProbeActiveWeight(weighting.classification, weighting.maxBackFaceRatio, volume.backFaceRatios, volume.grid,
+        probes.corners[corner] = GetIrradianceProbeCorner(volume.positions.grid, surface.position, corner);
+        probes.activeWeights[corner] = GetProbeActiveWeight(weighting.classification, weighting.maxBackFaceRatio, volume.backFaceRatios, volume.positions.grid,
             probes.corners[corner].coordinate);
         probes.visibilityWeights[corner] = GetProbeVisibilityWeight(weighting.visibility, weighting.chebyshevExponent, volume, linearClamp,
             probes.corners[corner].coordinate, surface, probes.distanceLookupPosition);
         probes.facingWeights[corner] = weighting.facing != 0 ?
-            GetProbeFacingWeight(weighting.minFacingWeight, volume.grid, probes.corners[corner].coordinate, surface.position, facingNormal) : 1.0;
+            GetProbeFacingWeight(weighting.minFacingWeight, volume.positions, probes.corners[corner].coordinate, surface.position, facingNormal) : 1.0;
         const float occlusionWeight = CrushWeakProbeWeight(weighting.weightCrushThreshold,
             probes.activeWeights[corner] * probes.visibilityWeights[corner] * probes.facingWeights[corner]);
         probes.weights[corner] = probes.corners[corner].trilinearWeight * occlusionWeight;
@@ -90,7 +90,7 @@ float3 SampleWeightedIrradianceProbes(ProbeWeighting weighting, ProbeVolume volu
         if (probes.weights[corner] == 0.0)
             continue;
         const float3 probeIrradiance =
-            SampleProbeIrradiance(volume.irradianceAtlas, linearClamp, volume.grid, probes.corners[corner].coordinate, surface.shadingNormal);
+            SampleProbeIrradiance(volume.irradianceAtlas, linearClamp, volume.positions.grid, probes.corners[corner].coordinate, surface.shadingNormal);
         irradiance += probes.weights[corner] * probeIrradiance;
     }
     return irradiance / probes.weightSum;

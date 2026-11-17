@@ -1,7 +1,7 @@
 #ifndef __PROBE_VOLUME_HLSLI__
 #define __PROBE_VOLUME_HLSLI__
 
-#include "Core/Shaders/IrradianceProbes.hlsli"
+#include "Model/DynamicGI/ProbePositions.hlsli"
 
 struct ProbeDistanceAtlas
 {
@@ -19,17 +19,17 @@ ProbeDistanceAtlas MakeProbeDistanceAtlas(Texture2D<float2> moments, uint texels
 
 struct ProbeVolume
 {
-    IrradianceProbeGrid grid;
+    ProbePositions positions;
     Texture2D<float4> irradianceAtlas;
     ProbeDistanceAtlas distanceAtlas;
     Texture2D<float> backFaceRatios;
 };
 
-ProbeVolume MakeProbeVolume(IrradianceProbeGrid grid, Texture2D<float4> irradianceAtlas, ProbeDistanceAtlas distanceAtlas,
+ProbeVolume MakeProbeVolume(ProbePositions positions, Texture2D<float4> irradianceAtlas, ProbeDistanceAtlas distanceAtlas,
     Texture2D<float> backFaceRatios)
 {
     ProbeVolume volume;
-    volume.grid = grid;
+    volume.positions = positions;
     volume.irradianceAtlas = irradianceAtlas;
     volume.distanceAtlas = distanceAtlas;
     volume.backFaceRatios = backFaceRatios;

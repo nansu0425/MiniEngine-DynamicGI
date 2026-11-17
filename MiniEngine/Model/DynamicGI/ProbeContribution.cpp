@@ -16,7 +16,7 @@ using namespace Graphics;
 
 namespace
 {
-    static_assert(sizeof(ProbeContribution::Surface) == 532, "ProbeContribution.hlsli의 SurfaceProbeContribution과 크기가 다르다");
+    static_assert(sizeof(ProbeContribution::Surface) == 628, "ProbeContribution.hlsli의 SurfaceProbeContribution과 크기가 다르다");
 
     enum RootParameter { kConstants, kScene, kInputs = kScene + RaytracingScene::kNumRootParameters, kOutputs, kNumRootParameters };
 
@@ -65,7 +65,7 @@ void ProbeContribution::Initialize(void)
     s_RootSignature.Reset(kNumRootParameters, 1);
     s_RootSignature[kConstants].InitAsConstantBuffer(0);
     RaytracingScene::InitRootParameters(s_RootSignature, kScene);
-    s_RootSignature[kInputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, kNumGBufferTargets + 3);
+    s_RootSignature[kInputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, kNumGBufferTargets + 4);
     s_RootSignature[kOutputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 1);
     s_RootSignature.InitStaticSampler(0, SamplerLinearClampDesc);
     s_RootSignature.Finalize(L"Probe Contribution");
@@ -74,7 +74,7 @@ void ProbeContribution::Initialize(void)
     s_PSO.SetComputeShader(g_pProbeContributionCS, sizeof(g_pProbeContributionCS));
     s_PSO.Finalize();
 
-    s_Inputs.Create(kNumGBufferTargets + 3);
+    s_Inputs.Create(kNumGBufferTargets + 4);
     s_Outputs.Create(1);
     s_Surface.Create(L"Probe Contribution Surface", 1, sizeof(Surface));
     s_SurfaceReadback.Create(L"Probe Contribution Surface Readback", 1, sizeof(Surface));
@@ -107,6 +107,7 @@ void ProbeContribution::Measure(const ProbeWeighting::Settings& weighting, const
         s_Inputs.PointTo(kNumGBufferTargets, probes.irradiance, probes.irradiance.GetSRV());
         s_Inputs.PointTo(kNumGBufferTargets + 1, probes.distance, probes.distance.GetSRV());
         s_Inputs.PointTo(kNumGBufferTargets + 2, probes.backFaceRatio, probes.backFaceRatio.GetSRV());
+        s_Inputs.PointTo(kNumGBufferTargets + 3, probes.offset, probes.offset.GetSRV());
         s_Outputs.PointTo(0, s_Surface, s_Surface.GetUAV());
 
         const Constants constants = {
@@ -123,6 +124,7 @@ void ProbeContribution::Measure(const ProbeWeighting::Settings& weighting, const
         context.TransitionResource(probes.irradiance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
         context.TransitionResource(probes.distance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
         context.TransitionResource(probes.backFaceRatio, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+        context.TransitionResource(probes.offset, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
         context.TransitionResource(s_Surface, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, true);
         context.SetDynamicConstantBufferView(kConstants, sizeof(constants), &constants);
         scene.Bind(context, kScene);

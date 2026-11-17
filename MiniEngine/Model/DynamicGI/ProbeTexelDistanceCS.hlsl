@@ -1,4 +1,5 @@
 #include "Model/DynamicGI/ProbeRayHit.hlsli"
+#include "Model/DynamicGI/ProbePositions.hlsli"
 
 cbuffer Constants : register(b0)
 {
@@ -6,6 +7,7 @@ cbuffer Constants : register(b0)
     IrradianceProbeGrid Grid;
 };
 
+Texture2D<float4> ProbesOffset : register(t0);
 RWTexture2D<float> ProbesTexelDistance : register(u0);
 
 [numthreads(8, 8, 1)]
@@ -18,6 +20,6 @@ void main(uint3 DTid : SV_DispatchThreadID)
     const uint3 coordinate = GetProbeCoordinate(Grid, DTid.z);
     RayHit rayHit;
     float distance;
-    TraceProbeRayHit(Grid, GetProbePosition(Grid, coordinate), GetProbeTexelDirection(DistanceTexelsPerSide, probeTexel), rayHit, distance);
+    TraceProbeRayHit(Grid, GetProbePosition(MakeProbePositions(Grid, ProbesOffset), coordinate), GetProbeTexelDirection(DistanceTexelsPerSide, probeTexel), rayHit, distance);
     ProbesTexelDistance[GetProbeAtlasTexel(Grid, DistanceTexelsPerSide, coordinate, probeTexel)] = distance;
 }

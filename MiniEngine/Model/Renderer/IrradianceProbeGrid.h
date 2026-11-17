@@ -24,7 +24,7 @@ inline uint32_t GetProbeIndex(const IrradianceProbeGrid& grid, const DirectX::XM
     return coordinate.x + (coordinate.y + coordinate.z * grid.counts[1]) * grid.counts[0];
 }
 
-inline Math::Vector3 GetProbePosition(const IrradianceProbeGrid& grid, uint32_t probe)
+inline Math::Vector3 GetProbeGridPosition(const IrradianceProbeGrid& grid, uint32_t probe)
 {
     const DirectX::XMUINT3 coordinate = GetProbeCoordinate(grid, probe);
     return grid.origin + Math::Vector3((float)coordinate.x, (float)coordinate.y, (float)coordinate.z) * grid.spacing;

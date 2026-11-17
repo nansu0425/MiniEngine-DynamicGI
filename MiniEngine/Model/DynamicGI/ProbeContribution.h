@@ -14,6 +14,7 @@ namespace ProbeContribution
     struct Corner
     {
         DirectX::XMUINT3 coordinate;
+        DirectX::XMFLOAT3 position;
         float trilinearWeight;
         float backFaceRatio;
         float activeWeight;

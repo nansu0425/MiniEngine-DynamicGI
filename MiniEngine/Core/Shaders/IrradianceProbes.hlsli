@@ -44,7 +44,7 @@ uint GetProbeIndex(IrradianceProbeGrid grid, uint3 coordinate)
     return coordinate.x + (coordinate.y + coordinate.z * grid.counts.y) * grid.counts.x;
 }
 
-float3 GetProbePosition(IrradianceProbeGrid grid, uint3 coordinate)
+float3 GetProbeGridPosition(IrradianceProbeGrid grid, uint3 coordinate)
 {
     return grid.origin + float3(coordinate) * grid.spacing;
 }

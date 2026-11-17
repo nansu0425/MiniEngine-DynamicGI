@@ -42,9 +42,9 @@ float GetCornerPixels(float weight)
     return weight == 0.0 ? kOccludedCornerPixels : lerp(kMinCornerPixels, kMaxCornerPixels, weight);
 }
 
-float3 GetCornerPosition(SurfaceProbeContribution contribution, uint corner)
+float3 GetCornerGridPosition(SurfaceProbeContribution contribution, uint corner)
 {
-    return GetProbePosition(Grid, contribution.corners[corner].coordinate);
+    return GetProbeGridPosition(Grid, contribution.corners[corner].coordinate);
 }
 
 uint2 GetCellEdgeCorners(uint edge)
@@ -67,7 +67,7 @@ Ribbon DescribeRibbon(SurfaceProbeContribution contribution, uint index)
     {
         const float weight = contribution.corners[index].weight;
         ribbon.start = contribution.distanceLookupPosition;
-        ribbon.end = GetCornerPosition(contribution, index);
+        ribbon.end = contribution.corners[index].position;
         ribbon.dashed = weight == 0.0;
         ribbon.pixels = GetCornerPixels(weight);
         ribbon.color = kCornerColor;
@@ -77,8 +77,8 @@ Ribbon DescribeRibbon(SurfaceProbeContribution contribution, uint index)
     else if (index < kNormalRibbon)
     {
         const uint2 corners = GetCellEdgeCorners(index - kFirstCellEdgeRibbon);
-        ribbon.start = GetCornerPosition(contribution, corners.x);
-        ribbon.end = GetCornerPosition(contribution, corners.y);
+        ribbon.start = GetCornerGridPosition(contribution, corners.x);
+        ribbon.end = GetCornerGridPosition(contribution, corners.y);
         ribbon.pixels = kCellEdgePixels;
         ribbon.color = kCellEdgeColor;
     }
@@ -94,7 +94,7 @@ Ribbon DescribeRibbon(SurfaceProbeContribution contribution, uint index)
     {
         const uint corner = index - kFirstDistanceMeanRibbon;
         const ProbeCornerContribution probe = contribution.corners[corner];
-        ribbon.start = GetCornerPosition(contribution, corner);
+        ribbon.start = probe.position;
         ribbon.end = ribbon.start + normalize(contribution.distanceLookupPosition - ribbon.start) * probe.distanceMean;
         ribbon.pixels = kDistanceMeanPixels;
         ribbon.sidePixels = 0.5 * GetCornerPixels(probe.weight) + kDistanceMeanGapPixels + 0.5 * kDistanceMeanPixels;

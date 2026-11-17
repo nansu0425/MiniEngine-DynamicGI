@@ -15,6 +15,7 @@ Texture2D<float> ShadowMap : register(t0);
 Texture2D<float4> ProbesIrradiance : register(t1);
 Texture2D<float2> ProbesDistance : register(t2);
 Texture2D<float> ProbesBackFaceRatio : register(t3);
+Texture2D<float4> ProbesOffset : register(t4);
 SamplerComparisonState ShadowMapSampler : register(s0);
 SamplerState LinearClamp : register(s1);
 RWTexture2D<float4> RaySamples : register(u0);
@@ -27,7 +28,7 @@ struct ProbeRaySample
     bool hitsBackFace;
 };
 
-ProbeRaySample TraceProbeRay(float3 origin, float3 direction)
+ProbeRaySample TraceProbeRay(ProbePositions positions, float3 origin, float3 direction)
 {
     ProbeRaySample sample;
     sample.hitsBackFace = false;
@@ -48,7 +49,7 @@ ProbeRaySample TraceProbeRay(float3 origin, float3 direction)
     const HitSurface surface = GetHitSurface(rayHit, kSharpestTextureLod);
     const GltfBrdfInput brdf = MakeGltfBrdfInput(surface.baseColor.rgb, surface.metallic, surface.roughness, surface.shadingNormal, -direction);
     const ProbeDistanceAtlas distanceAtlas = MakeProbeDistanceAtlas(ProbesDistance, DistanceTexelsPerSide);
-    const ProbeVolume volume = MakeProbeVolume(Rays.grid, ProbesIrradiance, distanceAtlas, ProbesBackFaceRatio);
+    const ProbeVolume volume = MakeProbeVolume(positions, ProbesIrradiance, distanceAtlas, ProbesBackFaceRatio);
     const ProbeLookupSurface lookupSurface = MakeProbeLookupSurface(surface.position, surface.geometryNormal, surface.shadingNormal);
     const float3 irradiance = InterpolatesTrilinearly(Weighting) ?
         SampleIrradianceProbes(ProbesIrradiance, LinearClamp, Rays.grid, surface.position, surface.shadingNormal) :
@@ -68,8 +69,9 @@ void main(uint2 DTid : SV_DispatchThreadID)
     if (ray >= Rays.raysPerProbe || probe >= GetProbeCount(Rays.grid))
         return;
 
-    const float3 origin = GetProbePosition(Rays.grid, GetProbeCoordinate(Rays.grid, probe));
-    const ProbeRaySample sample = TraceProbeRay(origin, GetProbeRayDirection(Rays, ray));
+    const ProbePositions positions = MakeProbePositions(Rays.grid, ProbesOffset);
+    const float3 origin = GetProbePosition(positions, GetProbeCoordinate(Rays.grid, probe));
+    const ProbeRaySample sample = TraceProbeRay(positions, origin, GetProbeRayDirection(Rays, ray));
     RaySamples[DTid] = float4(sample.radiance, sample.distance);
     RayBackFaces[DTid] = sample.hitsBackFace ? 1.0 : 0.0;
 }

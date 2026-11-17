@@ -1,8 +1,10 @@
 #include "Model/DynamicGI/ProbeDistanceLine.hlsli"
+#include "Model/DynamicGI/ProbePositions.hlsli"
 
 Texture2D<float2> ProbesDistance : register(t0);
 Texture2D<float4> RaySamples : register(t1);
 Texture2D<float> ProbesTexelDistance : register(t2);
+Texture2D<float4> ProbesOffset : register(t3);
 
 static const float3 kTexelMeanColor = float3(1.0, 0.85, 0.0);
 static const float3 kTexelDistanceColor = float3(1.0, 0.0, 1.0);
@@ -56,7 +58,7 @@ ProbeDistanceLineVertex main(uint vertexID : SV_VertexID, uint lineIndex : SV_In
 
     vertex.opacity = GetLineOpacity(lineIndex);
 
-    const float3 position = GetProbePosition(Grid, coordinate) + direction * distance * vertexID;
+    const float3 position = GetProbePosition(MakeProbePositions(Grid, ProbesOffset), coordinate) + direction * distance * vertexID;
     vertex.position = mul(ViewProj, float4(position, 1.0));
     return vertex;
 }

@@ -14,6 +14,7 @@ cbuffer Constants : register(b0)
 Texture2D<float4> ProbesIrradiance : register(t5);
 Texture2D<float2> ProbesDistance : register(t6);
 Texture2D<float> ProbesBackFaceRatio : register(t7);
+Texture2D<float4> ProbesOffset : register(t8);
 SamplerState LinearClamp : register(s0);
 RWStructuredBuffer<SurfaceProbeContribution> Contribution : register(u0);
 
@@ -36,7 +37,7 @@ void main()
     }
 
     const ProbeDistanceAtlas distanceAtlas = MakeProbeDistanceAtlas(ProbesDistance, DistanceTexelsPerSide);
-    const ProbeVolume volume = MakeProbeVolume(Grid, ProbesIrradiance, distanceAtlas, ProbesBackFaceRatio);
+    const ProbeVolume volume = MakeProbeVolume(MakeProbePositions(Grid, ProbesOffset), ProbesIrradiance, distanceAtlas, ProbesBackFaceRatio);
     const ProbeLookupSurface lookupSurface = MakeProbeLookupSurface(result.position, result.geometryNormal, result.shadingNormal);
     const WeightedProbeCorners probes = GetWeightedProbeCorners(Weighting, volume, LinearClamp, lookupSurface);
     result.distanceLookupPosition = probes.distanceLookupPosition;
@@ -48,6 +49,7 @@ void main()
     {
         ProbeCornerContribution contribution;
         contribution.coordinate = probes.corners[corner].coordinate;
+        contribution.position = GetProbePosition(volume.positions, contribution.coordinate);
         contribution.trilinearWeight = probes.corners[corner].trilinearWeight;
         contribution.backFaceRatio = GetProbeBackFaceRatio(ProbesBackFaceRatio, Grid, contribution.coordinate);
         contribution.activeWeight = probes.activeWeights[corner];

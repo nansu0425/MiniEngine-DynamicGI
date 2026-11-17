@@ -784,7 +784,7 @@ void DynamicGI::UpdateEditor(const Math::Camera& camera)
 
     const ProbeContribution::Surface* contribution = GetInspectedContribution();
     if (contribution != nullptr && contribution->hasSurface != 0)
-        ProbeVisualization::AnnotateContribution(camera, grid, *contribution, s_HoveredCorner);
+        ProbeVisualization::AnnotateContribution(camera, *contribution, s_HoveredCorner);
 }
 
 void DynamicGI::DrawProbes(GraphicsContext& context, const Math::Camera& camera, const D3D12_VIEWPORT& viewport, const D3D12_RECT& scissor)

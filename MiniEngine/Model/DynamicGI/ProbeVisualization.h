@@ -38,6 +38,6 @@ namespace ProbeVisualization
     void DrawContribution(GraphicsContext& context, const Math::Camera& camera, const IrradianceProbeGrid& grid, StructuredBuffer& contribution,
         std::optional<uint32_t> hoveredCorner);
 
-    void AnnotateContribution(const Math::Camera& camera, const IrradianceProbeGrid& grid, const ProbeContribution::Surface& contribution,
+    void AnnotateContribution(const Math::Camera& camera, const ProbeContribution::Surface& contribution,
         std::optional<uint32_t> hoveredCorner);
 }

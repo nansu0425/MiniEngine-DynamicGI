@@ -1,4 +1,7 @@
 #include "Model/DynamicGI/ProbeSphere.hlsli"
+#include "Model/DynamicGI/ProbePositions.hlsli"
+
+Texture2D<float4> ProbesOffset : register(t2);
 
 static const float2 kQuadCorners[6] =
 {
@@ -10,7 +13,7 @@ ProbeQuadVertex main(uint vertexID : SV_VertexID, uint probe : SV_InstanceID)
 {
     ProbeQuadVertex vertex;
     vertex.probeCoordinate= GetProbeCoordinate(Grid, probe);
-    vertex.probePosition = GetProbePosition(Grid, vertex.probeCoordinate);
+    vertex.probePosition = GetProbePosition(MakeProbePositions(Grid, ProbesOffset), vertex.probeCoordinate);
 
     const float3 toCenter = vertex.probePosition - CameraPosition;
     const float centerDistance = length(toCenter);

@@ -30,7 +30,7 @@ namespace
     constexpr uint32_t kVerticesPerLine = 2;
     constexpr uint32_t kVerticesPerArrow = 9;
 
-    enum RootParameter { kConstants, kIrradiance, kNumRootParameters };
+    enum RootParameter { kConstants, kInputs, kNumRootParameters };
     enum LineRootParameter { kLineConstants, kLineInputs, kNumLineRootParameters };
     enum class DistanceLines : uint32_t { kTexelMeans, kRaySamples, kTexelDistances };
     enum RibbonRootParameter { kRibbonConstants, kRibbonContribution, kNumRibbonRootParameters };
@@ -90,7 +90,7 @@ void ProbeVisualization::Initialize(void)
 {
     s_RootSignature.Reset(kNumRootParameters, 1);
     s_RootSignature[kConstants].InitAsConstantBuffer(0);
-    s_RootSignature[kIrradiance].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 2, D3D12_SHADER_VISIBILITY_PIXEL);
+    s_RootSignature[kInputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 3);
     s_RootSignature.InitStaticSampler(0, SamplerLinearClampDesc, D3D12_SHADER_VISIBILITY_PIXEL);
     s_RootSignature.Finalize(L"Probe Spheres");
 
@@ -108,7 +108,7 @@ void ProbeVisualization::Initialize(void)
 
     s_LineRootSignature.Reset(kNumLineRootParameters, 0);
     s_LineRootSignature[kLineConstants].InitAsConstantBuffer(0);
-    s_LineRootSignature[kLineInputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 3, D3D12_SHADER_VISIBILITY_VERTEX);
+    s_LineRootSignature[kLineInputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 4, D3D12_SHADER_VISIBILITY_VERTEX);
     s_LineRootSignature.Finalize(L"Probe Distance Lines");
 
     s_LinePSO.SetRootSignature(s_LineRootSignature);
@@ -161,8 +161,10 @@ void ProbeVisualization::DrawSpheres(GraphicsContext& context, const Camera& cam
     context.SetRenderTarget(g_SceneColorBuffer.GetRTV(), g_SceneDepthBuffer.GetDSV());
     context.SetViewportAndScissor(viewport, scissor);
     context.SetDynamicConstantBufferView(kConstants, sizeof(constants), &constants);
-    context.SetDynamicDescriptor(kIrradiance, 0, probes.irradiance.GetSRV());
-    context.SetDynamicDescriptor(kIrradiance, 1, probes.backFaceRatio.GetSRV());
+    context.TransitionResource(probes.offset, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+    context.SetDynamicDescriptor(kInputs, 0, probes.irradiance.GetSRV());
+    context.SetDynamicDescriptor(kInputs, 1, probes.backFaceRatio.GetSRV());
+    context.SetDynamicDescriptor(kInputs, 2, probes.offset.GetSRV());
     context.DrawInstanced(kVerticesPerQuad, GetProbeCount(probes.grid));
 }
 
@@ -174,7 +176,7 @@ std::optional<uint32_t> ProbeVisualization::FindProbeUnderCursor(const Camera& c
     float nearestDistance = FLT_MAX;
     for (uint32_t probe = 0; probe < GetProbeCount(grid); ++probe)
     {
-        const Vector3 position = GetProbePosition(grid, probe);
+        const Vector3 position = GetProbeGridPosition(grid, probe);
         ImVec2 center;
         if (!SceneEditor::ProjectToScene(camera, position, center))
             continue;
@@ -212,6 +214,7 @@ void ProbeVisualization::DrawDistanceLines(GraphicsContext& context, const Camer
     context.TransitionResource(probes.distance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     context.TransitionResource(probes.raySamples, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     context.TransitionResource(probes.texelDistance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+    context.TransitionResource(probes.offset, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     context.TransitionResource(g_SceneDepthBuffer, D3D12_RESOURCE_STATE_DEPTH_READ);
     context.TransitionResource(g_SceneOverlayBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
     context.SetRenderTarget(g_SceneOverlayBuffer.GetRTV(), g_SceneDepthBuffer.GetDSV_DepthReadOnly());
@@ -219,6 +222,7 @@ void ProbeVisualization::DrawDistanceLines(GraphicsContext& context, const Camer
     context.SetDynamicDescriptor(kLineInputs, 0, probes.distance.GetSRV());
     context.SetDynamicDescriptor(kLineInputs, 1, probes.raySamples.GetSRV());
     context.SetDynamicDescriptor(kLineInputs, 2, probes.texelDistance.GetSRV());
+    context.SetDynamicDescriptor(kLineInputs, 3, probes.offset.GetSRV());
 
     if (settings.showTexelMeans)
     {
@@ -267,7 +271,7 @@ void ProbeVisualization::DrawContribution(GraphicsContext& context, const Camera
     context.DrawInstanced(kVerticesPerArrow, kNumContributionRibbons);
 }
 
-void ProbeVisualization::AnnotateContribution(const Camera& camera, const IrradianceProbeGrid& grid, const ProbeContribution::Surface& contribution,
+void ProbeVisualization::AnnotateContribution(const Camera& camera, const ProbeContribution::Surface& contribution,
     std::optional<uint32_t> hoveredCorner)
 {
     const ImU32 textColor = IM_COL32(255, 255, 255, 255);
@@ -283,7 +287,7 @@ void ProbeVisualization::AnnotateContribution(const Camera& camera, const Irradi
     {
         const ProbeContribution::Corner& probe = contribution.corners[corner];
         ImVec2 center;
-        if (!SceneEditor::ProjectToScene(camera, GetProbePosition(grid, GetProbeIndex(grid, probe.coordinate)), center))
+        if (!SceneEditor::ProjectToScene(camera, Vector3(probe.position.x, probe.position.y, probe.position.z), center))
             continue;
 
         const char letter[] = { ProbeContribution::GetCornerLetter(corner), '\0' };
