@@ -248,7 +248,7 @@ namespace
             "Indirect Radiance shows the indirect light reflected toward the camera only. Without indirect light both views are black.");
     }
 
-    const char* kRelocationResultKeys[] = { "not_moved", "back_face_push", "blocked" };
+    const char* kRelocationResultKeys[] = { "not_moved", "back_face_push", "front_face_push", "blocked" };
 
     void ShowCensus(void)
     {
@@ -456,8 +456,8 @@ namespace
         }
         ImGui::Checkbox("Show Probe Offsets", &probeSpheres.showOffsets);
         ImGui::SetItemTooltip("Draws a line from the grid position of each probe to where Probe Relocation moved it. "
-            "Green lines end at a probe the last iteration pushed through a back face, red ones at a probe it could not move out within Max Probe Offset, "
-            "and gray ones at a probe it left where it was.");
+            "Green lines end at a probe the last iteration pushed through a back face, blue ones at a probe it moved away from a front face, "
+            "red ones at a probe it could not move within Max Probe Offset, and gray ones at a probe it left where it was.");
         ImGui::Checkbox("Show Texel Means", &probeSpheres.showTexelMeans);
         ImGui::SetItemTooltip("Draws a yellow line from the selected probe along the direction of each of its distance texels, "
             "as long as the mean distance the texel stores.");

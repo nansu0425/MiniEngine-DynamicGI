@@ -125,6 +125,7 @@ namespace
         float maxOffset;
         float maxPushScale;
         float minPushScale;
+        float minFrontFaceDistance;
         ProbeRays rays;
     };
 
@@ -261,11 +262,13 @@ namespace
     {
         ScopedTimer _prof(L"Probe Relocation", context);
 
+        const float shortestSpacing = GetShortestProbeSpacing(s_Grid);
         RelocationConstants constants = {
             .maxBackFaceRatio = relocation.maxBackFaceRatio,
-            .maxOffset = relocation.settings.maxOffset * GetShortestProbeSpacing(s_Grid),
+            .maxOffset = relocation.settings.maxOffset * shortestSpacing,
             .maxPushScale = relocation.settings.maxPushScale,
             .minPushScale = relocation.settings.minPushScale,
+            .minFrontFaceDistance = relocation.settings.minFrontFaceDistance * shortestSpacing,
         };
         s_RelocationOutputs.PointTo(0, s_ProbesOffset, s_ProbesOffset.GetUAV());
         context.SetRootSignature(s_RelocationRootSignature);

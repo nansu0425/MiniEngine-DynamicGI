@@ -5,12 +5,15 @@ Texture2D<float4> ProbesOffset : register(t0);
 
 static const float3 kNotMovedColor = float3(0.8, 0.8, 0.8);
 static const float3 kBackFacePushColor = float3(0.1, 0.85, 0.6);
+static const float3 kFrontFacePushColor = float3(0.3, 0.55, 1.0);
 static const float3 kBlockedColor = float3(1.0, 0.35, 0.2);
 
 float3 GetRelocationColor(uint result)
 {
     if (result == kProbeRelocationBackFacePush)
         return kBackFacePushColor;
+    if (result == kProbeRelocationFrontFacePush)
+        return kFrontFacePushColor;
     return result == kProbeRelocationBlocked ? kBlockedColor : kNotMovedColor;
 }
 

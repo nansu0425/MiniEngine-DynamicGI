@@ -5,7 +5,8 @@
 
 static const uint kProbeRelocationNotMoved = 0;
 static const uint kProbeRelocationBackFacePush = 1;
-static const uint kProbeRelocationBlocked = 2;
+static const uint kProbeRelocationFrontFacePush = 2;
+static const uint kProbeRelocationBlocked = 3;
 
 uint GetProbeRelocationResult(ProbePositions positions, uint3 coordinate)
 {
