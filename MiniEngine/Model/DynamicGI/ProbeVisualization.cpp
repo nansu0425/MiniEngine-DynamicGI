@@ -18,7 +18,6 @@
 #include "Output/Model/CompiledShaders/ProbeContributionRibbonPS.h"
 
 #include <imgui.h>
-#include <algorithm>
 #include <cfloat>
 
 using namespace Math;
@@ -79,11 +78,6 @@ namespace
         float normalLength;
         uint32_t hoveredCorner;
     };
-
-    float GetShortestSpacing(const IrradianceProbeGrid& grid)
-    {
-        return std::min({ (float)grid.spacing.GetX(), (float)grid.spacing.GetY(), (float)grid.spacing.GetZ() });
-    }
 }
 
 void ProbeVisualization::Initialize(void)
@@ -149,7 +143,7 @@ void ProbeVisualization::DrawSpheres(GraphicsContext& context, const Camera& cam
     constants.viewProj = camera.GetViewProjMatrix();
     constants.grid = probes.grid;
     XMStoreFloat3(&constants.cameraPosition, camera.GetPosition());
-    constants.radius = radiusPerSpacing * GetShortestSpacing(probes.grid);
+    constants.radius = radiusPerSpacing * GetShortestProbeSpacing(probes.grid);
     constants.classification = weighting.classification ? 1u : 0u;
     constants.maxBackFaceRatio = weighting.maxBackFaceRatio;
 
@@ -171,7 +165,7 @@ void ProbeVisualization::DrawSpheres(GraphicsContext& context, const Camera& cam
 std::optional<uint32_t> ProbeVisualization::FindProbeUnderCursor(const Camera& camera, const IrradianceProbeGrid& grid, float radiusPerSpacing)
 {
     const ImVec2 cursor = ImGui::GetMousePos();
-    const float radius = radiusPerSpacing * GetShortestSpacing(grid);
+    const float radius = radiusPerSpacing * GetShortestProbeSpacing(grid);
     std::optional<uint32_t> nearest;
     float nearestDistance = FLT_MAX;
     for (uint32_t probe = 0; probe < GetProbeCount(grid); ++probe)
@@ -256,7 +250,7 @@ void ProbeVisualization::DrawContribution(GraphicsContext& context, const Camera
     const uint32_t height = g_SceneOverlayBuffer.GetHeight();
     constants.viewportSize = XMFLOAT2((float)width, (float)height);
     constants.nearClip = camera.GetNearClip();
-    constants.normalLength = kNormalLengthPerSpacing * GetShortestSpacing(grid);
+    constants.normalLength = kNormalLengthPerSpacing * GetShortestProbeSpacing(grid);
     constants.hoveredCorner = hoveredCorner.value_or(kNoHoveredCorner);
 
     context.SetRootSignature(s_RibbonRootSignature);

@@ -2,12 +2,19 @@
 
 #include "Core/pch.h"
 
+#include <algorithm>
+
 __declspec(align(16)) struct IrradianceProbeGrid
 {
     Math::Vector3 origin;
     Math::Vector3 spacing;
     uint32_t counts[3];
 };
+
+inline float GetShortestProbeSpacing(const IrradianceProbeGrid& grid)
+{
+    return std::min({ (float)grid.spacing.GetX(), (float)grid.spacing.GetY(), (float)grid.spacing.GetZ() });
+}
 
 inline uint32_t GetProbeCount(const IrradianceProbeGrid& grid)
 {
