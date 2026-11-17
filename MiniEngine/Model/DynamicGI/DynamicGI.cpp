@@ -908,7 +908,7 @@ void DynamicGI::UpdateEditor(const Math::Camera& camera)
             InspectPixel((int)floorf(cursor.x), (int)floorf(cursor.y));
         }
         else if (showsProbes)
-            s_SelectedProbe = probe;
+            s_SelectedProbe = (probe && probe == GetSelectedProbe()) ? std::nullopt : probe;
     }
 
     const ProbeContribution::Surface* contribution = GetInspectedContribution();
