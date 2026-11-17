@@ -101,6 +101,8 @@
     <ClInclude Include="DynamicGI\GILights.h" />
     <ClInclude Include="DynamicGI\ProbeContribution.h" />
     <ClInclude Include="DynamicGI\ProbeLighting.h" />
+    <ClInclude Include="DynamicGI\ProbeReadback.h" />
+    <ClInclude Include="DynamicGI\ProbeRelocation.h" />
     <ClInclude Include="DynamicGI\ProbeWeighting.h" />
     <ClInclude Include="DynamicGI\ProbeVisualization.h" />
     <ClInclude Include="Renderer\IrradianceProbeGrid.h" />
@@ -138,6 +140,7 @@
     <ClCompile Include="DynamicGI\PathTracedLighting.cpp" />
     <ClCompile Include="DynamicGI\ProbeContribution.cpp" />
     <ClCompile Include="DynamicGI\ProbeLighting.cpp" />
+    <ClCompile Include="DynamicGI\ProbeReadback.cpp" />
     <ClCompile Include="DynamicGI\ProbeVisualization.cpp" />
     <ClCompile Include="Renderer\Renderer.cpp" />
     <ClCompile Include="Sponza\SponzaRenderer.cpp" />
@@ -166,6 +169,7 @@
     <None Include="DynamicGI\ProbeVisibility.hlsli" />
     <None Include="DynamicGI\ProbeFacing.hlsli" />
     <None Include="DynamicGI\ProbeClassification.hlsli" />
+    <None Include="DynamicGI\ProbeRelocation.hlsli" />
     <None Include="DynamicGI\ProbeWeighting.hlsli" />
     <None Include="DynamicGI\ProbeSphere.hlsli" />
     <None Include="DynamicGI\ProbeDistanceLine.hlsli" />
@@ -296,6 +300,9 @@
       <ShaderModel>6.5</ShaderModel>
     </FxCompile>
     <FxCompile Include="DynamicGI\ProbeTexelDistanceCS.hlsl">
+      <ShaderModel>6.5</ShaderModel>
+    </FxCompile>
+    <FxCompile Include="DynamicGI\ProbeRelocationCS.hlsl">
       <ShaderModel>6.5</ShaderModel>
     </FxCompile>
     <FxCompile Include="DynamicGI\ProbeIrradianceUpdateCS.hlsl" />

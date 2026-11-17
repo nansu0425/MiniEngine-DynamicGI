@@ -2,6 +2,7 @@
 
 #include "Core/Math/BoundingBox.h"
 #include "Model/DynamicGI/GIFrameInputs.h"
+#include "Model/DynamicGI/ProbeRelocation.h"
 #include "Model/DynamicGI/ProbeWeighting.h"
 #include "Model/Renderer/IrradianceProbeGrid.h"
 
@@ -19,6 +20,7 @@ namespace ProbeLighting
         uint32_t distanceTexelsPerSide = 8;
         float backFaceDistanceScale = 0.2f;
         ProbeWeighting::Settings weighting;
+        ProbeRelocation::Settings relocation;
     };
 
     struct Volume

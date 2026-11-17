@@ -20,6 +20,10 @@ namespace
     constexpr uint32_t kMaxDistanceTexelsPerSide = 32;
     constexpr float kMaxSelfShadowBias = 0.5f;
     constexpr float kMaxChebyshevExponent = 8.0f;
+    constexpr uint32_t kMaxRelocationIterations = 16;
+    constexpr float kMaxProbeOffset = 0.5f;
+    constexpr float kMinPushScale = 1.0f;
+    constexpr float kMaxPushScale = 2.0f;
 
     const char* kVisibilityNames[] = { "None", "Shadow Ray", "Chebyshev" };
     const char* kFacingNormalNames[] = { "Geometry", "Shading" };
@@ -48,6 +52,11 @@ namespace
         weighting.weightCrushThreshold = std::max(0.0f, std::min(weighting.weightCrushThreshold, 1.0f));
         weighting.minFacingWeight = std::max(0.0f, std::min(weighting.minFacingWeight, 1.0f));
         weighting.maxBackFaceRatio = std::max(0.0f, std::min(weighting.maxBackFaceRatio, 1.0f));
+        ProbeRelocation::Settings& relocation = settings.relocation;
+        relocation.iterations = std::max(1u, std::min(relocation.iterations, kMaxRelocationIterations));
+        relocation.maxOffset = std::max(0.0f, std::min(relocation.maxOffset, kMaxProbeOffset));
+        relocation.maxPushScale = std::max(kMinPushScale, std::min(relocation.maxPushScale, kMaxPushScale));
+        relocation.minPushScale = std::max(kMinPushScale, std::min(relocation.minPushScale, relocation.maxPushScale));
         return settings;
     }
 
@@ -136,14 +145,34 @@ namespace
             "A point with no probe left around it gets no indirect light.");
         ImGui::SliderFloat("Max Back Face Ratio", &weighting.maxBackFaceRatio, 0.0f, 1.0f);
         ImGui::SetItemTooltip("The largest fraction of a probe's rays, averaged over the updates, that may hit back faces "
-            "for the probe to stay in the interpolation.");
+            "for the probe to stay in the interpolation. Probe Relocation counts a probe with more as inside geometry too.");
+    }
+
+    void ShowRelocationSettings(ProbeRelocation::Settings& relocation)
+    {
+        ImGui::Checkbox("Probe Relocation", &relocation.enabled);
+        ImGui::SetItemTooltip("When the probes are cleared, moves each probe whose rays hit back faces more often than Max Back Face Ratio "
+            "through the closest back face it hit, out of the geometry it is in. Changing a setting here or Max Back Face Ratio clears the probes.");
+        const uint32_t step = 1;
+        ImGui::InputScalar("Relocation Iterations", ImGuiDataType_U32, &relocation.iterations, &step);
+        ImGui::SetItemTooltip("How many times each probe traces its rays again from where it is and moves if it is still inside geometry.");
+        ImGui::SliderFloat("Max Probe Offset", &relocation.maxOffset, 0.0f, kMaxProbeOffset);
+        ImGui::SetItemTooltip("Farthest a probe may move from its grid position along each axis, as a fraction of the shortest probe spacing. "
+            "A probe that cannot get out of the geometry within it stays.");
+        ImGui::SliderFloat("Back Face Push Max Scale", &relocation.maxPushScale, kMinPushScale, kMaxPushScale);
+        ImGui::SetItemTooltip("The move tries the vector to the closest back face times scales from this down to Back Face Push Min Scale "
+            "and takes the first that stays within Max Probe Offset. 1 puts the probe on the face, 2 as far beyond it as it was inside.");
+        ImGui::SliderFloat("Back Face Push Min Scale", &relocation.minPushScale, kMinPushScale, kMaxPushScale);
+        ImGui::SetItemTooltip("The smallest scale the move tries. Above 1 keeps the probe off the face it passed, "
+            "and leaves more probes where they are when Max Probe Offset is tight.");
     }
 }
 
 DynamicGIVolumeComponent::DynamicGIVolumeComponent(std::function<AxisAlignedBox()> findModelBounds)
     : Component({ "Position", "Size", "Probes X", "Probes Y", "Probes Z", "Rays per Probe", "Hysteresis", "Distance Sharpness",
         "Distance Texels per Side", "Back Face Distance Scale", "Visibility", "Self Shadow Bias", "Chebyshev Exponent",
-        "Weight Crush Threshold", "Facing Weight", "Min Facing Weight", "Facing Normal", "Probe Classification", "Max Back Face Ratio" }),
+        "Weight Crush Threshold", "Facing Weight", "Min Facing Weight", "Facing Normal", "Probe Classification", "Max Back Face Ratio",
+        "Probe Relocation", "Relocation Iterations", "Max Probe Offset", "Back Face Push Max Scale", "Back Face Push Min Scale" }),
     m_FindModelBounds(std::move(findModelBounds))
 {
 }
@@ -183,6 +212,11 @@ void DynamicGIVolumeComponent::SaveSettings(IniFile::Values& values) const
     values["Facing Normal"] = kFacingNormalNames[(int)probe.weighting.facingNormal];
     values["Probe Classification"] = SettingValues::FormatFlag(probe.weighting.classification);
     values["Max Back Face Ratio"] = MeasurementConditions::FormatFloat(probe.weighting.maxBackFaceRatio);
+    values["Probe Relocation"] = SettingValues::FormatFlag(probe.relocation.enabled);
+    values["Relocation Iterations"] = std::to_string(probe.relocation.iterations);
+    values["Max Probe Offset"] = MeasurementConditions::FormatFloat(probe.relocation.maxOffset);
+    values["Back Face Push Max Scale"] = MeasurementConditions::FormatFloat(probe.relocation.maxPushScale);
+    values["Back Face Push Min Scale"] = MeasurementConditions::FormatFloat(probe.relocation.minPushScale);
 }
 
 void DynamicGIVolumeComponent::LoadSettings(const IniFile::Values& values)
@@ -211,6 +245,11 @@ void DynamicGIVolumeComponent::LoadSettings(const IniFile::Values& values)
     SettingValues::ReadName(values, "Facing Normal", kFacingNormalNames, probe.weighting.facingNormal);
     SettingValues::ReadFlag(values, "Probe Classification", probe.weighting.classification);
     SettingValues::ReadFloat(values, "Max Back Face Ratio", probe.weighting.maxBackFaceRatio);
+    SettingValues::ReadFlag(values, "Probe Relocation", probe.relocation.enabled);
+    SettingValues::ReadUInt(values, "Relocation Iterations", probe.relocation.iterations);
+    SettingValues::ReadFloat(values, "Max Probe Offset", probe.relocation.maxOffset);
+    SettingValues::ReadFloat(values, "Back Face Push Max Scale", probe.relocation.maxPushScale);
+    SettingValues::ReadFloat(values, "Back Face Push Min Scale", probe.relocation.minPushScale);
 
     SetVolume({ MakeBounds(center, size), probe });
 }
@@ -269,6 +308,8 @@ void ShowDynamicGIVolumeDetails(DynamicGIVolumeComponent& volume)
     ShowProbeSettings(edited.settings);
     ImGui::SeparatorText("Weighting");
     ShowWeightingSettings(edited.settings.weighting);
+    ImGui::SeparatorText("Probe Relocation");
+    ShowRelocationSettings(edited.settings.relocation);
     volume.SetVolume(edited);
 }
 

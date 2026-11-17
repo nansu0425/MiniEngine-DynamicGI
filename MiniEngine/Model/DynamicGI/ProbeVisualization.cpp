@@ -1,4 +1,5 @@
 #include "Model/DynamicGI/ProbeVisualization.h"
+#include "Model/DynamicGI/ProbeReadback.h"
 #include "Core/Camera/Camera.h"
 #include "Core/Editor/SceneEditor.h"
 #include "Core/Graphics/GraphicsCommon.h"
@@ -170,7 +171,7 @@ std::optional<uint32_t> ProbeVisualization::FindProbeUnderCursor(const Camera& c
     float nearestDistance = FLT_MAX;
     for (uint32_t probe = 0; probe < GetProbeCount(grid); ++probe)
     {
-        const Vector3 position = GetProbeGridPosition(grid, probe);
+        const Vector3 position = ProbeReadback::GetProbePosition(grid, probe);
         ImVec2 center;
         if (!SceneEditor::ProjectToScene(camera, position, center))
             continue;

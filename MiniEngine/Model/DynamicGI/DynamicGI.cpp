@@ -4,6 +4,7 @@
 #include "Model/DynamicGI/PathTracedLighting.h"
 #include "Model/DynamicGI/ProbeContribution.h"
 #include "Model/DynamicGI/ProbeLighting.h"
+#include "Model/DynamicGI/ProbeReadback.h"
 #include "Model/DynamicGI/ProbeVisualization.h"
 #include "Core/App/UserSettings.h"
 #include "Core/Automation/ControlChannel.h"
@@ -375,8 +376,8 @@ namespace
         }
         if (ImGui::Button("Reset Probes"))
             ProbeLighting::Reset();
-        ImGui::SetItemTooltip("Clears the probes. Moving or resizing the Dynamic GI Volume, changing its probe counts, rays per probe "
-            "or distance texels per side, or changing the model also clears them.");
+        ImGui::SetItemTooltip("Clears the probes. Moving or resizing the Dynamic GI Volume, changing its probe counts, rays per probe, "
+            "distance texels per side or Probe Relocation settings, or changing the model also clears them.");
         ImGui::Text("Updates: %u", ProbeLighting::GetProgress().updates);
         ImGui::Checkbox("Pause Updates", &s_Settings.pauseProbeUpdates);
         ImGui::SetItemTooltip("Stops tracing and updating the probes. The scene keeps using the probes as they are. "
@@ -709,6 +710,7 @@ void DynamicGI::Initialize(void)
 void DynamicGI::Shutdown(void)
 {
     UserSettings::Unregister(kDebugPanelName);
+    ProbeReadback::Shutdown();
     ProbeContribution::Shutdown();
     ProbeLighting::Shutdown();
     PathTracedLighting::Shutdown();
@@ -811,9 +813,10 @@ void DynamicGI::DrawOverlay(GraphicsContext& context, const Math::Camera& camera
     s_HoveredCorner.reset();
 }
 
-void DynamicGI::MeasureProbeContribution(const RaytracingScene& scene)
+void DynamicGI::MeasureProbes(const RaytracingScene& scene)
 {
     if (IsInspectingPixel() && GetProbeCount(ProbeLighting::GetProbes().grid) != 0)
         ProbeContribution::Measure(FindProbeVolume()->settings.weighting, scene);
     ReplyToMeasuredPixelSelections();
+    ProbeReadback::Update();
 }

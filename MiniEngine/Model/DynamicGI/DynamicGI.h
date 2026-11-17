@@ -17,5 +17,5 @@ namespace DynamicGI
     void UpdateEditor(const Math::Camera& camera);
     void DrawProbes(GraphicsContext& context, const Math::Camera& camera, const D3D12_VIEWPORT& viewport, const D3D12_RECT& scissor);
     void DrawOverlay(GraphicsContext& context, const Math::Camera& camera);
-    void MeasureProbeContribution(const RaytracingScene& scene);
+    void MeasureProbes(const RaytracingScene& scene);
 }

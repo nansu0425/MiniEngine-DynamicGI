@@ -12,6 +12,7 @@
 
 #include "Output/Model/CompiledShaders/ProbeTraceCS.h"
 #include "Output/Model/CompiledShaders/ProbeTexelDistanceCS.h"
+#include "Output/Model/CompiledShaders/ProbeRelocationCS.h"
 #include "Output/Model/CompiledShaders/ProbeIrradianceUpdateCS.h"
 #include "Output/Model/CompiledShaders/ProbeDistanceUpdateCS.h"
 #include "Output/Model/CompiledShaders/ProbeBackFaceUpdateCS.h"
@@ -19,6 +20,7 @@
 #include "Output/Model/CompiledShaders/ProbeScreenIrradianceCS.h"
 
 #include <algorithm>
+#include <optional>
 #include <random>
 
 using namespace Math;
@@ -33,16 +35,20 @@ namespace
     enum TraceRootParameter { kTraceConstants, kTraceScene, kTraceInputs = kTraceScene + RaytracingScene::kNumRootParameters, kTraceOutputs, kNumTraceRootParameters };
     enum TexelDistanceRootParameter { kTexelDistanceConstants, kTexelDistanceScene,
         kTexelDistanceInputs = kTexelDistanceScene + RaytracingScene::kNumRootParameters, kTexelDistanceOutputs, kNumTexelDistanceRootParameters };
+    enum RelocationRootParameter { kRelocationConstants, kRelocationScene,
+        kRelocationOutputs = kRelocationScene + RaytracingScene::kNumRootParameters, kNumRelocationRootParameters };
     enum UpdateRootParameter { kUpdateConstants, kUpdateInputs, kUpdateOutputs, kNumUpdateRootParameters };
     enum ScreenRootParameter { kScreenConstants, kScreenScene, kScreenInputs = kScreenScene + RaytracingScene::kNumRootParameters, kScreenOutputs,
         kNumScreenRootParameters };
 
     RootSignature s_TraceRootSignature;
     RootSignature s_TexelDistanceRootSignature;
+    RootSignature s_RelocationRootSignature;
     RootSignature s_UpdateRootSignature;
     RootSignature s_ScreenRootSignature;
     ComputePSO s_TracePSO(L"Probe Trace");
     ComputePSO s_TexelDistancePSO(L"Probes Texel Distance");
+    ComputePSO s_RelocationPSO(L"Probe Relocation");
     ComputePSO s_IrradianceUpdatePSO(L"Probes Irradiance Update");
     ComputePSO s_DistanceUpdatePSO(L"Probes Distance Update");
     ComputePSO s_BackFaceUpdatePSO(L"Probes Back Face Update");
@@ -53,6 +59,7 @@ namespace
     SceneHeapTable s_TraceOutputs;
     SceneHeapTable s_TexelDistanceInputs;
     SceneHeapTable s_TexelDistanceOutputs;
+    SceneHeapTable s_RelocationOutputs;
     SceneHeapTable s_ScreenInputs;
     SceneHeapTable s_ScreenOutputs;
     ColorBuffer s_RaySamples;
@@ -99,6 +106,25 @@ namespace
         float blendWeight;
         float distanceSharpness;
         uint32_t distanceTexelsPerSide;
+        ProbeRays rays;
+    };
+
+    struct Relocation
+    {
+        ProbeRelocation::Settings settings;
+        float maxBackFaceRatio;
+
+        bool operator==(const Relocation&) const = default;
+    };
+
+    std::optional<Relocation> s_RelocationOfProbes;
+
+    __declspec(align(16)) struct RelocationConstants
+    {
+        float maxBackFaceRatio;
+        float maxOffset;
+        float maxPushScale;
+        float minPushScale;
         ProbeRays rays;
     };
 
@@ -224,6 +250,38 @@ namespace
         CopyProbeTileBorders(context, s_ProbesTexelDistance, s_DistanceTexelsPerSide);
     }
 
+    std::optional<Relocation> DescribeRelocation(const ProbeLighting::Settings& settings)
+    {
+        if (!settings.relocation.enabled)
+            return std::nullopt;
+        return Relocation{ settings.relocation, settings.weighting.maxBackFaceRatio };
+    }
+
+    void RelocateProbes(ComputeContext& context, const Relocation& relocation, const GIFrameInputs& inputs)
+    {
+        ScopedTimer _prof(L"Probe Relocation", context);
+
+        RelocationConstants constants = {
+            .maxBackFaceRatio = relocation.maxBackFaceRatio,
+            .maxOffset = relocation.settings.maxOffset * GetShortestProbeSpacing(s_Grid),
+            .maxPushScale = relocation.settings.maxPushScale,
+            .minPushScale = relocation.settings.minPushScale,
+        };
+        s_RelocationOutputs.PointTo(0, s_ProbesOffset, s_ProbesOffset.GetUAV());
+        context.SetRootSignature(s_RelocationRootSignature);
+        context.SetPipelineState(s_RelocationPSO);
+        context.TransitionResource(s_ProbesOffset, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, true);
+        inputs.scene.Bind(context, kRelocationScene);
+        s_RelocationOutputs.Bind(context, kRelocationOutputs);
+        for (uint32_t iteration = 0; iteration < relocation.settings.iterations; ++iteration)
+        {
+            constants.rays = { s_Grid, MakeRandomRotation(), s_RaysPerProbe };
+            context.SetDynamicConstantBufferView(kRelocationConstants, sizeof(constants), &constants);
+            context.Dispatch1D(GetProbeCount(s_Grid), 64);
+            context.InsertUAVBarrier(s_ProbesOffset);
+        }
+    }
+
     void FitScreenIrradianceTo(uint32_t width, uint32_t height)
     {
         if (s_ScreenIrradiance.GetWidth() == width && s_ScreenIrradiance.GetHeight() == height)
@@ -259,6 +317,16 @@ void ProbeLighting::Initialize(void)
     s_TexelDistancePSO.SetRootSignature(s_TexelDistanceRootSignature);
     s_TexelDistancePSO.SetComputeShader(g_pProbeTexelDistanceCS, sizeof(g_pProbeTexelDistanceCS));
     s_TexelDistancePSO.Finalize();
+
+    s_RelocationRootSignature.Reset(kNumRelocationRootParameters, 0);
+    s_RelocationRootSignature[kRelocationConstants].InitAsConstantBuffer(0);
+    RaytracingScene::InitRootParameters(s_RelocationRootSignature, kRelocationScene);
+    s_RelocationRootSignature[kRelocationOutputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 1);
+    s_RelocationRootSignature.Finalize(L"Probe Relocation");
+
+    s_RelocationPSO.SetRootSignature(s_RelocationRootSignature);
+    s_RelocationPSO.SetComputeShader(g_pProbeRelocationCS, sizeof(g_pProbeRelocationCS));
+    s_RelocationPSO.Finalize();
 
     s_UpdateRootSignature.Reset(kNumUpdateRootParameters, 0);
     s_UpdateRootSignature[kUpdateConstants].InitAsConstantBuffer(0);
@@ -298,6 +366,7 @@ void ProbeLighting::Initialize(void)
     s_TraceOutputs.Create(2);
     s_TexelDistanceInputs.Create(1);
     s_TexelDistanceOutputs.Create(1);
+    s_RelocationOutputs.Create(1);
     s_ScreenInputs.Create(kNumGBufferTargets + 4);
     s_ScreenOutputs.Create(1);
 }
@@ -330,6 +399,12 @@ void ProbeLighting::Update(ComputeContext& context, const Volume& volume, const 
 
     const Settings& settings = volume.settings;
     FitResourcesTo(DescribeGrid(volume.bounds, settings.probeCounts), settings.raysPerProbe, settings.distanceTexelsPerSide);
+    const std::optional<Relocation> relocation = DescribeRelocation(settings);
+    if (relocation != s_RelocationOfProbes)
+    {
+        s_RelocationOfProbes = relocation;
+        s_ResetRequested = true;
+    }
     if (s_ResetRequested)
     {
         context.TransitionResource(s_ProbesIrradiance, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, true);
@@ -340,8 +415,10 @@ void ProbeLighting::Update(ComputeContext& context, const Volume& volume, const 
         context.ClearUAV(s_ProbesBackFaceRatio);
         context.TransitionResource(s_ProbesOffset, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, true);
         context.ClearUAV(s_ProbesOffset);
-        MeasureTexelDistances(context, inputs);
         s_Random.seed(0);
+        if (relocation)
+            RelocateProbes(context, *relocation, inputs);
+        MeasureTexelDistances(context, inputs);
         s_Progress.updates = 0;
         ++s_Progress.resets;
         s_ResetRequested = false;

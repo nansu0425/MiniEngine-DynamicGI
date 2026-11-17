@@ -1712,7 +1712,7 @@ void ModelViewer::RenderScene( void )
 
     gfxContext.Finish();
 
-    DynamicGI::MeasureProbeContribution(m_RaytracingScene);
+    DynamicGI::MeasureProbes(m_RaytracingScene);
     RayPick::Render(m_Camera, m_MainViewport, g_SceneDepthBuffer, m_RaytracingScene);
 }
 
