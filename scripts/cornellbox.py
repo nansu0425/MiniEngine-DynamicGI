@@ -14,7 +14,9 @@ glTF 좌표는 Mitsuba 의 world 좌표 그대로이고 축을 바꾸지 않는�
 - rectangle 은 local 의 xy 평면에서 [-1, 1]^2 를 덮고 normal 이 +z 인 면이고, cube 는 [-1, 1]^3 의 상자이며 면의 normal 이
   바깥을 향한다 (Mitsuba 3 문서의 Rectangle 과 Cube 절. references/ 에 받지 않았다). normal 은 Mitsuba 처럼 to_world 의 inverse transpose 로 옮긴다. glTF 의 앞면이
   그 normal 쪽이 되도록 triangle 을 counter-clockwise 로 둔다. UV 는 면마다 [0, 1]^2 다.
-- twosided 안의 diffuse bsdf 는 baseColorFactor 가 reflectance 이고 metallic 0, roughness 1 인 doubleSided material 이다. glTF 의
+- twosided 안의 diffuse bsdf 는 baseColorFactor 가 reflectance 이고 metallic 0, roughness 1 인 material 이다. rectangle 의
+  material 은 doubleSided 다. cube 의 material 은 single-sided 다. cube 는 닫혀 있고 앞면이 바깥을 향하므로 바깥에서 오는 ray 는
+  앞면에만 맞는다. 그리고 DDGI 의 Probe Classification 은 cube 안의 probe 를 single-sided 뒷면에 맞는 ray 로 찾는다. glTF 의
   metallic-roughness 는 Lambert 가 아니므로 Mitsuba 와 같은 반사는 path tracer 의 Shading Lambert 로 그릴 때다
   (PathTracerCS.hlsl 의 LAMBERT_SHADING). twosided 가 아닌 bsdf 는 받지 않는다. Mitsuba 에서 그 뒷면은 빛을 받지 않으면서 ray 를
   막는데, 이 repo 는 single-sided 의 뒷면을 없는 것으로 친다 (docs/policy.md 의 "camera 밖에서 본 doubleSided").
@@ -56,6 +58,7 @@ def cube_faces():
 
 
 SHAPE_FACES = {'rectangle': RECTANGLE_FACES, 'cube': cube_faces()}
+CLOSED_SHAPES = {'cube'}
 
 
 class SceneError(Exception):
@@ -130,7 +133,8 @@ def world_face(matrix, face):
 
 
 def read(path):
-    """scene 의 shape 와 sensor. shape 마다 id, faces (world 의 면), reflectance, radiance (emitter 가 없으면 None) 를 둔다. sensor 는
+    """scene 의 shape 와 sensor. shape 마다 id, faces (world 의 면), closed (닫힌 shape 인지), reflectance, radiance (emitter 가 없으면
+    None) 를 둔다. sensor 는
     to_world 와 세로 시야각 (degree) 이다."""
     root = ElementTree.parse(path).getroot()
     if not root.get('version', '').startswith('3.'):
@@ -149,7 +153,7 @@ def read(path):
             raise SceneError(f'shape {element.get("id")}: only one area emitter is supported')
         matrix = to_world(element)
         shapes.append(SimpleNamespace(id=element.get('id'), faces=[world_face(matrix, face) for face in SHAPE_FACES[kind]],
-                                      reflectance=bsdfs[refs[0].get('id')], radiance=rgb(emitters[0], 'radiance') if emitters else None))
+                                      closed=kind in CLOSED_SHAPES, reflectance=bsdfs[refs[0].get('id')], radiance=rgb(emitters[0], 'radiance') if emitters else None))
     sensors = root.findall('sensor')
     if len(sensors) != 1 or sensors[0].get('type') != 'perspective':
         raise SceneError('needs one perspective sensor')
@@ -160,7 +164,7 @@ def primitives(shape):
     """shape 를 glTF primitive 로 나눈 (material 이름, material, 면들) 의 목록. 면은 앞면이 normal 쪽이다."""
     material = {'pbrMetallicRoughness': {'baseColorFactor': [*shape.reflectance, 1.0], 'metallicFactor': 0.0, 'roughnessFactor': 1.0}}
     if shape.radiance is None:
-        return [(shape.id, material | {'doubleSided': True}, shape.faces)]
+        return [(shape.id, material | {'doubleSided': not shape.closed}, shape.faces)]
     strength = max(shape.radiance)
     front = material | {'emissiveFactor': [value / strength for value in shape.radiance]}
     if strength > 1.0:
