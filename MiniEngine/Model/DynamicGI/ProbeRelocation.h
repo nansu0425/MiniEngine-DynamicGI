@@ -15,5 +15,11 @@ namespace ProbeRelocation
         bool operator==(const Settings&) const = default;
     };
 
-    enum class Result : uint32_t { kNotMoved, kBackFacePush, kBlocked };
+    enum class Result : uint32_t { kNotMoved, kBackFacePush, kBlocked, kCount };
+
+    inline const char* GetResultName(Result result)
+    {
+        const char* names[] = { "Not Moved", "Back Face Push", "Blocked" };
+        return names[(uint32_t)result];
+    }
 }

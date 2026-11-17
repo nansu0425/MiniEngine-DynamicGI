@@ -173,6 +173,7 @@
     <None Include="DynamicGI\ProbeWeighting.hlsli" />
     <None Include="DynamicGI\ProbeSphere.hlsli" />
     <None Include="DynamicGI\ProbeDistanceLine.hlsli" />
+    <None Include="DynamicGI\ProbeOffsetLine.hlsli" />
     <None Include="DynamicGI\DynamicGIVolumeBox.hlsli" />
     <None Include="DynamicGI\ProbeContribution.hlsli" />
     <None Include="DynamicGI\ProbeContributionRibbon.hlsli" />
@@ -305,6 +306,7 @@
     <FxCompile Include="DynamicGI\ProbeRelocationCS.hlsl">
       <ShaderModel>6.5</ShaderModel>
     </FxCompile>
+    <FxCompile Include="DynamicGI\ProbeCensusCS.hlsl" />
     <FxCompile Include="DynamicGI\ProbeIrradianceUpdateCS.hlsl" />
     <FxCompile Include="DynamicGI\ProbeDistanceUpdateCS.hlsl" />
     <FxCompile Include="DynamicGI\ProbeBackFaceUpdateCS.hlsl" />
@@ -322,6 +324,12 @@
       <ShaderType>Vertex</ShaderType>
     </FxCompile>
     <FxCompile Include="DynamicGI\ProbeDistanceLinePS.hlsl">
+      <ShaderType>Pixel</ShaderType>
+    </FxCompile>
+    <FxCompile Include="DynamicGI\ProbeOffsetLineVS.hlsl">
+      <ShaderType>Vertex</ShaderType>
+    </FxCompile>
+    <FxCompile Include="DynamicGI\ProbeOffsetLinePS.hlsl">
       <ShaderType>Pixel</ShaderType>
     </FxCompile>
     <FxCompile Include="DynamicGI\DynamicGIVolumeEdgesVS.hlsl">

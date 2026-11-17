@@ -17,6 +17,8 @@
 #include "Output/Model/CompiledShaders/ProbeDistanceLinePS.h"
 #include "Output/Model/CompiledShaders/ProbeContributionRibbonVS.h"
 #include "Output/Model/CompiledShaders/ProbeContributionRibbonPS.h"
+#include "Output/Model/CompiledShaders/ProbeOffsetLineVS.h"
+#include "Output/Model/CompiledShaders/ProbeOffsetLinePS.h"
 
 #include <imgui.h>
 #include <cfloat>
@@ -34,6 +36,7 @@ namespace
     enum LineRootParameter { kLineConstants, kLineInputs, kNumLineRootParameters };
     enum class DistanceLines : uint32_t { kTexelMeans, kRaySamples, kTexelDistances };
     enum RibbonRootParameter { kRibbonConstants, kRibbonContribution, kNumRibbonRootParameters };
+    enum OffsetLineRootParameter { kOffsetLineConstants, kOffsetLineInputs, kNumOffsetLineRootParameters };
 
     constexpr uint32_t kNumCellEdges = 12;
     constexpr uint32_t kNumContributionRibbons = ProbeContribution::kNumCorners + kNumCellEdges + 1 + ProbeContribution::kNumCorners + 1;
@@ -47,6 +50,8 @@ namespace
     GraphicsPSO s_LinePSO(L"Probe Distance Lines");
     RootSignature s_RibbonRootSignature;
     GraphicsPSO s_RibbonPSO(L"Probe Contribution Ribbons");
+    RootSignature s_OffsetLineRootSignature;
+    GraphicsPSO s_OffsetLinePSO(L"Probe Offset Lines");
 
     __declspec(align(16)) struct Constants
     {
@@ -78,6 +83,12 @@ namespace
         float nearClip;
         float normalLength;
         uint32_t hoveredCorner;
+    };
+
+    __declspec(align(16)) struct OffsetLineConstants
+    {
+        Matrix4 viewProj;
+        IrradianceProbeGrid grid;
     };
 }
 
@@ -133,6 +144,22 @@ void ProbeVisualization::Initialize(void)
     s_RibbonPSO.SetVertexShader(g_pProbeContributionRibbonVS, sizeof(g_pProbeContributionRibbonVS));
     s_RibbonPSO.SetPixelShader(g_pProbeContributionRibbonPS, sizeof(g_pProbeContributionRibbonPS));
     s_RibbonPSO.Finalize();
+
+    s_OffsetLineRootSignature.Reset(kNumOffsetLineRootParameters, 0);
+    s_OffsetLineRootSignature[kOffsetLineConstants].InitAsConstantBuffer(0);
+    s_OffsetLineRootSignature[kOffsetLineInputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 1, D3D12_SHADER_VISIBILITY_VERTEX);
+    s_OffsetLineRootSignature.Finalize(L"Probe Offset Lines");
+
+    s_OffsetLinePSO.SetRootSignature(s_OffsetLineRootSignature);
+    s_OffsetLinePSO.SetRasterizerState(RasterizerTwoSided);
+    s_OffsetLinePSO.SetBlendState(BlendDisable);
+    s_OffsetLinePSO.SetDepthStencilState(DepthStateReadOnly);
+    s_OffsetLinePSO.SetInputLayout(0, nullptr);
+    s_OffsetLinePSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE);
+    s_OffsetLinePSO.SetRenderTargetFormats(1, &overlayFormat, g_SceneDepthBuffer.GetFormat());
+    s_OffsetLinePSO.SetVertexShader(g_pProbeOffsetLineVS, sizeof(g_pProbeOffsetLineVS));
+    s_OffsetLinePSO.SetPixelShader(g_pProbeOffsetLinePS, sizeof(g_pProbeOffsetLinePS));
+    s_OffsetLinePSO.Finalize();
 }
 
 void ProbeVisualization::DrawSpheres(GraphicsContext& context, const Camera& camera, const D3D12_VIEWPORT& viewport, const D3D12_RECT& scissor,
@@ -237,6 +264,24 @@ void ProbeVisualization::DrawDistanceLines(GraphicsContext& context, const Camer
         context.SetDynamicConstantBufferView(kLineConstants, sizeof(constants), &constants);
         context.DrawInstanced(kVerticesPerLine, probes.raysPerProbe);
     }
+}
+
+void ProbeVisualization::DrawOffsetLines(GraphicsContext& context, const Camera& camera, const ProbeLighting::Probes& probes)
+{
+    ScopedTimer _prof(L"Probe Offset Lines", context);
+
+    const OffsetLineConstants constants = { .viewProj = camera.GetViewProjMatrix(), .grid = probes.grid };
+    context.SetRootSignature(s_OffsetLineRootSignature);
+    context.SetPipelineState(s_OffsetLinePSO);
+    context.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
+    context.TransitionResource(probes.offset, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+    context.TransitionResource(g_SceneDepthBuffer, D3D12_RESOURCE_STATE_DEPTH_READ);
+    context.TransitionResource(g_SceneOverlayBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
+    context.SetRenderTarget(g_SceneOverlayBuffer.GetRTV(), g_SceneDepthBuffer.GetDSV_DepthReadOnly());
+    context.SetViewportAndScissor(0, 0, g_SceneOverlayBuffer.GetWidth(), g_SceneOverlayBuffer.GetHeight());
+    context.SetDynamicConstantBufferView(kOffsetLineConstants, sizeof(constants), &constants);
+    context.SetDynamicDescriptor(kOffsetLineInputs, 0, probes.offset.GetSRV());
+    context.DrawInstanced(kVerticesPerLine, GetProbeCount(probes.grid));
 }
 
 void ProbeVisualization::DrawContribution(GraphicsContext& context, const Camera& camera, const IrradianceProbeGrid& grid, StructuredBuffer& contribution,

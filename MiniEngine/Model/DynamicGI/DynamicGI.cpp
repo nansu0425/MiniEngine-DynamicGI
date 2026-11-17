@@ -57,11 +57,18 @@ namespace
         ControlChannel::Reply reply;
     };
 
+    struct PendingCensusReply
+    {
+        uint32_t censusId;
+        ControlChannel::Reply reply;
+    };
+
     Settings s_Settings;
     bool s_ProbeStepRequested = false;
     std::optional<uint32_t> s_SelectedProbe;
     std::optional<InspectedPixel> s_InspectedPixel;
     std::vector<PendingPixelReply> s_PendingPixelReplies;
+    std::vector<PendingCensusReply> s_PendingCensusReplies;
     std::optional<uint32_t> s_HoveredCorner;
 
     bool IsIndirectOn(void)
@@ -144,6 +151,28 @@ namespace
         return std::nullopt;
     }
 
+    std::optional<std::string> FindWhyProbesCannotBeCounted(void)
+    {
+        if (std::optional<std::string> error = FindWhyProbesAreOff())
+            return error;
+        if (ProbeLighting::GetProgress().resets == 0)
+            return "the probes have not been updated yet";
+        return std::nullopt;
+    }
+
+    uint32_t CountProbes(void)
+    {
+        return ProbeReadback::RequestCensus(FindProbeVolume()->settings.weighting.maxBackFaceRatio);
+    }
+
+    std::optional<ProbeReadback::ProbeRelocationReadback> FindSelectedProbeRelocation(void)
+    {
+        const std::optional<uint32_t> probe = GetSelectedProbe();
+        if (!probe)
+            return std::nullopt;
+        return ProbeReadback::FindProbeRelocation(ProbeLighting::GetProbes().grid, *probe);
+    }
+
     std::optional<std::string> InspectPixel(int x, int y)
     {
         const RECT scene = ImGuiLayer::GetSceneViewport();
@@ -217,6 +246,20 @@ namespace
         ImGui::SetItemTooltip("What the raster writes for the opaque surfaces. Lit adds the emission, the directional light and the indirect light. "
             "Indirect Irradiance shows the probe irradiance from the shading normal, the same way Show Probes does, and needs the Probe source. "
             "Indirect Radiance shows the indirect light reflected toward the camera only. Without indirect light both views are black.");
+    }
+
+    const char* kRelocationResultKeys[] = { "not_moved", "back_face_push", "blocked" };
+
+    void ShowCensus(void)
+    {
+        const std::optional<ProbeReadback::CensusReadback>& readback = ProbeReadback::GetCensus();
+        if (!readback)
+            return;
+        const ProbeReadback::Census& census = readback->census;
+        ImGui::Text("Measured at update %u of reset %u, %u probes:", readback->updates, readback->resets, readback->probes);
+        ImGui::Text("Inside Geometry: %u (Max Back Face Ratio %.3f)", census.insideGeometry, readback->maxBackFaceRatio);
+        for (uint32_t result = 0; result < (uint32_t)ProbeRelocation::Result::kCount; ++result)
+            ImGui::Text("%s: %u", ProbeRelocation::GetResultName((ProbeRelocation::Result)result), census.relocationResults[result]);
     }
 
     const ImVec4 kOccludingMeanColor(1.0f, 0.4f, 0.3f, 1.0f);
@@ -388,6 +431,13 @@ namespace
             s_ProbeStepRequested = true;
         ImGui::SetItemTooltip("Updates the probes once on the next frame.");
         ImGui::EndDisabled();
+        ImGui::BeginDisabled(FindWhyProbesCannotBeCounted().has_value());
+        if (ImGui::Button("Measure"))
+            CountProbes();
+        ImGui::SetItemTooltip("Counts the probes Max Back Face Ratio finds inside geometry, from the back face ratios averaged over the updates so far, "
+            "and the probes by what the last Probe Relocation iteration did to them.");
+        ImGui::EndDisabled();
+        ShowCensus();
 
         ProbeVisualization::Settings& probeSpheres = s_Settings.probeSpheres;
         ImGui::BeginDisabled(FindProbeVolume() == nullptr);
@@ -398,6 +448,16 @@ namespace
         ImGui::SetItemTooltip("Radius of the spheres as a fraction of the shortest probe spacing. At 0.5 neighbors touch.");
         ImGui::Text("Selected Probe: %s", FormatSelectedProbe().c_str());
         ImGui::SetItemTooltip("Click a probe sphere to select it. Clicking elsewhere in the scene clears the selection.");
+        if (const std::optional<ProbeReadback::ProbeRelocationReadback> relocation = FindSelectedProbeRelocation())
+        {
+            ImGui::Text("Selected Probe Offset: %.3f %.3f %.3f (%s)", relocation->offset.x, relocation->offset.y, relocation->offset.z,
+                ProbeRelocation::GetResultName(relocation->result));
+            ImGui::SetItemTooltip("How far Probe Relocation moved the selected probe from its grid position, and what the last iteration did to it.");
+        }
+        ImGui::Checkbox("Show Probe Offsets", &probeSpheres.showOffsets);
+        ImGui::SetItemTooltip("Draws a line from the grid position of each probe to where Probe Relocation moved it. "
+            "Green lines end at a probe the last iteration pushed through a back face, red ones at a probe it could not move out within Max Probe Offset, "
+            "and gray ones at a probe it left where it was.");
         ImGui::Checkbox("Show Texel Means", &probeSpheres.showTexelMeans);
         ImGui::SetItemTooltip("Draws a yellow line from the selected probe along the direction of each of its distance texels, "
             "as long as the mean distance the texel stores.");
@@ -441,6 +501,7 @@ namespace
         values["Show Texel Means"] = SettingValues::FormatFlag(probeSpheres.showTexelMeans);
         values["Show Texel Distances"] = SettingValues::FormatFlag(probeSpheres.showTexelDistances);
         values["Show Ray Samples"] = SettingValues::FormatFlag(probeSpheres.showRaySamples);
+        values["Show Probe Offsets"] = SettingValues::FormatFlag(probeSpheres.showOffsets);
         values["Inspect Pixel"] = SettingValues::FormatFlag(s_Settings.inspectPixel);
     }
 
@@ -463,6 +524,7 @@ namespace
         SettingValues::ReadFlag(values, "Show Texel Means", probeSpheres.showTexelMeans);
         SettingValues::ReadFlag(values, "Show Texel Distances", probeSpheres.showTexelDistances);
         SettingValues::ReadFlag(values, "Show Ray Samples", probeSpheres.showRaySamples);
+        SettingValues::ReadFlag(values, "Show Probe Offsets", probeSpheres.showOffsets);
         SettingValues::ReadFlag(values, "Inspect Pixel", s_Settings.inspectPixel);
         ClampSettings();
     }
@@ -523,6 +585,36 @@ namespace
             .Object("probes", probes);
     }
 
+    ControlChannel::Fields DescribeSelectedProbeRelocation(void)
+    {
+        const std::optional<ProbeReadback::ProbeRelocationReadback> relocation = FindSelectedProbeRelocation();
+        if (!relocation)
+            return ControlChannel::Fields().Flag("read", false);
+        return ControlChannel::Fields()
+            .Flag("read", true)
+            .Object("offset", DescribeVector(relocation->offset))
+            .Text("result", ProbeRelocation::GetResultName(relocation->result));
+    }
+
+    ControlChannel::Fields DescribeCensus(void)
+    {
+        const std::optional<ProbeReadback::CensusReadback>& readback = ProbeReadback::GetCensus();
+        if (!readback)
+            return ControlChannel::Fields().Flag("measured", false);
+        ControlChannel::Fields relocation;
+        for (uint32_t result = 0; result < (uint32_t)ProbeRelocation::Result::kCount; ++result)
+            relocation.Integer(kRelocationResultKeys[result], readback->census.relocationResults[result]);
+        return ControlChannel::Fields()
+            .Flag("measured", true)
+            .Integer("id", readback->id)
+            .Integer("updates", readback->updates)
+            .Integer("resets", readback->resets)
+            .Integer("probes", readback->probes)
+            .Float("max_back_face_ratio", readback->maxBackFaceRatio)
+            .Integer("inside_geometry", readback->census.insideGeometry)
+            .Object("relocation", relocation);
+    }
+
     ControlChannel::Fields DescribeState(void)
     {
         const PathTracedLighting::Progress progress = PathTracedLighting::GetProgress();
@@ -537,9 +629,11 @@ namespace
                 .Flag("volume", FindDynamicGIVolume() != nullptr)
                 .Flag("paused", s_Settings.pauseProbeUpdates)
                 .Text("selected", FormatSelectedProbe())
+                .Object("selected_relocation", DescribeSelectedProbeRelocation())
                 .Integer("updates", ProbeLighting::GetProgress().updates)
                 .Integer("resets", ProbeLighting::GetProgress().resets)
-                .Object("pixel", DescribePixel()));
+                .Object("pixel", DescribePixel())
+                .Object("measure", DescribeCensus()));
     }
 
     const char kDebugPanelName[] = "Dynamic GI Debug";
@@ -631,8 +725,35 @@ namespace
         });
     }
 
+    void MeasureProbesForReply(const ControlChannel::Reply& reply)
+    {
+        if (std::optional<std::string> error = FindWhyProbesCannotBeCounted())
+        {
+            reply.Error(*error);
+            return;
+        }
+        s_PendingCensusReplies.push_back({ CountProbes(), reply });
+    }
+
+    void ReplyToCountedProbes(void)
+    {
+        const std::optional<ProbeReadback::CensusReadback>& readback = ProbeReadback::GetCensus();
+        std::erase_if(s_PendingCensusReplies, [&readback](const PendingCensusReply& pending)
+        {
+            if (!readback || readback->id < pending.censusId)
+                return false;
+            pending.reply.Ok(ControlChannel::Fields().Object("state", ControlChannel::GetState("gi")));
+            return true;
+        });
+    }
+
     void HandleGICommand(const std::string& arguments, const ControlChannel::Reply& reply)
     {
+        if (arguments == "probe measure")
+        {
+            MeasureProbesForReply(reply);
+            return;
+        }
         const std::string selectPrefix = "probe select ";
         if (arguments.rfind(selectPrefix, 0) == 0)
         {
@@ -672,6 +793,7 @@ void DynamicGI::Initialize(void)
     ProbeLighting::Initialize();
     ProbeVisualization::Initialize();
     ProbeContribution::Initialize();
+    ProbeReadback::Initialize();
     DynamicGIVolumeBox::Initialize();
 
     const ProbeLighting::Probes probes = ProbeLighting::GetProbes();
@@ -679,6 +801,7 @@ void DynamicGI::Initialize(void)
     TextureViewer::AddTexture("Probes Distance", probes.distance);
     TextureViewer::AddTexture("Probes Texel Distance", probes.texelDistance);
     TextureViewer::AddTexture("Probes Back Face Ratio", probes.backFaceRatio);
+    TextureViewer::AddTexture("Probes Offset", probes.offset);
     TextureViewer::AddTexture("Probe Ray Samples", probes.raySamples, {
         .markedRowName = "Selected Probe",
         .findMarkedRow = GetSelectedProbe,
@@ -691,11 +814,15 @@ void DynamicGI::Initialize(void)
     UserSettings::Register(kDebugPanelName, SaveSettings, LoadSettings);
 
     ControlChannel::RegisterState("gi", DescribeState);
-    ControlChannel::Register("gi", "gi probe step | gi probe select <x> <y> <z>|none | gi pixel select <x> <y>|none. "
+    ControlChannel::Register("gi", "gi probe step | gi probe select <x> <y> <z>|none | gi probe measure | gi pixel select <x> <y>|none. "
         "step updates the probes once on the next frame while Pause Updates is on, as the Step button does, "
         "and fails unless Indirect is Probe, the scene has a Dynamic GI Volume and Pause Updates is on. "
         "probe select selects the probe at a grid coordinate, or clears the selection, as clicking a probe sphere or elsewhere in the scene does. "
         "The lines of the selected probe are drawn while Show Probes is on. Both reply with state gi after the next frame. "
+        "probe.selected_relocation has the offset Probe Relocation moved the selected probe by and what its last iteration did, once read back after a reset. "
+        "probe measure counts the probes as the Measure button does and fails unless Indirect is Probe, the scene has a Dynamic GI Volume and the probes were updated. "
+        "It replies with state gi once counted: probe.measure has the updates and resets at the count, the probe count, the Max Back Face Ratio it used, "
+        "the probes whose back face ratio averaged over the updates is above it, and the probes by what the last Probe Relocation iteration did. "
         "pixel select inspects the surface at a client pixel, as clicking the scene off the probe spheres does while Inspect Pixel is on, "
         "and fails unless Indirect is Probe, the scene has a Dynamic GI Volume and Inspect Pixel is on. The pixel must be in the scene, not under the UI. "
         "It replies with state gi once the surface is measured: probe.pixel has the eight probes the irradiance of the surface interpolates, "
@@ -803,6 +930,9 @@ void DynamicGI::DrawOverlay(GraphicsContext& context, const Math::Camera& camera
 {
     DrawSelectedDynamicGIVolume(context, camera);
 
+    if (FindProbeVolume() != nullptr && s_Settings.probeSpheres.show && s_Settings.probeSpheres.showOffsets)
+        ProbeVisualization::DrawOffsetLines(context, camera, ProbeLighting::GetProbes());
+
     const std::optional<uint32_t> probe = GetSelectedProbe();
     if (FindProbeVolume() != nullptr && s_Settings.probeSpheres.show && probe)
         ProbeVisualization::DrawDistanceLines(context, camera, ProbeLighting::GetProbes(), *probe, s_Settings.probeSpheres, FindInspectedRayOfSelectedProbe());
@@ -819,4 +949,5 @@ void DynamicGI::MeasureProbes(const RaytracingScene& scene)
         ProbeContribution::Measure(FindProbeVolume()->settings.weighting, scene);
     ReplyToMeasuredPixelSelections();
     ProbeReadback::Update();
+    ReplyToCountedProbes();
 }

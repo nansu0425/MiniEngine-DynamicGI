@@ -23,6 +23,7 @@ namespace ProbeVisualization
         bool showTexelMeans = true;
         bool showTexelDistances = true;
         bool showRaySamples = true;
+        bool showOffsets = false;
     };
 
     void Initialize(void);
@@ -34,6 +35,8 @@ namespace ProbeVisualization
 
     void DrawDistanceLines(GraphicsContext& context, const Math::Camera& camera, const ProbeLighting::Probes& probes, uint32_t probe,
         const Settings& settings, std::optional<uint32_t> highlightedRay);
+
+    void DrawOffsetLines(GraphicsContext& context, const Math::Camera& camera, const ProbeLighting::Probes& probes);
 
     void DrawContribution(GraphicsContext& context, const Math::Camera& camera, const IrradianceProbeGrid& grid, StructuredBuffer& contribution,
         std::optional<uint32_t> hoveredCorner);
