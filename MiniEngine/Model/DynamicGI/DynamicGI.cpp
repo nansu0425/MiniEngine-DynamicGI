@@ -42,6 +42,7 @@ namespace
         bool pauseProbeUpdates = false;
         ProbeVisualization::Settings probeSpheres;
         bool inspectPixel = false;
+        float inspectLabelScale = 1.0f;
     };
 
     struct InspectedPixel
@@ -212,6 +213,8 @@ namespace
     // albedo가 1에 가까운 scene에서도 한 dispatch가 끝나는 시간을 이 상한이 정한다.
     constexpr uint32_t kMaxHits = 1u << 10;
     constexpr float kMaxRadiusPerSpacing = 0.5f;
+    constexpr float kMinInspectLabelScale = 1.0f;
+    constexpr float kMaxInspectLabelScale = 4.0f;
     // Source의 순서이고, user.ini의 저장과 settings 명령이 이 이름으로 읽고 쓴다.
     const char* kSourceNames[] = { "Off", "Path Traced", "Probe" };
     const char* kViewNames[] = { "Lit", "Indirect Irradiance", "Indirect Radiance" };
@@ -225,6 +228,8 @@ namespace
 
         ProbeVisualization::Settings& probeSpheres = s_Settings.probeSpheres;
         probeSpheres.radiusPerSpacing = std::max(0.0f, std::min(probeSpheres.radiusPerSpacing, kMaxRadiusPerSpacing));
+
+        s_Settings.inspectLabelScale = std::max(kMinInspectLabelScale, std::min(s_Settings.inspectLabelScale, kMaxInspectLabelScale));
     }
 
     void ShowViewCombo(void)
@@ -477,7 +482,11 @@ namespace
             "While Visibility is Chebyshev, the lines to the probes start from the point Self Shadow Bias moves off the surface, "
             "which a green arrow from the surface points to. The point stays as the camera moves.");
         if (s_Settings.inspectPixel)
+        {
+            ImGui::SliderFloat("Inspect Label Scale", &s_Settings.inspectLabelScale, kMinInspectLabelScale, kMaxInspectLabelScale);
+            ImGui::SetItemTooltip("Scales the letter and weight boxes drawn by each probe of the inspected pixel.");
             ShowContributionTable();
+        }
         ImGui::EndDisabled();
         ClampSettings();
     }
@@ -503,6 +512,7 @@ namespace
         values["Show Ray Samples"] = SettingValues::FormatFlag(probeSpheres.showRaySamples);
         values["Show Probe Offsets"] = SettingValues::FormatFlag(probeSpheres.showOffsets);
         values["Inspect Pixel"] = SettingValues::FormatFlag(s_Settings.inspectPixel);
+        values["Inspect Label Scale"] = MeasurementConditions::FormatFloat(s_Settings.inspectLabelScale);
     }
 
     void LoadSettings(const UserSettings::Values& values)
@@ -526,6 +536,7 @@ namespace
         SettingValues::ReadFlag(values, "Show Ray Samples", probeSpheres.showRaySamples);
         SettingValues::ReadFlag(values, "Show Probe Offsets", probeSpheres.showOffsets);
         SettingValues::ReadFlag(values, "Inspect Pixel", s_Settings.inspectPixel);
+        SettingValues::ReadFloat(values, "Inspect Label Scale", s_Settings.inspectLabelScale);
         ClampSettings();
     }
 
@@ -913,7 +924,7 @@ void DynamicGI::UpdateEditor(const Math::Camera& camera)
 
     const ProbeContribution::Surface* contribution = GetInspectedContribution();
     if (contribution != nullptr && contribution->hasSurface != 0)
-        ProbeVisualization::AnnotateContribution(camera, *contribution, s_HoveredCorner);
+        ProbeVisualization::AnnotateContribution(camera, *contribution, { s_HoveredCorner, s_Settings.inspectLabelScale });
 }
 
 void DynamicGI::DrawProbes(GraphicsContext& context, const Math::Camera& camera, const D3D12_VIEWPORT& viewport, const D3D12_RECT& scissor)

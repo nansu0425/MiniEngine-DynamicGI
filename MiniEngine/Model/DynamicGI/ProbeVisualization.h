@@ -26,6 +26,12 @@ namespace ProbeVisualization
         bool showOffsets = false;
     };
 
+    struct ContributionLabels
+    {
+        std::optional<uint32_t> hoveredCorner;
+        float scale = 1.0f;
+    };
+
     void Initialize(void);
 
     void DrawSpheres(GraphicsContext& context, const Math::Camera& camera, const D3D12_VIEWPORT& viewport, const D3D12_RECT& scissor,
@@ -42,5 +48,5 @@ namespace ProbeVisualization
         std::optional<uint32_t> hoveredCorner);
 
     void AnnotateContribution(const Math::Camera& camera, const ProbeContribution::Surface& contribution,
-        std::optional<uint32_t> hoveredCorner);
+        const ContributionLabels& labels);
 }

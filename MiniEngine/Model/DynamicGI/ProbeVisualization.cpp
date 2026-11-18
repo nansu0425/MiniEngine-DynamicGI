@@ -312,13 +312,14 @@ void ProbeVisualization::DrawContribution(GraphicsContext& context, const Camera
 }
 
 void ProbeVisualization::AnnotateContribution(const Camera& camera, const ProbeContribution::Surface& contribution,
-    std::optional<uint32_t> hoveredCorner)
+    const ContributionLabels& labels)
 {
     const ImU32 textColor = IM_COL32(255, 255, 255, 255);
     const ImU32 backgroundColor = IM_COL32(0, 0, 0, 160);
     const ImU32 hoveredBorderColor = IM_COL32(255, 140, 26, 255);
-    const float letterSize = ImGui::GetFontSize() * 1.5f;
-    const ImVec2 padding(4.0f, 2.0f);
+    const float weightSize = ImGui::GetFontSize() * labels.scale;
+    const float letterSize = weightSize * 1.5f;
+    const ImVec2 padding(4.0f * labels.scale, 2.0f * labels.scale);
 
     const RECT scene = ImGuiLayer::GetSceneViewport();
     ImDrawList* drawList = ImGui::GetBackgroundDrawList();
@@ -334,16 +335,17 @@ void ProbeVisualization::AnnotateContribution(const Camera& camera, const ProbeC
         char weight[16];
         sprintf_s(weight, " %.1f%%", probe.weight * 100.0f);
         const ImVec2 letterExtent = ImGui::GetFont()->CalcTextSizeA(letterSize, FLT_MAX, 0.0f, letter);
-        const ImVec2 weightExtent = ImGui::CalcTextSize(weight);
+        const ImVec2 weightExtent = ImGui::GetFont()->CalcTextSizeA(weightSize, FLT_MAX, 0.0f, weight);
         const ImVec2 origin(center.x + padding.x, center.y - letterExtent.y - padding.y);
         const ImVec2 end(origin.x + letterExtent.x + weightExtent.x + 2.0f * padding.x, origin.y + letterExtent.y + 2.0f * padding.y);
 
         drawList->AddRectFilled(origin, end, backgroundColor);
-        if (hoveredCorner == corner)
-            drawList->AddRect(origin, end, hoveredBorderColor, 0.0f, 0, 2.0f);
+        if (labels.hoveredCorner == corner)
+            drawList->AddRect(origin, end, hoveredBorderColor, 0.0f, 0, 2.0f * labels.scale);
         const ImVec2 letterPosition(origin.x + padding.x, origin.y + padding.y);
         drawList->AddText(ImGui::GetFont(), letterSize, letterPosition, textColor, letter);
-        drawList->AddText(ImVec2(letterPosition.x + letterExtent.x, letterPosition.y + letterExtent.y - weightExtent.y), textColor, weight);
+        drawList->AddText(ImGui::GetFont(), weightSize, ImVec2(letterPosition.x + letterExtent.x, letterPosition.y + letterExtent.y - weightExtent.y),
+            textColor, weight);
     }
 
     ImVec2 point;
