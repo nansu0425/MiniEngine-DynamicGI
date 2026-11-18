@@ -428,7 +428,8 @@ void ProbeLighting::Update(ComputeContext& context, const Volume& volume, const 
     }
 
     const uint32_t probeCount = GetProbeCount(s_Grid);
-    const ProbeRays rays = { s_Grid, MakeRandomRotation(), s_RaysPerProbe };
+    const Matrix4 rotation = settings.randomRayRotation ? MakeRandomRotation() : Matrix4(kIdentity);
+    const ProbeRays rays = { s_Grid, rotation, s_RaysPerProbe };
     s_RaySamplesRotation = rays.rotation;
 
     {

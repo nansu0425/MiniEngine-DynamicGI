@@ -16,6 +16,7 @@ namespace ProbeLighting
         uint32_t probeCounts[3] = { 16, 8, 8 };
         uint32_t raysPerProbe = 64;
         float hysteresis = 0.95f;
+        bool randomRayRotation = true;
         float distanceSharpness = 1.0f;
         uint32_t distanceTexelsPerSide = 8;
         float backFaceDistanceScale = 0.2f;

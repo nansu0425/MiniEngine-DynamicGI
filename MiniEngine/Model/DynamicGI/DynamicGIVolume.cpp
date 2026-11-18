@@ -101,6 +101,9 @@ namespace
         ImGui::InputScalar("Rays per Probe", ImGuiDataType_U32, &probe.raysPerProbe, &step);
         ImGui::SliderFloat("Hysteresis", &probe.hysteresis, 0.0f, kMaxHysteresis);
         ImGui::SetItemTooltip("How much of the old irradiance each update keeps.");
+        ImGui::Checkbox("Random Ray Rotation", &probe.randomRayRotation);
+        ImGui::SetItemTooltip("Rotates the ray directions of every probe by a new random rotation on each update. "
+            "Off traces the same directions on every update.");
         ImGui::SliderFloat("Distance Sharpness", &probe.distanceSharpness, 1.0f, kMaxDistanceSharpness);
         ImGui::SetItemTooltip("Exponent on the cosine between a distance texel and a ray that weights the ray's distance in the texel. "
             "Higher values keep only the rays close to the texel direction. The irradiance keeps the cosine itself.");
@@ -175,7 +178,7 @@ namespace
 }
 
 DynamicGIVolumeComponent::DynamicGIVolumeComponent(std::function<AxisAlignedBox()> findModelBounds)
-    : Component({ "Position", "Size", "Probes X", "Probes Y", "Probes Z", "Rays per Probe", "Hysteresis", "Distance Sharpness",
+    : Component({ "Position", "Size", "Probes X", "Probes Y", "Probes Z", "Rays per Probe", "Hysteresis", "Random Ray Rotation", "Distance Sharpness",
         "Distance Texels per Side", "Back Face Distance Scale", "Visibility", "Self Shadow Bias", "Chebyshev Exponent",
         "Weight Crush Threshold", "Facing Weight", "Min Facing Weight", "Facing Normal", "Probe Classification", "Max Back Face Ratio",
         "Probe Relocation", "Relocation Iterations", "Max Probe Offset", "Back Face Push Max Scale", "Back Face Push Min Scale", "Min Front Face Distance" }),
@@ -206,6 +209,7 @@ void DynamicGIVolumeComponent::SaveSettings(IniFile::Values& values) const
     values["Probes Z"] = std::to_string(probe.probeCounts[2]);
     values["Rays per Probe"] = std::to_string(probe.raysPerProbe);
     values["Hysteresis"] = MeasurementConditions::FormatFloat(probe.hysteresis);
+    values["Random Ray Rotation"] = SettingValues::FormatFlag(probe.randomRayRotation);
     values["Distance Sharpness"] = MeasurementConditions::FormatFloat(probe.distanceSharpness);
     values["Distance Texels per Side"] = std::to_string(probe.distanceTexelsPerSide);
     values["Back Face Distance Scale"] = MeasurementConditions::FormatFloat(probe.backFaceDistanceScale);
@@ -240,6 +244,7 @@ void DynamicGIVolumeComponent::LoadSettings(const IniFile::Values& values)
     SettingValues::ReadUInt(values, "Probes Z", probe.probeCounts[2]);
     SettingValues::ReadUInt(values, "Rays per Probe", probe.raysPerProbe);
     SettingValues::ReadFloat(values, "Hysteresis", probe.hysteresis);
+    SettingValues::ReadFlag(values, "Random Ray Rotation", probe.randomRayRotation);
     SettingValues::ReadFloat(values, "Distance Sharpness", probe.distanceSharpness);
     SettingValues::ReadUInt(values, "Distance Texels per Side", probe.distanceTexelsPerSide);
     SettingValues::ReadFloat(values, "Back Face Distance Scale", probe.backFaceDistanceScale);
