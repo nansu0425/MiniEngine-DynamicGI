@@ -11,15 +11,16 @@ namespace ProbeRelocation
         float maxOffset = 0.5f;
         float maxPushScale = 1.99f;
         float minPushScale = 1.0f;
+        float minFrontFaceDistance = 0.1f;
 
         bool operator==(const Settings&) const = default;
     };
 
-    enum class Result : uint32_t { kNotMoved, kBackFacePush, kBlocked, kCount };
+    enum class Result : uint32_t { kNotMoved, kBackFacePush, kFrontFacePush, kBlocked, kCount };
 
     inline const char* GetResultName(Result result)
     {
-        const char* names[] = { "Not Moved", "Back Face Push", "Blocked" };
+        const char* names[] = { "Not Moved", "Back Face Push", "Front Face Push", "Blocked" };
         return names[(uint32_t)result];
     }
 }

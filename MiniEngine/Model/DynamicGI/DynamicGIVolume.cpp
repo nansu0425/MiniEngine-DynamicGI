@@ -57,6 +57,7 @@ namespace
         relocation.maxOffset = std::max(0.0f, std::min(relocation.maxOffset, kMaxProbeOffset));
         relocation.maxPushScale = std::max(kMinPushScale, std::min(relocation.maxPushScale, kMaxPushScale));
         relocation.minPushScale = std::max(kMinPushScale, std::min(relocation.minPushScale, relocation.maxPushScale));
+        relocation.minFrontFaceDistance = std::max(0.0f, std::min(relocation.minFrontFaceDistance, kMaxProbeOffset));
         return settings;
     }
 
@@ -152,7 +153,8 @@ namespace
     {
         ImGui::Checkbox("Probe Relocation", &relocation.enabled);
         ImGui::SetItemTooltip("When the probes are cleared, moves each probe whose rays hit back faces more often than Max Back Face Ratio "
-            "through the closest back face it hit, out of the geometry it is in. Changing a setting here or Max Back Face Ratio clears the probes.");
+            "through the closest back face it hit, out of the geometry it is in, and each other probe closer than Min Front Face Distance "
+            "to a front face away from that face. Changing a setting here or Max Back Face Ratio clears the probes.");
         const uint32_t step = 1;
         ImGui::InputScalar("Relocation Iterations", ImGuiDataType_U32, &relocation.iterations, &step);
         ImGui::SetItemTooltip("How many times each probe traces its rays again from where it is and moves if it is still inside geometry.");
@@ -165,6 +167,10 @@ namespace
         ImGui::SliderFloat("Back Face Push Min Scale", &relocation.minPushScale, kMinPushScale, kMaxPushScale);
         ImGui::SetItemTooltip("The smallest scale the move tries. Above 1 keeps the probe off the face it passed, "
             "and leaves more probes where they are when Max Probe Offset is tight.");
+        ImGui::SliderFloat("Min Front Face Distance", &relocation.minFrontFaceDistance, 0.0f, kMaxProbeOffset);
+        ImGui::SetItemTooltip("Closest a probe outside geometry may stay to the front face its rays hit closest, "
+            "as a fraction of the shortest probe spacing. A closer probe moves straight away from that face until it is this far, "
+            "or halfway to what lies behind it if that is nearer. A probe the move would take beyond Max Probe Offset stays. 0 moves none.");
     }
 }
 
@@ -172,7 +178,7 @@ DynamicGIVolumeComponent::DynamicGIVolumeComponent(std::function<AxisAlignedBox(
     : Component({ "Position", "Size", "Probes X", "Probes Y", "Probes Z", "Rays per Probe", "Hysteresis", "Distance Sharpness",
         "Distance Texels per Side", "Back Face Distance Scale", "Visibility", "Self Shadow Bias", "Chebyshev Exponent",
         "Weight Crush Threshold", "Facing Weight", "Min Facing Weight", "Facing Normal", "Probe Classification", "Max Back Face Ratio",
-        "Probe Relocation", "Relocation Iterations", "Max Probe Offset", "Back Face Push Max Scale", "Back Face Push Min Scale" }),
+        "Probe Relocation", "Relocation Iterations", "Max Probe Offset", "Back Face Push Max Scale", "Back Face Push Min Scale", "Min Front Face Distance" }),
     m_FindModelBounds(std::move(findModelBounds))
 {
 }
@@ -217,6 +223,7 @@ void DynamicGIVolumeComponent::SaveSettings(IniFile::Values& values) const
     values["Max Probe Offset"] = MeasurementConditions::FormatFloat(probe.relocation.maxOffset);
     values["Back Face Push Max Scale"] = MeasurementConditions::FormatFloat(probe.relocation.maxPushScale);
     values["Back Face Push Min Scale"] = MeasurementConditions::FormatFloat(probe.relocation.minPushScale);
+    values["Min Front Face Distance"] = MeasurementConditions::FormatFloat(probe.relocation.minFrontFaceDistance);
 }
 
 void DynamicGIVolumeComponent::LoadSettings(const IniFile::Values& values)
@@ -250,6 +257,7 @@ void DynamicGIVolumeComponent::LoadSettings(const IniFile::Values& values)
     SettingValues::ReadFloat(values, "Max Probe Offset", probe.relocation.maxOffset);
     SettingValues::ReadFloat(values, "Back Face Push Max Scale", probe.relocation.maxPushScale);
     SettingValues::ReadFloat(values, "Back Face Push Min Scale", probe.relocation.minPushScale);
+    SettingValues::ReadFloat(values, "Min Front Face Distance", probe.relocation.minFrontFaceDistance);
 
     SetVolume({ MakeBounds(center, size), probe });
 }
