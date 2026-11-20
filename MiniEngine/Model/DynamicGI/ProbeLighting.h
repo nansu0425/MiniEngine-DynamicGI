@@ -15,6 +15,7 @@ namespace ProbeLighting
     {
         uint32_t probeCounts[3] = { 16, 8, 8 };
         uint32_t raysPerProbe = 64;
+        uint32_t emissiveSamplesPerProbe = 0;
         float hysteresis = 0.95f;
         bool randomRayRotation = true;
         float distanceSharpness = 1.0f;
@@ -42,6 +43,7 @@ namespace ProbeLighting
         ColorBuffer& raySamples;
         const Math::Matrix4& raySamplesRotation;
         uint32_t raysPerProbe;
+        ColorBuffer& emissiveSamples;
     };
 
     struct Progress

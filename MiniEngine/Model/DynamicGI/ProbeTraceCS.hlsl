@@ -1,12 +1,14 @@
 #include "Model/DynamicGI/ProbeRayHit.hlsli"
 #include "Model/DynamicGI/ProbeWeighting.hlsli"
 #include "Model/DynamicGI/HitLighting.hlsli"
+#include "Model/DynamicGI/ProbeEmissiveSamples.hlsli"
 
 cbuffer Constants : register(b0)
 {
     uint DistanceTexelsPerSide;
     float BackFaceDistanceScale;
     ProbeWeighting Weighting;
+    ProbeEmissiveSampling EmissiveSampling;
     GILights Lights;
     ProbeRays Rays;
 };
@@ -57,7 +59,9 @@ ProbeRaySample TraceProbeRay(ProbePositions positions, float3 origin, float3 dir
     const float3 indirectRadiance = kPi * EvaluateGltfDiffuseLobeForIrradiance(brdf) * irradiance;
     const float3 directRadiance = GetHitDirectRadiance(surface, brdf, Lights, ShadowMap, ShadowMapSampler);
 
-    sample.radiance = surface.emissive + directRadiance + indirectRadiance;
+    const float3 emissiveRadiance = HasEmissiveSamples(EmissiveSampling) ? 0.0 : surface.emissive;
+
+    sample.radiance = emissiveRadiance + directRadiance + indirectRadiance;
     return sample;
 }
 

@@ -163,6 +163,7 @@
     <None Include="Raytracing\SurfaceRay.hlsli" />
     <None Include="Raytracing\CameraRays.hlsli" />
     <None Include="Raytracing\EmissiveTriangles.hlsli" />
+    <None Include="DynamicGI\ProbeEmissiveSamples.hlsli" />
     <None Include="DynamicGI\HitLighting.hlsli" />
     <None Include="DynamicGI\ProbeRays.hlsli" />
     <None Include="DynamicGI\ProbeRayHit.hlsli" />
@@ -301,6 +302,9 @@
       <ShaderModel>6.5</ShaderModel>
     </FxCompile>
     <FxCompile Include="DynamicGI\ProbeTraceCS.hlsl">
+      <ShaderModel>6.5</ShaderModel>
+    </FxCompile>
+    <FxCompile Include="DynamicGI\ProbeEmissiveTraceCS.hlsl">
       <ShaderModel>6.5</ShaderModel>
     </FxCompile>
     <FxCompile Include="DynamicGI\ProbeTexelDistanceCS.hlsl">

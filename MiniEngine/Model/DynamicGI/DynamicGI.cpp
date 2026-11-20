@@ -818,6 +818,10 @@ void DynamicGI::Initialize(void)
         .findMarkedRow = GetSelectedProbe,
         .describeTexel = DescribeRaySample,
     });
+    TextureViewer::AddTexture("Probe Emissive Samples", probes.emissiveSamples, {
+        .markedRowName = "Selected Probe",
+        .findMarkedRow = GetSelectedProbe,
+    });
     TextureViewer::AddTexture("Probe Screen Irradiance", ProbeLighting::GetScreenIrradiance());
     TextureViewer::AddTexture("Path Traced Indirect Radiance", PathTracedLighting::GetIndirectRadiance());
 
