@@ -229,11 +229,13 @@ std::shared_ptr<Model> Renderer::LoadModel(const std::wstring& filePath, bool fo
     model->m_NumMeshes = header.numMeshes;
     model->m_MeshData.reset(new uint8_t[header.meshDataSize]);
 
+    std::vector<uint8_t> geometryData(header.geometrySize);
 	if (header.geometrySize > 0)
 	{
+		inFile.read((char*)geometryData.data(), header.geometrySize);
 		UploadBuffer modelData;
 		modelData.Create(L"Model Data Upload", header.geometrySize);
-		inFile.read((char*)modelData.Map(), header.geometrySize);
+		std::memcpy(modelData.Map(), geometryData.data(), header.geometrySize);
 		modelData.Unmap();
 		model->m_DataBuffer.Create(L"Model Data", header.geometrySize, 1, modelData);
 	}
@@ -241,16 +243,14 @@ std::shared_ptr<Model> Renderer::LoadModel(const std::wstring& filePath, bool fo
     inFile.read((char*)model->m_SceneGraph.get(), header.numNodes * sizeof(GraphNode));
     inFile.read((char*)model->m_MeshData.get(), header.meshDataSize);
 
+    std::vector<MaterialConstants> materials(header.numMaterials);
 	if (header.numMaterials > 0)
 	{
+		for (MaterialConstants& material : materials)
+			inFile.read((char*)&material, sizeof(MaterialConstantData));
 		UploadBuffer materialConstants;
 		materialConstants.Create(L"Material Constant Upload", header.numMaterials * sizeof(MaterialConstants));
-		MaterialConstants* materialCBV = (MaterialConstants*)materialConstants.Map();
-		for (uint32_t i = 0; i < header.numMaterials; ++i)
-		{
-			inFile.read((char*)materialCBV, sizeof(MaterialConstantData));
-			materialCBV++;
-		}
+		std::memcpy(materialConstants.Map(), materials.data(), header.numMaterials * sizeof(MaterialConstants));
 		materialConstants.Unmap();
 		model->m_MaterialConstants.Create(L"Material Constants", header.numMaterials, sizeof(MaterialConstants), materialConstants);
 	}
@@ -276,6 +276,7 @@ std::shared_ptr<Model> Renderer::LoadModel(const std::wstring& filePath, bool fo
     {
         BuildBottomLevelAS(*model);
         CreateBLASGeometries(*model);
+        CollectEmissiveTriangles(*model, geometryData.data(), materials.data());
     }
 
     model->m_BoundingSphere = BoundingSphere(*(XMFLOAT4*)header.boundingSphere);

@@ -91,6 +91,7 @@
     <ClInclude Include="Raytracing\RayPick.h" />
     <ClInclude Include="Raytracing\RayQuerySmokeTest.h" />
     <ClInclude Include="Raytracing\SceneHeapTable.h" />
+    <ClInclude Include="Raytracing\EmissiveTriangles.h" />
     <ClInclude Include="PathTracer\PathTracer.h" />
     <ClInclude Include="PathTracer\PathTracerTuning.h" />
     <ClInclude Include="PathTracer\BrdfTest.h" />
@@ -131,6 +132,7 @@
     <ClCompile Include="Raytracing\RayPick.cpp" />
     <ClCompile Include="Raytracing\RayQuerySmokeTest.cpp" />
     <ClCompile Include="Raytracing\SceneHeapTable.cpp" />
+    <ClCompile Include="Raytracing\EmissiveTriangles.cpp" />
     <ClCompile Include="PathTracer\PathTracer.cpp" />
     <ClCompile Include="PathTracer\PathTracerTuning.cpp" />
     <ClCompile Include="PathTracer\BrdfTest.cpp" />
@@ -160,6 +162,7 @@
     <None Include="Raytracing\SurfaceRayOrigin.hlsli" />
     <None Include="Raytracing\SurfaceRay.hlsli" />
     <None Include="Raytracing\CameraRays.hlsli" />
+    <None Include="Raytracing\EmissiveTriangles.hlsli" />
     <None Include="DynamicGI\HitLighting.hlsli" />
     <None Include="DynamicGI\ProbeRays.hlsli" />
     <None Include="DynamicGI\ProbeRayHit.hlsli" />

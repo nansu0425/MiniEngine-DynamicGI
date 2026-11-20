@@ -23,6 +23,7 @@
 #include "Core/Graphics/Texture/TextureManager.h"
 #include "Core/Math/BoundingBox.h"
 #include "Core/Math/BoundingSphere.h"
+#include "Model/Raytracing/EmissiveTriangles.h"
 #include <cstdint>
 
 namespace Renderer
@@ -138,6 +139,7 @@ public:
     // ray tracing shader가 읽도록 Renderer::s_TextureHeap에 둔 m_DataBuffer, m_MaterialConstants,
     // m_BLASGeometries SRV 중 첫 번째의 위치. 세 SRV는 이 순서로 붙어 있다.
     uint32_t m_RaytracingSRVs;
+    std::vector<EmissiveTriangle> m_EmissiveTriangles;
 
 protected:
     void Destroy();

@@ -7,6 +7,7 @@ class CommandContext;
 class ComputeContext;
 class RootSignature;
 class ModelInstance;
+class Model;
 
 // ray를 쏘는 대상이 되는 scene의 TLAS와, BLAS instance마다 그 model의 data를 shader가 찾을 위치를 갖는다.
 // 매 frame model instance를 Update한 뒤 AddModelInstance로 넣고 Build한다.
@@ -17,6 +18,12 @@ class RaytracingScene
 public:
     static const UINT kNumRootParameters = 5;
     static const UINT kDoubleSidedInstanceIDBit = 1;
+
+    struct EmissiveTriangles
+    {
+        const StructuredBuffer& buffer;
+        uint32_t count;
+    };
 
     static void InitRootParameters(RootSignature& rootSignature, UINT firstRootIndex);
 
@@ -29,6 +36,8 @@ public:
     // ray pass는 자기 resource를 SceneHeapTable로 가리킨다.
     void Bind(ComputeContext& context, UINT firstRootIndex) const;
 
+    EmissiveTriangles GetEmissiveTriangles() const;
+
 private:
     // RaytracingScene.hlsli의 BLASInstance와 같은 layout이다.
     struct BLASInstance
@@ -37,7 +46,21 @@ private:
         uint32_t firstGeometry;
     };
 
+    struct WorldEmissiveTriangle
+    {
+        Math::XMFLOAT3 p0;
+        uint32_t instanceIndex;
+        Math::XMFLOAT3 p1;
+        uint32_t geometryIndex;
+        Math::XMFLOAT3 p2;
+        uint32_t primitiveIndex;
+        float probability;
+        float cumulativeProbability;
+    };
+
     void CreateBuffers(const D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS& inputs);
+    void AddEmissiveTriangles(const Model& model, const std::vector<uint32_t>& meshInstances, const std::vector<Math::AffineTransform>& meshTransforms);
+    void WriteEmissiveTriangles(CommandContext& context);
 
     // 두 vector는 같은 BLAS instance를 같은 순서로 담는다.
     std::vector<D3D12_RAYTRACING_INSTANCE_DESC> m_InstanceDescs;
@@ -46,4 +69,10 @@ private:
     ByteAddressBuffer m_ScratchBuffer;
     StructuredBuffer m_BLASInstanceBuffer;
     uint32_t m_MaxInstances = 0;
+
+    std::vector<WorldEmissiveTriangle> m_EmissiveTriangles;
+    std::vector<float> m_EmissiveTrianglePowers;
+    StructuredBuffer m_EmissiveTriangleBuffer;
+    uint32_t m_MaxEmissiveTriangles = 0;
+    uint32_t m_EmissiveTriangleCount = 0;
 };

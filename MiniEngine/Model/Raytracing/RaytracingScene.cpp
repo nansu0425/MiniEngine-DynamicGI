@@ -33,6 +33,8 @@ void RaytracingScene::AddModelInstance(const ModelInstance& modelInstance)
     const Model& model = modelInstance.GetModel();
     const AffineTransform* nodeWorldTransforms = modelInstance.GetNodeWorldTransforms();
     const uint8_t* pMesh = model.m_MeshData.get();
+    std::vector<uint32_t> meshInstances(model.m_NumMeshes, UINT32_MAX);
+    std::vector<AffineTransform> meshTransforms(model.m_NumMeshes);
 
     for (uint32_t i = 0; i < model.m_NumMeshes; ++i)
     {
@@ -41,6 +43,9 @@ void RaytracingScene::AddModelInstance(const ModelInstance& modelInstance)
 
         if (model.m_MeshBLAS[i] == D3D12_GPU_VIRTUAL_ADDRESS_NULL)
             continue;
+
+        meshInstances[i] = (uint32_t)m_InstanceDescs.size();
+        meshTransforms[i] = nodeWorldTransforms[mesh.meshCBV];
 
         D3D12_RAYTRACING_INSTANCE_DESC desc = {};
         XMStoreFloat3x4((XMFLOAT3X4*)desc.Transform, nodeWorldTransforms[mesh.meshCBV]);
@@ -57,13 +62,76 @@ void RaytracingScene::AddModelInstance(const ModelInstance& modelInstance)
 
         m_BLASInstances.push_back({ model.m_RaytracingSRVs, model.m_MeshFirstBLASGeometry[i] });
     }
+
+    AddEmissiveTriangles(model, meshInstances, meshTransforms);
+}
+
+void RaytracingScene::AddEmissiveTriangles(const Model& model, const std::vector<uint32_t>& meshInstances, const std::vector<AffineTransform>& meshTransforms)
+{
+    for (const EmissiveTriangle& triangle : model.m_EmissiveTriangles)
+    {
+        const AffineTransform& transform = meshTransforms[triangle.mesh];
+        const Vector3 p0 = transform * Vector3(triangle.positions[0]);
+        const Vector3 p1 = transform * Vector3(triangle.positions[1]);
+        const Vector3 p2 = transform * Vector3(triangle.positions[2]);
+        const float area = 0.5f * Length(Cross(p1 - p0, p2 - p0));
+        if (area <= 0.0f)
+            continue;
+
+        WorldEmissiveTriangle world = {
+            .instanceIndex = meshInstances[triangle.mesh],
+            .geometryIndex = triangle.geometry,
+            .primitiveIndex = triangle.primitive,
+        };
+        XMStoreFloat3(&world.p0, p0);
+        XMStoreFloat3(&world.p1, p1);
+        XMStoreFloat3(&world.p2, p2);
+        m_EmissiveTriangles.push_back(world);
+        m_EmissiveTrianglePowers.push_back(area * triangle.emission);
+    }
+}
+
+void RaytracingScene::WriteEmissiveTriangles(CommandContext& context)
+{
+    m_EmissiveTriangleCount = (uint32_t)m_EmissiveTriangles.size();
+
+    double totalPower = 0.0;
+    for (float power : m_EmissiveTrianglePowers)
+        totalPower += power;
+    double cumulativePower = 0.0;
+    for (uint32_t i = 0; i < m_EmissiveTriangleCount; ++i)
+    {
+        cumulativePower += m_EmissiveTrianglePowers[i];
+        m_EmissiveTriangles[i].probability = (float)(m_EmissiveTrianglePowers[i] / totalPower);
+        m_EmissiveTriangles[i].cumulativeProbability = i + 1 == m_EmissiveTriangleCount ? 1.0f : (float)(cumulativePower / totalPower);
+    }
+
+    if (m_MaxEmissiveTriangles == 0)
+    {
+        m_MaxEmissiveTriangles = std::max(m_EmissiveTriangleCount, 1u);
+        m_EmissiveTriangleBuffer.Create(L"Emissive Triangles", m_MaxEmissiveTriangles, sizeof(WorldEmissiveTriangle));
+    }
+    ASSERT(m_EmissiveTriangleCount <= m_MaxEmissiveTriangles);
+
+    if (m_EmissiveTriangleCount > 0)
+        context.WriteBuffer(m_EmissiveTriangleBuffer, 0, m_EmissiveTriangles.data(), m_EmissiveTriangleCount * sizeof(WorldEmissiveTriangle));
+    context.TransitionResource(m_EmissiveTriangleBuffer, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+    m_EmissiveTriangles.clear();
+    m_EmissiveTrianglePowers.clear();
 }
 
 void RaytracingScene::Build(CommandContext& context)
 {
     const uint32_t numInstances = (uint32_t)m_InstanceDescs.size();
     if (numInstances == 0)
+    {
+        m_EmissiveTriangleCount = 0;
+        m_EmissiveTriangles.clear();
+        m_EmissiveTrianglePowers.clear();
         return;
+    }
+
+    WriteEmissiveTriangles(context);
 
     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC build = {};
     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS& inputs = build.Inputs;
@@ -109,6 +177,11 @@ void RaytracingScene::Destroy()
     m_ScratchBuffer.Destroy();
     m_BLASInstanceBuffer.Destroy();
     m_MaxInstances = 0;
+    m_EmissiveTriangles.clear();
+    m_EmissiveTrianglePowers.clear();
+    m_EmissiveTriangleBuffer.Destroy();
+    m_MaxEmissiveTriangles = 0;
+    m_EmissiveTriangleCount = 0;
 }
 
 void RaytracingScene::Bind(ComputeContext& context, UINT firstRootIndex) const
@@ -121,6 +194,11 @@ void RaytracingScene::Bind(ComputeContext& context, UINT firstRootIndex) const
     context.SetDescriptorTable(firstRootIndex + kBuffers, Renderer::s_TextureHeap[0]);
     context.SetDescriptorTable(firstRootIndex + kTextures, Renderer::s_TextureHeap[0]);
     context.SetDescriptorTable(firstRootIndex + kSamplers, Renderer::s_SamplerHeap[0]);
+}
+
+RaytracingScene::EmissiveTriangles RaytracingScene::GetEmissiveTriangles() const
+{
+    return { m_EmissiveTriangleBuffer, m_EmissiveTriangleCount };
 }
 
 void RaytracingScene::CreateBuffers(const D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS& inputs)
