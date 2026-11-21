@@ -15,6 +15,7 @@
 
 #include "Core/Camera/Camera.h"
 #include "Core/Math/VectorMath.h"
+#include "Core/Math/BoundingBox.h"
 
 class ShadowCamera : public Math::BaseCamera
 {
@@ -29,6 +30,14 @@ public:
         uint32_t BufferWidth,		// Shadow buffer width
         uint32_t BufferHeight,		// Shadow buffer height--usually same as width
         uint32_t BufferPrecision	// Bit depth of shadow buffer--usually 16 or 24
+        );
+
+    void UpdateMatrixToEnclose(
+        Math::Vector3 LightDirection,
+        const Math::AxisAlignedBox& ShadowedBox,
+        uint32_t BufferWidth,
+        uint32_t BufferHeight,
+        uint32_t BufferPrecision
         );
 
     // Used to transform world space to texture space for shadow sampling

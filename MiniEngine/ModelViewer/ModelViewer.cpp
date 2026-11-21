@@ -1607,10 +1607,8 @@ void ModelViewer::RenderScene( void )
     {
         // Update global constants
         Vector3 LightDirection = m_Light.GetDirection();
-        // directional light가 어느 방향에 있어도 shadow map이 model 전체를 덮게 bounding sphere를 감싼다.
-        // ShadowCamera는 자기 위치에서 light 쪽으로만 depth를 담으므로 위치를 light 반대편 끝에 둔다.
-        Scalar ShadowRadius = m_ModelInst.GetRadius();
-        m_ShadowCamera.UpdateMatrix(-LightDirection, m_ModelInst.GetCenter() - LightDirection * ShadowRadius, Vector3(ShadowRadius * 2.0f),
+        // directional light가 어느 방향에 있어도 shadow map이 model 전체를 덮게 light 방향에서 본 model의 AABB를 감싼다.
+        m_ShadowCamera.UpdateMatrixToEnclose(-LightDirection, m_ModelInst.GetAxisAlignedBox(),
             (uint32_t)g_ShadowBuffer.GetWidth(), (uint32_t)g_ShadowBuffer.GetHeight(), 16);
 
         GlobalConstants globals;
