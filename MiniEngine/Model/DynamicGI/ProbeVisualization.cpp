@@ -67,8 +67,6 @@ namespace
     {
         Matrix4 viewProj;
         IrradianceProbeGrid grid;
-        Matrix4 rayRotation;
-        uint32_t raysPerProbe;
         uint32_t probe;
         DistanceLines lines;
         uint32_t distanceTexelsPerSide;
@@ -114,7 +112,7 @@ void ProbeVisualization::Initialize(void)
 
     s_LineRootSignature.Reset(kNumLineRootParameters, 0);
     s_LineRootSignature[kLineConstants].InitAsConstantBuffer(0);
-    s_LineRootSignature[kLineInputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 4, D3D12_SHADER_VISIBILITY_VERTEX);
+    s_LineRootSignature[kLineInputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 5, D3D12_SHADER_VISIBILITY_VERTEX);
     s_LineRootSignature.Finalize(L"Probe Distance Lines");
 
     s_LinePSO.SetRootSignature(s_LineRootSignature);
@@ -224,8 +222,6 @@ void ProbeVisualization::DrawDistanceLines(GraphicsContext& context, const Camer
     LineConstants constants;
     constants.viewProj = camera.GetViewProjMatrix();
     constants.grid = probes.grid;
-    constants.rayRotation = probes.raySamplesRotation;
-    constants.raysPerProbe = probes.raysPerProbe;
     constants.probe = probe;
     constants.distanceTexelsPerSide = probes.distanceTexelsPerSide;
     constants.highlightedRay = highlightedRay.value_or(kNoHighlightedRay);
@@ -237,6 +233,7 @@ void ProbeVisualization::DrawDistanceLines(GraphicsContext& context, const Camer
     context.TransitionResource(probes.raySamples, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     context.TransitionResource(probes.texelDistance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     context.TransitionResource(probes.offset, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+    context.TransitionResource(probes.rayDirections, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     context.TransitionResource(g_SceneDepthBuffer, D3D12_RESOURCE_STATE_DEPTH_READ);
     context.TransitionResource(g_SceneOverlayBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
     context.SetRenderTarget(g_SceneOverlayBuffer.GetRTV(), g_SceneDepthBuffer.GetDSV_DepthReadOnly());
@@ -245,6 +242,7 @@ void ProbeVisualization::DrawDistanceLines(GraphicsContext& context, const Camer
     context.SetDynamicDescriptor(kLineInputs, 1, probes.raySamples.GetSRV());
     context.SetDynamicDescriptor(kLineInputs, 2, probes.texelDistance.GetSRV());
     context.SetDynamicDescriptor(kLineInputs, 3, probes.offset.GetSRV());
+    context.SetDynamicDescriptor(kLineInputs, 4, probes.rayDirections.GetSRV());
 
     if (settings.showTexelMeans)
     {

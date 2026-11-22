@@ -40,8 +40,8 @@ namespace ProbeLighting
         ColorBuffer& backFaceRatio;
         ColorBuffer& offset;
         uint32_t distanceTexelsPerSide;
+        ColorBuffer& rayDirections;
         ColorBuffer& raySamples;
-        const Math::Matrix4& raySamplesRotation;
         uint32_t raysPerProbe;
         ColorBuffer& emissiveSamples;
     };

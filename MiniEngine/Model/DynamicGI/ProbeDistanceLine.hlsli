@@ -11,8 +11,6 @@ cbuffer Constants : register(b0)
 {
     float4x4 ViewProj;
     IrradianceProbeGrid Grid;
-    float4x4 RayRotation;
-    uint RaysPerProbe;
     uint Probe;
     uint Lines;
     uint DistanceTexelsPerSide;

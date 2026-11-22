@@ -813,6 +813,11 @@ void DynamicGI::Initialize(void)
     TextureViewer::AddTexture("Probes Texel Distance", probes.texelDistance);
     TextureViewer::AddTexture("Probes Back Face Ratio", probes.backFaceRatio);
     TextureViewer::AddTexture("Probes Offset", probes.offset);
+    TextureViewer::AddTexture("Probe Ray Directions", probes.rayDirections, {
+        .markedRowName = "Selected Probe",
+        .findMarkedRow = GetSelectedProbe,
+        .describeTexel = DescribeRaySample,
+    });
     TextureViewer::AddTexture("Probe Ray Samples", probes.raySamples, {
         .markedRowName = "Selected Probe",
         .findMarkedRow = GetSelectedProbe,

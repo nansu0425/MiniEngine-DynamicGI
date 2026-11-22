@@ -5,6 +5,7 @@ Texture2D<float2> ProbesDistance : register(t0);
 Texture2D<float4> RaySamples : register(t1);
 Texture2D<float> ProbesTexelDistance : register(t2);
 Texture2D<float4> ProbesOffset : register(t3);
+Texture2D<float4> RayDirections : register(t4);
 
 static const float3 kTexelMeanColor = float3(1.0, 0.85, 0.0);
 static const float3 kTexelDistanceColor = float3(1.0, 0.0, 1.0);
@@ -47,11 +48,7 @@ ProbeDistanceLineVertex main(uint vertexID : SV_VertexID, uint lineIndex : SV_In
     }
     else
     {
-        ProbeRays rays;
-        rays.grid = Grid;
-        rays.rotation = RayRotation;
-        rays.raysPerProbe = RaysPerProbe;
-        direction = GetProbeRayDirection(rays, lineIndex);
+        direction = RayDirections[uint2(lineIndex, Probe)].xyz;
         distance = RaySamples[uint2(lineIndex, Probe)].a;
         vertex.color = GetRaySampleColor(lineIndex, distance);
     }

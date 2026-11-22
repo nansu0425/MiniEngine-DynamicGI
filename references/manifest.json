@@ -29,5 +29,15 @@
         "name": "Majercik2021-ScalingDDGI.pdf",
         "url": "https://jcgt.org/published/0010/02/01/paper-lowres.pdf",
         "sha256": "273397f6b9bdde59bf9bcca49e4185702e0356f99eb7efe396dafe19f4cf22b5"
+    },
+    {
+        "name": "Wright2022-Lumen.pdf",
+        "url": "https://advances.realtimerendering.com/s2022/SIGGRAPH2022-Advances-Lumen-Wright%20et%20al.pdf",
+        "sha256": "6c028991069171bf50667205d1a26445fe0a207a01ff5783692608d10c7c9f17"
+    },
+    {
+        "name": "Wright2021-RadianceCaching.pptx",
+        "url": "https://advances.realtimerendering.com/s2021/Radiance%20Caching%20for%20real-time%20Global%20Illumination%20(SIGGRAPH%202021).pptx",
+        "sha256": "180722857be8a0ca3bf300cbd0ab763006cbd9999cae25c6f0010c2b145f2d64"
     }
 ]

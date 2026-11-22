@@ -22,6 +22,7 @@ SamplerComparisonState ShadowMapSampler : register(s0);
 SamplerState LinearClamp : register(s1);
 RWTexture2D<float4> RaySamples : register(u0);
 RWTexture2D<float> RayBackFaces : register(u1);
+RWTexture2D<float4> RayDirections : register(u2);
 
 struct ProbeRaySample
 {
@@ -75,7 +76,9 @@ void main(uint2 DTid : SV_DispatchThreadID)
 
     const ProbePositions positions = MakeProbePositions(Rays.grid, ProbesOffset);
     const float3 origin = GetProbePosition(positions, GetProbeCoordinate(Rays.grid, probe));
-    const ProbeRaySample sample = TraceProbeRay(positions, origin, GetProbeRayDirection(Rays, ray));
+    const float3 direction = GetProbeRayDirection(Rays, ray);
+    const ProbeRaySample sample = TraceProbeRay(positions, origin, direction);
+    RayDirections[DTid] = float4(direction, 0.0);
     RaySamples[DTid] = float4(sample.radiance, sample.distance);
     RayBackFaces[DTid] = sample.hitsBackFace ? 1.0 : 0.0;
 }
