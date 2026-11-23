@@ -11,6 +11,13 @@ class ComputeContext;
 
 namespace ProbeLighting
 {
+    struct SpikeLimit
+    {
+        bool enabled = true;
+        float sigmas = 4.0f;
+        float floor = 0.01f;
+    };
+
     struct Settings
     {
         uint32_t probeCounts[3] = { 16, 8, 8 };
@@ -18,6 +25,7 @@ namespace ProbeLighting
         uint32_t guidedRaysPerProbe = 0;
         uint32_t emissiveSamplesPerProbe = 0;
         float hysteresis = 0.95f;
+        SpikeLimit spikeLimit;
         bool randomRayRotation = true;
         float distanceSharpness = 1.0f;
         uint32_t distanceTexelsPerSide = 8;

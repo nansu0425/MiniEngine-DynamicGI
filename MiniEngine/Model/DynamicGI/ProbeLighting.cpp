@@ -126,6 +126,8 @@ namespace
     __declspec(align(16)) struct IrradianceUpdateConstants
     {
         float blendWeight;
+        float spikeLimitSigmas;
+        float spikeLimitFloor;
         ProbeEmissiveSampling emissiveSampling;
         ProbeRays rays;
     };
@@ -592,7 +594,9 @@ void ProbeLighting::Update(ComputeContext& context, const Volume& volume, const 
     {
         ScopedTimer _updateProf(L"Probes Update", context);
 
-        const float blendWeight = std::max(1.0f - settings.hysteresis, 1.0f / (s_Progress.updates + 1));
+        const float settledBlendWeight = 1.0f - settings.hysteresis;
+        const float blendWeight = std::max(settledBlendWeight, 1.0f / (s_Progress.updates + 1));
+        const bool keepsOldIrradiance = blendWeight == settledBlendWeight && blendWeight < 1.0f;
         context.SetRootSignature(s_UpdateRootSignature);
         context.TransitionResource(s_WeightedRayDirections, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
         context.TransitionResource(s_RaySamples, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
@@ -602,7 +606,13 @@ void ProbeLighting::Update(ComputeContext& context, const Volume& volume, const 
         context.TransitionResource(s_ProbesDistance, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
         context.SetDynamicDescriptor(kUpdateInputs, 0, s_RaySamples.GetSRV());
 
-        const IrradianceUpdateConstants irradianceConstants = { .blendWeight = blendWeight, .emissiveSampling = emissiveSampling, .rays = rays };
+        const IrradianceUpdateConstants irradianceConstants = {
+            .blendWeight = blendWeight,
+            .spikeLimitSigmas = settings.spikeLimit.enabled && keepsOldIrradiance ? settings.spikeLimit.sigmas : 0.0f,
+            .spikeLimitFloor = settings.spikeLimit.floor,
+            .emissiveSampling = emissiveSampling,
+            .rays = rays,
+        };
         context.SetPipelineState(s_IrradianceUpdatePSO);
         context.SetDynamicConstantBufferView(kUpdateConstants, sizeof(irradianceConstants), &irradianceConstants);
         context.SetDynamicDescriptor(kUpdateInputs, 1, s_EmissiveSamples.GetSRV());

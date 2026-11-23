@@ -18,6 +18,8 @@ namespace
     constexpr uint32_t kMaxGuidedRaysPerProbe = 1024;
     constexpr uint32_t kMaxEmissiveSamplesPerProbe = 256;
     constexpr float kMaxHysteresis = 0.999f;
+    constexpr float kMinSpikeLimitSigmas = 2.0f;
+    constexpr float kMaxSpikeLimitSigmas = 16.0f;
     constexpr float kMaxDistanceSharpness = 100.0f;
     constexpr uint32_t kMaxDistanceTexelsPerSide = 32;
     constexpr float kMaxSelfShadowBias = 0.5f;
@@ -47,6 +49,8 @@ namespace
         settings.guidedRaysPerProbe = std::min(settings.guidedRaysPerProbe, kMaxGuidedRaysPerProbe);
         settings.emissiveSamplesPerProbe = std::min(settings.emissiveSamplesPerProbe, kMaxEmissiveSamplesPerProbe);
         settings.hysteresis = std::max(0.0f, std::min(settings.hysteresis, kMaxHysteresis));
+        settings.spikeLimit.sigmas = std::max(kMinSpikeLimitSigmas, std::min(settings.spikeLimit.sigmas, kMaxSpikeLimitSigmas));
+        settings.spikeLimit.floor = std::max(0.0f, settings.spikeLimit.floor);
         settings.distanceSharpness = std::max(1.0f, std::min(settings.distanceSharpness, kMaxDistanceSharpness));
         settings.distanceTexelsPerSide = std::max(1u, std::min(settings.distanceTexelsPerSide, kMaxDistanceTexelsPerSide));
         settings.backFaceDistanceScale = std::max(0.0f, std::min(settings.backFaceDistanceScale, 1.0f));
@@ -113,6 +117,15 @@ namespace
             "0 leaves emissive light to the probe rays.");
         ImGui::SliderFloat("Hysteresis", &probe.hysteresis, 0.0f, kMaxHysteresis);
         ImGui::SetItemTooltip("How much of the old irradiance each update keeps.");
+        ImGui::Checkbox("Limit Spikes", &probe.spikeLimit.enabled);
+        ImGui::SetItemTooltip("Scales down the irradiance of an update that is much brighter than a texel's updates usually are before it is blended in, "
+            "so a single bright ray cannot make the probe flash. Each texel keeps the mean and the deviation of the luminance of its updates, "
+            "and an update may be as bright as the mean plus Spike Limit Sigmas deviations. Light that stays brighter raises the deviation and gets through "
+            "over the updates. The light scaled away is lost. Updates right after the probes are cleared are not limited, and none is while Hysteresis is 0.");
+        ImGui::SliderFloat("Spike Limit Sigmas", &probe.spikeLimit.sigmas, kMinSpikeLimitSigmas, kMaxSpikeLimitSigmas);
+        ImGui::SetItemTooltip("How many deviations above the mean luminance of a texel's updates an update may be. Lower values cut more flashes and lose more light.");
+        ImGui::DragFloat("Spike Limit Floor", &probe.spikeLimit.floor, 0.001f, 0.0f, FLT_MAX, "%.4f");
+        ImGui::SetItemTooltip("The luminance Limit Spikes never limits an update below, so a texel that keeps no irradiance can still brighten.");
         ImGui::Checkbox("Random Ray Rotation", &probe.randomRayRotation);
         ImGui::SetItemTooltip("Rotates the ray directions of every probe by a new random rotation on each update. "
             "Off traces the same directions on every update.");
@@ -190,7 +203,7 @@ namespace
 }
 
 DynamicGIVolumeComponent::DynamicGIVolumeComponent(std::function<AxisAlignedBox()> findModelBounds)
-    : Component({ "Position", "Size", "Probes X", "Probes Y", "Probes Z", "Rays per Probe", "Guided Rays per Probe", "Emissive Samples per Probe", "Hysteresis", "Random Ray Rotation", "Distance Sharpness",
+    : Component({ "Position", "Size", "Probes X", "Probes Y", "Probes Z", "Rays per Probe", "Guided Rays per Probe", "Emissive Samples per Probe", "Hysteresis", "Limit Spikes", "Spike Limit Sigmas", "Spike Limit Floor", "Random Ray Rotation", "Distance Sharpness",
         "Distance Texels per Side", "Back Face Distance Scale", "Visibility", "Self Shadow Bias", "Chebyshev Exponent",
         "Weight Crush Threshold", "Facing Weight", "Min Facing Weight", "Facing Normal", "Probe Classification", "Max Back Face Ratio",
         "Probe Relocation", "Relocation Iterations", "Max Probe Offset", "Back Face Push Max Scale", "Back Face Push Min Scale", "Min Front Face Distance" }),
@@ -223,6 +236,9 @@ void DynamicGIVolumeComponent::SaveSettings(IniFile::Values& values) const
     values["Guided Rays per Probe"] = std::to_string(probe.guidedRaysPerProbe);
     values["Emissive Samples per Probe"] = std::to_string(probe.emissiveSamplesPerProbe);
     values["Hysteresis"] = MeasurementConditions::FormatFloat(probe.hysteresis);
+    values["Limit Spikes"] = SettingValues::FormatFlag(probe.spikeLimit.enabled);
+    values["Spike Limit Sigmas"] = MeasurementConditions::FormatFloat(probe.spikeLimit.sigmas);
+    values["Spike Limit Floor"] = MeasurementConditions::FormatFloat(probe.spikeLimit.floor);
     values["Random Ray Rotation"] = SettingValues::FormatFlag(probe.randomRayRotation);
     values["Distance Sharpness"] = MeasurementConditions::FormatFloat(probe.distanceSharpness);
     values["Distance Texels per Side"] = std::to_string(probe.distanceTexelsPerSide);
@@ -260,6 +276,9 @@ void DynamicGIVolumeComponent::LoadSettings(const IniFile::Values& values)
     SettingValues::ReadUInt(values, "Guided Rays per Probe", probe.guidedRaysPerProbe);
     SettingValues::ReadUInt(values, "Emissive Samples per Probe", probe.emissiveSamplesPerProbe);
     SettingValues::ReadFloat(values, "Hysteresis", probe.hysteresis);
+    SettingValues::ReadFlag(values, "Limit Spikes", probe.spikeLimit.enabled);
+    SettingValues::ReadFloat(values, "Spike Limit Sigmas", probe.spikeLimit.sigmas);
+    SettingValues::ReadFloat(values, "Spike Limit Floor", probe.spikeLimit.floor);
     SettingValues::ReadFlag(values, "Random Ray Rotation", probe.randomRayRotation);
     SettingValues::ReadFloat(values, "Distance Sharpness", probe.distanceSharpness);
     SettingValues::ReadUInt(values, "Distance Texels per Side", probe.distanceTexelsPerSide);

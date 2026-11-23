@@ -2,10 +2,13 @@
 #include "Model/DynamicGI/ProbeEmissiveSamples.hlsli"
 #include "Model/DynamicGI/ProbePositions.hlsli"
 #include "Core/Shaders/GltfBrdf.hlsli"
+#include "Core/Shaders/ShaderUtility.hlsli"
 
 cbuffer Constants : register(b0)
 {
     float BlendWeight;
+    float SpikeLimitSigmas;
+    float SpikeLimitFloor;
     ProbeEmissiveSampling EmissiveSampling;
     ProbeRays Rays;
 };
@@ -48,6 +51,33 @@ float3 EstimateIrradianceFromEmissiveSamples(uint probe, float3 texelDirection)
     return weightedIrradiance / (kPi * EmissiveSampling.samplesPerProbe);
 }
 
+struct StoredIrradiance
+{
+    float3 irradiance;
+    float squaredLuminance;
+};
+
+StoredIrradiance GetStoredIrradiance(uint2 texel)
+{
+    const float4 stored = ProbesIrradiance[texel];
+    StoredIrradiance storedIrradiance;
+    storedIrradiance.irradiance = stored.rgb;
+    storedIrradiance.squaredLuminance = stored.a;
+    return storedIrradiance;
+}
+
+float3 LimitSpike(float3 irradiance, StoredIrradiance stored)
+{
+    if (SpikeLimitSigmas <= 0.0)
+        return irradiance;
+
+    const float meanLuminance = RGBToLuminance(stored.irradiance);
+    const float luminanceDeviation = sqrt(max(0.0, stored.squaredLuminance - meanLuminance * meanLuminance));
+    const float largestLuminance = max(meanLuminance + SpikeLimitSigmas * luminanceDeviation, SpikeLimitFloor);
+    const float luminance = RGBToLuminance(irradiance);
+    return luminance > largestLuminance ? irradiance * (largestLuminance / luminance) : irradiance;
+}
+
 [numthreads(kProbeIrradianceTexelsPerSide, kProbeIrradianceTexelsPerSide, 1)]
 void main(uint3 Gid : SV_GroupID, uint3 GTid : SV_GroupThreadID)
 {
@@ -56,5 +86,10 @@ void main(uint3 Gid : SV_GroupID, uint3 GTid : SV_GroupThreadID)
     const float3 irradiance = EstimateIrradianceFromRaySamples(probe, texelDirection) + EstimateIrradianceFromEmissiveSamples(probe, texelDirection);
 
     const uint2 texel = GetProbeAtlasTexel(Rays.grid, kProbeIrradianceTexelsPerSide, GetProbeCoordinate(Rays.grid, probe), GTid.xy);
-    ProbesIrradiance[texel] = float4(lerp(ProbesIrradiance[texel].rgb, irradiance, BlendWeight), 0.0);
+    const StoredIrradiance stored = GetStoredIrradiance(texel);
+    const float3 limitedIrradiance = LimitSpike(irradiance, stored);
+    const float limitedLuminance = RGBToLuminance(limitedIrradiance);
+    const float3 blendedIrradiance = lerp(stored.irradiance, limitedIrradiance, BlendWeight);
+    const float blendedSquaredLuminance = lerp(stored.squaredLuminance, limitedLuminance * limitedLuminance, BlendWeight);
+    ProbesIrradiance[texel] = float4(blendedIrradiance, blendedSquaredLuminance);
 }
