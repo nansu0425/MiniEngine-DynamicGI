@@ -41,6 +41,7 @@ namespace
         Renderer::ShadingOutput view = Renderer::ShadingOutput::kLit;
         PathTracedLighting::Settings pathTraced;
         bool pauseProbeUpdates = false;
+        float spikeFluxShare = 0.3f;
         ProbeVisualization::Settings probeSpheres;
         bool inspectPixel = false;
         float inspectLabelScale = 1.0f;
@@ -77,6 +78,7 @@ namespace
 
     Settings s_Settings;
     bool s_ProbeStepRequested = false;
+    bool s_SteppingUntilSpike = false;
     std::optional<uint32_t> s_SelectedProbe;
     std::optional<InspectedPixel> s_InspectedPixel;
     std::vector<PendingPixelReply> s_PendingPixelReplies;
@@ -299,6 +301,7 @@ namespace
         probeSpheres.radiusPerSpacing = std::max(0.0f, std::min(probeSpheres.radiusPerSpacing, kMaxRadiusPerSpacing));
 
         s_Settings.inspectLabelScale = std::max(kMinInspectLabelScale, std::min(s_Settings.inspectLabelScale, kMaxInspectLabelScale));
+        s_Settings.spikeFluxShare = std::max(0.0f, std::min(s_Settings.spikeFluxShare, 1.0f));
     }
 
     void ShowViewCombo(void)
@@ -575,6 +578,19 @@ namespace
             s_ProbeStepRequested = true;
         ImGui::SetItemTooltip("Updates the probes once on the next frame.");
         ImGui::EndDisabled();
+        ImGui::SameLine();
+        ImGui::BeginDisabled(!s_Settings.pauseProbeUpdates || !GetSelectedProbe());
+        if (ImGui::Button(s_SteppingUntilSpike ? "Stop###Step Until Spike" : "Step Until Spike###Step Until Spike"))
+        {
+            s_SteppingUntilSpike = !s_SteppingUntilSpike;
+            s_ProbeStepRequested = s_SteppingUntilSpike;
+        }
+        ImGui::SetItemTooltip("Updates the probes one update at a time until a single ray of the selected probe has at least Spike Flux Share "
+            "of the flux of the probe's rays, and stops there with the rays of that update. Needs Pause Updates and a selected probe.");
+        ImGui::EndDisabled();
+        ImGui::SliderFloat("Spike Flux Share", &s_Settings.spikeFluxShare, 0.0f, 1.0f);
+        ImGui::SetItemTooltip("The share of the flux of a probe's rays a single ray must have for Step Until Spike to stop. "
+            "The flux of a ray is its weight times the luminance of its radiance, as the guide map counts it.");
         ImGui::BeginDisabled(FindWhyProbesCannotBeCounted().has_value());
         if (ImGui::Button("Measure"))
             CountProbes();
@@ -654,6 +670,7 @@ namespace
         values["Russian Roulette"] = SettingValues::FormatFlag(pathTraced.russianRoulette);
 
         values["Pause Updates"] = SettingValues::FormatFlag(s_Settings.pauseProbeUpdates);
+        values["Spike Flux Share"] = MeasurementConditions::FormatFloat(s_Settings.spikeFluxShare);
 
         const ProbeVisualization::Settings& probeSpheres = s_Settings.probeSpheres;
         values["Show Probes"] = SettingValues::FormatFlag(probeSpheres.show);
@@ -679,6 +696,7 @@ namespace
         SettingValues::ReadFlag(values, "Russian Roulette", pathTraced.russianRoulette);
 
         SettingValues::ReadFlag(values, "Pause Updates", s_Settings.pauseProbeUpdates);
+        SettingValues::ReadFloat(values, "Spike Flux Share", s_Settings.spikeFluxShare);
 
         ProbeVisualization::Settings& probeSpheres = s_Settings.probeSpheres;
         SettingValues::ReadFlag(values, "Show Probes", probeSpheres.show);
@@ -916,6 +934,28 @@ namespace
         return FindProbeVolume() != nullptr ? GetSelectedProbe() : std::nullopt;
     }
 
+    void StepUntilSpike(void)
+    {
+        if (!s_SteppingUntilSpike)
+            return;
+        const std::optional<uint32_t> probe = FindProbeOfWatchedRays();
+        if (!probe || !s_Settings.pauseProbeUpdates)
+        {
+            s_SteppingUntilSpike = false;
+            return;
+        }
+        if (s_ProbeStepRequested)
+            return;
+        const ProbeReadback::ProbeRaysReadback* rays = ProbeReadback::FindRaysOfLastUpdate(*probe);
+        if (rays == nullptr)
+            return;
+
+        if (GetLargestFluxShare(*rays) >= s_Settings.spikeFluxShare)
+            s_SteppingUntilSpike = false;
+        else
+            s_ProbeStepRequested = true;
+    }
+
     void HandleGICommand(const std::string& arguments, const ControlChannel::Reply& reply)
     {
         if (arguments == "probe measure")
@@ -1132,5 +1172,6 @@ void DynamicGI::MeasureProbes(const RaytracingScene& scene)
         ProbeContribution::Measure(FindProbeVolume()->settings.weighting, scene);
     ReplyToMeasuredPixelSelections();
     ProbeReadback::Update(FindProbeOfWatchedRays());
+    StepUntilSpike();
     ReplyToCountedProbes();
 }
