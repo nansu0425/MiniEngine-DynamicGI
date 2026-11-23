@@ -8,6 +8,7 @@
 #include "Core/Graphics/Resource/ColorBuffer.h"
 #include "Core/Graphics/Resource/GpuBuffer.h"
 #include "Core/Graphics/Resource/ReadbackBuffer.h"
+#include "Core/Math/Common.h"
 
 #include "Output/Model/CompiledShaders/ProbeCensusCS.h"
 
@@ -37,6 +38,16 @@ namespace
         ProbeReadback::CensusReadback readback;
     };
 
+    struct PendingRays
+    {
+        uint64_t fence;
+        size_t rowSize;
+        uint32_t raysPerProbe;
+        ProbeReadback::ProbeRaysReadback readback;
+    };
+
+    constexpr float kProbeRayMissDistance = 1e30f;
+
     __declspec(align(16)) struct CensusConstants
     {
         float maxBackFaceRatio;
@@ -56,6 +67,82 @@ namespace
     std::optional<CensusRequest> s_CensusRequest;
     std::optional<PendingCensus> s_PendingCensus;
     std::optional<ProbeReadback::CensusReadback> s_CensusResult;
+
+    ReadbackBuffer s_RayReadback;
+    std::optional<PendingRays> s_PendingRays;
+    std::optional<ProbeReadback::ProbeRaysReadback> s_Rays;
+
+    void CollectFinishedRays(void)
+    {
+        if (!s_PendingRays || !g_CommandManager.IsFenceComplete(s_PendingRays->fence))
+            return;
+
+        const uint8_t* rows = static_cast<const uint8_t*>(s_RayReadback.Map());
+        const DirectX::XMFLOAT4* weightedDirections = reinterpret_cast<const DirectX::XMFLOAT4*>(rows);
+        const DirectX::XMFLOAT4* samples = reinterpret_cast<const DirectX::XMFLOAT4*>(rows + s_PendingRays->rowSize);
+        ProbeReadback::ProbeRaysReadback readback = std::move(s_PendingRays->readback);
+        readback.rays.reserve(s_PendingRays->raysPerProbe);
+        for (uint32_t ray = 0; ray < s_PendingRays->raysPerProbe; ++ray)
+        {
+            const DirectX::XMFLOAT4& weightedDirection = weightedDirections[ray];
+            const DirectX::XMFLOAT4& sample = samples[ray];
+            readback.rays.push_back({
+                .direction = DirectX::XMFLOAT3(weightedDirection.x, weightedDirection.y, weightedDirection.z),
+                .weight = weightedDirection.w,
+                .radiance = DirectX::XMFLOAT3(sample.x, sample.y, sample.z),
+                .hitDistance = sample.w < kProbeRayMissDistance ? std::optional<float>(sample.w) : std::nullopt,
+            });
+        }
+        s_RayReadback.Unmap();
+        s_Rays = std::move(readback);
+        s_PendingRays.reset();
+    }
+
+    void CopyRowOfProbe(ComputeContext& context, ColorBuffer& rows, uint32_t probe, size_t offset)
+    {
+        D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint = {};
+        footprint.Offset = offset;
+        footprint.Footprint.Format = rows.GetFormat();
+        footprint.Footprint.Width = rows.GetWidth();
+        footprint.Footprint.Height = 1;
+        footprint.Footprint.Depth = 1;
+        footprint.Footprint.RowPitch = (UINT)Math::AlignUp(rows.GetWidth() * sizeof(DirectX::XMFLOAT4), D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+        const CD3DX12_TEXTURE_COPY_LOCATION destination(s_RayReadback.GetResource(), footprint);
+        const CD3DX12_TEXTURE_COPY_LOCATION source(rows.GetResource(), 0);
+        const D3D12_BOX rowOfProbe = { 0, probe, 0, rows.GetWidth(), probe + 1, 1 };
+        context.TransitionResource(rows, D3D12_RESOURCE_STATE_COPY_SOURCE, true);
+        context.GetCommandList()->CopyTextureRegion(&destination, 0, 0, 0, &source, &rowOfProbe);
+    }
+
+    bool AreRaysOfLastUpdate(const ProbeReadback::ProbeRaysReadback& rays, uint32_t probe)
+    {
+        const ProbeLighting::Progress progress = ProbeLighting::GetProgress();
+        return rays.probe == probe && rays.updates == progress.updates && rays.resets == progress.resets;
+    }
+
+    void ReadBackRaysOfLastUpdate(std::optional<uint32_t> probe)
+    {
+        const ProbeLighting::Probes probes = ProbeLighting::GetProbes();
+        if (!probe || s_PendingRays || ProbeLighting::GetProgress().updates == 0 || *probe >= GetProbeCount(probes.grid))
+            return;
+        if (s_Rays && AreRaysOfLastUpdate(*s_Rays, *probe))
+            return;
+
+        const size_t rowSize = Math::AlignUp(probes.raysPerProbe * sizeof(DirectX::XMFLOAT4), D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT);
+        if (s_RayReadback.GetBufferSize() != 2 * rowSize)
+            s_RayReadback.Create(L"Probe Ray Readback", (uint32_t)(2 * rowSize), 1);
+
+        const ProbeLighting::Progress progress = ProbeLighting::GetProgress();
+        ComputeContext& context = ComputeContext::Begin(L"Probe Ray Readback");
+        CopyRowOfProbe(context, probes.weightedRayDirections, *probe, 0);
+        CopyRowOfProbe(context, probes.raySamples, *probe, rowSize);
+        s_PendingRays = PendingRays{ context.Finish(), rowSize, probes.raysPerProbe, {
+            .probe = *probe,
+            .updates = progress.updates,
+            .resets = progress.resets,
+            .uniformRaysPerProbe = probes.uniformRaysPerProbe,
+        } };
+    }
 
     void CollectFinishedOffsets(void)
     {
@@ -151,10 +238,13 @@ void ProbeReadback::Shutdown(void)
     s_OffsetReadback.Destroy();
     s_Census.Destroy();
     s_CensusReadback.Destroy();
+    s_RayReadback.Destroy();
 }
 
-void ProbeReadback::Update(void)
+void ProbeReadback::Update(std::optional<uint32_t> probeOfWatchedRays)
 {
+    CollectFinishedRays();
+    ReadBackRaysOfLastUpdate(probeOfWatchedRays);
     CollectFinishedOffsets();
     ReadBackOffsetsOfLastReset();
     CollectFinishedCensus();
@@ -188,4 +278,14 @@ const std::optional<ProbeReadback::CensusReadback>& ProbeReadback::GetCensus(voi
 {
     CollectFinishedCensus();
     return s_CensusResult;
+}
+
+const ProbeReadback::ProbeRaysReadback* ProbeReadback::FindRaysOfLastUpdate(uint32_t probe)
+{
+    return s_Rays && AreRaysOfLastUpdate(*s_Rays, probe) ? &*s_Rays : nullptr;
+}
+
+const ProbeReadback::ProbeRaysReadback* ProbeReadback::FindLastReadRays(uint32_t probe)
+{
+    return s_Rays && s_Rays->probe == probe && s_Rays->resets == ProbeLighting::GetProgress().resets ? &*s_Rays : nullptr;
 }

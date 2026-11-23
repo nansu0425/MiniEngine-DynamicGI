@@ -19,6 +19,7 @@
 
 #include <imgui.h>
 #include <algorithm>
+#include <numeric>
 #include <optional>
 #include <sstream>
 #include <vector>
@@ -52,6 +53,16 @@ namespace
         uint32_t captureId;
     };
 
+    struct SelectedRay
+    {
+        uint32_t ray;
+        uint32_t probe;
+        uint32_t updates;
+        uint32_t resets;
+
+        bool operator==(const SelectedRay&) const = default;
+    };
+
     struct PendingPixelReply
     {
         uint32_t captureId;
@@ -71,6 +82,8 @@ namespace
     std::vector<PendingPixelReply> s_PendingPixelReplies;
     std::vector<PendingCensusReply> s_PendingCensusReplies;
     std::optional<uint32_t> s_HoveredCorner;
+    std::optional<uint32_t> s_HoveredRay;
+    std::optional<SelectedRay> s_SelectedRay;
 
     bool IsIndirectOn(void)
     {
@@ -120,6 +133,60 @@ namespace
         if (!probe || !texel || texel->y != *probe)
             return std::nullopt;
         return texel->x;
+    }
+
+    std::optional<uint32_t> FindSelectedRayOfLastUpdate(void)
+    {
+        const std::optional<uint32_t> probe = GetSelectedProbe();
+        const ProbeLighting::Progress progress = ProbeLighting::GetProgress();
+        if (!probe || !s_SelectedRay)
+            return std::nullopt;
+        const SelectedRay sameRayOfLastUpdate = { s_SelectedRay->ray, *probe, progress.updates, progress.resets };
+        return s_SelectedRay == sameRayOfLastUpdate ? std::optional<uint32_t>(s_SelectedRay->ray) : std::nullopt;
+    }
+
+    std::optional<uint32_t> FindHighlightedRayOfSelectedProbe(void)
+    {
+        if (s_HoveredRay)
+            return s_HoveredRay;
+        if (const std::optional<uint32_t> selectedRay = FindSelectedRayOfLastUpdate())
+            return selectedRay;
+        return FindInspectedRayOfSelectedProbe();
+    }
+
+    float GetLuminance(const DirectX::XMFLOAT3& color)
+    {
+        return 0.212671f * color.x + 0.715160f * color.y + 0.072169f * color.z;
+    }
+
+    float GetFlux(const ProbeReadback::ProbeRay& ray)
+    {
+        return ray.weight * GetLuminance(ray.radiance);
+    }
+
+    float GetFluxSum(const ProbeReadback::ProbeRaysReadback& rays)
+    {
+        return std::accumulate(rays.rays.begin(), rays.rays.end(), 0.0f,
+            [](float sum, const ProbeReadback::ProbeRay& ray) { return sum + GetFlux(ray); });
+    }
+
+    float GetFluxShare(const ProbeReadback::ProbeRay& ray, float fluxSum)
+    {
+        return fluxSum > 0.0f ? GetFlux(ray) / fluxSum : 0.0f;
+    }
+
+    float GetLargestFluxShare(const ProbeReadback::ProbeRaysReadback& rays)
+    {
+        const float fluxSum = GetFluxSum(rays);
+        float largestShare = 0.0f;
+        for (const ProbeReadback::ProbeRay& ray : rays.rays)
+            largestShare = std::max(largestShare, GetFluxShare(ray, fluxSum));
+        return largestShare;
+    }
+
+    float GetGuidedRaysPerUniformRay(const ProbeReadback::ProbeRay& ray)
+    {
+        return ray.weight > 0.0f ? 1.0f / ray.weight - 1.0f : 0.0f;
     }
 
     bool IsInspectingPixel(void)
@@ -219,6 +286,7 @@ namespace
     const char* kSourceNames[] = { "Off", "Path Traced", "Probe" };
     const char* kViewNames[] = { "Lit", "Indirect Irradiance", "Indirect Radiance" };
     const char* kRaySampleColorNames[] = { "Distance", "Kind", "Contribution" };
+    constexpr size_t kNumListedRays = 16;
 
     void ClampSettings(void)
     {
@@ -383,6 +451,76 @@ namespace
         ImGui::SetItemTooltip("The irradiance the shading function gives at the same point. It matches the sum of the contributions up to rounding.");
     }
 
+    void ShowRayTable(void)
+    {
+        const std::optional<uint32_t> probe = GetSelectedProbe();
+        if (!probe)
+            return;
+        const ProbeReadback::ProbeRaysReadback* rays = ProbeReadback::FindLastReadRays(*probe);
+        if (rays == nullptr)
+        {
+            ImGui::TextDisabled("Rays: reading");
+            return;
+        }
+
+        const float fluxSum = GetFluxSum(*rays);
+        ImGui::Text("Rays of update %u: largest flux share %.1f%%", rays->updates, GetLargestFluxShare(*rays) * 100.0f);
+        if (ProbeReadback::FindRaysOfLastUpdate(*probe) == nullptr)
+        {
+            ImGui::SameLine();
+            ImGui::TextDisabled("(reading the last update)");
+        }
+
+        std::vector<uint32_t> raysByFlux(rays->rays.size());
+        std::iota(raysByFlux.begin(), raysByFlux.end(), 0u);
+        const size_t listedRays = std::min(raysByFlux.size(), kNumListedRays);
+        std::partial_sort(raysByFlux.begin(), raysByFlux.begin() + listedRays, raysByFlux.end(),
+            [rays](uint32_t a, uint32_t b) { return GetFlux(rays->rays[a]) > GetFlux(rays->rays[b]); });
+
+        const ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit;
+        if (!ImGui::BeginTable("Probe Rays", 7, flags))
+            return;
+
+        ImGui::TableSetupColumn("Ray");
+        ImGui::TableSetupColumn("Kind");
+        ImGui::TableSetupColumn("Flux Share");
+        ImGui::TableSetupColumn("Weight");
+        ImGui::TableSetupColumn("Guided per Uniform");
+        ImGui::TableSetupColumn("Luminance");
+        ImGui::TableSetupColumn("Hit Distance");
+        ImGui::TableHeadersRow();
+
+        for (size_t row = 0; row < listedRays; ++row)
+        {
+            const uint32_t rayIndex = raysByFlux[row];
+            const ProbeReadback::ProbeRay& ray = rays->rays[rayIndex];
+
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            const SelectedRay rayOfRow = { rayIndex, rays->probe, rays->updates, rays->resets };
+            if (ImGui::Selectable(std::to_string(rayIndex).c_str(), s_SelectedRay == rayOfRow, ImGuiSelectableFlags_SpanAllColumns))
+                s_SelectedRay = s_SelectedRay == rayOfRow ? std::nullopt : std::optional<SelectedRay>(rayOfRow);
+            if (ImGui::IsItemHovered())
+                s_HoveredRay = rayIndex;
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(rayIndex < rays->uniformRaysPerProbe ? "Uniform" : "Guided");
+            ImGui::TableNextColumn();
+            ImGui::Text("%.1f%%", GetFluxShare(ray, fluxSum) * 100.0f);
+            ImGui::TableNextColumn();
+            ImGui::Text("%.4f", ray.weight);
+            ImGui::TableNextColumn();
+            ImGui::Text("%.2f", GetGuidedRaysPerUniformRay(ray));
+            ImGui::TableNextColumn();
+            ImGui::Text("%.4f", GetLuminance(ray.radiance));
+            ImGui::TableNextColumn();
+            if (ray.hitDistance)
+                ImGui::Text("%.3f", *ray.hitDistance);
+            else
+                ImGui::TextDisabled("miss");
+        }
+        ImGui::EndTable();
+    }
+
     void ShowDebugPanelContent(void)
     {
         int indirect = (int)s_Settings.indirect;
@@ -472,10 +610,12 @@ namespace
             "as long as a single ray along that direction hit when the probes were last cleared.");
         ImGui::Checkbox("Show Ray Samples", &probeSpheres.showRaySamples);
         ImGui::SetItemTooltip("Draws a line from the selected probe along each ray of its last update, up to the point the ray hit. "
-            "A ray that hit nothing ends at the longest distance a probe keeps. "
-            "Ray Sample Color picks the colors. "
-            "While the Texture Viewer shows Probe Ray Samples with a texel of the selected probe's row inspected, "
-            "the ray of that texel is white and the other lines are faint.");
+            "A ray that hit nothing ends at the longest distance a probe keeps. Ray Sample Color picks the colors. "
+            "While the Texture Viewer shows Probe Ray Samples with a texel of the selected probe's row inspected, or a row of the ray table is hovered or selected, "
+            "the ray of that texel or row is white, the rays in the same guide map texel keep their color, and the other lines are faint. "
+            "Click a row to select its ray and click it again to clear the selection. The selection lasts until the probe updates. "
+            "The table lists the rays of the selected probe with the largest flux, the weight times the luminance of the radiance. "
+            "Guided per Uniform is how many guided rays the guide map sent around the ray for each uniform ray.");
         int raySampleColor = (int)probeSpheres.raySampleColor;
         if (ImGui::Combo("Ray Sample Color", &raySampleColor, kRaySampleColorNames, IM_ARRAYSIZE(kRaySampleColorNames)))
             probeSpheres.raySampleColor = (ProbeVisualization::RaySampleColor)raySampleColor;
@@ -483,6 +623,8 @@ namespace
             "Kind draws uniform rays in cyan and guided rays in orange. "
             "Contribution draws a ray brighter and more opaque the larger its flux is next to the largest flux of the probe's rays, "
             "from faint blue to yellow.");
+        if (probeSpheres.showRaySamples)
+            ShowRayTable();
         ImGui::Checkbox("Inspect Pixel", &s_Settings.inspectPixel);
         ImGui::SetItemTooltip("Click a point of the scene other than a probe sphere to see the probes its irradiance interpolates. "
             "A line from the point to each probe is as thick as the probe's weight, and dashed where the weight is 0. "
@@ -769,6 +911,11 @@ namespace
         });
     }
 
+    std::optional<uint32_t> FindProbeOfWatchedRays(void)
+    {
+        return FindProbeVolume() != nullptr ? GetSelectedProbe() : std::nullopt;
+    }
+
     void HandleGICommand(const std::string& arguments, const ControlChannel::Reply& reply)
     {
         if (arguments == "probe measure")
@@ -970,12 +1117,13 @@ void DynamicGI::DrawOverlay(GraphicsContext& context, const Math::Camera& camera
 
     const std::optional<uint32_t> probe = GetSelectedProbe();
     if (FindProbeVolume() != nullptr && s_Settings.probeSpheres.show && probe)
-        ProbeVisualization::DrawDistanceLines(context, camera, ProbeLighting::GetProbes(), *probe, s_Settings.probeSpheres, FindInspectedRayOfSelectedProbe());
+        ProbeVisualization::DrawDistanceLines(context, camera, ProbeLighting::GetProbes(), *probe, s_Settings.probeSpheres, FindHighlightedRayOfSelectedProbe());
 
     const ProbeContribution::Surface* contribution = GetInspectedContribution();
     if (contribution != nullptr && contribution->hasSurface != 0)
         ProbeVisualization::DrawContribution(context, camera, ProbeLighting::GetProbes().grid, ProbeContribution::GetSurfaceBuffer(), s_HoveredCorner);
     s_HoveredCorner.reset();
+    s_HoveredRay.reset();
 }
 
 void DynamicGI::MeasureProbes(const RaytracingScene& scene)
@@ -983,6 +1131,6 @@ void DynamicGI::MeasureProbes(const RaytracingScene& scene)
     if (IsInspectingPixel() && GetProbeCount(ProbeLighting::GetProbes().grid) != 0)
         ProbeContribution::Measure(FindProbeVolume()->settings.weighting, scene);
     ReplyToMeasuredPixelSelections();
-    ProbeReadback::Update();
+    ProbeReadback::Update(FindProbeOfWatchedRays());
     ReplyToCountedProbes();
 }

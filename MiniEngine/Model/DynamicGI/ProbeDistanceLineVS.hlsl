@@ -62,6 +62,12 @@ bool HasHighlightedRay()
     return HighlightedRay < RaysPerProbe;
 }
 
+bool SharesGuideTexelWithHighlightedRay(uint ray)
+{
+    return GetProbeGuideTexelIndex(WeightedRayDirections[uint2(ray, Probe)].xyz) ==
+        GetProbeGuideTexelIndex(WeightedRayDirections[uint2(HighlightedRay, Probe)].xyz);
+}
+
 LineStyle PickOutHighlightedRay(LineStyle style, uint lineIndex)
 {
     if (!HasHighlightedRay())
@@ -74,6 +80,8 @@ LineStyle PickOutHighlightedRay(LineStyle style, uint lineIndex)
         pickedOut.color = kHighlightedRaySampleColor;
         pickedOut.opacity = 1.0;
     }
+    else if (isRaySample && SharesGuideTexelWithHighlightedRay(lineIndex))
+        pickedOut.opacity = 1.0;
     else
         pickedOut.opacity *= kOpacityBesideHighlightedRay;
     return pickedOut;
