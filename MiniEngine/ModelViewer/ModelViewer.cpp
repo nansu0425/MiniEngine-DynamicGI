@@ -50,6 +50,7 @@
 #include "Core/Editor/MeasurementConditions.h"
 #include "Core/Automation/VectorFields.h"
 #include "ModelViewer/Light.h"
+#include "ModelViewer/SunPath.h"
 #include "Core/UI/ImGuiLayer.h"
 #include "Core/Utility/IniFile.h"
 
@@ -208,6 +209,7 @@ private:
     ShadowCamera m_ShadowCamera;
     Scene::Object m_LightObject{ "Directional Light" };
     LightComponent& m_Light = AssembleLight(m_LightObject);
+    SunPathComponent& m_SunPath = m_LightObject.AddComponent<SunPathComponent>(m_Light);
     Scene::Object m_SkyObject{ "Sky" };
     SkyComponent& m_Sky = m_SkyObject.AddComponent<SkyComponent>();
     Scene::Object m_GIVolumeObject{ kDynamicGIVolumeName };
@@ -955,9 +957,11 @@ void ModelViewer::Startup( void )
     SceneEditor::RegisterComponentDetails<ModelComponent>(ShowModelDetails);
     SceneEditor::RegisterComponentDetails<CameraComponent>(ShowCameraDetails);
     SceneEditor::RegisterComponentDetails<LightComponent>(ShowLightDetails);
+    SceneEditor::RegisterComponentDetails<SunPathComponent>(ShowSunPathDetails);
     SceneEditor::RegisterComponentDetails<SkyComponent>(ShowSkyDetails);
     SceneEditor::RegisterCommands(m_Camera);
     RegisterLight(m_Light);
+    RegisterSunPath(m_SunPath);
     RegisterSky(m_Sky);
     RegisterSceneConditions();
     RegisterMeasurementConditions(camera, m_Light, m_Sky);
@@ -966,6 +970,7 @@ void ModelViewer::Startup( void )
 void ModelViewer::Cleanup( void )
 {
     UnregisterMeasurementConditions();
+    UnregisterSunPath();
     Scene::RemoveObject(m_GIVolumeObject);
     Scene::UnregisterOptionalObject(m_GIVolumeObject);
     Scene::RemoveObject(m_SkyObject);
@@ -1007,6 +1012,7 @@ void ModelViewer::Update( float deltaT )
     m_CameraController->Update(deltaT);
 
     SceneEditor::Update(m_Camera);
+    m_SunPath.Update(Graphics::GetMeasuredFrameTime());
     DynamicGI::UpdateEditor(m_Camera);
     PathTracerTuning::Update();
 

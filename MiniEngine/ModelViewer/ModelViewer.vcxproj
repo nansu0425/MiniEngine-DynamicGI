@@ -68,9 +68,11 @@
   <ItemGroup>
     <ClCompile Include="Light.cpp" />
     <ClCompile Include="ModelViewer.cpp" />
+    <ClCompile Include="SunPath.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Light.h" />
+    <ClInclude Include="SunPath.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Core/Core.vcxproj">
