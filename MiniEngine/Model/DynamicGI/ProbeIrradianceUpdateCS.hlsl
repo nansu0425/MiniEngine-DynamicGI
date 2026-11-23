@@ -14,16 +14,17 @@ Texture2D<float4> RaySamples : register(t0);
 Texture2D<float4> EmissiveSamples : register(t1);
 StructuredBuffer<EmissiveTriangle> EmissiveTriangles : register(t2);
 Texture2D<float4> ProbesOffset : register(t3);
-Texture2D<float4> RayDirections : register(t4);
+Texture2D<float4> WeightedRayDirections : register(t4);
 RWTexture2D<float4> ProbesIrradiance : register(u0);
 
 float3 EstimateIrradianceFromRaySamples(uint probe, float3 texelDirection)
 {
     float3 weightedRadiance = 0.0;
     float weightSum = 0.0;
-    for (uint ray = 0; ray < Rays.raysPerProbe; ++ray)
+    for (uint ray = 0; ray < GetProbeRayCount(Rays); ++ray)
     {
-        const float weight = max(0.0, dot(texelDirection, RayDirections[uint2(ray, probe)].xyz));
+        const float4 weightedDirection = WeightedRayDirections[uint2(ray, probe)];
+        const float weight = weightedDirection.w * max(0.0, dot(texelDirection, weightedDirection.xyz));
         weightedRadiance += weight * RaySamples[uint2(ray, probe)].rgb;
         weightSum += weight;
     }

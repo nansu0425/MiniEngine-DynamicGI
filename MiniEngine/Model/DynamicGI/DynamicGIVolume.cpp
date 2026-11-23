@@ -14,7 +14,8 @@ namespace
 {
     constexpr float kMinSize = 0.01f;
     constexpr uint32_t kMaxProbesPerAxis = 64;
-    constexpr uint32_t kMaxRaysPerProbe = 1024;
+    constexpr uint32_t kMaxUniformRaysPerProbe = 1024;
+    constexpr uint32_t kMaxGuidedRaysPerProbe = 1024;
     constexpr uint32_t kMaxEmissiveSamplesPerProbe = 256;
     constexpr float kMaxHysteresis = 0.999f;
     constexpr float kMaxDistanceSharpness = 100.0f;
@@ -42,7 +43,8 @@ namespace
     {
         for (uint32_t& count : settings.probeCounts)
             count = std::max(2u, std::min(count, kMaxProbesPerAxis));
-        settings.raysPerProbe = std::max(1u, std::min(settings.raysPerProbe, kMaxRaysPerProbe));
+        settings.uniformRaysPerProbe = std::max(1u, std::min(settings.uniformRaysPerProbe, kMaxUniformRaysPerProbe));
+        settings.guidedRaysPerProbe = std::min(settings.guidedRaysPerProbe, kMaxGuidedRaysPerProbe);
         settings.emissiveSamplesPerProbe = std::min(settings.emissiveSamplesPerProbe, kMaxEmissiveSamplesPerProbe);
         settings.hysteresis = std::max(0.0f, std::min(settings.hysteresis, kMaxHysteresis));
         settings.distanceSharpness = std::max(1.0f, std::min(settings.distanceSharpness, kMaxDistanceSharpness));
@@ -100,7 +102,11 @@ namespace
             ImGui::InputScalar(axisNames[axis], ImGuiDataType_U32, &probe.probeCounts[axis], &step);
             ImGui::SetItemTooltip("Probes along this axis of a uniform grid over the volume. Each probe sits at the center of its cell.");
         }
-        ImGui::InputScalar("Rays per Probe", ImGuiDataType_U32, &probe.raysPerProbe, &step);
+        ImGui::InputScalar("Rays per Probe", ImGuiDataType_U32, &probe.uniformRaysPerProbe, &step);
+        ImGui::SetItemTooltip("Rays that each probe traces on each update, spread evenly over all directions.");
+        ImGui::InputScalar("Guided Rays per Probe", ImGuiDataType_U32, &probe.guidedRaysPerProbe, &step);
+        ImGui::SetItemTooltip("Rays that each probe traces on each update besides Rays per Probe, toward the directions its earlier rays found bright. "
+            "Each ray counts less where the rays are denser, so the irradiance keeps its mean and flickers less. 0 traces none.");
         ImGui::InputScalar("Emissive Samples per Probe", ImGuiDataType_U32, &probe.emissiveSamplesPerProbe, &step);
         ImGui::SetItemTooltip("Points on emissive triangles that each probe traces toward on each update. "
             "Above 0, the probe rays leave out the emission they hit, so emissive light reaches the probes only through these samples. "
@@ -184,7 +190,7 @@ namespace
 }
 
 DynamicGIVolumeComponent::DynamicGIVolumeComponent(std::function<AxisAlignedBox()> findModelBounds)
-    : Component({ "Position", "Size", "Probes X", "Probes Y", "Probes Z", "Rays per Probe", "Emissive Samples per Probe", "Hysteresis", "Random Ray Rotation", "Distance Sharpness",
+    : Component({ "Position", "Size", "Probes X", "Probes Y", "Probes Z", "Rays per Probe", "Guided Rays per Probe", "Emissive Samples per Probe", "Hysteresis", "Random Ray Rotation", "Distance Sharpness",
         "Distance Texels per Side", "Back Face Distance Scale", "Visibility", "Self Shadow Bias", "Chebyshev Exponent",
         "Weight Crush Threshold", "Facing Weight", "Min Facing Weight", "Facing Normal", "Probe Classification", "Max Back Face Ratio",
         "Probe Relocation", "Relocation Iterations", "Max Probe Offset", "Back Face Push Max Scale", "Back Face Push Min Scale", "Min Front Face Distance" }),
@@ -213,7 +219,8 @@ void DynamicGIVolumeComponent::SaveSettings(IniFile::Values& values) const
     values["Probes X"] = std::to_string(probe.probeCounts[0]);
     values["Probes Y"] = std::to_string(probe.probeCounts[1]);
     values["Probes Z"] = std::to_string(probe.probeCounts[2]);
-    values["Rays per Probe"] = std::to_string(probe.raysPerProbe);
+    values["Rays per Probe"] = std::to_string(probe.uniformRaysPerProbe);
+    values["Guided Rays per Probe"] = std::to_string(probe.guidedRaysPerProbe);
     values["Emissive Samples per Probe"] = std::to_string(probe.emissiveSamplesPerProbe);
     values["Hysteresis"] = MeasurementConditions::FormatFloat(probe.hysteresis);
     values["Random Ray Rotation"] = SettingValues::FormatFlag(probe.randomRayRotation);
@@ -249,7 +256,8 @@ void DynamicGIVolumeComponent::LoadSettings(const IniFile::Values& values)
     SettingValues::ReadUInt(values, "Probes X", probe.probeCounts[0]);
     SettingValues::ReadUInt(values, "Probes Y", probe.probeCounts[1]);
     SettingValues::ReadUInt(values, "Probes Z", probe.probeCounts[2]);
-    SettingValues::ReadUInt(values, "Rays per Probe", probe.raysPerProbe);
+    SettingValues::ReadUInt(values, "Rays per Probe", probe.uniformRaysPerProbe);
+    SettingValues::ReadUInt(values, "Guided Rays per Probe", probe.guidedRaysPerProbe);
     SettingValues::ReadUInt(values, "Emissive Samples per Probe", probe.emissiveSamplesPerProbe);
     SettingValues::ReadFloat(values, "Hysteresis", probe.hysteresis);
     SettingValues::ReadFlag(values, "Random Ray Rotation", probe.randomRayRotation);

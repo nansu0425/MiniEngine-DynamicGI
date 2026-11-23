@@ -233,7 +233,7 @@ void ProbeVisualization::DrawDistanceLines(GraphicsContext& context, const Camer
     context.TransitionResource(probes.raySamples, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     context.TransitionResource(probes.texelDistance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     context.TransitionResource(probes.offset, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-    context.TransitionResource(probes.rayDirections, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+    context.TransitionResource(probes.weightedRayDirections, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     context.TransitionResource(g_SceneDepthBuffer, D3D12_RESOURCE_STATE_DEPTH_READ);
     context.TransitionResource(g_SceneOverlayBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
     context.SetRenderTarget(g_SceneOverlayBuffer.GetRTV(), g_SceneDepthBuffer.GetDSV_DepthReadOnly());
@@ -242,7 +242,7 @@ void ProbeVisualization::DrawDistanceLines(GraphicsContext& context, const Camer
     context.SetDynamicDescriptor(kLineInputs, 1, probes.raySamples.GetSRV());
     context.SetDynamicDescriptor(kLineInputs, 2, probes.texelDistance.GetSRV());
     context.SetDynamicDescriptor(kLineInputs, 3, probes.offset.GetSRV());
-    context.SetDynamicDescriptor(kLineInputs, 4, probes.rayDirections.GetSRV());
+    context.SetDynamicDescriptor(kLineInputs, 4, probes.weightedRayDirections.GetSRV());
 
     if (settings.showTexelMeans)
     {

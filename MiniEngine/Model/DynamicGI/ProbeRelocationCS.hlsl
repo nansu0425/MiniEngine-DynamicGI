@@ -32,9 +32,9 @@ NearbyFaces FindNearbyFaces(float3 origin)
     faces.closestBackFace = 0.0;
     faces.closestFrontFaceDistance = 1e30;
     faces.closestFrontFaceDirection = 0.0;
-    for (uint ray = 0; ray < Rays.raysPerProbe; ++ray)
+    for (uint ray = 0; ray < Rays.uniformRaysPerProbe; ++ray)
     {
-        const float3 direction = GetProbeRayDirection(Rays, ray);
+        const float3 direction = GetUniformProbeRayDirection(Rays, ray);
         RayHit rayHit;
         float distance;
         if (!TraceProbeRayHit(Rays.grid, origin, direction, rayHit, distance))
@@ -54,7 +54,7 @@ NearbyFaces FindNearbyFaces(float3 origin)
             faces.closestFrontFaceDirection = direction;
         }
     }
-    faces.backFaceRatio = (float)backFaceCount / Rays.raysPerProbe;
+    faces.backFaceRatio = (float)backFaceCount / Rays.uniformRaysPerProbe;
     return faces;
 }
 

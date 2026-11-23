@@ -166,6 +166,7 @@
     <None Include="DynamicGI\ProbeEmissiveSamples.hlsli" />
     <None Include="DynamicGI\HitLighting.hlsli" />
     <None Include="DynamicGI\ProbeRays.hlsli" />
+    <None Include="DynamicGI\ProbeGuide.hlsli" />
     <None Include="DynamicGI\ProbeRayHit.hlsli" />
     <None Include="DynamicGI\ProbePositions.hlsli" />
     <None Include="DynamicGI\ProbeVolume.hlsli" />
@@ -317,6 +318,7 @@
     <FxCompile Include="DynamicGI\ProbeIrradianceUpdateCS.hlsl" />
     <FxCompile Include="DynamicGI\ProbeDistanceUpdateCS.hlsl" />
     <FxCompile Include="DynamicGI\ProbeBackFaceUpdateCS.hlsl" />
+    <FxCompile Include="DynamicGI\ProbeGuideUpdateCS.hlsl" />
     <FxCompile Include="DynamicGI\ProbeBorderCS.hlsl" />
     <FxCompile Include="DynamicGI\ProbeScreenIrradianceCS.hlsl">
       <ShaderModel>6.5</ShaderModel>

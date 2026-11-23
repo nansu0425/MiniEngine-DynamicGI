@@ -14,7 +14,8 @@ namespace ProbeLighting
     struct Settings
     {
         uint32_t probeCounts[3] = { 16, 8, 8 };
-        uint32_t raysPerProbe = 64;
+        uint32_t uniformRaysPerProbe = 64;
+        uint32_t guidedRaysPerProbe = 0;
         uint32_t emissiveSamplesPerProbe = 0;
         float hysteresis = 0.95f;
         bool randomRayRotation = true;
@@ -40,7 +41,8 @@ namespace ProbeLighting
         ColorBuffer& backFaceRatio;
         ColorBuffer& offset;
         uint32_t distanceTexelsPerSide;
-        ColorBuffer& rayDirections;
+        ColorBuffer& guide;
+        ColorBuffer& weightedRayDirections;
         ColorBuffer& raySamples;
         uint32_t raysPerProbe;
         ColorBuffer& emissiveSamples;

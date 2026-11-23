@@ -23,9 +23,9 @@ void main(uint3 DTid : SV_DispatchThreadID)
 
     float2 weightedMoments = 0.0;
     float weightSum = 0.0;
-    for (uint ray = 0; ray < Rays.raysPerProbe; ++ray)
+    for (uint ray = 0; ray < Rays.uniformRaysPerProbe; ++ray)
     {
-        const float weight = pow(max(0.0, dot(texelDirection, GetProbeRayDirection(Rays, ray))), DistanceSharpness);
+        const float weight = pow(max(0.0, dot(texelDirection, GetUniformProbeRayDirection(Rays, ray))), DistanceSharpness);
         const float distance = RaySamples[uint2(ray, probe)].a;
         weightedMoments += weight * float2(distance, distance * distance);
         weightSum += weight;

@@ -7,8 +7,15 @@ struct ProbeRays
 {
     IrradianceProbeGrid grid;
     float4x4 rotation;
-    uint raysPerProbe;
+    uint uniformRaysPerProbe;
+    uint guidedRaysPerProbe;
+    uint update;
 };
+
+uint GetProbeRayCount(ProbeRays rays)
+{
+    return rays.uniformRaysPerProbe + rays.guidedRaysPerProbe;
+}
 
 static const float kProbeRayMaxDistancePerSpacing = 1.5;
 
@@ -27,9 +34,9 @@ float3 GetSphericalFibonacciDirection(uint index, uint count)
     return float3(radius * cos(azimuth), radius * sin(azimuth), z);
 }
 
-float3 GetProbeRayDirection(ProbeRays rays, uint ray)
+float3 GetUniformProbeRayDirection(ProbeRays rays, uint ray)
 {
-    return normalize(mul((float3x3)rays.rotation, GetSphericalFibonacciDirection(ray, rays.raysPerProbe)));
+    return normalize(mul((float3x3)rays.rotation, GetSphericalFibonacciDirection(ray, rays.uniformRaysPerProbe)));
 }
 
 #endif
