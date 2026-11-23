@@ -24,6 +24,18 @@ float GetProbeRayMaxDistance(IrradianceProbeGrid grid)
     return kProbeRayMaxDistancePerSpacing * length(grid.spacing);
 }
 
+static const float kProbeRayMissDistance = 1e30;
+
+bool HitsAnything(float hitDistance)
+{
+    return hitDistance < kProbeRayMissDistance;
+}
+
+float GetProbeRayKeptDistance(IrradianceProbeGrid grid, float hitDistance)
+{
+    return min(hitDistance, GetProbeRayMaxDistance(grid));
+}
+
 float3 GetSphericalFibonacciDirection(uint index, uint count)
 {
     static const float kGoldenRatioFraction = 0.6180339887;

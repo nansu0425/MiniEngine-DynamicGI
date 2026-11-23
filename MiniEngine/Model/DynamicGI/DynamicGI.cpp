@@ -470,7 +470,8 @@ namespace
         ImGui::SetItemTooltip("Draws a magenta line from the selected probe along the direction of each of its distance texels, "
             "as long as a single ray along that direction hit when the probes were last cleared.");
         ImGui::Checkbox("Show Ray Samples", &probeSpheres.showRaySamples);
-        ImGui::SetItemTooltip("Draws a line from the selected probe along each ray of its last update, as long as the distance the ray recorded. "
+        ImGui::SetItemTooltip("Draws a line from the selected probe along each ray of its last update, up to the point the ray hit. "
+            "A ray that hit nothing ends at the longest distance a probe keeps. "
             "Cyan rays hit something closer than the longest distance a probe keeps, and red rays did not. "
             "While the Texture Viewer shows Probe Ray Samples with a texel of the selected probe's row inspected, "
             "the ray of that texel is white and the other lines are faint.");

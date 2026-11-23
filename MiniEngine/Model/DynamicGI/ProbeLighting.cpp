@@ -111,7 +111,6 @@ namespace
     __declspec(align(16)) struct TraceConstants
     {
         uint32_t distanceTexelsPerSide;
-        float backFaceDistanceScale;
         ProbeWeighting::Constants weighting;
         ProbeEmissiveSampling emissiveSampling;
         GILights lights;
@@ -142,6 +141,7 @@ namespace
         float blendWeight;
         float distanceSharpness;
         uint32_t distanceTexelsPerSide;
+        float backFaceDistanceScale;
         ProbeRays rays;
     };
 
@@ -551,7 +551,6 @@ void ProbeLighting::Update(ComputeContext& context, const Volume& volume, const 
 
         const TraceConstants constants = {
             .distanceTexelsPerSide = s_DistanceTexelsPerSide,
-            .backFaceDistanceScale = settings.backFaceDistanceScale,
             .weighting = ProbeWeighting::DescribeConstants(settings.weighting),
             .emissiveSampling = emissiveSampling,
             .lights = DescribeGILights(inputs),
@@ -620,10 +619,13 @@ void ProbeLighting::Update(ComputeContext& context, const Volume& volume, const 
             .blendWeight = blendWeight,
             .distanceSharpness = settings.distanceSharpness,
             .distanceTexelsPerSide = s_DistanceTexelsPerSide,
+            .backFaceDistanceScale = settings.backFaceDistanceScale,
             .rays = rays,
         };
+        context.TransitionResource(s_RayBackFaces, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
         context.SetPipelineState(s_DistanceUpdatePSO);
         context.SetDynamicConstantBufferView(kUpdateConstants, sizeof(distanceConstants), &distanceConstants);
+        context.SetDynamicDescriptor(kUpdateInputs, 1, s_RayBackFaces.GetSRV());
         context.SetDynamicDescriptor(kUpdateOutputs, 0, s_ProbesDistance.GetUAV());
         context.Dispatch3D(s_DistanceTexelsPerSide, s_DistanceTexelsPerSide, probeCount, kProbeAtlasGroupSize, kProbeAtlasGroupSize, 1);
 
@@ -636,7 +638,6 @@ void ProbeLighting::Update(ComputeContext& context, const Volume& volume, const 
             context.Dispatch1D(probeCount, 64);
         }
 
-        context.TransitionResource(s_RayBackFaces, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
         context.TransitionResource(s_ProbesBackFaceRatio, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
         context.SetPipelineState(s_BackFaceUpdatePSO);
         context.SetDynamicConstantBufferView(kUpdateConstants, sizeof(blendConstants), &blendConstants);

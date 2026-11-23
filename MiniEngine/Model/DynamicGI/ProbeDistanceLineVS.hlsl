@@ -48,9 +48,10 @@ ProbeDistanceLineVertex main(uint vertexID : SV_VertexID, uint lineIndex : SV_In
     }
     else
     {
+        const float hitDistance = RaySamples[uint2(lineIndex, Probe)].a;
         direction = WeightedRayDirections[uint2(lineIndex, Probe)].xyz;
-        distance = RaySamples[uint2(lineIndex, Probe)].a;
-        vertex.color = GetRaySampleColor(lineIndex, distance);
+        distance = HitsAnything(hitDistance) ? hitDistance : GetProbeRayMaxDistance(Grid);
+        vertex.color = GetRaySampleColor(lineIndex, hitDistance);
     }
 
     vertex.opacity = GetLineOpacity(lineIndex);

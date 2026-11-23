@@ -4,17 +4,24 @@
 #include "Model/DynamicGI/ProbeRays.hlsli"
 #include "Model/Raytracing/RaytracingScene.hlsli"
 
-bool TraceProbeRayHit(IrradianceProbeGrid grid, float3 origin, float3 direction, out RayHit rayHit, out float distance)
+bool TraceUnclampedProbeRayHit(float3 origin, float3 direction, out RayHit rayHit, out float hitDistance)
 {
     RayDesc ray;
     ray.Origin = origin;
     ray.Direction = direction;
     ray.TMin = 0.0;
-    ray.TMax = 1e30;
+    ray.TMax = kProbeRayMissDistance;
 
-    const float maxDistance = GetProbeRayMaxDistance(grid);
     const bool hit = TraceClosestHit(ray, RAY_FLAG_NONE, rayHit);
-    distance = hit ? min(rayHit.t, maxDistance) : maxDistance;
+    hitDistance = hit ? rayHit.t : kProbeRayMissDistance;
+    return hit;
+}
+
+bool TraceProbeRayHit(IrradianceProbeGrid grid, float3 origin, float3 direction, out RayHit rayHit, out float distance)
+{
+    float hitDistance;
+    const bool hit = TraceUnclampedProbeRayHit(origin, direction, rayHit, hitDistance);
+    distance = GetProbeRayKeptDistance(grid, hitDistance);
     return hit;
 }
 

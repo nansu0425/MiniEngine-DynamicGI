@@ -5,11 +5,19 @@ cbuffer Constants : register(b0)
     float BlendWeight;
     float DistanceSharpness;
     uint DistanceTexelsPerSide;
+    float BackFaceDistanceScale;
     ProbeRays Rays;
 };
 
 Texture2D<float4> RaySamples : register(t0);
+Texture2D<float> RayBackFaces : register(t1);
 RWTexture2D<float2> ProbesDistance : register(u0);
+
+float GetRayKeptDistance(uint2 raySample)
+{
+    const float distance = GetProbeRayKeptDistance(Rays.grid, RaySamples[raySample].a);
+    return RayBackFaces[raySample] > 0.0 ? distance * BackFaceDistanceScale : distance;
+}
 
 [numthreads(8, 8, 1)]
 void main(uint3 DTid : SV_DispatchThreadID)
@@ -26,7 +34,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
     for (uint ray = 0; ray < Rays.uniformRaysPerProbe; ++ray)
     {
         const float weight = pow(max(0.0, dot(texelDirection, GetUniformProbeRayDirection(Rays, ray))), DistanceSharpness);
-        const float distance = RaySamples[uint2(ray, probe)].a;
+        const float distance = GetRayKeptDistance(uint2(ray, probe));
         weightedMoments += weight * float2(distance, distance * distance);
         weightSum += weight;
     }

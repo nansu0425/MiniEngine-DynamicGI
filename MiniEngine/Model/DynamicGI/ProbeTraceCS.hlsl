@@ -7,7 +7,6 @@
 cbuffer Constants : register(b0)
 {
     uint DistanceTexelsPerSide;
-    float BackFaceDistanceScale;
     ProbeWeighting Weighting;
     ProbeEmissiveSampling EmissiveSampling;
     GILights Lights;
@@ -29,7 +28,7 @@ RWTexture2D<float4> WeightedRayDirections : register(u2);
 struct ProbeRaySample
 {
     float3 radiance;
-    float distance;
+    float hitDistance;
     bool hitsBackFace;
 };
 
@@ -38,7 +37,7 @@ ProbeRaySample TraceProbeRay(ProbePositions positions, float3 origin, float3 dir
     ProbeRaySample sample;
     sample.hitsBackFace = false;
     RayHit rayHit;
-    if (!TraceProbeRayHit(Rays.grid, origin, direction, rayHit, sample.distance))
+    if (!TraceUnclampedProbeRayHit(origin, direction, rayHit, sample.hitDistance))
     {
         sample.radiance = Lights.skyRadiance;
         return sample;
@@ -47,7 +46,6 @@ ProbeRaySample TraceProbeRay(ProbePositions positions, float3 origin, float3 dir
     {
         sample.hitsBackFace = true;
         sample.radiance = 0.0;
-        sample.distance *= BackFaceDistanceScale;
         return sample;
     }
 
@@ -103,6 +101,6 @@ void main(uint2 DTid : SV_DispatchThreadID)
     const float3 direction = GetProbeRayDirection(probe, ray);
     const ProbeRaySample sample = TraceProbeRay(positions, origin, direction);
     WeightedRayDirections[DTid] = float4(direction, GetProbeRayWeight(probe, direction));
-    RaySamples[DTid] = float4(sample.radiance, sample.distance);
+    RaySamples[DTid] = float4(sample.radiance, sample.hitDistance);
     RayBackFaces[DTid] = sample.hitsBackFace ? 1.0 : 0.0;
 }
