@@ -134,6 +134,7 @@
     <ClInclude Include="Automation\FrameCapture.h" />
     <ClInclude Include="Automation\SettingsAssignment.h" />
     <ClInclude Include="Automation\UnattendedRun.h" />
+    <ClInclude Include="Automation\VectorFields.h" />
     <ClInclude Include="Editor\EditorCameraController.h" />
     <ClInclude Include="Editor\MeasurementConditions.h" />
     <ClInclude Include="Editor\SceneEditor.h" />

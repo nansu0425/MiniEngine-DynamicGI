@@ -48,13 +48,13 @@
 #include "Core/Scene/SettingValues.h"
 #include "Core/Automation/ControlChannel.h"
 #include "Core/Editor/MeasurementConditions.h"
+#include "Core/Automation/VectorFields.h"
+#include "ModelViewer/Light.h"
 #include "Core/UI/ImGuiLayer.h"
 #include "Core/Utility/IniFile.h"
-#include "Core/Math/Rotation.h"
 
 #include <algorithm>
 #include <map>
-#include <sstream>
 
 // Dynamic GI 프로젝트에선 legacy path가 아닌 glTF path를 사용한다.
 // legacy는 Blinn-Phong, glTF는 PBR shading
@@ -67,77 +67,6 @@ using namespace Graphics;
 using namespace std;
 
 using Renderer::MeshSorter;
-
-// KHR_lights_punctual의 light 하나 (references/glTF/extensions/2.0/Khronos/KHR_lights_punctual/README.md). light의 종류는 Type이 정한다.
-// 지금 받는 Type은 directional light (README.md:110) 하나다. directional light는 무한히 멀어서 감쇠하지 않고, 자기 transform의 local -Z
-// 방향으로 빛을 낸다. transform의 위치는 조명에 영향을 주지 않고, scene editor에서 light를 보고 고르는 자리다.
-class LightComponent : public Scene::Component
-{
-public:
-    // Type은 spec의 light type이다 (README.md:91). Type에는 renderer가 지금 지원하는 directional만 있다. point와 spot은 renderer가
-    // 지원할 때 range나 cone angle 같은 값과 함께 Type에 들어간다.
-    enum class Type { Directional };
-
-    // gizmo, light set 명령, Details panel, scene file이 바꾸는 값
-    struct Properties
-    {
-        // GetX, GetY, GetZ가 local의 +X, +Y, +Z를 world에서 본 방향이다. 조명이 쓰는 +Z를 계산 없이 그대로 읽도록
-        // quaternion 대신 직교 matrix로 둔다.
-        Matrix3 rotation;
-        Vector3 position;
-        // spec대로 color는 linear RGB이고 성분마다 0 ~ 1이며, intensity는 lux이고 0 이상이다.
-        Vector3 color;
-        float intensity;
-    };
-
-    LightComponent();
-
-    // type은 Properties와 달리 scene file과 editor set만 바꾼다 (LoadSettings).
-    Type GetType() const { return m_Type; }
-    const Properties& GetProperties() const { return m_Properties; }
-    void SetProperties(const Properties& properties) { m_Properties = properties; }
-
-    // surface에서 light를 향하는 방향. transform의 +Z다.
-    Vector3 GetDirection() const { return m_Properties.rotation.GetZ(); }
-    // light에 수직인 면의 illuminance (lux). spec은 color를 흰색 light의 intensity에 곱하는 값으로 정한다 (README.md:96).
-    Vector3 GetIlluminance() const { return m_Properties.color * Scalar(m_Properties.intensity); }
-
-    // 회전이 없는 transform으로 둔다. 빛은 world의 -Z로 가고 icon은 원점에 놓인다. color와 intensity는 그대로다.
-    void ResetTransform();
-
-    virtual void SaveSettings(IniFile::Values& values) const override;
-    virtual void LoadSettings(const IniFile::Values& values) override;
-
-private:
-    static Properties GetDefaultProperties();
-
-    Type m_Type;
-    Properties m_Properties;
-};
-
-// light의 transform 위치에 icon을 두고 빛이 나아가는 방향을 화살표로 표시한다. gizmo로 transform을 옮기고 돌린다.
-class LightIconComponent : public SceneEditor::IconComponent
-{
-public:
-    explicit LightIconComponent(LightComponent& light) : m_Light(light) {}
-
-    virtual Vector3 GetPosition() const override { return m_Light.GetProperties().position; }
-    virtual void SetPosition(Vector3 position) override;
-    virtual void Draw(const Camera& camera, bool selected) const override;
-    virtual void Rotate(const Camera& camera, ImGuizmo::MODE axes) override;
-    virtual void Scale(const Camera&) override {}
-
-private:
-    LightComponent& m_Light;
-};
-
-// light object를 이루는 component를 붙이고, 조명이 쓰는 component를 돌려준다.
-LightComponent& AssembleLight(Scene::Object& object)
-{
-    LightComponent& light = object.AddComponent<LightComponent>();
-    object.AddComponent<LightIconComponent>(light);
-    return light;
-}
 
 // ray가 아무 면도 만나지 않을 때 받는 빛. 무한히 먼 sky가 모든 방향에서 같은 radiance를 낸다.
 // ray tracing으로 간접광을 구하는 곳 (path tracer, 앞으로의 DDGI)이 miss에서 이 radiance를 쓴다. raster는 이 빛으로 surface를 비추지
@@ -286,14 +215,6 @@ private:
 
 CREATE_APPLICATION( ModelViewer )
 
-// scene file에 Type이 없거나 받을 수 없는 값이 있을 때의 type
-constexpr LightComponent::Type kDefaultLightType = LightComponent::Type::Directional;
-// 예전에 방위 -0.5 rad와 고도 0.75 x 90°로 정하던 기본 방향을 bit 단위로 옮겨서, 기본 화면이 그때와 같다.
-const Vector3 kDefaultLightDirection(0.335837096f, 0.923879147f, -0.18346864f);
-// spec의 기본 intensity는 1 lux이지만, 기본 화면과 harness baseline의 Exposure가 맞춰 둔 밝기를 지키도록 4π로 둔다. 그 Exposure를
-// 맞출 때의 raster는 diffuse에 1/π가 없어 intensity 4로 지금의 4π만큼 밝았다.
-constexpr float kDefaultLightIntensity = 4.0f * XM_PI;
-
 // scripts/viewer.py가 이 이름과 형식으로 -scene이 없을 때 여는 scene file의 경로를 읽는다.
 const wchar_t kDefaultScene[] = L"Scenes/Sponza.ini";
 // Scene menu가 scene file을 찾는 폴더
@@ -314,122 +235,6 @@ static_assert(kDefaultCameraVerticalFov == XM_PIDIV4, "scene files and lines wit
 bool IsVerticalFov(float verticalFov)
 {
     return verticalFov > 0.0f && verticalFov < XM_PI;
-}
-
-// direction을 그대로 +Z로 두고 +Y를 world의 위쪽에 가깝게 둔 rotation. direction은 단위 vector다.
-Matrix3 MakeRotationToward(Vector3 direction)
-{
-    // 수직인 방향은 world의 위쪽과 함께 +X를 정하지 못하므로 world의 +Z를 위쪽 대신 쓴다.
-    const Vector3 up = fabsf(direction.GetY()) > 0.9999f ? Vector3(kZUnitVector) : Vector3(kYUnitVector);
-    const Vector3 x = Normalize(Cross(up, direction));
-    return Matrix3(x, Cross(direction, x), direction);
-}
-
-// +Z와 +Y로 rotation을 만든다. 둘이 서로 직교하는 단위 vector가 아니면 false를 돌려준다.
-// 두 vector를 그대로 쓰므로, 저장한 rotation의 두 vector를 다시 읽으면 bit 단위로 같은 rotation이 된다.
-bool MakeRotation(Vector3 direction, Vector3 up, Matrix3& rotation)
-{
-    const float tolerance = 1e-4f;
-    if (fabsf(Length(direction) - 1.0f) > tolerance || fabsf(Length(up) - 1.0f) > tolerance || fabsf(Dot(direction, up)) > tolerance)
-        return false;
-    rotation = Matrix3(Cross(up, direction), up, direction);
-    return true;
-}
-
-LightComponent::Properties LightComponent::GetDefaultProperties()
-{
-    Properties properties;
-    properties.rotation = MakeRotationToward(kDefaultLightDirection);
-    properties.position = Vector3(kZero);
-    properties.color = Vector3(1.0f, 1.0f, 1.0f);
-    properties.intensity = kDefaultLightIntensity;
-    return properties;
-}
-
-LightComponent::LightComponent()
-    : Component({ "Type", "Direction", "Up", "Position", "Color", "Intensity" }), m_Type(kDefaultLightType), m_Properties(GetDefaultProperties())
-{
-}
-
-void LightComponent::ResetTransform()
-{
-    m_Properties.rotation = Matrix3(kIdentity);
-    m_Properties.position = Vector3(kZero);
-}
-
-bool IsColor(Vector3 color)
-{
-    const Vector3 clamped = Min(Max(color, Vector3(kZero)), Vector3(1.0f, 1.0f, 1.0f));
-    return XMVector3Equal(color, clamped);
-}
-
-// scene file의 Type이 쓰는 이름. LightComponent::Type에 type을 추가하면 kLightTypeNames에도 추가한 type의 이름을 넣는다.
-const std::pair<LightComponent::Type, const char*> kLightTypeNames[] = { { LightComponent::Type::Directional, "Directional" } };
-
-const char* GetLightTypeName(LightComponent::Type type)
-{
-    for (const auto& name : kLightTypeNames)
-    {
-        if (name.first == type)
-            return name.second;
-    }
-    ASSERT(false, "kLightTypeNames has no name for a light type.");
-    return "";
-}
-
-// text가 받는 type의 이름이면 type에 담고 true를 돌려준다.
-bool ReadLightType(const std::string& text, LightComponent::Type& type)
-{
-    for (const auto& name : kLightTypeNames)
-    {
-        if (text == name.second)
-        {
-            type = name.first;
-            return true;
-        }
-    }
-    return false;
-}
-
-void LightComponent::SaveSettings(IniFile::Values& values) const
-{
-    values["Type"] = GetLightTypeName(m_Type);
-    values["Direction"] = SettingValues::FormatVector(m_Properties.rotation.GetZ());
-    values["Up"] = SettingValues::FormatVector(m_Properties.rotation.GetY());
-    values["Position"] = SettingValues::FormatVector(m_Properties.position);
-    values["Color"] = SettingValues::FormatVector(m_Properties.color);
-    char text[32];
-    sprintf_s(text, "%.9g", m_Properties.intensity);
-    values["Intensity"] = text;
-}
-
-void LightComponent::LoadSettings(const IniFile::Values& values)
-{
-    const auto read = [&values](const char* key, Vector3& vector)
-    {
-        const auto text = values.find(key);
-        return text != values.end() && SettingValues::ReadVector(text->second, vector);
-    };
-
-    Type type = kDefaultLightType;
-    const auto typeName = values.find("Type");
-    if (typeName != values.end())
-        ReadLightType(typeName->second, type);
-
-    Properties properties = GetDefaultProperties();
-    Vector3 direction, up, position, color;
-    if (read("Direction", direction) && read("Up", up))
-        MakeRotation(direction, up, properties.rotation);
-    if (read("Position", position))
-        properties.position = position;
-    if (read("Color", color) && IsColor(color))
-        properties.color = color;
-    const auto intensity = values.find("Intensity");
-    float number = 0.0f;
-    if (intensity != values.end() && SettingValues::ReadNumbers(intensity->second, &number, 1) && number >= 0.0f)
-        properties.intensity = number;
-    m_Type = type;
-    m_Properties = properties;
 }
 
 SkyComponent::Properties SkyComponent::GetDefaultProperties()
@@ -598,35 +403,6 @@ void ReadTaa(const MeasurementConditions::Values& values, MeasurementConditions:
     reading.applies.push_back([taa] { TemporalEffects::EnableTAA = taa; });
 }
 
-// light의 rotation은 user.ini처럼 +Z와 +Y로 적어, 다시 읽으면 bit 단위로 같은 rotation이 된다. position은 조명에 영향이 없어 적지 않는다.
-void DescribeLightConditions(const LightComponent& light, MeasurementConditions::Values& values)
-{
-    const LightComponent::Properties& properties = light.GetProperties();
-    values["light direction"] = SettingValues::FormatVector(properties.rotation.GetZ());
-    values["light up"] = SettingValues::FormatVector(properties.rotation.GetY());
-    values["light color"] = SettingValues::FormatVector(properties.color);
-    values["light intensity"] = FormatFloat(properties.intensity);
-}
-
-void ReadLightConditions(LightComponent& light, const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading)
-{
-    LightComponent::Properties properties = light.GetProperties();
-    Vector3 direction, up;
-    const bool hasDirection = ReadValue(values, "light direction", reading, [&direction](const std::string& text) { return SettingValues::ReadVector(text, direction); });
-    const bool hasUp = ReadValue(values, "light up", reading, [&up](const std::string& text) { return SettingValues::ReadVector(text, up); });
-    if (hasDirection && hasUp && !MakeRotation(direction, up, properties.rotation))
-    {
-        reading.unread.push_back("light direction");
-        reading.unread.push_back("light up");
-    }
-    ReadValue(values, "light color", reading, [&properties](const std::string& text) { return SettingValues::ReadVector(text, properties.color) && IsColor(properties.color); });
-    ReadValue(values, "light intensity", reading, [&properties](const std::string& text)
-    {
-        return SettingValues::ReadNumbers(text, &properties.intensity, 1) && properties.intensity >= 0.0f;
-    });
-    reading.applies.push_back([&light, properties] { light.SetProperties(properties); });
-}
-
 void DescribeSkyConditions(const SkyComponent& sky, MeasurementConditions::Values& values)
 {
     const SkyComponent::Properties& properties = sky.GetProperties();
@@ -672,11 +448,6 @@ void UnregisterMeasurementConditions(void)
         MeasurementConditions::Unregister(group);
 }
 
-ControlChannel::Fields DescribeVector(Vector3 vector)
-{
-    return ControlChannel::Fields().Float("x", vector.GetX()).Float("y", vector.GetY()).Float("z", vector.GetZ());
-}
-
 // state의 camera
 ControlChannel::Fields DescribeCamera(const Camera& camera, const EditorCameraController& controller)
 {
@@ -690,7 +461,7 @@ ControlChannel::Fields DescribeCamera(const Camera& camera, const EditorCameraCo
         .Float("heading", pose.heading)
         .Float("pitch", pose.pitch)
         .Float("move_speed", controller.GetMoveSpeed())
-        .Object("forward", DescribeVector(camera.GetForwardVec()))
+        .Object("forward", ControlChannel::DescribeVector(camera.GetForwardVec()))
         .Float("vertical_fov", camera.GetFOV())
         .Float("aspect", 1.0f / camera.GetAspectRatio())
         .Float("near", camera.GetNearClip())
@@ -702,7 +473,7 @@ ControlChannel::Fields DescribeModel(const std::string& path, const ModelInstanc
     const AxisAlignedBox bounds = model.GetAxisAlignedBox();
     return ControlChannel::Fields()
         .Text("path", path)
-        .Object("bounds", ControlChannel::Fields().Object("min", DescribeVector(bounds.GetMin())).Object("max", DescribeVector(bounds.GetMax())));
+        .Object("bounds", ControlChannel::Fields().Object("min", ControlChannel::DescribeVector(bounds.GetMin())).Object("max", ControlChannel::DescribeVector(bounds.GetMax())));
 }
 
 // harness가 camera를 숫자로 읽고 정한다.
@@ -751,325 +522,6 @@ void RegisterPoseCommand(EditorCameraController& controller)
             .Float("pitch", pose.pitch)
             .Object("state", ControlChannel::GetState("camera")));
     });
-}
-
-float GetElevation(Vector3 direction)
-{
-    return XMConvertToDegrees(asinf(Clamp((float)direction.GetY(), -1.0f, 1.0f)));
-}
-
-// [0, 360)
-float WrapDegrees(float degrees)
-{
-    const float wrapped = fmodf(degrees, 360.0f);
-    if (wrapped >= 0.0f)
-        return wrapped;
-    // -0.00001처럼 360을 더하면 360으로 반올림되는 값은 0이다.
-    return wrapped + 360.0f < 360.0f ? wrapped + 360.0f : 0.0f;
-}
-
-// 수직인 방향은 방위가 없으므로 0이다.
-float GetAzimuth(Vector3 direction)
-{
-    const float x = direction.GetX();
-    const float z = direction.GetZ();
-    return x == 0.0f && z == 0.0f ? 0.0f : WrapDegrees(XMConvertToDegrees(atan2f(z, x)));
-}
-
-float GetDegreesBetween(float first, float second)
-{
-    const float difference = WrapDegrees(first - second);
-    return std::min(difference, 360.0f - difference);
-}
-
-// 고도와 방위 (degree)가 가리키는 방향. 고도가 ±90이면 방위와 상관없이 수직이다.
-Vector3 GetDirectionAt(float elevation, float azimuth)
-{
-    if (fabsf(elevation) == 90.0f)
-        return Vector3(0.0f, elevation > 0.0f ? 1.0f : -1.0f, 0.0f);
-    const float e = XMConvertToRadians(elevation);
-    const float a = XMConvertToRadians(azimuth);
-    return Normalize(Vector3(cosf(e) * cosf(a), sinf(e), cosf(e) * sinf(a)));
-}
-
-// state의 light. rotation은 GetCanonicalQuaternion의 형태로 적은 quaternion이다. 고도와 방위는 조명이 쓰는 방향에서 계산한다.
-ControlChannel::Fields DescribeLight(const LightComponent& light)
-{
-    const LightComponent::Properties& properties = light.GetProperties();
-    const Quaternion rotation = GetCanonicalQuaternion(Quaternion((XMMATRIX)properties.rotation));
-    const Vector3 direction = light.GetDirection();
-    return ControlChannel::Fields()
-        .Object("rotation", ControlChannel::Fields()
-            .Float("x", XMVectorGetX(rotation)).Float("y", XMVectorGetY(rotation)).Float("z", XMVectorGetZ(rotation)).Float("w", XMVectorGetW(rotation)))
-        .Object("direction", DescribeVector(direction))
-        .Float("elevation", GetElevation(direction))
-        .Float("azimuth", GetAzimuth(direction))
-        .Object("color", ControlChannel::Fields()
-            .Float("r", properties.color.GetX()).Float("g", properties.color.GetY()).Float("b", properties.color.GetZ()))
-        .Float("intensity", properties.intensity)
-        .Object("position", DescribeVector(properties.position));
-}
-
-// 받은 값과 다시 읽은 고도와 방위가 같다고 보는 차이. degree와 radian을 오가며 생기는 float 오차보다 크게 잡았다.
-constexpr float kLightDegreesTolerance = 1e-4f;
-
-// gizmo와 Details panel이 바꾸는 값을 같은 방식으로 바꾼다.
-// 받지 않는 값이 하나라도 있으면 아무것도 바꾸지 않도록, 값의 사본에 먼저 적용해 읽어 본다.
-void SetLight(LightComponent& light, const std::string& arguments, const ControlChannel::Reply& reply)
-{
-    const std::string usage = "usage: light set rotation=<x>,<y>,<z>,<w> | direction=<x>,<y>,<z> | elevation=<degrees> azimuth=<degrees> | "
-        "position=<x>,<y>,<z> | color=<r>,<g>,<b> | intensity=<lux>";
-    const std::map<std::string, int> counts = { { "rotation", 4 }, { "direction", 3 }, { "position", 3 }, { "color", 3 },
-        { "elevation", 1 }, { "azimuth", 1 }, { "intensity", 1 } };
-    std::map<std::string, std::vector<float>> values;
-    std::istringstream tokens(arguments);
-    for (std::string token; tokens >> token;)
-    {
-        const size_t separator = token.find('=');
-        const std::string key = token.substr(0, separator);
-        const auto count = counts.find(key);
-        if (separator == std::string::npos || count == counts.end() || values.count(key) != 0)
-        {
-            reply.Error("'" + token + "' is not a key=value of light set, or repeats a key. Nothing was set. " + usage);
-            return;
-        }
-        float numbers[4];
-        if (!SettingValues::ReadNumbers(token.substr(separator + 1), numbers, count->second))
-        {
-            reply.Error(key + " takes " + std::to_string(count->second) + " numbers joined by ','. Nothing was set. " + usage);
-            return;
-        }
-        values[key].assign(numbers, numbers + count->second);
-    }
-    if (values.empty())
-    {
-        reply.Error(usage);
-        return;
-    }
-    const bool hasElevation = values.count("elevation") != 0;
-    const bool hasAzimuth = values.count("azimuth") != 0;
-    if (values.count("rotation") + values.count("direction") + (hasElevation || hasAzimuth ? 1 : 0) > 1)
-    {
-        reply.Error("rotation, direction and elevation with azimuth each set the rotation, so only one of them is given. Nothing was set.");
-        return;
-    }
-
-    LightComponent::Properties properties = light.GetProperties();
-    ControlChannel::Fields rejected;
-    bool anyRejected = false;
-    if (values.count("rotation") != 0)
-    {
-        const std::vector<float>& xyzw = values["rotation"];
-        Quaternion rotation;
-        if (!MakeQuaternionRotation(xyzw[0], xyzw[1], xyzw[2], xyzw[3], rotation))
-        {
-            reply.Error("rotation has no length. Nothing was set.");
-            return;
-        }
-        properties.rotation = Matrix3(rotation);
-    }
-    if (values.count("direction") != 0)
-    {
-        const std::vector<float>& xyz = values["direction"];
-        const Vector3 requested(xyz[0], xyz[1], xyz[2]);
-        if (LengthSquare(requested) == 0.0f)
-        {
-            reply.Error("direction has no length. Nothing was set.");
-            return;
-        }
-        properties.rotation = MakeRotationToward(Normalize(requested));
-    }
-    ControlChannel::Fields fields;
-    if (hasElevation || hasAzimuth)
-    {
-        const Vector3 current = light.GetDirection();
-        const float elevation = hasElevation ? values["elevation"][0] : GetElevation(current);
-        const float azimuth = hasAzimuth ? values["azimuth"][0] : GetAzimuth(current);
-        if (elevation < -90.0f || elevation > 90.0f)
-        {
-            rejected.Float("elevation", elevation);
-            anyRejected = true;
-        }
-        else
-        {
-            const Vector3 direction = GetDirectionAt(elevation, azimuth);
-            properties.rotation = MakeRotationToward(direction);
-            if (hasElevation && fabsf(GetElevation(direction) - elevation) > kLightDegreesTolerance)
-            {
-                rejected.Float("elevation", GetElevation(direction));
-                anyRejected = true;
-            }
-            if (fabsf(elevation) == 90.0f)
-                fields.Text("note", "a vertical direction has no azimuth, so state light gives azimuth 0");
-            else if (hasAzimuth && GetDegreesBetween(GetAzimuth(direction), azimuth) > kLightDegreesTolerance)
-            {
-                rejected.Float("azimuth", GetAzimuth(direction));
-                anyRejected = true;
-            }
-        }
-    }
-    if (values.count("position") != 0)
-        properties.position = Vector3(values["position"][0], values["position"][1], values["position"][2]);
-    if (values.count("color") != 0)
-    {
-        const Vector3 color(values["color"][0], values["color"][1], values["color"][2]);
-        if (IsColor(color))
-            properties.color = color;
-        else
-        {
-            rejected.Object("color", ControlChannel::Fields().Float("r", color.GetX()).Float("g", color.GetY()).Float("b", color.GetZ()));
-            anyRejected = true;
-        }
-    }
-    if (values.count("intensity") != 0)
-    {
-        if (values["intensity"][0] >= 0.0f)
-            properties.intensity = values["intensity"][0];
-        else
-        {
-            rejected.Float("intensity", values["intensity"][0]);
-            anyRejected = true;
-        }
-    }
-    if (anyRejected)
-    {
-        reply.Error("the light cannot take some values, so nothing was set. rejected has them, or what they would read back as. "
-            "elevation is -90 to 90, each color component is 0 to 1, and intensity is 0 or more.",
-            ControlChannel::Fields().Object("rejected", rejected));
-        return;
-    }
-
-    light.SetProperties(properties);
-    reply.Ok(fields.Object("state", ControlChannel::GetState("light")));
-}
-
-// light를 harness의 light 명령과 state로 읽고 바꾸게 한다.
-void RegisterLight(LightComponent& light)
-{
-    ControlChannel::RegisterState("light", [&light] { return DescribeLight(light); });
-    ControlChannel::Register("light", "light set <key>=<value> ... | light reset: the directional light, as its rotate and translate gizmos and its "
-        "Details panel change it. reset sets the transform to no rotation at the origin, so the light goes along world -Z, "
-        "and keeps the color and intensity, as Reset Transform in the Details panel does. It is a KHR_lights_punctual directional light and goes along the local -Z of its transform. "
-        "Its Type, which editor get gives and the scene file keeps, is Directional, the only type for now, and light set does not change it. "
-        "rotation=<x>,<y>,<z>,<w> is the quaternion of the transform, as a glTF node's rotation. "
-        "direction=<x>,<y>,<z> points from a surface toward the light, the local +Z, and is normalized. "
-        "elevation=<degrees> is up from the horizon, -90 to 90. azimuth=<degrees> turns about +y from +x toward +z, 0 to 360. "
-        "rotation, direction and elevation with azimuth each set the rotation, so only one of them is given. "
-        "direction, elevation and azimuth keep the local +Y as near to world +y as they can. "
-        "position=<x>,<y>,<z> in world units only places the icon, as the light is infinitely far. "
-        "color=<r>,<g>,<b> is linear, each 0 to 1. intensity=<lux> is the illuminance on a surface facing the light, 0 or more. "
-        "Nothing is set unless every value reads back as given. state light has these keys, with the direction the lighting uses",
-        [&light](const std::string& arguments, const ControlChannel::Reply& reply)
-    {
-        if (arguments == "reset")
-        {
-            light.ResetTransform();
-            reply.Ok(ControlChannel::Fields().Object("state", ControlChannel::GetState("light")));
-            return;
-        }
-        if (arguments.compare(0, 4, "set ") != 0)
-        {
-            reply.Error("usage: light set <key>=<value> ... | light reset. state light reads the light");
-            return;
-        }
-        SetLight(light, arguments.substr(4), reply);
-    });
-}
-
-void DrawArrow(ImDrawList& drawList, ImVec2 from, ImVec2 to, ImU32 color, float thickness)
-{
-    const float dx = to.x - from.x;
-    const float dy = to.y - from.y;
-    const float length = sqrtf(dx * dx + dy * dy);
-    const float headLength = thickness * 4.0f;
-    if (length < headLength)
-        return;
-
-    const ImVec2 forward(dx / length, dy / length);
-    const ImVec2 headBase(to.x - forward.x * headLength, to.y - forward.y * headLength);
-    const ImVec2 side(-forward.y * headLength * 0.5f, forward.x * headLength * 0.5f);
-    drawList.AddLine(from, headBase, color, thickness);
-    drawList.AddTriangleFilled(to, ImVec2(headBase.x + side.x, headBase.y + side.y), ImVec2(headBase.x - side.x, headBase.y - side.y), color);
-}
-
-void LightIconComponent::SetPosition(Vector3 position)
-{
-    LightComponent::Properties properties = m_Light.GetProperties();
-    properties.position = position;
-    m_Light.SetProperties(properties);
-}
-
-void LightIconComponent::Draw(const Camera& camera, bool selected) const
-{
-    const Vector3 position = GetPosition();
-    ImVec2 icon;
-    if (!SceneEditor::ProjectToScene(camera, position, icon))
-        return;
-
-    const ImU32 lightColor = IM_COL32(255, 200, 0, 255);
-    const ImU32 selectedColor = IM_COL32(255, 128, 16, 255);
-    const float radius = SceneEditor::GetIconRadius();
-    const float thickness = radius * 0.15f;
-    ImDrawList* drawList = ImGui::GetWindowDrawList();
-
-    // 화살표는 빛이 나아가는 방향, 곧 local -Z다.
-    const float arrowLength = radius * 4.0f * SceneEditor::GetWorldLengthPerPixel(camera, position);
-    ImVec2 arrowTip;
-    if (SceneEditor::ProjectToScene(camera, position - m_Light.GetDirection() * arrowLength, arrowTip))
-        DrawArrow(*drawList, icon, arrowTip, lightColor, thickness);
-
-    drawList->AddCircleFilled(icon, radius * 0.45f, lightColor);
-    const int kRayCount = 8;
-    for (int i = 0; i < kRayCount; ++i)
-    {
-        const float angle = XM_2PI * i / kRayCount;
-        const ImVec2 direction(cosf(angle), sinf(angle));
-        drawList->AddLine(
-            ImVec2(icon.x + direction.x * radius * 0.65f, icon.y + direction.y * radius * 0.65f),
-            ImVec2(icon.x + direction.x * radius, icon.y + direction.y * radius),
-            lightColor, thickness);
-    }
-
-    if (selected)
-        drawList->AddCircle(icon, radius * 1.2f, selectedColor, 0, thickness);
-}
-
-void LightIconComponent::Rotate(const Camera& camera, ImGuizmo::MODE axes)
-{
-    LightComponent::Properties properties = m_Light.GetProperties();
-    Matrix4 transform(properties.rotation, properties.position);
-    if (!SceneEditor::Manipulate(camera, ImGuizmo::ROTATE_X | ImGuizmo::ROTATE_Y | ImGuizmo::ROTATE_Z, axes, transform))
-        return;
-    // gizmo가 돌린 matrix는 float 오차로 직교에서 조금씩 벗어나므로 quaternion을 거쳐 직교 matrix로 되돌린다.
-    properties.rotation = Matrix3(Normalize(Quaternion((XMMATRIX)transform.Get3x3())));
-    m_Light.SetProperties(properties);
-}
-
-// type을 표시하고, color와 intensity를 바꾸고, transform을 되돌린다. type은 고를 수 있는 값이 하나뿐이라 표시만 한다.
-void ShowLightDetails(LightComponent& light)
-{
-    ImGui::LabelText("Type", "%s", GetLightTypeName(light.GetType()));
-    ImGui::SetItemTooltip("KHR_lights_punctual type of the light, which the scene file keeps as Type. Directional is the only type "
-        "the renderer supports now.");
-
-    LightComponent::Properties properties = light.GetProperties();
-    float color[3] = { properties.color.GetX(), properties.color.GetY(), properties.color.GetZ() };
-    if (ImGui::ColorEdit3("Color", color, ImGuiColorEditFlags_Float))
-        properties.color = Min(Max(Vector3(color[0], color[1], color[2]), Vector3(kZero)), Vector3(1.0f, 1.0f, 1.0f));
-    ImGui::SetItemTooltip("Linear RGB, each 0 to 1.");
-    if (ImGui::DragFloat("Intensity", &properties.intensity, 0.05f, 0.0f, FLT_MAX, "%.3f lux"))
-        properties.intensity = std::max(0.0f, properties.intensity);
-    ImGui::SetItemTooltip("Illuminance on a surface facing the light, in lux.");
-    light.SetProperties(properties);
-
-    ImGui::SeparatorText("Transform");
-    const Vector3 direction = light.GetDirection();
-    ImGui::Text("Toward the light: %.3f, %.3f, %.3f", (float)direction.GetX(), (float)direction.GetY(), (float)direction.GetZ());
-    ImGui::Text("Elevation %.2f, azimuth %.2f degrees", GetElevation(direction), GetAzimuth(direction));
-    if (ImGui::Button("Reset Transform"))
-        light.ResetTransform();
-    ImGui::SetItemTooltip("Sets the transform to no rotation at the origin, so the light goes along world -Z. The color and intensity stay.");
-    ImGui::TextDisabled("Rotate the light with the gizmo (E). The toolbar on the scene picks local or world rings.");
 }
 
 // scene file의 [Camera] section 을 읽은 것. fitModel이면 pose를 쓰지 않는다.
