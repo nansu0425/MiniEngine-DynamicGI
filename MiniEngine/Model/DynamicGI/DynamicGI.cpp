@@ -218,6 +218,7 @@ namespace
     // Source의 순서이고, user.ini의 저장과 settings 명령이 이 이름으로 읽고 쓴다.
     const char* kSourceNames[] = { "Off", "Path Traced", "Probe" };
     const char* kViewNames[] = { "Lit", "Indirect Irradiance", "Indirect Radiance" };
+    const char* kRaySampleColorNames[] = { "Distance", "Kind", "Contribution" };
 
     void ClampSettings(void)
     {
@@ -472,9 +473,16 @@ namespace
         ImGui::Checkbox("Show Ray Samples", &probeSpheres.showRaySamples);
         ImGui::SetItemTooltip("Draws a line from the selected probe along each ray of its last update, up to the point the ray hit. "
             "A ray that hit nothing ends at the longest distance a probe keeps. "
-            "Cyan rays hit something closer than the longest distance a probe keeps, and red rays did not. "
+            "Ray Sample Color picks the colors. "
             "While the Texture Viewer shows Probe Ray Samples with a texel of the selected probe's row inspected, "
             "the ray of that texel is white and the other lines are faint.");
+        int raySampleColor = (int)probeSpheres.raySampleColor;
+        if (ImGui::Combo("Ray Sample Color", &raySampleColor, kRaySampleColorNames, IM_ARRAYSIZE(kRaySampleColorNames)))
+            probeSpheres.raySampleColor = (ProbeVisualization::RaySampleColor)raySampleColor;
+        ImGui::SetItemTooltip("Distance draws rays that hit something closer than the longest distance a probe keeps in cyan and the others in red. "
+            "Kind draws uniform rays in cyan and guided rays in orange. "
+            "Contribution draws a ray brighter and more opaque the larger its flux is next to the largest flux of the probe's rays, "
+            "from faint blue to yellow.");
         ImGui::Checkbox("Inspect Pixel", &s_Settings.inspectPixel);
         ImGui::SetItemTooltip("Click a point of the scene other than a probe sphere to see the probes its irradiance interpolates. "
             "A line from the point to each probe is as thick as the probe's weight, and dashed where the weight is 0. "
@@ -511,6 +519,7 @@ namespace
         values["Show Texel Means"] = SettingValues::FormatFlag(probeSpheres.showTexelMeans);
         values["Show Texel Distances"] = SettingValues::FormatFlag(probeSpheres.showTexelDistances);
         values["Show Ray Samples"] = SettingValues::FormatFlag(probeSpheres.showRaySamples);
+        values["Ray Sample Color"] = kRaySampleColorNames[(int)probeSpheres.raySampleColor];
         values["Show Probe Offsets"] = SettingValues::FormatFlag(probeSpheres.showOffsets);
         values["Inspect Pixel"] = SettingValues::FormatFlag(s_Settings.inspectPixel);
         values["Inspect Label Scale"] = MeasurementConditions::FormatFloat(s_Settings.inspectLabelScale);
@@ -535,6 +544,7 @@ namespace
         SettingValues::ReadFlag(values, "Show Texel Means", probeSpheres.showTexelMeans);
         SettingValues::ReadFlag(values, "Show Texel Distances", probeSpheres.showTexelDistances);
         SettingValues::ReadFlag(values, "Show Ray Samples", probeSpheres.showRaySamples);
+        SettingValues::ReadName(values, "Ray Sample Color", kRaySampleColorNames, probeSpheres.raySampleColor);
         SettingValues::ReadFlag(values, "Show Probe Offsets", probeSpheres.showOffsets);
         SettingValues::ReadFlag(values, "Inspect Pixel", s_Settings.inspectPixel);
         SettingValues::ReadFloat(values, "Inspect Label Scale", s_Settings.inspectLabelScale);

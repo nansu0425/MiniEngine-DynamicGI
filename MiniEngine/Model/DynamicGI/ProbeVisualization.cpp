@@ -70,6 +70,9 @@ namespace
         DistanceLines lines;
         uint32_t distanceTexelsPerSide;
         uint32_t highlightedRay;
+        ProbeVisualization::RaySampleColor raySampleColor;
+        uint32_t uniformRaysPerProbe;
+        uint32_t raysPerProbe;
         IrradianceProbeGrid grid;
     };
 
@@ -225,6 +228,9 @@ void ProbeVisualization::DrawDistanceLines(GraphicsContext& context, const Camer
     constants.probe = probe;
     constants.distanceTexelsPerSide = probes.distanceTexelsPerSide;
     constants.highlightedRay = highlightedRay.value_or(kNoHighlightedRay);
+    constants.raySampleColor = settings.raySampleColor;
+    constants.uniformRaysPerProbe = probes.uniformRaysPerProbe;
+    constants.raysPerProbe = probes.raysPerProbe;
 
     context.SetRootSignature(s_LineRootSignature);
     context.SetPipelineState(s_LinePSO);

@@ -707,6 +707,7 @@ ProbeLighting::Probes ProbeLighting::GetProbes(void)
         .weightedRayDirections = s_WeightedRayDirections,
         .raySamples = s_RaySamples,
         .raysPerProbe = GetRaysPerProbe(),
+        .uniformRaysPerProbe = s_UniformRaysPerProbe,
         .emissiveSamples = s_EmissiveSamples,
     };
 }

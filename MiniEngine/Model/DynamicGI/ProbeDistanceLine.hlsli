@@ -14,10 +14,17 @@ cbuffer Constants : register(b0)
     uint Lines;
     uint DistanceTexelsPerSide;
     uint HighlightedRay;
+    uint RaySampleColor;
+    uint UniformRaysPerProbe;
+    uint RaysPerProbe;
     IrradianceProbeGrid Grid;
 };
 
 static const uint kNoHighlightedRay = 0xffffffff;
+
+static const uint kRaySampleColorOfDistance = 0;
+static const uint kRaySampleColorOfKind = 1;
+static const uint kRaySampleColorOfContribution = 2;
 
 struct ProbeDistanceLineVertex
 {

@@ -1,5 +1,4 @@
 #include "Model/DynamicGI/ProbeGuide.hlsli"
-#include "Core/Shaders/ShaderUtility.hlsli"
 
 cbuffer Constants : register(b0)
 {
@@ -26,7 +25,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
     {
         const float4 weightedDirection = WeightedRayDirections[uint2(ray, probe)];
         // 한 texel의 flux = 해당 texel 범위에 해당하는 모든 ray에 대한 sum(ray가 담당하는 넓이 (solid angle) * ray의 밝기 (luminance))
-        flux[GetProbeGuideTexelIndex(weightedDirection.xyz)] += weightedDirection.w * RGBToLuminance(RaySamples[uint2(ray, probe)].rgb);
+        flux[GetProbeGuideTexelIndex(weightedDirection.xyz)] += GetProbeRayFlux(weightedDirection.w, RaySamples[uint2(ray, probe)].rgb);
     }
 
     float cumulativeFlux = 0.0;

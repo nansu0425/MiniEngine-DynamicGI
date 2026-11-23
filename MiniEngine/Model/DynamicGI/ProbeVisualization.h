@@ -16,6 +16,8 @@ namespace Math
 
 namespace ProbeVisualization
 {
+    enum class RaySampleColor : uint32_t { kDistance, kKind, kContribution };
+
     struct Settings
     {
         bool show = false;
@@ -23,6 +25,7 @@ namespace ProbeVisualization
         bool showTexelMeans = true;
         bool showTexelDistances = true;
         bool showRaySamples = true;
+        RaySampleColor raySampleColor = RaySampleColor::kDistance;
         bool showOffsets = false;
     };
 

@@ -2,6 +2,7 @@
 #define __PROBE_GUIDE_HLSLI__
 
 #include "Core/Shaders/Random.hlsli"
+#include "Core/Shaders/ShaderUtility.hlsli"
 #include "Model/DynamicGI/ProbeRays.hlsli"
 
 static const uint kProbeGuideTexelsPerSide = 16;
@@ -14,6 +15,11 @@ struct ProbeGuideTexel
     float flux;
     float cumulativeFlux;
 };
+
+float GetProbeRayFlux(float weight, float3 radiance)
+{
+    return weight * RGBToLuminance(radiance);
+}
 
 ProbeGuideTexel GetProbeGuideTexel(Texture2D<float2> guide, uint probe, uint texel)
 {

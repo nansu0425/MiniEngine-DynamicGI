@@ -45,6 +45,7 @@ namespace ProbeLighting
         ColorBuffer& weightedRayDirections;
         ColorBuffer& raySamples;
         uint32_t raysPerProbe;
+        uint32_t uniformRaysPerProbe;
         ColorBuffer& emissiveSamples;
     };
 
