@@ -36,6 +36,7 @@ struct VSOutput
 #endif
     float3 worldPos : TEXCOORD2;
     float3 shadowCoord : TEXCOORD3;
+    nointerpolation float3 worldPosAtVertex : TEXCOORD4;
 };
 
 // Flag helpers
@@ -69,10 +70,13 @@ float3 ComputeNormal(VSOutput vsOutput)
 #endif
 }
 
-// pixel이 놓인 triangle 면의 normal을 view 쪽으로 구한다. vertex normal은 면을 따라 휘므로 면의 방향은 worldPos의 미분으로 구한다.
-float3 GetGeometryNormal(float3 worldPos, float3 view)
+// pixel이 놓인 triangle 면의 normal을 view 쪽으로 구한다. vertex normal은 면을 따라 휘므로 면의 방향은 triangle의 세 vertex로 구한다.
+float3 GetGeometryNormal(VSOutput vsOutput, float3 view)
 {
-    float3 geometryNormal = cross(ddx(worldPos), ddy(worldPos));
+    const float3 p0 = GetAttributeAtVertex(vsOutput.worldPosAtVertex, 0);
+    const float3 p1 = GetAttributeAtVertex(vsOutput.worldPosAtVertex, 1);
+    const float3 p2 = GetAttributeAtVertex(vsOutput.worldPosAtVertex, 2);
+    float3 geometryNormal = cross(p1 - p0, p2 - p0);
     if (dot(geometryNormal, view) < 0.0)
         geometryNormal = -geometryNormal;
     return normalize(geometryNormal);
@@ -82,7 +86,7 @@ RasterSurface GetRasterSurface(VSOutput vsOutput, bool isFrontFace, float3 view)
 {
     RasterSurface surface;
     surface.position = vsOutput.worldPos;
-    surface.geometryNormal = GetGeometryNormal(vsOutput.worldPos, view);
+    surface.geometryNormal = GetGeometryNormal(vsOutput, view);
 
     // GltfBrdf.hlsli는 단위 normal을 받는다. tangent frame을 보간한 normal map의 normal은 길이가 1이 아닐 수 있다.
     surface.shadingNormal = normalize(ComputeNormal(vsOutput));

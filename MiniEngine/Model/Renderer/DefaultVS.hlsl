@@ -72,6 +72,7 @@ struct VSOutput
 #endif
     float3 worldPos : TEXCOORD2;
     float3 shadowCoord : TEXCOORD3;
+    nointerpolation float3 worldPosAtVertex : TEXCOORD4;
 };
 
 [RootSignature(Renderer_RootSig)]
@@ -111,6 +112,7 @@ VSOutput main(VSInput vsInput)
 #endif
 
     vsOutput.worldPos = mul(WorldMatrix, position).xyz;
+    vsOutput.worldPosAtVertex = vsOutput.worldPos;
     vsOutput.position = mul(ViewProjMatrix, float4(vsOutput.worldPos, 1.0));
     vsOutput.shadowCoord = mul(ShadowMatrix, float4(vsOutput.worldPos, 1.0)).xyz;
     vsOutput.normal = mul(WorldIT, normal);
