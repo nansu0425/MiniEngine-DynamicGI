@@ -66,11 +66,11 @@ namespace
     __declspec(align(16)) struct LineConstants
     {
         Matrix4 viewProj;
-        IrradianceProbeGrid grid;
         uint32_t probe;
         DistanceLines lines;
         uint32_t distanceTexelsPerSide;
         uint32_t highlightedRay;
+        IrradianceProbeGrid grid;
     };
 
     __declspec(align(16)) struct RibbonConstants

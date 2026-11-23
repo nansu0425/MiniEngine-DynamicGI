@@ -10,11 +10,11 @@ static const uint kProbeDistanceLinesOfTexelDistances = 2;
 cbuffer Constants : register(b0)
 {
     float4x4 ViewProj;
-    IrradianceProbeGrid Grid;
     uint Probe;
     uint Lines;
     uint DistanceTexelsPerSide;
     uint HighlightedRay;
+    IrradianceProbeGrid Grid;
 };
 
 static const uint kNoHighlightedRay = 0xffffffff;
