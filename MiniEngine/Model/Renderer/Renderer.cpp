@@ -17,6 +17,8 @@
 #include "Model/ConstantBuffers.h"
 #include "Model/Lights/SceneLights.h"
 #include "Model/Renderer/LightManager.h"
+#include "Model/Raytracing/RaytracingScene.h"
+#include "Model/Raytracing/SceneHeapTable.h"
 #include "Core/Graphics/Pipeline/RootSignature.h"
 #include "Core/Graphics/Pipeline/PipelineState.h"
 #include "Core/Graphics/GraphicsCommon.h"
@@ -106,9 +108,25 @@ namespace
         return s_ProbesIndirectIrradiance != nullptr ? kProbesIndirectIrradiance : kIndirectIrradianceNone;
     }
 
-    enum OpaqueShadingRootParameter { kOpaqueShadingConstants, kOpaqueShadingInputs, kOpaqueShadingOutput, kNumOpaqueShadingRootParameters };
+    enum OpaqueShadingRootParameter { kOpaqueShadingConstants, kOpaqueShadingScene,
+        kOpaqueShadingInputs = kOpaqueShadingScene + RaytracingScene::kNumRootParameters, kOpaqueShadingOutput, kNumOpaqueShadingRootParameters };
     RootSignature s_OpaqueShadingRootSig;
     ComputePSO s_OpaqueShadingPSO(L"Renderer: Opaque Shading PSO");
+
+    const uint32_t kNumOpaqueShadingInputs = kNumGBufferTargets + 4;
+    SceneHeapTable s_OpaqueShadingInputs;
+    SceneHeapTable s_OpaqueShadingOutput;
+
+    void PointToOptionalInput(uint32_t slot, const ColorBuffer* input)
+    {
+        if (input != nullptr)
+        {
+            s_OpaqueShadingInputs.PointTo(slot, *input, input->GetSRV());
+            return;
+        }
+        const Texture& black = GetDefaultTextureResource(kBlackOpaque2D);
+        s_OpaqueShadingInputs.PointTo(slot, black, black.GetSRV());
+    }
 
     __declspec(align(16)) struct OpaqueShadingConstants
     {
@@ -247,7 +265,8 @@ void Renderer::Initialize(void)
 
     s_OpaqueShadingRootSig.Reset(kNumOpaqueShadingRootParameters, 2);
     s_OpaqueShadingRootSig[kOpaqueShadingConstants].InitAsConstantBuffer(0);
-    s_OpaqueShadingRootSig[kOpaqueShadingInputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, kNumGBufferTargets + 4);
+    RaytracingScene::InitRootParameters(s_OpaqueShadingRootSig, kOpaqueShadingScene);
+    s_OpaqueShadingRootSig[kOpaqueShadingInputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, kNumOpaqueShadingInputs);
     s_OpaqueShadingRootSig[kOpaqueShadingOutput].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 0, 1);
     s_OpaqueShadingRootSig.InitStaticSampler(0, SamplerShadowDesc);
     s_OpaqueShadingRootSig.InitStaticSampler(1, SamplerLinearClampDesc);
@@ -290,6 +309,9 @@ void Renderer::Initialize(void)
 
     g_SSAOFullScreenID = g_SSAOFullScreen.GetVersionID();
     g_ShadowBufferID = g_ShadowBuffer.GetVersionID();
+
+    s_OpaqueShadingInputs.Create(kNumOpaqueShadingInputs);
+    s_OpaqueShadingOutput.Create(1);
 
     s_Initialized = true;
 }
@@ -337,12 +359,16 @@ void Renderer::SetIndirectRadiance(const ColorBuffer* radiance)
 
 void Renderer::SetProbesIndirectIrradiance(const ColorBuffer* irradiance, const IrradianceProbeGrid& grid)
 {
+    if (irradiance != s_ProbesIndirectIrradiance)
+        g_CommandManager.IdleGPU();
     s_ProbesIndirectIrradiance = irradiance;
     s_ProbesIndirectIrradianceGrid = grid;
 }
 
 void Renderer::SetScreenIndirectIrradiance(const ColorBuffer* irradiance)
 {
+    if (irradiance != s_ScreenIndirectIrradiance)
+        g_CommandManager.IdleGPU();
     s_ScreenIndirectIrradiance = irradiance;
 }
 
@@ -523,7 +549,8 @@ void Renderer::DrawSkyBackground(GraphicsContext& gfxContext, const D3D12_VIEWPO
     gfxContext.Draw(3);
 }
 
-void Renderer::ShadeOpaqueSurfaces(ComputeContext& context, const BaseCamera& camera, const GlobalConstants& globals, ColorBuffer& sceneColor)
+void Renderer::ShadeOpaqueSurfaces(ComputeContext& context, const BaseCamera& camera, const GlobalConstants& globals, const RaytracingScene& scene,
+    ColorBuffer& sceneColor)
 {
     ScopedTimer _prof(L"Opaque Shading", context);
 
@@ -538,25 +565,26 @@ void Renderer::ShadeOpaqueSurfaces(ComputeContext& context, const BaseCamera& ca
     constants.ShadingOutput = (uint32_t)s_ShadingOutput;
 
     const D3D12_RESOURCE_STATES shaderResource = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-    D3D12_CPU_DESCRIPTOR_HANDLE inputs[kNumGBufferTargets + 4];
     for (uint32_t i = 0; i < kNumGBufferTargets; ++i)
     {
         ColorBuffer& target = g_GBuffer[i];
         context.TransitionResource(target, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-        inputs[i] = target.GetSRV();
+        s_OpaqueShadingInputs.PointTo(i, target, target.GetSRV());
     }
     context.TransitionResource(g_ShadowBuffer, shaderResource);
-    inputs[kNumGBufferTargets] = g_ShadowBuffer.GetSRV();
-    inputs[kNumGBufferTargets + 1] = s_IndirectRadiance != nullptr ? s_IndirectRadiance->GetSRV() : GetDefaultTexture(kBlackOpaque2D);
-    inputs[kNumGBufferTargets + 2] = s_ProbesIndirectIrradiance != nullptr ? s_ProbesIndirectIrradiance->GetSRV() : GetDefaultTexture(kBlackOpaque2D);
-    inputs[kNumGBufferTargets + 3] = s_ScreenIndirectIrradiance != nullptr ? s_ScreenIndirectIrradiance->GetSRV() : GetDefaultTexture(kBlackOpaque2D);
+    s_OpaqueShadingInputs.PointTo(kNumGBufferTargets, g_ShadowBuffer, g_ShadowBuffer.GetSRV());
+    PointToOptionalInput(kNumGBufferTargets + 1, s_IndirectRadiance);
+    PointToOptionalInput(kNumGBufferTargets + 2, s_ProbesIndirectIrradiance);
+    PointToOptionalInput(kNumGBufferTargets + 3, s_ScreenIndirectIrradiance);
     context.TransitionResource(sceneColor, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+    s_OpaqueShadingOutput.PointTo(0, sceneColor, sceneColor.GetUAV());
 
     context.SetRootSignature(s_OpaqueShadingRootSig);
     context.SetPipelineState(s_OpaqueShadingPSO);
     context.SetDynamicConstantBufferView(kOpaqueShadingConstants, sizeof(constants), &constants);
-    context.SetDynamicDescriptors(kOpaqueShadingInputs, 0, _countof(inputs), inputs);
-    context.SetDynamicDescriptor(kOpaqueShadingOutput, 0, sceneColor.GetUAV());
+    scene.Bind(context, kOpaqueShadingScene);
+    s_OpaqueShadingInputs.Bind(context, kOpaqueShadingInputs);
+    s_OpaqueShadingOutput.Bind(context, kOpaqueShadingOutput);
     context.Dispatch2D(constants.Width, constants.Height);
 }
 

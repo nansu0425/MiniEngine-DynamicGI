@@ -190,7 +190,8 @@ void RaytracingScene::Bind(ComputeContext& context, UINT firstRootIndex) const
     context.SetDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, Renderer::s_SamplerHeap.GetHeapPointer());
 
     context.SetAccelerationStructure(firstRootIndex + kScene, m_TLAS);
-    context.SetBufferSRV(firstRootIndex + kBLASInstances, m_BLASInstanceBuffer);
+    if (m_MaxInstances > 0)
+        context.SetBufferSRV(firstRootIndex + kBLASInstances, m_BLASInstanceBuffer);
     context.SetDescriptorTable(firstRootIndex + kBuffers, Renderer::s_TextureHeap[0]);
     context.SetDescriptorTable(firstRootIndex + kTextures, Renderer::s_TextureHeap[0]);
     context.SetDescriptorTable(firstRootIndex + kSamplers, Renderer::s_SamplerHeap[0]);

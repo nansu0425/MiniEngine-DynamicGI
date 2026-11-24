@@ -60,6 +60,12 @@ namespace Graphics
         return DefaultTextures[texID].GetSRV();
     }
 
+    const Texture& GetDefaultTextureResource( eDefaultTexture texID )
+    {
+        ASSERT(texID < kNumDefaultTextures);
+        return DefaultTextures[texID];
+    }
+
     D3D12_RASTERIZER_DESC RasterizerDefault;	// Counter-clockwise
     D3D12_RASTERIZER_DESC RasterizerDefaultMsaa;
     D3D12_RASTERIZER_DESC RasterizerDefaultCw;	// Clockwise winding

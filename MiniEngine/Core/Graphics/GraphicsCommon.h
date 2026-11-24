@@ -20,6 +20,7 @@ class CommandSignature;
 class RootSignature;
 class ComputePSO;
 class GraphicsPSO;
+class Texture;
 
 namespace Graphics
 {
@@ -85,6 +86,7 @@ namespace Graphics
         kNumDefaultTextures
     };
     D3D12_CPU_DESCRIPTOR_HANDLE GetDefaultTexture( eDefaultTexture texID );
+    const Texture& GetDefaultTextureResource( eDefaultTexture texID );
 
     extern RootSignature g_CommonRS;
     extern ComputePSO g_GenerateMipsLinearPSO[4];

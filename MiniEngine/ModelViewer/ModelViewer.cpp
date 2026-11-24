@@ -1126,7 +1126,7 @@ void ModelViewer::RenderScene( void )
             gfxContext.TransitionResource(g_SceneColorBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
             gfxContext.ClearColor(g_SceneColorBuffer);
 
-            Renderer::ShadeOpaqueSurfaces(gfxContext.GetComputeContext(), m_Camera, globals, g_SceneColorBuffer);
+            Renderer::ShadeOpaqueSurfaces(gfxContext.GetComputeContext(), m_Camera, globals, m_RaytracingScene, g_SceneColorBuffer);
 
             Renderer::DrawSkyBackground(gfxContext, viewport, scissor, lights);
 

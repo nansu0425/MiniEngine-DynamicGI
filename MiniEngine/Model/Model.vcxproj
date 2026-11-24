@@ -256,7 +256,9 @@
     <FxCompile Include="Renderer\GBufferNoTangentNoUV1PS.hlsl">
       <ShaderType>Pixel</ShaderType>
     </FxCompile>
-    <FxCompile Include="Renderer\OpaqueShadingCS.hlsl" />
+    <FxCompile Include="Renderer\OpaqueShadingCS.hlsl">
+      <ShaderModel>6.5</ShaderModel>
+    </FxCompile>
     <FxCompile Include="Renderer\TransparentPS.hlsl">
       <ShaderType>Pixel</ShaderType>
     </FxCompile>

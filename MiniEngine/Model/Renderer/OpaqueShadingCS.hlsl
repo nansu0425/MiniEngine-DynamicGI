@@ -2,6 +2,7 @@
 #include "Model/Renderer/SurfaceRadiance.hlsli"
 #include "Core/Shaders/IrradianceProbes.hlsli"
 #include "Core/Shaders/SceneLights.hlsli"
+#include "Model/Raytracing/RaytracingScene.hlsli"
 
 cbuffer Constants : register(b0)
 {
