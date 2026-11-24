@@ -5,6 +5,7 @@
 #include "Core/Shaders/GltfBrdf.hlsli"
 #include "Core/Shaders/SurfaceShading.hlsli"
 #include "Core/Shaders/SceneLights.hlsli"
+#include "Model/Raytracing/LocalLightReflection.hlsli"
 
 struct GILights
 {
@@ -17,7 +18,8 @@ float3 GetHitDirectRadiance(HitSurface surface, GltfBrdfInput brdf, GILights lig
     const bool lit = any(lights.sceneLights.directionalLightIlluminance != 0.0);
     const float3 shadowCoord = mul(lights.shadowMatrix, float4(surface.position, 1.0)).xyz;
     const float visibility = lit ? GetDirectionalLightVisibility(shadowMap, shadowMapSampler, shadowCoord, surface.vertexNormal, lights.sceneLights.directionalLightDirection) : 0.0;
-    return EvaluateGltfBrdf(brdf, lights.sceneLights.directionalLightDirection) * lights.sceneLights.directionalLightIlluminance * (max(0.0, dot(surface.shadingNormal, lights.sceneLights.directionalLightDirection)) * visibility);
+    const float3 directionalLightRadiance = EvaluateGltfBrdf(brdf, lights.sceneLights.directionalLightDirection) * lights.sceneLights.directionalLightIlluminance * (max(0.0, dot(surface.shadingNormal, lights.sceneLights.directionalLightDirection)) * visibility);
+    return directionalLightRadiance + ReflectLocalLights(surface, brdf, lights.sceneLights);
 }
 
 #endif

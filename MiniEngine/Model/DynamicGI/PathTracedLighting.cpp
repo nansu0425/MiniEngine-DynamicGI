@@ -40,10 +40,20 @@ namespace
         return a.seed == b.seed && a.maxHits == b.maxHits && a.russianRoulette == b.russianRoulette;
     }
 
+    bool CanKeepAccumulating(const LocalLight& a, const LocalLight& b)
+    {
+        return XMVector3Equal(XMLoadFloat3(&a.position), XMLoadFloat3(&b.position)) && a.inverseRange == b.inverseRange &&
+            XMVector3Equal(XMLoadFloat3(&a.intensity), XMLoadFloat3(&b.intensity)) && a.spotAngleScale == b.spotAngleScale &&
+            XMVector3Equal(XMLoadFloat3(&a.emissionDirection), XMLoadFloat3(&b.emissionDirection)) && a.spotAngleOffset == b.spotAngleOffset;
+    }
+
     bool CanKeepAccumulating(const SceneLights& a, const SceneLights& b)
     {
         return XMVector3Equal(a.directionalLightDirection, b.directionalLightDirection) &&
-            XMVector3Equal(a.directionalLightIlluminance, b.directionalLightIlluminance) && XMVector3Equal(a.skyRadiance, b.skyRadiance);
+            XMVector3Equal(a.directionalLightIlluminance, b.directionalLightIlluminance) && XMVector3Equal(a.skyRadiance, b.skyRadiance) &&
+            a.localLightCount == b.localLightCount &&
+            std::equal(a.localLights, a.localLights + a.localLightCount, b.localLights,
+                [](const LocalLight& x, const LocalLight& y) { return CanKeepAccumulating(x, y); });
     }
 
     bool CanKeepAccumulating(const AccumulationConditions& a, const AccumulationConditions& b)

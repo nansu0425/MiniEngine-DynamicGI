@@ -46,7 +46,7 @@ float3 TraceIncomingRadiance(RayDesc ray, inout Random random)
 
         const HitSurface surface = GetHitSurface(rayHit, kSharpestTextureLod);
         const GltfBrdfInput brdf = MakeGltfBrdfInput(surface.baseColor.rgb, surface.metallic, surface.roughness, surface.shadingNormal, -ray.Direction);
-        radiance += throughput * (surface.emissive + ReflectDirectionalLight(surface, brdf));
+        radiance += throughput * (surface.emissive + ReflectDirectionalLight(surface, brdf) + ReflectLocalLights(surface, brdf, Lights.sceneLights));
 
         if (hits == MaxHits)
             return radiance;
