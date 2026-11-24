@@ -3,10 +3,9 @@
   python -I scripts/cornellbox.py <Mitsuba scene> <scene file>
 
 scripts/fetch-assets.ps1 이 zip 을 받아 푼 뒤에 부른다. glTF 는 그 glTF 를 여는 ModelViewer 의 scene file 이 [Model] glTF 로
-가리키는 곳에 쓰고, glTF 의 asset.extras.source 에 Mitsuba scene 의 경로를 glTF 폴더 기준으로 남긴다 (SOURCE_KEY).
-받은 파일을 읽으므로 python -I 로 돌리고, 자기 폴더만 sys.path 에 넣어
-module 을 import 한다. 수치는 모두 scene 에서 읽고, 여기에는 Mitsuba 의 shape 정의만 둔다. scene 이 이 script 가 아는 것 밖의
-plugin 이나 transform 을 쓰면 바꾸지 않고 실패한다.
+가리키는 곳에 쓴다. 받은 파일을 읽으므로 python -I 로 돌리고, 자기 폴더만 sys.path 에 넣어 module 을 import 한다. 수치는
+모두 scene 에서 읽고, 여기에는 Mitsuba 의 shape 정의만 둔다. scene 이 이 script 가 아는 것 밖의 plugin 이나 transform 을 쓰면
+바꾸지 않고 실패한다.
 
 glTF 좌표는 Mitsuba 의 world 좌표 그대로이고 축을 바꾸지 않는다. 바꾸는 규칙은 아래와 같다.
 
@@ -16,10 +15,9 @@ glTF 좌표는 Mitsuba 의 world 좌표 그대로이고 축을 바꾸지 않는�
   그 normal 쪽이 되도록 triangle 을 counter-clockwise 로 둔다. UV 는 면마다 [0, 1]^2 다.
 - twosided 안의 diffuse bsdf 는 baseColorFactor 가 reflectance 이고 metallic 0, roughness 1 인 material 이다. rectangle 의
   material 은 doubleSided 다. cube 의 material 은 single-sided 다. cube 는 닫혀 있고 앞면이 바깥을 향하므로 바깥에서 오는 ray 는
-  앞면에만 맞는다. 그리고 DDGI 의 Probe Classification 은 cube 안의 probe 를 single-sided 뒷면에 맞는 ray 로 찾는다. glTF 의
-  metallic-roughness 는 Lambert 가 아니므로 Mitsuba 와 같은 반사는 path tracer 의 Shading Lambert 로 그릴 때다
-  (PathTracerCS.hlsl 의 LAMBERT_SHADING). twosided 가 아닌 bsdf 는 받지 않는다. Mitsuba 에서 그 뒷면은 빛을 받지 않으면서 ray 를
-  막는데, 이 repo 는 single-sided 의 뒷면을 없는 것으로 친다 (docs/policy.md 의 "camera 밖에서 본 doubleSided").
+  앞면에만 맞는다. 그리고 DDGI 의 Probe Classification 은 cube 안의 probe 를 single-sided 뒷면에 맞는 ray 로 찾는다.
+  twosided 가 아닌 bsdf 는 받지 않는다. Mitsuba 에서 그 뒷면은 빛을 받지 않으면서 ray 를 막는데, 이 repo 는 single-sided 의
+  뒷면을 없는 것으로 친다 (docs/policy.md 의 "camera 밖에서 본 doubleSided").
 - area emitter 는 normal 쪽으로만 빛난다. 그래서 emitter 가 붙은 shape 는 single-sided 인 앞면과, 같은 reflectance 로 반대쪽을
   향하는 single-sided 인 뒷면 두 primitive 로 나눈다. 두 면은 어느 쪽에서 오는 ray 든 하나만 맞으므로 twosided bsdf 처럼 ray 를
   막는다. emission 은 앞면의 material 에만 둔다. core 의 emissiveFactor 는 [0, 1] 이므로 radiance 를 그 최댓값으로 나눈 값과
@@ -38,7 +36,6 @@ from gltfwriter import GLTF_FLOAT, GLTF_UNSIGNED_SHORT, BufferBuilder, flatten
 from pickanswers import parallelogram
 from viewer import VIEWER_DIR, scene_gltf
 
-SOURCE_KEY = 'source'
 EMISSIVE_STRENGTH = 'KHR_materials_emissive_strength'
 
 # Mitsuba 3 의 shape 의 local 면. 면마다 (중심, 반 변 u, 반 변 v, 바깥 normal) 이다.
@@ -173,8 +170,8 @@ def primitives(shape):
     return [(shape.id, front, shape.faces), (f'{shape.id} back', material, back)]
 
 
-def write(scene, source, gltf_path):
-    """source 에서 읽은 scene 을 gltf_path 에, buffer 를 그 옆의 같은 이름 .bin 에 쓴다. 내용이 같으면 파일을 다시 쓰지 않아 .mini 를
+def write(scene, gltf_path):
+    """scene 을 gltf_path 에, buffer 를 그 옆의 같은 이름 .bin 에 쓴다. 내용이 같으면 파일을 다시 쓰지 않아 .mini 를
     다시 만들지 않게 한다."""
     import numpy as np
     builder = BufferBuilder()
@@ -203,8 +200,7 @@ def write(scene, source, gltf_path):
     gltf_path = Path(gltf_path).resolve()
     bin_name = gltf_path.with_suffix('.bin').name
     gltf = {
-        'asset': {'version': '2.0', 'generator': 'scripts/cornellbox.py',
-                  'extras': {SOURCE_KEY: Path(os.path.relpath(Path(source).resolve(), gltf_path.parent)).as_posix()}},
+        'asset': {'version': '2.0', 'generator': 'scripts/cornellbox.py'},
         'scene': 0,
         'scenes': [{'nodes': list(range(len(nodes)))}],
         'nodes': nodes,
@@ -239,19 +235,13 @@ def written_gltf(scene_file):
     return VIEWER_DIR / scene_gltf(Path(os.path.relpath(Path(scene_file).resolve(), VIEWER_DIR)).as_posix())
 
 
-def written_source(gltf_path):
-    """write 가 gltf_path 에 남긴 Mitsuba scene 의 경로"""
-    gltf = json.loads(Path(gltf_path).read_text(encoding='utf-8'))
-    return (Path(gltf_path).parent / gltf['asset']['extras'][SOURCE_KEY]).resolve()
-
-
 def main():
     if len(sys.argv) != 3:
         print(__doc__.splitlines()[2].strip(), file=sys.stderr)
         return 2
     try:
         gltf_path = written_gltf(sys.argv[2])
-        write(read(sys.argv[1]), sys.argv[1], gltf_path)
+        write(read(sys.argv[1]), gltf_path)
         print(f'glTF: {gltf_path}')
     except (SceneError, ElementTree.ParseError, ValueError) as error:
         print(f'error: {error}', file=sys.stderr)
