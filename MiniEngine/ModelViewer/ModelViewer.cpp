@@ -1036,7 +1036,20 @@ void ModelViewer::Update( float deltaT )
 
 SceneLights ModelViewer::DescribeSceneLights(void) const
 {
-    return { m_DirectionalLight.GetDirection(), m_DirectionalLight.GetIlluminance(), m_Sky.GetRadiance() };
+    SceneLights lights = {
+        .directionalLightDirection = m_DirectionalLight.GetDirection(),
+        .directionalLightIlluminance = m_DirectionalLight.GetIlluminance(),
+        .skyRadiance = m_Sky.GetRadiance(),
+    };
+    for (const Scene::Object* object : Scene::GetObjects())
+    {
+        const LightComponent* light = FindLocalLight(*object);
+        if (light == nullptr)
+            continue;
+        ASSERT(lights.localLightCount < kMaxLocalLights, "SceneLights has no room for another local light.");
+        lights.localLights[lights.localLightCount++] = DescribeLocalLightInWorldUnits(*light, m_ModelInst.GetScale());
+    }
+    return lights;
 }
 
 void ModelViewer::RenderScene( void )
@@ -1060,7 +1073,7 @@ void ModelViewer::RenderScene( void )
         // Update global constants
         const SceneLights lights = DescribeSceneLights();
         // directional light가 어느 방향에 있어도 shadow map이 model 전체를 덮게 light 방향에서 본 model의 AABB를 감싼다.
-        m_ShadowCamera.UpdateMatrixToEnclose(-lights.lightDirection, m_ModelInst.GetAxisAlignedBox(),
+        m_ShadowCamera.UpdateMatrixToEnclose(-lights.directionalLightDirection, m_ModelInst.GetAxisAlignedBox(),
             (uint32_t)g_ShadowBuffer.GetWidth(), (uint32_t)g_ShadowBuffer.GetHeight(), 16);
 
         GlobalConstants globals;

@@ -12,8 +12,8 @@ float3 GetOutgoingRadiance(RasterSurface surface, float3 view, float3 shadowCoor
     const GltfBrdfInput brdf = MakeGltfBrdfInput(surface.baseColor.rgb, surface.metallic, surface.roughness, surface.shadingNormal, view);
 
     // direct light
-    const float lightVisibility = GetDirectionalLightVisibility(shadowMap, shadowMapSampler, shadowCoord, surface.vertexNormal, lights.lightDirection);
-    const float3 directRadiance = EvaluateGltfBrdf(brdf, lights.lightDirection) * lights.lightIlluminance * (max(0.0, dot(surface.shadingNormal, lights.lightDirection)) * lightVisibility);
+    const float lightVisibility = GetDirectionalLightVisibility(shadowMap, shadowMapSampler, shadowCoord, surface.vertexNormal, lights.directionalLightDirection);
+    const float3 directRadiance = EvaluateGltfBrdf(brdf, lights.directionalLightDirection) * lights.directionalLightIlluminance * (max(0.0, dot(surface.shadingNormal, lights.directionalLightDirection)) * lightVisibility);
 
     // TODO: indirect specular light
 

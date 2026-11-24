@@ -42,8 +42,8 @@ namespace
 
     bool CanKeepAccumulating(const SceneLights& a, const SceneLights& b)
     {
-        return XMVector3Equal(a.lightDirection, b.lightDirection) && XMVector3Equal(a.lightIlluminance, b.lightIlluminance) &&
-            XMVector3Equal(a.skyRadiance, b.skyRadiance);
+        return XMVector3Equal(a.directionalLightDirection, b.directionalLightDirection) &&
+            XMVector3Equal(a.directionalLightIlluminance, b.directionalLightIlluminance) && XMVector3Equal(a.skyRadiance, b.skyRadiance);
     }
 
     bool CanKeepAccumulating(const AccumulationConditions& a, const AccumulationConditions& b)

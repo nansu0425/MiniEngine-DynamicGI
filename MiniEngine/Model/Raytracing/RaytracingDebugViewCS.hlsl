@@ -92,7 +92,7 @@ uint DebugViewRayFlags()
 // 면이 directional light를 가리면 false를 돌려준다 (DescribeSurfaceRay).
 bool DescribeLightRay(HitSurface surface, out RayDesc ray)
 {
-    return DescribeSurfaceRay(surface.position, surface.geometryNormal, Lights.lightDirection, ray);
+    return DescribeSurfaceRay(surface.position, surface.geometryNormal, Lights.directionalLightDirection, ray);
 }
 
 // directional light가 보이면 흰색, 가려지면 검정이다.

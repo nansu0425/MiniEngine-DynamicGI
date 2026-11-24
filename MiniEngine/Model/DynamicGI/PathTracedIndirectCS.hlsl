@@ -26,12 +26,12 @@ static const uint kFirstRussianRouletteHit = 3;
 
 float3 ReflectDirectionalLight(HitSurface surface, GltfBrdfInput brdf)
 {
-    if (all(Lights.sceneLights.lightIlluminance == 0.0))
+    if (all(Lights.sceneLights.directionalLightIlluminance == 0.0))
         return 0.0;
     RayDesc ray;
-    if (!DescribeSurfaceRay(surface.position, surface.geometryNormal, Lights.sceneLights.lightDirection, ray) || IsOccluded(ray, kCullSingleSidedBackFaces))
+    if (!DescribeSurfaceRay(surface.position, surface.geometryNormal, Lights.sceneLights.directionalLightDirection, ray) || IsOccluded(ray, kCullSingleSidedBackFaces))
         return 0.0;
-    return EvaluateGltfBrdf(brdf, Lights.sceneLights.lightDirection) * Lights.sceneLights.lightIlluminance * max(0.0, dot(surface.shadingNormal, Lights.sceneLights.lightDirection));
+    return EvaluateGltfBrdf(brdf, Lights.sceneLights.directionalLightDirection) * Lights.sceneLights.directionalLightIlluminance * max(0.0, dot(surface.shadingNormal, Lights.sceneLights.directionalLightDirection));
 }
 
 float3 TraceIncomingRadiance(RayDesc ray, inout Random random)

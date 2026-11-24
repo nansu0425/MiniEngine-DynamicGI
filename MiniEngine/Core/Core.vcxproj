@@ -447,6 +447,7 @@
     <None Include="Shaders\NormalTexture.hlsli" />
     <None Include="Shaders\IrradianceProbes.hlsli" />
     <None Include="Shaders\SceneLights.hlsli" />
+    <None Include="Shaders\LocalLight.hlsli" />
     <None Include="Effects\PostEffects\PostEffectsRS.hlsli" />
     <None Include="Display\PresentRS.hlsli" />
     <None Include="Shaders\ShaderUtility.hlsli" />

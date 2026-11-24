@@ -1606,8 +1606,6 @@ def check_local_lights(session, check, changes):
     scene = copy_scene_file(session.instance['scene'], LOCAL_LIGHT_SCENE_DIR)
     session.ask_ok(f'scene open {scene}')
     names = list(LOCAL_LIGHT_DEFAULTS)
-    session.ask_ok(f'frames {SETTLE_FRAMES}')
-    before = read_dds_rgba32f(capture(session, 'scene', 'selftest-local-lights-before'))
 
     check('state local_lights is empty while the scene has no local light', local_lights() == {} and not any(name in editor_state()['objects'] for name in names),
           str(local_lights()))
@@ -1650,11 +1648,6 @@ def check_local_lights(session, check, changes):
             accepted.append(f'{name}: {assignment}')
     check('editor set of a local light fails and changes nothing for a value out of range, a range that is not a number above 0, '
           'a cone angle pair the spec does not allow, another type or a key of another type', not accepted, ', '.join(accepted))
-
-    session.ask_ok(f'frames {SETTLE_FRAMES}')
-    after = read_dds_rgba32f(capture(session, 'scene', 'selftest-local-lights-after'))
-    check('scene is bit-identical with the local lights in it, as nothing renders them yet', np.array_equal(before.view(np.uint32), after.view(np.uint32)),
-          describe_difference(before, after))
 
     start_pose = session.ask_ok('state camera')['state']['camera']
     session.ask_ok('ui show')
@@ -1769,6 +1762,36 @@ def check_local_lights(session, check, changes):
     check('editor remove takes the local lights out, removing one not in the scene fails, and scene save drops their sections',
           local_lights() == {} and not removed_again['ok'] and not any(sections.has_section(name) for name in names),
           f'{local_lights()}, {removed_again.get("error")}, {sections.sections()}')
+
+    def scene_image(shot):
+        session.ask_ok(f'frames {SETTLE_FRAMES}')
+        return read_dds_rgba32f(capture(session, 'scene', shot))
+
+    def differing_pixels(first, second):
+        return int(np.count_nonzero(np.any(first.view(np.uint32) != second.view(np.uint32), axis=2)))
+
+    session.ask_ok(f'scene open {copy_scene_file(baseline_scene("CornellBox.ini"), LOCAL_LIGHT_SCENE_DIR)}')
+    unlit = scene_image('selftest-local-lights-unlit')
+    for name in names:
+        session.ask_ok(f'editor add {name}')
+    session.ask_ok('editor set Point Light: Position=0,900,0; Intensity=1')
+    session.ask_ok('editor set Spot Light: Position=0,900,0; Direction=0,1,0; Up=0,0,-1; Intensity=0')
+    point_lit = scene_image('selftest-local-lights-point-lit')
+    session.ask_ok('editor set Point Light: Intensity=0')
+    session.ask_ok('editor set Spot Light: Intensity=1')
+    spot_lit = scene_image('selftest-local-lights-spot-lit')
+    session.ask_ok('editor set Spot Light: Intensity=0')
+    dark = scene_image('selftest-local-lights-dark')
+    for name in names:
+        session.ask_ok(f'editor remove {name}')
+    removed = scene_image('selftest-local-lights-removed')
+    least_lit = unlit.shape[0] * unlit.shape[1] // 100
+    check('in the Cornell box, whose directional light and sky have intensity 0, a Point Light and a Spot Light of intensity 1 each change more than '
+          '1% of the scene, and the scene is bit-identical to the one without local lights while their intensity is 0 and once they are removed',
+          differing_pixels(unlit, point_lit) > least_lit and differing_pixels(unlit, spot_lit) > least_lit
+          and differing_pixels(unlit, dark) == 0 and differing_pixels(unlit, removed) == 0,
+          f'point {describe_difference(unlit, point_lit)}; spot {describe_difference(unlit, spot_lit)}; '
+          f'intensity 0 {describe_difference(unlit, dark)}; removed {describe_difference(unlit, removed)}')
 
     session.ask_ok(f'restore {start_line}')
     session.ask_ok('editor select ' + start_editor['selected'])

@@ -249,6 +249,23 @@ LightComponent* FindLocalLight(const Scene::Object& object)
     return light != nullptr && light->GetType() != LightComponent::Type::Directional ? light : nullptr;
 }
 
+LocalLight DescribeLocalLightInWorldUnits(const LightComponent& light, float worldUnitsPerMetre)
+{
+    const LightComponent::Properties& properties = light.GetProperties();
+    const bool spot = light.GetType() == LightComponent::Type::Spot;
+    const float outerConeCosine = cosf(properties.outerConeAngle);
+    const float spotAngleScale = spot ? 1.0f / std::max(0.001f, cosf(properties.innerConeAngle) - outerConeCosine) : 0.0f;
+
+    LocalLight described;
+    XMStoreFloat3(&described.position, properties.position);
+    described.inverseRange = properties.range ? 1.0f / (*properties.range * worldUnitsPerMetre) : 0.0f;
+    XMStoreFloat3(&described.intensity, light.GetLuminousIntensity() * Scalar(worldUnitsPerMetre * worldUnitsPerMetre));
+    described.spotAngleScale = spotAngleScale;
+    XMStoreFloat3(&described.emissionDirection, -light.GetDirection());
+    described.spotAngleOffset = spot ? -outerConeCosine * spotAngleScale : 1.0f;
+    return described;
+}
+
 std::string GetConditionPrefix(const Scene::Object& object)
 {
     std::string prefix = object.GetName() + " ";
@@ -826,7 +843,7 @@ void ShowLightDetails(LightComponent& light)
     const LightComponent::Type type = light.GetType();
     ImGui::LabelText("Type", "%s", GetLightTypeName(type));
     ImGui::SetItemTooltip("KHR_lights_punctual type of the light, which the scene file keeps as Type. Each light object keeps its type. "
-        "The renderer draws only the directional light for now.");
+        "The raster lights opaque surfaces with every type, while transparent surfaces and Dynamic GI use only the directional light for now.");
 
     LightComponent::Properties properties = light.GetProperties();
     float color[3] = { properties.color.GetX(), properties.color.GetY(), properties.color.GetZ() };

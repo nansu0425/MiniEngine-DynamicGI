@@ -14,4 +14,13 @@ bool DescribeSurfaceRay(float3 position, float3 geometryNormal, float3 direction
     return dot(geometryNormal, direction) > 0.0;
 }
 
+bool DescribeSurfaceRayToPoint(float3 position, float3 geometryNormal, float3 target, out RayDesc ray)
+{
+    const float3 toTarget = target - position;
+    const float distance = length(toTarget);
+    const bool leavesSurface = DescribeSurfaceRay(position, geometryNormal, toTarget / distance, ray);
+    ray.TMax = distance;
+    return leavesSurface;
+}
+
 #endif

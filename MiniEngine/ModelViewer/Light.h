@@ -4,6 +4,7 @@
 #include "Core/Editor/MeasurementConditions.h"
 #include "Core/Math/Matrix3.h"
 #include "Core/Scene/Scene.h"
+#include "Model/Lights/SceneLights.h"
 
 #include <optional>
 #include <string>
@@ -35,7 +36,16 @@ public:
     void SetProperties(const Properties& properties) { m_Properties = properties; }
 
     Math::Vector3 GetDirection() const { return m_Properties.rotation.GetZ(); }
-    Math::Vector3 GetIlluminance() const { return m_Properties.color * Math::Scalar(m_Properties.intensity); }
+    Math::Vector3 GetIlluminance() const
+    {
+        ASSERT(m_Type == Type::Directional);
+        return m_Properties.color * Math::Scalar(m_Properties.intensity);
+    }
+    Math::Vector3 GetLuminousIntensity() const
+    {
+        ASSERT(m_Type != Type::Directional);
+        return m_Properties.color * Math::Scalar(m_Properties.intensity);
+    }
 
     void ResetTransform();
 
@@ -60,6 +70,8 @@ constexpr float kDefaultDirectionalLightIntensity = 4.0f * DirectX::XM_PI;
 bool IsColor(Math::Vector3 color);
 
 LightComponent& AssembleLight(Scene::Object& object, LightComponent::Type type, const ModelInstance& model);
+LightComponent* FindLocalLight(const Scene::Object& object);
+LocalLight DescribeLocalLightInWorldUnits(const LightComponent& light, float worldUnitsPerMetre);
 
 void RegisterDirectionalLight(LightComponent& light);
 void RegisterLocalLights(void);
