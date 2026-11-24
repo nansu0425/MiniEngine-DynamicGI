@@ -10,10 +10,10 @@ cbuffer Constants : register(b0)
     IrradianceProbeGrid Grid;
 };
 
-Texture2D<float4> ProbesIrradiance : register(t5);
-Texture2D<float2> ProbesDistance : register(t6);
-Texture2D<float> ProbesBackFaceRatio : register(t7);
-Texture2D<float4> ProbesOffset : register(t8);
+Texture2D<float4> ProbesIrradiance : register(t6);
+Texture2D<float2> ProbesDistance : register(t7);
+Texture2D<float> ProbesBackFaceRatio : register(t8);
+Texture2D<float4> ProbesOffset : register(t9);
 SamplerState LinearClamp : register(s0);
 RWTexture2D<float4> ScreenIrradiance : register(u0);
 

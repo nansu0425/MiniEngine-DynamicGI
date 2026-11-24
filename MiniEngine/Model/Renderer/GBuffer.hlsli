@@ -3,7 +3,7 @@
 
 #include "Model/Renderer/RasterSurface.hlsli"
 
-static const uint kNumGBufferTargets = 5;
+static const uint kNumGBufferTargets = 6;
 
 struct GBufferTargets
 {
@@ -12,6 +12,7 @@ struct GBufferTargets
     float4 geometryNormalAndRoughness : SV_Target2;
     float4 baseColor : SV_Target3;
     float4 emissive : SV_Target4;
+    float4 vertexNormal : SV_Target5;
 };
 
 GBufferTargets EncodeGBuffer(RasterSurface surface)
@@ -22,6 +23,7 @@ GBufferTargets EncodeGBuffer(RasterSurface surface)
     targets.geometryNormalAndRoughness = float4(surface.geometryNormal, surface.roughness);
     targets.baseColor = surface.baseColor;
     targets.emissive = float4(surface.emissive, 0.0);
+    targets.vertexNormal = float4(surface.vertexNormal, 0.0);
     return targets;
 }
 
@@ -34,6 +36,7 @@ bool DecodeGBuffer(float4 targets[kNumGBufferTargets], out RasterSurface surface
     surface.roughness = targets[2].w;
     surface.baseColor = targets[3];
     surface.emissive = targets[4].rgb;
+    surface.vertexNormal = targets[5].xyz;
     return targets[0].w != 0.0;
 }
 

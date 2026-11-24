@@ -23,10 +23,10 @@ static const uint kIndirectIrradianceNone = 0;
 static const uint kProbesIndirectIrradiance = 1;
 static const uint kScreenIndirectIrradiance = 2;
 
-Texture2D<float> ShadowMap : register(t5);
-Texture2D<float3> IndirectRadiance : register(t6);
-Texture2D<float4> ProbesIndirectIrradiance : register(t7);
-Texture2D<float3> ScreenIndirectIrradiance : register(t8);
+Texture2D<float> ShadowMap : register(t6);
+Texture2D<float3> IndirectRadiance : register(t7);
+Texture2D<float4> ProbesIndirectIrradiance : register(t8);
+Texture2D<float3> ScreenIndirectIrradiance : register(t9);
 RWTexture2D<float3> SceneColor : register(u0);
 SamplerComparisonState ShadowMapSampler : register(s0);
 SamplerState LinearClamp : register(s1);

@@ -5,6 +5,7 @@ struct RasterSurface
 {
     float3 position;
     float3 geometryNormal;
+    float3 vertexNormal;
     float3 shadingNormal;
     float4 baseColor;
     float metallic;

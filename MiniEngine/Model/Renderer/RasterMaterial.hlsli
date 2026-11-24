@@ -54,19 +54,17 @@ static const uint ALPHA_TEST_FLAG = 1u << 6;
 #define UVSET( offset ) lerp(vsOutput.uv0, vsOutput.uv1, (flags >> offset) & 1)
 #endif
 
-float3 ComputeNormal(VSOutput vsOutput)
+float3 GetShadingNormal(VSOutput vsOutput, float3 vertexNormal)
 {
-    float3 normal = normalize(vsOutput.normal);
-
 #ifdef NO_TANGENT_FRAME
-    return normal;
+    return vertexNormal;
 #else
     // normal texture가 없는 material은 surface normal을 그대로 쓴다 (ConstantBuffers.h의 normalTexture).
     if ((flags & NORMAL_TEXTURE_FLAG) == 0)
-        return normal;
+        return vertexNormal;
 
     // Read normal map and convert to SNORM (TODO:  convert all normal maps to R8G8B8A8_SNORM?)
-    return GetNormalTextureNormal(normal, vsOutput.tangent, normalTexture.Sample(normalSampler, UVSET(NORMAL)), normalTextureScale);
+    return GetNormalTextureNormal(vertexNormal, vsOutput.tangent, normalTexture.Sample(normalSampler, UVSET(NORMAL)), normalTextureScale);
 #endif
 }
 
@@ -89,10 +87,14 @@ RasterSurface GetRasterSurface(VSOutput vsOutput, bool isFrontFace, float3 view)
     surface.geometryNormal = GetGeometryNormal(vsOutput, view);
 
     // GltfBrdf.hlsli는 단위 normal을 받는다. tangent frame을 보간한 normal map의 normal은 길이가 1이 아닐 수 있다.
-    surface.shadingNormal = normalize(ComputeNormal(vsOutput));
+    surface.vertexNormal = normalize(vsOutput.normal);
+    surface.shadingNormal = normalize(GetShadingNormal(vsOutput, surface.vertexNormal));
     // double-sided material의 뒷면에서는 뒤집은 normal로 반사한다.
     if (!isFrontFace)
+    {
+        surface.vertexNormal = -surface.vertexNormal;
         surface.shadingNormal = -surface.shadingNormal;
+    }
 
     // Load and modulate textures
     surface.baseColor = baseColorFactor * baseColorTexture.Sample(baseColorSampler, UVSET(BASECOLOR));
