@@ -3,9 +3,11 @@
 #include "Model/DynamicGI/DynamicGIVolumeBox.h"
 #include "Model/DynamicGI/PathTracedLighting.h"
 #include "Model/DynamicGI/ProbeContribution.h"
+#include "Model/DynamicGI/ProbeGuide.h"
 #include "Model/DynamicGI/ProbeLighting.h"
 #include "Model/DynamicGI/ProbeReadback.h"
 #include "Model/DynamicGI/ProbeVisualization.h"
+#include "Model/DynamicGI/SelectedProbeGuide.h"
 #include "Core/App/UserSettings.h"
 #include "Core/Automation/ControlChannel.h"
 #include "Core/Editor/MeasurementConditions.h"
@@ -126,6 +128,27 @@ namespace
         if (texel.y >= GetProbeCount(grid))
             return std::string();
         return "probe " + FormatCoordinate(GetProbeCoordinate(grid, texel.y)) + ", ray " + std::to_string(texel.x);
+    }
+
+    std::string DescribeGuideTexel(uint32_t texel)
+    {
+        const DirectX::XMFLOAT3 direction = GetProbeGuideTexelCenterDirection(texel);
+        char text[96];
+        sprintf_s(text, "guide texel %u, direction %.3f %.3f %.3f", texel, direction.x, direction.y, direction.z);
+        return text;
+    }
+
+    std::string DescribeProbesGuideTexel(DirectX::XMUINT2 texel)
+    {
+        const IrradianceProbeGrid& grid = ProbeLighting::GetProbes().grid;
+        if (texel.x >= kProbeGuideTexelCount || texel.y >= GetProbeCount(grid))
+            return std::string();
+        return "probe " + FormatCoordinate(GetProbeCoordinate(grid, texel.y)) + ", " + DescribeGuideTexel(texel.x);
+    }
+
+    std::string DescribeSelectedProbeGuideTexel(DirectX::XMUINT2 texel)
+    {
+        return "probe " + FormatSelectedProbe() + ", " + DescribeGuideTexel(GetProbeGuideTexelIndexAt(texel));
     }
 
     std::optional<uint32_t> FindInspectedRayOfSelectedProbe(void)
@@ -1003,6 +1026,7 @@ void DynamicGI::Initialize(void)
     ProbeVisualization::Initialize();
     ProbeContribution::Initialize();
     ProbeReadback::Initialize();
+    SelectedProbeGuide::Initialize();
     DynamicGIVolumeBox::Initialize();
 
     const ProbeLighting::Probes probes = ProbeLighting::GetProbes();
@@ -1014,6 +1038,10 @@ void DynamicGI::Initialize(void)
     TextureViewer::AddTexture("Probes Guide", probes.guide, {
         .markedRowName = "Selected Probe",
         .findMarkedRow = GetSelectedProbe,
+        .describeTexel = DescribeProbesGuideTexel,
+    });
+    TextureViewer::AddTexture("Selected Probe Guide", SelectedProbeGuide::GetTexture(), {
+        .describeTexel = DescribeSelectedProbeGuideTexel,
     });
     TextureViewer::AddTexture("Probe Weighted Ray Directions", probes.weightedRayDirections, {
         .markedRowName = "Selected Probe",
@@ -1059,6 +1087,7 @@ void DynamicGI::Initialize(void)
 void DynamicGI::Shutdown(void)
 {
     UserSettings::Unregister(kDebugPanelName);
+    SelectedProbeGuide::Shutdown();
     ProbeReadback::Shutdown();
     ProbeContribution::Shutdown();
     ProbeLighting::Shutdown();
@@ -1105,6 +1134,7 @@ void DynamicGI::Update(ComputeContext& context, const GIFrameInputs& inputs, uin
             context.TransitionResource(ProbeLighting::GetProbes().irradiance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         }
     }
+    SelectedProbeGuide::Update(context, ProbeLighting::GetProbes().guide, FindProbeVolume() != nullptr ? GetSelectedProbe() : std::nullopt);
     Renderer::SetIndirectRadiance(indirectRadiance);
     Renderer::SetProbesIndirectIrradiance(probesIndirectIrradiance, ProbeLighting::GetProbes().grid);
     Renderer::SetScreenIndirectIrradiance(screenIndirectIrradiance);

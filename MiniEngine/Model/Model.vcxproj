@@ -99,6 +99,7 @@
     <ClInclude Include="DynamicGI\GILights.h" />
     <ClInclude Include="DynamicGI\ProbeContribution.h" />
     <ClInclude Include="DynamicGI\ProbeGuide.h" />
+    <ClInclude Include="DynamicGI\SelectedProbeGuide.h" />
     <ClInclude Include="DynamicGI\ProbeLighting.h" />
     <ClInclude Include="DynamicGI\ProbeReadback.h" />
     <ClInclude Include="DynamicGI\ProbeRelocation.h" />
@@ -137,6 +138,7 @@
     <ClCompile Include="DynamicGI\DynamicGIVolumeBox.cpp" />
     <ClCompile Include="DynamicGI\PathTracedLighting.cpp" />
     <ClCompile Include="DynamicGI\ProbeContribution.cpp" />
+    <ClCompile Include="DynamicGI\SelectedProbeGuide.cpp" />
     <ClCompile Include="DynamicGI\ProbeLighting.cpp" />
     <ClCompile Include="DynamicGI\ProbeReadback.cpp" />
     <ClCompile Include="DynamicGI\ProbeVisualization.cpp" />
@@ -299,6 +301,7 @@
     <FxCompile Include="DynamicGI\ProbeDistanceUpdateCS.hlsl" />
     <FxCompile Include="DynamicGI\ProbeBackFaceUpdateCS.hlsl" />
     <FxCompile Include="DynamicGI\ProbeGuideUpdateCS.hlsl" />
+    <FxCompile Include="DynamicGI\SelectedProbeGuideCS.hlsl" />
     <FxCompile Include="DynamicGI\ProbeBorderCS.hlsl" />
     <FxCompile Include="DynamicGI\ProbeScreenIrradianceCS.hlsl">
       <ShaderModel>6.5</ShaderModel>
