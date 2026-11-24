@@ -41,6 +41,18 @@ constexpr int kWireframeCircleSegments = 48;
 const ImU32 kLightColor = IM_COL32(255, 200, 0, 255);
 const ImU32 kInnerConeColor = IM_COL32(255, 200, 0, 140);
 const ImU32 kSelectedColor = IM_COL32(255, 128, 16, 255);
+const ImU32 kDisabledLightColor = IM_COL32(128, 128, 128, 255);
+const ImU32 kDisabledInnerConeColor = IM_COL32(128, 128, 128, 140);
+
+ImU32 GetIconColor(const LightComponent& light)
+{
+    return light.GetProperties().enabled ? kLightColor : kDisabledLightColor;
+}
+
+ImU32 GetInnerConeColor(const LightComponent& light)
+{
+    return light.GetProperties().enabled ? kInnerConeColor : kDisabledInnerConeColor;
+}
 
 bool HasRotation(LightComponent::Type type)
 {
@@ -88,9 +100,9 @@ std::vector<std::string> LightComponent::ListSettingKeys(Type type)
 {
     switch (type)
     {
-    case Type::Point: return { "Type", "Position", "Color", "Intensity", "Range" };
-    case Type::Spot: return { "Type", "Direction", "Up", "Position", "Color", "Intensity", "Range", "Inner Cone Angle", "Outer Cone Angle" };
-    default: return { "Type", "Direction", "Up", "Position", "Color", "Intensity" };
+    case Type::Point: return { "Type", "Enabled", "Position", "Color", "Intensity", "Range" };
+    case Type::Spot: return { "Type", "Enabled", "Direction", "Up", "Position", "Color", "Intensity", "Range", "Inner Cone Angle", "Outer Cone Angle" };
+    default: return { "Type", "Enabled", "Direction", "Up", "Position", "Color", "Intensity" };
     }
 }
 
@@ -98,6 +110,7 @@ LightComponent::Properties LightComponent::GetDefaultProperties(Type type)
 {
     const bool directional = type == Type::Directional;
     Properties properties;
+    properties.enabled = true;
     properties.rotation = directional ? MakeRotationToward(kDefaultDirectionalLightDirection) : Matrix3(kIdentity);
     properties.position = Vector3(kZero);
     properties.color = Vector3(1.0f, 1.0f, 1.0f);
@@ -142,6 +155,7 @@ const char* GetLightTypeName(LightComponent::Type type)
 void LightComponent::SaveSettings(IniFile::Values& values) const
 {
     values["Type"] = GetLightTypeName(m_Type);
+    values["Enabled"] = SettingValues::FormatFlag(m_Properties.enabled);
     if (HasRotation(m_Type))
     {
         values["Direction"] = SettingValues::FormatVector(m_Properties.rotation.GetZ());
@@ -179,6 +193,7 @@ void LightComponent::LoadSettings(const IniFile::Values& values)
     };
 
     Properties properties = GetDefaultProperties(m_Type);
+    SettingValues::ReadFlag(values, "Enabled", properties.enabled);
     Vector3 direction, up, position, color;
     if (read("Direction", direction) && read("Up", up))
         MakeRotation(direction, up, properties.rotation);
@@ -204,9 +219,28 @@ void LightComponent::LoadSettings(const IniFile::Values& values)
     m_Properties = properties;
 }
 
+void DescribeEnabledCondition(bool enabled, const std::string& prefix, MeasurementConditions::Values& values)
+{
+    if (!enabled)
+        values[prefix + "enabled"] = "off";
+}
+
+void ReadEnabledCondition(const MeasurementConditions::Values& values, const std::string& prefix, MeasurementConditions::Reading& reading, bool& enabled)
+{
+    enabled = true;
+    if (values.count(prefix + "enabled") == 0)
+        return;
+    MeasurementConditions::ReadValue(values, prefix + "enabled", reading, [&enabled](const std::string& text)
+    {
+        enabled = text == "on";
+        return text == "on" || text == "off";
+    });
+}
+
 void DescribeDirectionalLightConditions(const LightComponent& light, MeasurementConditions::Values& values)
 {
     const LightComponent::Properties& properties = light.GetProperties();
+    DescribeEnabledCondition(properties.enabled, "light ", values);
     values["light direction"] = SettingValues::FormatVector(properties.rotation.GetZ());
     values["light up"] = SettingValues::FormatVector(properties.rotation.GetY());
     values["light color"] = SettingValues::FormatVector(properties.color);
@@ -238,6 +272,7 @@ void ReadColorAndIntensityConditions(const MeasurementConditions::Values& values
 void ReadDirectionalLightConditions(LightComponent& light, const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading)
 {
     LightComponent::Properties properties = light.GetProperties();
+    ReadEnabledCondition(values, "light ", reading, properties.enabled);
     ReadRotationConditions(values, "light ", reading, properties.rotation);
     ReadColorAndIntensityConditions(values, "light ", reading, properties);
     reading.applies.push_back([&light, properties] { light.SetProperties(properties); });
@@ -282,6 +317,7 @@ void DescribeLocalLightConditions(MeasurementConditions::Values& values)
             continue;
         const std::string prefix = GetConditionPrefix(*object);
         const LightComponent::Properties& properties = light->GetProperties();
+        DescribeEnabledCondition(properties.enabled, prefix, values);
         values[prefix + "position"] = SettingValues::FormatVector(properties.position);
         values[prefix + "color"] = SettingValues::FormatVector(properties.color);
         values[prefix + "intensity"] = MeasurementConditions::FormatFloat(properties.intensity);
@@ -313,6 +349,7 @@ void ReadLocalLightConditions(const MeasurementConditions::Values& values, Measu
         }
 
         LightComponent::Properties properties = light->GetProperties();
+        ReadEnabledCondition(values, prefix, reading, properties.enabled);
         MeasurementConditions::ReadValue(values, prefix + "position", reading, [&properties](const std::string& text) { return SettingValues::ReadVector(text, properties.position); });
         ReadColorAndIntensityConditions(values, prefix, reading, properties);
         properties.range = std::nullopt;
@@ -405,6 +442,7 @@ ControlChannel::Fields DescribeDirectionalLight(const LightComponent& light)
     const LightComponent::Properties& properties = light.GetProperties();
     const Vector3 direction = light.GetDirection();
     return ControlChannel::Fields()
+        .Flag("enabled", properties.enabled)
         .Object("rotation", DescribeRotation(properties.rotation))
         .Object("direction", ControlChannel::DescribeVector(direction))
         .Float("elevation", GetElevation(direction))
@@ -419,6 +457,7 @@ ControlChannel::Fields DescribeLocalLight(const LightComponent& light)
     const LightComponent::Properties& properties = light.GetProperties();
     ControlChannel::Fields fields;
     fields.Text("type", GetLightTypeName(light.GetType()))
+        .Flag("enabled", properties.enabled)
         .Object("position", ControlChannel::DescribeVector(properties.position));
     if (light.GetType() == LightComponent::Type::Spot)
     {
@@ -582,6 +621,7 @@ void RegisterDirectionalLight(LightComponent& light)
         "Details panel change it. reset sets the transform to no rotation at the origin, so the light goes along world -Z, "
         "and keeps the color and intensity, as Reset Transform in the Details panel does. It is a KHR_lights_punctual directional light and goes along the local -Z of its transform. "
         "Its Type, which editor get gives and the scene file keeps, is Directional, and light set does not change it. "
+        "editor set Directional Light: Enabled=0 turns it off, so it lights nothing and the shadow map is not drawn, and Enabled=1 turns it back on. "
         "The Point Light and Spot Light, which editor add puts in the scene, are the other types, and editor set changes them. "
         "rotation=<x>,<y>,<z>,<w> is the quaternion of the transform, as a glTF node's rotation. "
         "direction=<x>,<y>,<z> points from a surface toward the light, the local +Z, and is normalized. "
@@ -731,9 +771,9 @@ void LightIconComponent::DrawRange(const Camera& camera) const
     const float worldRange = *properties.range * m_Model.GetScale();
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     if (m_Light.GetType() == LightComponent::Type::Spot)
-        DrawSpotCone(*drawList, camera, m_Light, worldRange, kLightColor, kInnerConeColor, GetWireframeThickness());
+        DrawSpotCone(*drawList, camera, m_Light, worldRange, GetIconColor(m_Light), GetInnerConeColor(m_Light), GetWireframeThickness());
     else
-        DrawSphere(*drawList, camera, properties.position, worldRange, kLightColor, GetWireframeThickness());
+        DrawSphere(*drawList, camera, properties.position, worldRange, GetIconColor(m_Light), GetWireframeThickness());
 }
 
 void LightIconComponent::Draw(const Camera& camera, bool selected) const
@@ -751,24 +791,25 @@ void LightIconComponent::Draw(const Camera& camera, bool selected) const
     const float thickness = GetIconThickness();
     const float worldLengthPerPixel = SceneEditor::GetWorldLengthPerPixel(camera, position);
     const LightComponent::Type type = m_Light.GetType();
+    const ImU32 color = GetIconColor(m_Light);
     ImDrawList* drawList = ImGui::GetWindowDrawList();
 
     if (type == LightComponent::Type::Spot && selected && !hasRange)
-        DrawSpotCone(*drawList, camera, m_Light, radius * kSpotConeLengthInIconRadii * worldLengthPerPixel, kLightColor, kInnerConeColor, GetWireframeThickness());
+        DrawSpotCone(*drawList, camera, m_Light, radius * kSpotConeLengthInIconRadii * worldLengthPerPixel, color, GetInnerConeColor(m_Light), GetWireframeThickness());
 
     if (HasRotation(type))
     {
         const float arrowLength = radius * 4.0f * worldLengthPerPixel;
         ImVec2 arrowTip;
         if (SceneEditor::ProjectToScene(camera, position - m_Light.GetDirection() * arrowLength, arrowTip))
-            DrawArrow(*drawList, icon, arrowTip, kLightColor, thickness);
+            DrawArrow(*drawList, icon, arrowTip, color, thickness);
     }
 
     switch (type)
     {
-    case LightComponent::Type::Point: DrawBulbIcon(*drawList, icon, radius, kLightColor); break;
-    case LightComponent::Type::Spot: DrawSpotIcon(*drawList, icon, radius, kLightColor, thickness); break;
-    default: DrawSunIcon(*drawList, icon, radius, kLightColor, thickness); break;
+    case LightComponent::Type::Point: DrawBulbIcon(*drawList, icon, radius, color); break;
+    case LightComponent::Type::Spot: DrawSpotIcon(*drawList, icon, radius, color, thickness); break;
+    default: DrawSunIcon(*drawList, icon, radius, color, thickness); break;
     }
 
     if (selected)
@@ -846,6 +887,10 @@ void ShowLightDetails(LightComponent& light)
         "The raster lights opaque surfaces with every type and so does Dynamic GI at the points its rays hit, while transparent surfaces and the ray tracing debug views use only the directional light for now.");
 
     LightComponent::Properties properties = light.GetProperties();
+    ImGui::Checkbox("Enabled", &properties.enabled);
+    ImGui::SetItemTooltip(type == LightComponent::Type::Directional
+        ? "Off, the light lights nothing and the shadow map is not drawn. The other settings stay. The scene file keeps it as Enabled."
+        : "Off, the light lights nothing. The other settings stay. The scene file keeps it as Enabled.");
     float color[3] = { properties.color.GetX(), properties.color.GetY(), properties.color.GetZ() };
     if (ImGui::ColorEdit3("Color", color, ImGuiColorEditFlags_Float))
         properties.color = Min(Max(Vector3(color[0], color[1], color[2]), Vector3(kZero)), Vector3(1.0f, 1.0f, 1.0f));

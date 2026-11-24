@@ -19,6 +19,7 @@ public:
 
     struct Properties
     {
+        bool enabled;
         // 조명이 쓰는 +Z를 계산 없이 그대로 읽도록 quaternion 대신 직교 matrix로 둔다.
         Math::Matrix3 rotation;
         Math::Vector3 position;
@@ -76,6 +77,9 @@ LocalLight DescribeLocalLightInWorldUnits(const LightComponent& light, float wor
 void RegisterDirectionalLight(LightComponent& light);
 void RegisterLocalLights(void);
 void ShowLightDetails(LightComponent& light);
+
+void DescribeEnabledCondition(bool enabled, const std::string& prefix, MeasurementConditions::Values& values);
+void ReadEnabledCondition(const MeasurementConditions::Values& values, const std::string& prefix, MeasurementConditions::Reading& reading, bool& enabled);
 
 // directional light의 rotation은 user.ini처럼 +Z와 +Y로 적어, 다시 읽으면 bit 단위로 같은 rotation이 된다. position은 조명에 영향이 없어 적지 않는다.
 void DescribeDirectionalLightConditions(const LightComponent& light, MeasurementConditions::Values& values);

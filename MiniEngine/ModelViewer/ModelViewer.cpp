@@ -77,6 +77,7 @@ public:
     // Details panel, scene file, editor set 명령이 바꾸는 값
     struct Properties
     {
+        bool enabled;
         // directional light처럼 color는 linear RGB이고 성분마다 0 ~ 1이며, intensity와 곱한 것이 빛이다. intensity는 lux가 아니라
         // radiance (cd/m²)이고 0 이상이다. ray가 받는 값이 radiance이고 glTF의 emissive도 cd/m²다.
         Vector3 color;
@@ -243,17 +244,19 @@ bool IsVerticalFov(float verticalFov)
 SkyComponent::Properties SkyComponent::GetDefaultProperties()
 {
     Properties properties;
+    properties.enabled = true;
     properties.color = Vector3(1.0f, 1.0f, 1.0f);
     properties.intensity = kDefaultSkyIntensity;
     return properties;
 }
 
-SkyComponent::SkyComponent() : Component({ "Color", "Intensity" }), m_Properties(GetDefaultProperties())
+SkyComponent::SkyComponent() : Component({ "Enabled", "Color", "Intensity" }), m_Properties(GetDefaultProperties())
 {
 }
 
 void SkyComponent::SaveSettings(IniFile::Values& values) const
 {
+    values["Enabled"] = SettingValues::FormatFlag(m_Properties.enabled);
     values["Color"] = SettingValues::FormatVector(m_Properties.color);
     char text[32];
     sprintf_s(text, "%.9g", m_Properties.intensity);
@@ -264,6 +267,7 @@ void SkyComponent::SaveSettings(IniFile::Values& values) const
 void SkyComponent::LoadSettings(const IniFile::Values& values)
 {
     Properties properties = GetDefaultProperties();
+    SettingValues::ReadFlag(values, "Enabled", properties.enabled);
     const auto color = values.find("Color");
     Vector3 readColor;
     if (color != values.end() && SettingValues::ReadVector(color->second, readColor) && IsColor(readColor))
@@ -280,6 +284,7 @@ ControlChannel::Fields DescribeSky(const SkyComponent& sky)
 {
     const SkyComponent::Properties& properties = sky.GetProperties();
     return ControlChannel::Fields()
+        .Flag("enabled", properties.enabled)
         .Object("color", ControlChannel::Fields()
             .Float("r", properties.color.GetX()).Float("g", properties.color.GetY()).Float("b", properties.color.GetZ()))
         .Float("intensity", properties.intensity);
@@ -294,6 +299,9 @@ void RegisterSky(SkyComponent& sky)
 void ShowSkyDetails(SkyComponent& sky)
 {
     SkyComponent::Properties properties = sky.GetProperties();
+    ImGui::Checkbox("Enabled", &properties.enabled);
+    ImGui::SetItemTooltip("Off, rays that hit nothing see no light and the background is black. The other settings stay. "
+        "The scene file keeps it as Enabled.");
     float color[3] = { properties.color.GetX(), properties.color.GetY(), properties.color.GetZ() };
     if (ImGui::ColorEdit3("Color", color, ImGuiColorEditFlags_Float))
         properties.color = Min(Max(Vector3(color[0], color[1], color[2]), Vector3(kZero)), Vector3(1.0f, 1.0f, 1.0f));
@@ -409,6 +417,7 @@ void ReadTaa(const MeasurementConditions::Values& values, MeasurementConditions:
 void DescribeSkyConditions(const SkyComponent& sky, MeasurementConditions::Values& values)
 {
     const SkyComponent::Properties& properties = sky.GetProperties();
+    DescribeEnabledCondition(properties.enabled, "sky ", values);
     values["sky color"] = SettingValues::FormatVector(properties.color);
     values["sky intensity"] = FormatFloat(properties.intensity);
 }
@@ -417,6 +426,7 @@ void DescribeSkyConditions(const SkyComponent& sky, MeasurementConditions::Value
 void ReadSkyConditions(SkyComponent& sky, const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading)
 {
     SkyComponent::Properties properties = sky.GetProperties();
+    ReadEnabledCondition(values, "sky ", reading, properties.enabled);
     ReadValue(values, "sky color", reading, [&properties](const std::string& text) { return SettingValues::ReadVector(text, properties.color) && IsColor(properties.color); });
     ReadValue(values, "sky intensity", reading, [&properties](const std::string& text)
     {
@@ -1038,13 +1048,13 @@ SceneLights ModelViewer::DescribeSceneLights(void) const
 {
     SceneLights lights = {
         .directionalLightDirection = m_DirectionalLight.GetDirection(),
-        .directionalLightIlluminance = m_DirectionalLight.GetIlluminance(),
-        .skyRadiance = m_Sky.GetRadiance(),
+        .directionalLightIlluminance = m_DirectionalLight.GetProperties().enabled ? m_DirectionalLight.GetIlluminance() : Vector3(kZero),
+        .skyRadiance = m_Sky.GetProperties().enabled ? m_Sky.GetRadiance() : Vector3(kZero),
     };
     for (const Scene::Object* object : Scene::GetObjects())
     {
         const LightComponent* light = FindLocalLight(*object);
-        if (light == nullptr)
+        if (light == nullptr || !light->GetProperties().enabled)
             continue;
         ASSERT(lights.localLightCount < kMaxLocalLights, "SceneLights has no room for another local light.");
         lights.localLights[lights.localLightCount++] = DescribeLocalLightInWorldUnits(*light, m_ModelInst.GetScale());
@@ -1113,6 +1123,7 @@ void ModelViewer::RenderScene( void )
         {
             ScopedTimer _outerprof(L"Main Render", gfxContext);
 
+            if (m_DirectionalLight.GetProperties().enabled)
             {
                 ScopedTimer _prof(L"Shadow Map", gfxContext);
 

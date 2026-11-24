@@ -1549,12 +1549,12 @@ def check_editor(session, check, changes):
 
 LOCAL_LIGHT_SCENE_DIR = HARNESS_DIR / 'selftest-local-lights'
 LOCAL_LIGHT_DEFAULTS = {
-    'Point Light': {'Type': 'Point', 'Position': '0,0,0', 'Color': '1,1,1', 'Intensity': '1', 'Range': ''},
-    'Spot Light': {'Type': 'Spot', 'Position': '0,0,0', 'Direction': '0,0,1', 'Up': '0,1,0', 'Color': '1,1,1', 'Intensity': '1', 'Range': '',
+    'Point Light': {'Type': 'Point', 'Enabled': '1', 'Position': '0,0,0', 'Color': '1,1,1', 'Intensity': '1', 'Range': ''},
+    'Spot Light': {'Type': 'Spot', 'Enabled': '1', 'Position': '0,0,0', 'Direction': '0,0,1', 'Up': '0,1,0', 'Color': '1,1,1', 'Intensity': '1', 'Range': '',
                    'Inner Cone Angle': '0', 'Outer Cone Angle': '0.785398185'},
 }
 LOCAL_LIGHT_SETTINGS = {
-    'Point Light': [{'Position': '-400,200,0'}, {'Color': '0.5,1,0.25'}, {'Intensity': '50'}, {'Range': '1.5'}],
+    'Point Light': [{'Enabled': '0'}, {'Enabled': '1'}, {'Position': '-400,200,0'}, {'Color': '0.5,1,0.25'}, {'Intensity': '50'}, {'Range': '1.5'}],
     'Spot Light': [{'Position': '0,300,0'}, {'Direction': '0,1,0', 'Up': '0,0,-1'}, {'Color': '1,0.5,0.25'}, {'Intensity': '200'},
                    {'Inner Cone Angle': '0.300000012'}, {'Outer Cone Angle': '0.600000024'}, {'Range': '0.75'}, {'Range': ''}],
 }
@@ -1564,7 +1564,7 @@ LOCAL_LIGHT_REJECTED = [
     ('Spot Light', 'Inner Cone Angle=0.7'), ('Spot Light', 'Inner Cone Angle=-0.1'), ('Spot Light', 'Outer Cone Angle=1.6'),
     ('Spot Light', 'Outer Cone Angle=0.2'), ('Spot Light', 'Inner Cone Angle=0.5; Outer Cone Angle=0.5'),
     ('Spot Light', 'Direction=0,0,0; Up=0,1,0'), ('Spot Light', 'Direction=0,0.6,-0.8'), ('Spot Light', 'Type=Point'),
-    ('Point Light', 'Range=0'), ('Point Light', 'Range=-1'), ('Point Light', 'Range=far'), ('Point Light', 'Range=inf'),
+    ('Point Light', 'Enabled=2'), ('Point Light', 'Range=0'), ('Point Light', 'Range=-1'), ('Point Light', 'Range=far'), ('Point Light', 'Range=inf'),
     ('Spot Light', 'Range=0'), ('Spot Light', 'Range=-0.5'), ('Spot Light', 'Range=1,2'), ('Directional Light', 'Range=1'),
 ]
 
@@ -1579,7 +1579,7 @@ def copy_scene_file(scene, folder):
 
 
 def as_saved_local_light(light):
-    saved = {'Type': light['type'], 'Position': ','.join(str(light['position'][axis]) for axis in 'xyz'),
+    saved = {'Type': light['type'], 'Enabled': '1' if light['enabled'] else '0', 'Position': ','.join(str(light['position'][axis]) for axis in 'xyz'),
              'Color': ','.join(str(light['color'][channel]) for channel in 'rgb'), 'Intensity': str(light['intensity']),
              'Range': str(light['range']) if light['limit_range'] else str(light.get('range', ''))}
     if light['type'] == 'Spot':
