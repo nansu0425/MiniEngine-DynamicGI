@@ -525,7 +525,7 @@ def measurement_scenes():
 
 
 def read_scene_file(scene):
-    """scene file (MiniEngine/ModelViewer 기준 경로) 의 section. 형식은 ModelViewer.cpp 의 SceneFile 주석에 있다."""
+    """scene file (MiniEngine/ModelViewer 기준 경로) 의 section."""
     import configparser
     ini = configparser.ConfigParser(delimiters=('=',), comment_prefixes=(';',), interpolation=None)
     ini.optionxform = str
@@ -544,7 +544,7 @@ def scene_gltf(scene):
 
 def write_scene_file(gltf):
     """test scene 의 glTF 옆에 scene file 을 쓰고 그 MiniEngine/ModelViewer 기준 경로를 돌려준다.
-    model 은 bounding sphere 반지름이 10 이 되게 늘리고, camera 는 그 sphere 를 화면에 담는다 (ModelViewer.cpp 의 SceneFile).
+    model 은 bounding sphere 반지름이 10 이 되게 늘리고, camera 는 그 sphere 를 화면에 담는다.
     light 와 sky 의 section 은 없으므로 기본값이다."""
     gltf = Path(gltf)
     scene = gltf.with_suffix('.ini')

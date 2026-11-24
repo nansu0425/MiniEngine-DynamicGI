@@ -535,22 +535,6 @@ struct CameraSection
     float verticalFov = kDefaultCameraVerticalFov;
 };
 
-// scene 은 scene file 하나로 연다. 형식은 IniFile이고 key는 아래와 같다. 실행 중에는 Scene menu와 scene open 명령으로 다른 scene 을 연다.
-// section은 이름이 같은 Scene Hierarchy의 object (Model, Camera, Directional Light, Sky) 의 것이다. Scene menu의 Save와 scene save
-// 명령은 모든 object의 지금 설정을 object의 section에 쓴다. 설정의 key는 object의 component가 가진 setting key다 (Scene::Component).
-//   [Model]  아래 key는 scene 을 열 때 model을 load하고 크기를 정하는 데 읽는다. Model object의 설정이 아니므로 Save가 쓰지 않는다.
-//            glTF: scene file이 있는 폴더 기준의 glTF 경로
-//            Scale: glTF 좌표에 곱해 world 좌표로 바꾸는 배율. 다음의 Radius와 둘 중 하나만 둔다.
-//            Radius: model의 bounding sphere 반지름이 이 world 길이가 되는 배율 (ModelInstance::Resize)
-//   [Directional Light], [Sky] section이나 key가 없으면 기본값이다.
-//   [Camera] Position=<x>,<y>,<z>, Heading, Pitch: camera의 pose. 단위는 state camera와 pose 명령과 같다.
-//            Fit=Model: 위 셋 대신 둘 수 있다. bounding sphere 중심의 +z 쪽 반지름의 2배와 near clip을 더한 거리에서 -z를 본다.
-//            예전 -model의 OrbitCamera가 처음 그린 화면과 bit 단위로 같다. Save는 Fit=Model 줄을 지우고 지금 pose를 위 셋으로 쓴다.
-//            두 형식 중 하나가 없으면 scene file을 열지 않는다.
-//            Vertical FOV: camera의 세로 FOV (radian). 0보다 크고 pi보다 작다. 없으면 kDefaultCameraVerticalFov이고, 받을 수 없는 값이면
-//            scene file을 열지 않는다.
-// scene 을 열면 camera는 scene file의 pose와 세로 FOV로 시작한다. 다른 scene 의 줄을 Restore하면 줄의 camera를 쓴다. user.ini는
-// camera의 이동 속도만 남긴다.
 struct SceneFile
 {
     // scale과 radius 중 0이 아닌 하나만 쓴다.
