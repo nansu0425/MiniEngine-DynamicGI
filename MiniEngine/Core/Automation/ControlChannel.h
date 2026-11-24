@@ -7,7 +7,7 @@
 #include <vector>
 
 // harness가 -control <pipe>로 연 \\.\pipe\<pipe>에 보낸 명령을 main thread가 frame 사이에서 실행하고 JSON 한 줄로 응답한다.
-// 요청은 "<명령> <나머지 줄>" 한 줄이다. Log 줄처럼 '='와 "; "가 든 인자를 escape 없이 넘기려고 나머지 줄은 그대로 handler에 준다.
+// 요청은 "<명령> <나머지 줄>" 한 줄이다. 측정 조건의 줄처럼 '='와 "; "가 든 인자를 escape 없이 넘기려고 나머지 줄은 그대로 handler에 준다.
 // 응답은 {"ok":true,...} 또는 {"ok":false,"error":"...",...}이다. 명령은 하나씩 실행하고, 앞 명령이 응답하기 전에는 다음 명령을 꺼내지 않는다.
 // 응답을 기다리던 client가 연결을 끊으면 그 명령은 버리고 다음 명령을 꺼낸다.
 // ping만은 main thread를 거치지 않고 바로 지금까지 그린 frame 수로 응답하므로, harness는 이것으로 main loop가 멈췄는지 본다.

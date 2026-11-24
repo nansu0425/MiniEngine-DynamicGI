@@ -10,7 +10,6 @@ import ctypes
 import functools
 import hashlib
 import json
-import math
 import msvcrt
 import os
 import posixpath
@@ -22,7 +21,7 @@ import time
 from ctypes import wintypes
 from pathlib import Path
 
-from imagefiles import ImageFileError, read_dds_r32f, read_dds_rgba32f
+from imagefiles import ImageFileError, read_dds_rgba32f
 from pickanswers import camera_ray, grid_cells, is_unambiguous, vector_of
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -76,7 +75,7 @@ PREVIEW_MAX_WIDTH = 1280
 PREVIEW_EXPOSURE = 1.0
 DEPTH_MATCH_TOLERANCE = 1e-4
 # 아무것도 바꾸지 않아도 frame 마다 바뀌는 state 의 값. state 끼리 비교할 때 뺀다.
-TIME_VARYING_STATE = [('frame',), ('pt', 'samples'), ('pt', 'seconds')]
+TIME_VARYING_STATE = [('frame',)]
 
 
 class HarnessError(Exception):
@@ -506,14 +505,6 @@ def default_scene():
     return match.group(1)
 
 
-def default_vertical_fov():
-    """scene file 의 [Camera] 에 Vertical FOV 가 없을 때 app 의 camera 의 세로 FOV (radian) 의 text"""
-    match = re.search(r'^constexpr float kDefaultCameraVerticalFov = ([0-9.]+)f;', MODEL_VIEWER_SOURCE.read_text(encoding='utf-8'), re.M)
-    if match is None:
-        raise HarnessError(f'{MODEL_VIEWER_SOURCE} has no line starting with constexpr float kDefaultCameraVerticalFov = <radians>f;')
-    return match.group(1)
-
-
 def baseline_scene(name):
     """BASELINE_SCENES_DIR 의 scene file name 의 MiniEngine/ModelViewer 기준 경로"""
     return Path(os.path.relpath(BASELINE_SCENES_DIR / name, VIEWER_DIR)).as_posix()
@@ -706,11 +697,8 @@ def describe_difference(first, second):
 
 def make_view(original, target, view, crop, max_width, exposure):
     from PIL import Image
-    if target in ('scene', 'pt'):
+    if target == 'scene':
         image = Image.fromarray(tone_map_for_view(read_dds_rgba32f(original), exposure))
-    elif target == 'pt-truncated':
-        # 끊긴 sample 이 하나라도 있는 pixel 을 흰색으로 그린다.
-        image = Image.fromarray(((read_dds_r32f(original) > 0) * 255).astype('uint8')).convert('RGB')
     else:
         # overlay 는 premultiplied alpha 라서 RGB 가 곧 검은 바탕에 합성한 색이다. display 에는 alpha 가 없다.
         image = Image.open(original).convert('RGB')
@@ -905,23 +893,6 @@ SNAPSHOT_PANEL_SIZE = (640, 360)
 # SSAO 와 함께 linear depth 가 빠진 bug 는 0.30% ~ 6.74% 였다.
 SNAPSHOT_SAME_CODE_FACTOR = 4
 SNAPSHOT_SAME_CODE_FLOOR = 0.001
-# path tracer 의 shot. -scene 없이 연 scene 의 처음 시점 (baseline_scene_pose()) 에서 Shading 과 Output 의 조합마다 같은 Seed 로 쌓아
-# export 한다. 나머지 설정은 harness baseline 과 app 의 기본값이다. raster 의 shot 을 찍는 순서가 PT 의 shot 을 넣기 전과 같도록 raster 의
-# shot 을 다 찍은 뒤에 찍는다. export 는 post effects 전의 누적값이고 TAA 의 jitter 와 무관하므로 app 의 기본 효과를 켠 채 찍어도 된다.
-SNAPSHOT_PT_SETTINGS = {'Show': 1, 'Seed': 0, 'Samples per Frame': 1, 'Max Bounces': 64, 'Russian Roulette': 1, 'Geometric Normals': 0,
-                        'Furnace': 0}
-SNAPSHOT_PT_RUNS = [(shading, output) for shading in ('glTF', 'Lambert', 'DDGI Probe Hit') for output in ('Radiance', 'Indirect Irradiance')]
-SNAPSHOT_PT_SAMPLES = 64
-# compare 가 같은 code 의 차이로 보는 rgb 의 ulp 차의 하한. 같은 build 를 두 번 띄워도 rgb 가 다른 Shading 이 있는데, save 의 두 실행만으로는
-# 그 차이를 다 재지 못한다. 0708952 의 snapshot 을 save 하고 두 번 compare 했을 때 Lambert 는 6 ulp, DDGI Probe Hit 는 4 ulp 까지 달랐고
-# (Probe Hit 의 Indirect Irradiance 는 save 의 두 실행에서 같았다), glTF 는 같았다. 그 두 배를 둔다.
-SNAPSHOT_PT_RUN_ULPS = {'glTF': 0, 'Lambert': 12, 'DDGI Probe Hit': 8}
-
-
-def baseline_scene_pose():
-    """scene 을 주지 않고 띄운 app 의 처음 시점 (default_baseline_scene() 의 [Camera]) 을 pose 명령의 인자로."""
-    camera = read_scene_file(default_baseline_scene())['Camera']
-    return ' '.join(camera['Position'].split(',') + [camera['Heading'], camera['Pitch']])
 
 
 def code_revision():
@@ -929,32 +900,6 @@ def code_revision():
     def git(*arguments):
         return subprocess.run(['git', *arguments], cwd=REPO_ROOT, capture_output=True, text=True, check=True).stdout.strip()
     return git('rev-parse', '--short', 'HEAD') + ('+' if git('status', '--porcelain') else '')
-
-
-def path_tracer_snapshot():
-    """snapshot.json 에 남기는 PT shot 의 조건. JSON 으로 오간 값과 비교하도록 list 로 둔다."""
-    return {'pose': baseline_scene_pose(), 'settings': SNAPSHOT_PT_SETTINGS,
-            'runs': [list(run) for run in SNAPSHOT_PT_RUNS], 'samples': SNAPSHOT_PT_SAMPLES}
-
-
-def path_tracer_shot_name(shading, output):
-    return f'pt-{shading}-{output}'.lower().replace(' ', '-')
-
-
-def capture_path_tracer(session, folder):
-    """SNAPSHOT_PT_RUNS 를 쌓아 folder 에 export 하고 PT 를 끈다. 찍은 shot 을 돌려준다."""
-    session.ask_ok(f'pose {path_tracer_snapshot()["pose"]}')
-    shots = []
-    for shading, output in SNAPSHOT_PT_RUNS:
-        settings = SNAPSHOT_PT_SETTINGS | {'Shading': shading, 'Output': output, 'Target Samples': SNAPSHOT_PT_SAMPLES}
-        session.ask_ok('settings set Engine Tuning: ' + '; '.join(f'Path Tracer/{key}={value}' for key, value in settings.items()))
-        session.ask_ok('pt reset')
-        session.ask_ok(f'pt wait samples={SNAPSHOT_PT_SAMPLES}')
-        name = path_tracer_shot_name(shading, output)
-        session.ask_ok(f'capture pt {folder / name}')
-        shots.append(name)
-    session.ask_ok('settings set Engine Tuning: Path Tracer/Show=0')
-    return shots
 
 
 def measurement_scenes_snapshot():
@@ -992,9 +937,9 @@ def capture_measurement_scenes(session, folder):
 
 
 def capture_snapshot(config, build_first, folder):
-    """SNAPSHOT_SETTINGS x SNAPSHOT_POSES 의 scene 과 display, PT 의 shot, SNAPSHOT_SETTINGS x measurement_scenes() 의 scene 과 display 를
-    folder 에 찍고, 찍은 raster 의 shot, PT 의 shot, app 의 끝을 돌려준다. 측정 scene 의 shot 은 다른 shot 을 모두 찍은 뒤에 찍어서, 다른
-    shot 을 찍는 순서가 측정 scene 의 shot 을 넣기 전과 같다."""
+    """SNAPSHOT_SETTINGS x SNAPSHOT_POSES 의 scene 과 display, SNAPSHOT_SETTINGS x measurement_scenes() 의 scene 과 display 를 folder 에
+    찍고, 찍은 shot 과 app 의 끝을 돌려준다. 측정 scene 의 shot 은 다른 shot 을 모두 찍은 뒤에 찍어서, 다른 shot 을 찍는 순서가 측정
+    scene 의 shot 을 넣기 전과 같다."""
     folder.mkdir(parents=True)
     instance = start_instance(config, build_first=build_first)
     shots = []
@@ -1012,14 +957,13 @@ def capture_snapshot(config, build_first, folder):
                     for target in ['scene', 'display']:
                         session.ask_ok(f'capture {target} {folder / f"{name}-{target}"}')
                     shots.append(name)
-            path_tracer_shots = capture_path_tracer(session, folder)
             shots += capture_measurement_scenes(session, folder)
         finally:
             session.close()
     except HarnessError:
         stop_instance(instance, kill_now=True)
         raise
-    return shots, path_tracer_shots, stop_instance(instance)
+    return shots, stop_instance(instance)
 
 
 def snapshot_ended_well(stopped):
@@ -1047,30 +991,8 @@ def shot_change(before_folder, after_folder, name):
             'display_changed': int(np.count_nonzero(np.any(displays[0] != displays[1], axis=2)))}
 
 
-def path_tracer_change(before_folder, after_folder, name):
-    """한 PT shot 에서 rgba 가 바뀐 pixel 과 크게 바뀐 pixel 의 mask, rgb 의 가장 큰 ulp 차, a 가 같은지, after 의 NaN 과 Inf 수."""
-    import numpy as np
-    before = read_dds_rgba32f(before_folder / f'{name}.dds')
-    after = read_dds_rgba32f(after_folder / f'{name}.dds')
-    if before.shape != after.shape:
-        raise HarnessError(f'{name}: export is {before.shape} before and {after.shape} after')
-    changed = np.any(before.view(np.uint32) != after.view(np.uint32), axis=2)
-    relative = np.abs(np.nan_to_num(after[..., :3] - before[..., :3])).max(axis=2) / np.maximum(np.abs(before[..., :3]).max(axis=2), 1e-3)
-    # 0 이상의 float 는 bit 를 정수로 읽은 차가 ulp 수다.
-    ulps = np.abs(after[..., :3].view(np.int32).astype(np.int64) - before[..., :3].view(np.int32).astype(np.int64))
-    return {'changed': changed, 'large': changed & (relative > SNAPSHOT_LARGE_CHANGE), 'ulps': int(ulps.max()),
-            'samples_same': bool(np.array_equal(before[..., 3].view(np.uint32), after[..., 3].view(np.uint32))),
-            'nonfinite': int(np.count_nonzero(~np.isfinite(after[..., :3]).all(axis=2))),
-            'before': before, 'after': after}
-
-
 def change_counts(change):
     return {'changed': int(change['changed'].sum()), 'large': int(change['large'].sum()), 'pixels': int(change['changed'].size)}
-
-
-def path_tracer_counts(change):
-    return {'changed': int(change['changed'].sum()), 'ulps': change['ulps'], 'samples_same': change['samples_same'],
-            'pixels': int(change['changed'].size)}
 
 
 def exceeds_same_code(counts, same_code):
@@ -1079,15 +1001,6 @@ def exceeds_same_code(counts, same_code):
         return counts['changed'] > 0
     return counts['large'] / counts['pixels'] > max(SNAPSHOT_SAME_CODE_FACTOR * same_code['large'] / same_code['pixels'],
                                                     SNAPSHOT_SAME_CODE_FLOOR)
-
-
-def path_tracer_allowed_ulps(same_code, shading):
-    return max(SNAPSHOT_SAME_CODE_FACTOR * same_code['ulps'], SNAPSHOT_PT_RUN_ULPS[shading])
-
-
-def path_tracer_exceeds_same_code(counts, same_code, shading):
-    """같은 code 로 쌓아도 생기는 차이보다 크게 바뀌었는가. a 가 다르거나 rgb 의 가장 큰 ulp 차가 path_tracer_allowed_ulps 를 넘으면 크다."""
-    return not counts['samples_same'] or counts['ulps'] > path_tracer_allowed_ulps(same_code, shading)
 
 
 def change_sheet(before, after, change):
@@ -1110,47 +1023,31 @@ def display_sheet(before_folder, after_folder, name, change):
     return change_sheet(Image.open(before_folder / f'{name}-display.png'), Image.open(after_folder / f'{name}-display.png'), change)
 
 
-def path_tracer_sheet(change, output):
-    """before export, after export 의 보기용 image 와 export 의 차이 mask 를 나란히 놓은 image."""
-    from PIL import Image
-    # Indirect Irradiance 의 rgb 는 E 라서 radiance 로 보이게 π 로 나눈다 (PathTracer.h 의 Output).
-    exposure = PREVIEW_EXPOSURE / math.pi if output == 'Indirect Irradiance' else PREVIEW_EXPOSURE
-    before, after = (Image.fromarray(tone_map_for_view(change[key], exposure)) for key in ('before', 'after'))
-    return change_sheet(before, after, change)
-
-
 def command_snapshot_save(args):
     folder = SNAPSHOT_DIR / args.name
     if folder.exists():
         if not args.replace:
             raise HarnessError(f'{folder} exists. Use --replace to take it again')
         shutil.rmtree(folder)
-    shots, path_tracer_shots, stopped = capture_snapshot(args.config, not args.no_build, folder)
+    shots, stopped = capture_snapshot(args.config, not args.no_build, folder)
     ended_well = snapshot_ended_well(stopped)
     for line in describe_snapshot_end(stopped):
         print(line)
-    # TAA, adaptive exposure 와 PT 의 Shading Lambert 는 같은 code 에서도 실행마다 결과를 바꾸므로, 한 번 더 띄워 그 차이를 compare 의
-    # 기준으로 남긴다.
+    # TAA 와 adaptive exposure 는 같은 code 에서도 실행마다 결과를 바꾸므로, 한 번 더 띄워 그 차이를 compare 의 기준으로 남긴다.
     same_code_folder = folder / 'same-code'
-    _, _, stopped = capture_snapshot(args.config, False, same_code_folder)
+    _, stopped = capture_snapshot(args.config, False, same_code_folder)
     ended_well &= snapshot_ended_well(stopped)
     for line in describe_snapshot_end(stopped):
         print(line)
     same_code = {name: change_counts(shot_change(folder, same_code_folder, name)) for name in shots}
-    path_tracer_same_code = {name: path_tracer_counts(path_tracer_change(folder, same_code_folder, name)) for name in path_tracer_shots}
     manifest = {'code': code_revision(), 'config': args.config, 'created': time.strftime('%Y-%m-%d %H:%M:%S'), 'shots': shots,
                 'poses': SNAPSHOT_POSES, 'settings': SNAPSHOT_SETTINGS,
-                'measurement_scenes': measurement_scenes_snapshot(), 'same_code': same_code, 'path_tracer': path_tracer_snapshot(),
-                'path_tracer_same_code': path_tracer_same_code}
+                'measurement_scenes': measurement_scenes_snapshot(), 'same_code': same_code}
     (folder / 'snapshot.json').write_text(json.dumps(manifest, indent=2), encoding='utf-8')
     for name in shots:
         counts = same_code[name]
         print(f'same code {name}: {counts["changed"]} pixels changed, {counts["large"]} by more than {SNAPSHOT_LARGE_CHANGE:.0%}')
-    for name in path_tracer_shots:
-        counts = path_tracer_same_code[name]
-        print(f'same code {name}: {counts["changed"]} pixels changed by up to {counts["ulps"]} ulps, '
-              f'a {"same" if counts["samples_same"] else "differs"}')
-    print(f'saved {len(shots)} shots and {len(path_tracer_shots)} path tracer shots of {manifest["code"]} to {folder}')
+    print(f'saved {len(shots)} shots of {manifest["code"]} to {folder}')
     return 0 if ended_well else 1
 
 
@@ -1160,19 +1057,16 @@ def command_snapshot_compare(args):
     if not manifest_path.exists():
         raise HarnessError(f'no snapshot {before_folder}. Take it with snapshot save {args.name} before changing the code')
     manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
-    if (manifest['poses'] != SNAPSHOT_POSES or manifest['settings'] != SNAPSHOT_SETTINGS or manifest.get('path_tracer') != path_tracer_snapshot()
+    if (manifest['poses'] != SNAPSHOT_POSES or manifest['settings'] != SNAPSHOT_SETTINGS
             or manifest.get('measurement_scenes') != measurement_scenes_snapshot() or manifest['config'] != args.config):
         raise HarnessError(f'{args.name} was taken with other poses, settings, measurement scenes or config. '
                            'Take a new snapshot with this viewer.py')
 
     after_folder = before_folder / f'compare-{time.strftime("%Y%m%d-%H%M%S")}'
-    shots, _, stopped = capture_snapshot(args.config, not args.no_build, after_folder)
+    shots, stopped = capture_snapshot(args.config, not args.no_build, after_folder)
     lines = [f'before: {manifest["code"]} ({manifest["created"]}), after: {code_revision()}',
              f'CHANGED marks a shot that changed more than two runs of the before code did (more than {SNAPSHOT_SAME_CODE_FACTOR}x '
-             f'the pixels changed by more than {SNAPSHOT_LARGE_CHANGE:.0%}, and more than {SNAPSHOT_SAME_CODE_FLOOR:.2%} of the scene). '
-             f'A path tracer shot is CHANGED when its sample counts differ, or when an rgb changed by more ulps than allowed: '
-             f'{SNAPSHOT_SAME_CODE_FACTOR}x the ulps that changed between the two runs, and at least the run to run ulps of its Shading '
-             f'({", ".join(f"{shading} {ulps}" for shading, ulps in SNAPSHOT_PT_RUN_ULPS.items())})']
+             f'the pixels changed by more than {SNAPSHOT_LARGE_CHANGE:.0%}, and more than {SNAPSHOT_SAME_CODE_FLOOR:.2%} of the scene)']
     nonfinite = 0
     for name in shots:
         change = shot_change(before_folder, after_folder, name)
@@ -1183,20 +1077,9 @@ def command_snapshot_compare(args):
                      f'({counts["changed"] / counts["pixels"]:.2%}), {counts["large"]} by more than {SNAPSHOT_LARGE_CHANGE:.0%} '
                      f'({counts["large"] / counts["pixels"]:.2%}; same code {same_code["large"] / same_code["pixels"]:.2%}), '
                      f'{change["nonfinite"]} NaN or Inf after; display {change["display_changed"]} pixels changed')
-    for shading, output in SNAPSHOT_PT_RUNS:
-        name = path_tracer_shot_name(shading, output)
-        change = path_tracer_change(before_folder, after_folder, name)
-        path_tracer_sheet(change, output).save(after_folder / f'{name}-sheet.png')
-        counts, same_code = path_tracer_counts(change), manifest['path_tracer_same_code'][name]
-        nonfinite += change['nonfinite']
-        lines.append(f'{"CHANGED" if path_tracer_exceeds_same_code(counts, same_code, shading) else "same   "} {name}: '
-                     f'{counts["changed"]} pixels changed ({counts["changed"] / counts["pixels"]:.2%}; same code '
-                     f'{same_code["changed"] / same_code["pixels"]:.2%}) by up to {counts["ulps"]} ulps (same code {same_code["ulps"]}, '
-                     f'allowed {path_tracer_allowed_ulps(same_code, shading)}), a {"same" if counts["samples_same"] else "differs"}, '
-                     f'{change["nonfinite"]} NaN or Inf after')
     lines += describe_snapshot_end(stopped)
-    lines.append(f'sheets (before, after, change: gray changed, white by more than {SNAPSHOT_LARGE_CHANGE:.0%}; the display and the scene '
-                 f'for a raster shot, the export for a path tracer shot): {after_folder}')
+    lines.append(f'sheets (before display, after display, scene change: gray changed, white by more than {SNAPSHOT_LARGE_CHANGE:.0%}): '
+                 f'{after_folder}')
     (after_folder / 'report.txt').write_text('\n'.join(lines) + '\n', encoding='utf-8')
     for line in lines:
         print(line)
@@ -1299,7 +1182,7 @@ def check_state(session, check):
     whole = session.ask_ok('state')['state']
     session.ask_ok('frames 60')
     later = session.ask_ok('state')['state']
-    check('state stays the same for 60 frames but the frame and PT progress',
+    check('state stays the same for 60 frames but the frame',
           without_time_varying(later) == without_time_varying(whole) and later['frame'] >= whole['frame'] + 60,
           f'frame {whole["frame"]} -> {later["frame"]}')
 
@@ -1337,10 +1220,6 @@ def check_state(session, check):
     differing = [section for section in sections if whole['settings'].get(section) != session.ask_ok(f'settings get {section}')['values']]
     check('state settings has every section as settings get reads it', not differing and sorted(sections) == sorted(whole['settings']),
           ', '.join(differing) or ', '.join(sections))
-
-    progress = {key: value for key, value in session.ask_ok('pt status').items() if key != 'ok'}
-    check('state pt is what pt status reports but the progress', without_time_varying({'pt': progress}) == without_time_varying({'pt': whole['pt']}),
-          f'{progress} vs {whole["pt"]}')
 
     changes = []
     change = functools.partial(record_change, session, changes)
@@ -1383,8 +1262,6 @@ def check_state(session, check):
 
 
 LIGHT_OBJECT = 'Directional Light'
-# Scene Hierarchy 와 editor 명령이 camera 를 가리키는 이름이자 scene file 의 section 이름
-CAMERA_OBJECT = 'Camera'
 
 
 def numbers_of(text):
@@ -1784,58 +1661,47 @@ def check_rest_of_ui_commands(session, check):
     moved_speed = session.ask_ok('state camera')['state']['camera']['move_speed']
     session.ask_ok(f'settings set Editor Camera: Move Speed={speed}')
 
-    tuning = start['settings']['Engine Tuning']
-    back_faces = tuning['Ray Tracing/Show Single-Sided Back Faces']
-    for key, value in [('Ray Tracing/Show Single-Sided Back Faces', '0' if back_faces == '1' else '1'),
-                       ('Path Tracer/Samples per Frame', str(int(tuning['Path Tracer/Samples per Frame']) + 1))]:
-        change(f'settings set Engine Tuning: {key}', f'settings set Engine Tuning: {key}={value}', 'settings.Engine Tuning')
-        session.ask_ok(f'settings set Engine Tuning: {key}={tuning[key]}')
-
-    # Show 가 꺼져 있으면 reset 은 다시 켤 때 일어나므로, 켜고 쌓은 뒤에 reset 한다.
-    session.ask_ok('settings set Engine Tuning: Path Tracer/Show=1')
-    session.ask_ok('pt wait samples=2')
-    change('pt reset', 'pt reset', 'pt')
-    session.ask_ok(f'settings set Engine Tuning: Path Tracer/Show={tuning["Path Tracer/Show"]}')
+    key = 'Ray Tracing/Show Single-Sided Back Faces'
+    back_faces = start['settings']['Engine Tuning'][key]
+    change(f'settings set Engine Tuning: {key}', f'settings set Engine Tuning: {key}={"0" if back_faces == "1" else "1"}', 'settings.Engine Tuning')
+    session.ask_ok(f'settings set Engine Tuning: {key}={back_faces}')
 
     line = session.ask_ok('describe')['line']
     camera = start['camera']
     session.ask_ok('pose ' + ' '.join(repr(float(camera[key]) + 10) for key in ['x', 'y', 'z']) + f' {camera["heading"]} {camera["pitch"]}')
     session.ask_ok('light set elevation=40')
     change('restore', f'restore {line}', 'scene', 'model', 'camera', 'light', 'sky', 'settings.Engine Tuning')
-    # restore 는 줄의 pt samples 를 Target Samples 로 둔다.
-    session.ask_ok(f'settings set Engine Tuning: Path Tracer/Target Samples={tuning["Path Tracer/Target Samples"]}')
 
-    check_changes(check, 'window, settings set Editor Camera and the Ray Tracing and Path Tracer of Engine Tuning, pt reset and restore '
+    check_changes(check, 'window, settings set Editor Camera and the Ray Tracing of Engine Tuning, and restore '
                          'change the state and reply with the changed part', changes)
     check('settings set Editor Camera changes the move speed in state camera', float(moved_speed) == faster != float(speed),
           f'{speed} -> {moved_speed}')
-    # pt 는 reset 과 Show 를 켜고 끈 것이 resets 를 늘린다.
     now = session.ask_ok('state')['state']
-    differing = [key for key in start if key not in ('frame', 'pt') and now[key] != start[key]]
-    check('the state other than pt is as it was after the rest of the UI commands', not differing, ', '.join(differing))
+    differing = [key for key in start if key != 'frame' and now[key] != start[key]]
+    check('the state is as it was after the rest of the UI commands', not differing, ', '.join(differing))
 
 
 def check_profile(session, check, config):
-    """profile 이 PT 를 그리는 동안 그 scope 의 GPU time 을 frame 수만큼 모으고, 없는 scope 와 그리지 않는 scope 는 거절하는지 본다.
-    PT 의 Show 를 되돌려 놓는다."""
-    show = session.ask_ok('state settings.Engine Tuning')['state']['settings']['Engine Tuning']['Path Tracer/Show']
+    """profile 이 Dynamic GI 의 Path Traced 간접광을 그리는 동안 그 scope 의 GPU time 을 frame 수만큼 모으고, 없는 scope 와 그리지 않는
+    scope 는 거절하는지 본다. Dynamic GI Debug 의 Indirect 를 되돌려 놓는다."""
+    indirect = session.ask_ok('settings get Dynamic GI Debug')['values']['Indirect']
     unknown = session.ask('profile No Such Scope frames=1')
     check('profile refuses a scope the profiler does not have', not unknown['ok'], unknown.get('error'))
 
-    session.ask_ok('settings set Engine Tuning: Path Tracer/Show=1')
+    session.ask_ok('settings set Dynamic GI Debug: Indirect=Path Traced')
     session.ask_ok('frames 2')
-    measured = session.ask('profile Path Tracer frames=4')
+    measured = session.ask('profile Path Traced Indirect frames=4')
     if config == 'Release':
-        check('profile has no Path Tracer scope in Release, which compiles the timers out', not measured['ok'], measured.get('error'))
+        check('profile has no Path Traced Indirect scope in Release, which compiles the timers out', not measured['ok'], measured.get('error'))
     else:
         gpu = measured.get('gpu_ms')
-        check('profile gives the GPU time of Path Tracer over 4 frames',
+        check('profile gives the GPU time of Path Traced Indirect over 4 frames',
               measured['ok'] and measured['frames'] == 4 and 0 < float(gpu['min']) <= float(gpu['mean']) <= float(gpu['max']), measured)
-        session.ask_ok('settings set Engine Tuning: Path Tracer/Show=0')
+        session.ask_ok('settings set Dynamic GI Debug: Indirect=Off')
         session.ask_ok('frames 2')
-        stopped = session.ask('profile Path Tracer frames=2')
+        stopped = session.ask('profile Path Traced Indirect frames=2')
         check('profile fails for a scope that does not run', not stopped['ok'], stopped.get('error'))
-    session.ask_ok(f'settings set Engine Tuning: Path Tracer/Show={show}')
+    session.ask_ok(f'settings set Dynamic GI Debug: Indirect={indirect}')
 
 
 def check_acceptance(session, check):
@@ -2314,18 +2180,18 @@ def main():
 
     command = add_command('shot', 'capture a target and write a small PNG to look at, '
                                   'with the state of the captured frame as JSON next to it', command_shot)
-    command.add_argument('target', choices=['scene', 'overlay', 'display', 'pt', 'pt-truncated'])
+    command.add_argument('target', choices=['scene', 'overlay', 'display'])
     command.add_argument('--crop', type=parse_crop, metavar='X,Y,W,H', help='in original pixels')
     command.add_argument('--max-width', type=int, default=PREVIEW_MAX_WIDTH)
-    command.add_argument('--exposure', type=float, default=PREVIEW_EXPOSURE, help='for the scene and pt views only')
+    command.add_argument('--exposure', type=float, default=PREVIEW_EXPOSURE, help='for the scene view only')
 
     command = add_command('stop', 'quit the running instance, killing it if it hangs, and summarize its log with the D3D12 messages. '
                                   'Exits with 1 unless the app ended normally, whatever the messages', command_stop)
     command.add_argument('--kill', action='store_true', help='kill without sending quit')
 
     command = add_command('snapshot', 'take the scene and display of fixed poses and of each measurement scene with the harness baseline '
-                                      'and with the app defaults (TAA, motion blur, adaptive exposure), and the path tracer export of each '
-                                      'Shading and Output, before changing the code, then compare the same shots after it',
+                                      'and with the app defaults (TAA, motion blur, adaptive exposure) before changing the code, '
+                                      'then compare the same shots after it',
                           None)
     actions = command.add_subparsers(dest='action', required=True)
     action = actions.add_parser('save', help=f'start a new instance and keep the shots in {SNAPSHOT_DIR}/<name>',

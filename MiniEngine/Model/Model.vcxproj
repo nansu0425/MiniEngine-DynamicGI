@@ -92,8 +92,6 @@
     <ClInclude Include="Raytracing\RayQuerySmokeTest.h" />
     <ClInclude Include="Raytracing\SceneHeapTable.h" />
     <ClInclude Include="Raytracing\EmissiveTriangles.h" />
-    <ClInclude Include="PathTracer\PathTracer.h" />
-    <ClInclude Include="PathTracer\PathTracerTuning.h" />
     <ClInclude Include="DynamicGI\DynamicGI.h" />
     <ClInclude Include="DynamicGI\DynamicGIVolume.h" />
     <ClInclude Include="DynamicGI\DynamicGIVolumeBox.h" />
@@ -132,8 +130,6 @@
     <ClCompile Include="Raytracing\RayQuerySmokeTest.cpp" />
     <ClCompile Include="Raytracing\SceneHeapTable.cpp" />
     <ClCompile Include="Raytracing\EmissiveTriangles.cpp" />
-    <ClCompile Include="PathTracer\PathTracer.cpp" />
-    <ClCompile Include="PathTracer\PathTracerTuning.cpp" />
     <ClCompile Include="DynamicGI\DynamicGI.cpp" />
     <ClCompile Include="DynamicGI\DynamicGIVolume.cpp" />
     <ClCompile Include="DynamicGI\DynamicGIVolumeBox.cpp" />
@@ -276,24 +272,6 @@
       <ShaderModel>6.5</ShaderModel>
     </FxCompile>
     <FxCompile Include="Raytracing\RayPickCS.hlsl">
-      <ShaderModel>6.5</ShaderModel>
-    </FxCompile>
-    <FxCompile Include="PathTracer\PathTracerCS.hlsl">
-      <ShaderModel>6.5</ShaderModel>
-    </FxCompile>
-    <FxCompile Include="PathTracer\PathTracerLambertCS.hlsl">
-      <ShaderModel>6.5</ShaderModel>
-    </FxCompile>
-    <FxCompile Include="PathTracer\PathTracerIrradianceCS.hlsl">
-      <ShaderModel>6.5</ShaderModel>
-    </FxCompile>
-    <FxCompile Include="PathTracer\PathTracerLambertIrradianceCS.hlsl">
-      <ShaderModel>6.5</ShaderModel>
-    </FxCompile>
-    <FxCompile Include="PathTracer\PathTracerProbeHitCS.hlsl">
-      <ShaderModel>6.5</ShaderModel>
-    </FxCompile>
-    <FxCompile Include="PathTracer\PathTracerProbeHitIrradianceCS.hlsl">
       <ShaderModel>6.5</ShaderModel>
     </FxCompile>
     <FxCompile Include="DynamicGI\PathTracedIndirectCS.hlsl">

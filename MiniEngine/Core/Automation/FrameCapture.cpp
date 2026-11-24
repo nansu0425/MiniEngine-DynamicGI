@@ -28,8 +28,6 @@ namespace
         { "scene", ".dds", DXGI_FORMAT_R32G32B32A32_FLOAT },
         { "overlay", ".png", DXGI_FORMAT_R8G8B8A8_UNORM },
         { "display", ".png", DXGI_FORMAT_R8G8B8A8_UNORM },
-        { "pt", ".dds", DXGI_FORMAT_R32G32B32A32_FLOAT },
-        { "pt-truncated", ".dds", DXGI_FORMAT_R32_FLOAT },
     };
     static_assert(_countof(kTargets) == kNumTargets, "target 개수가 Target과 다르다");
 
@@ -56,7 +54,7 @@ namespace
             fileImage = converted.GetImage(0, 0, 0);
         }
 
-        if (target == kScene || target == kPathTracer || target == kPathTracerTruncatedSamples)
+        if (target == kScene)
             return SaveToDDSFile(*fileImage, DDS_FLAGS_NONE, path.c_str());
 
         // present는 backbuffer의 alpha를 쓰지 않아 그 값이 정해져 있지 않으므로 버린다.

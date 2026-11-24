@@ -1,4 +1,4 @@
-// glTF 2.0 metallic-roughness material의 BRDF (references/glTF의 Specification.adoc Appendix B). path tracer와 raster가 같은 함수로
+// glTF 2.0 metallic-roughness material의 BRDF (references/glTF의 Specification.adoc Appendix B). raster와 Dynamic GI가 같은 함수로
 // 평가한다.
 
 #ifndef __GLTF_BRDF_HLSLI__
@@ -117,8 +117,8 @@ GltfBrdfInput MakeGltfBrdfInput(float3 baseColor, float metallic, float roughnes
 
     // dielectric의 diffuse와 specular는 Kulla & Conty의 energy-preserving coupling
     // f_d = ρ (1 − E_s(μ_o)) (1 − E_s(μ_i)) / (π (1 − E_avg))로 잇는다. sample implementation의 fresnel_mix는 energy conservation을 깨고
-    // (spec :3877), 정답으로 쓰는 BRDF는 energy conserving이어야 한다 (MUST, :3651). (1 − F(μ_i))(1 − F(μ_o)) (:3879)도 energy를
-    // 지키지만 grazing에서 어두워져, ρ = 1인 dielectric이 모든 빛을 반사하지 않는다.
+    // (spec :3877), 물리적으로 정확한 light simulation의 BRDF는 energy conserving이어야 한다 (MUST, :3651).
+    // (1 − F(μ_i))(1 − F(μ_o)) (:3879)도 energy를 지키지만 grazing에서 어두워져, ρ = 1인 dielectric이 모든 빛을 반사하지 않는다.
     const float viewAlbedo = GetDielectricSpecularAlbedo(input.viewCosine, input.alpha);
     input.diffuseFactor = (1.0 - metallic) * baseColor * (1.0 - viewAlbedo) * kInversePi / (1.0 - GetAverageDielectricSpecularAlbedo(input.alpha));
 

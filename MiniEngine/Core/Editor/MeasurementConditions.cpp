@@ -1,21 +1,12 @@
 #include "Core/pch.h"
 #include "Core/Editor/MeasurementConditions.h"
 
-#include <imgui.h>
 #include <algorithm>
 #include <cerrno>
 
 namespace
 {
     std::map<std::string, MeasurementConditions::Group> s_Groups;
-
-    std::string JoinKeys(const std::vector<std::string>& keys)
-    {
-        std::string joined;
-        for (const std::string& key : keys)
-            joined += (joined.empty() ? "" : ", ") + key;
-        return joined;
-    }
 }
 
 void MeasurementConditions::AppendValue(std::string& line, const std::string& key, const std::string& value)
@@ -132,38 +123,4 @@ std::vector<std::string> MeasurementConditions::GetStatePaths(void)
         }
     }
     return paths;
-}
-
-void MeasurementConditions::RestoreField::SetLine(const std::string& line)
-{
-    strncpy_s(m_Line, line.c_str(), _TRUNCATE);
-    m_HasResult = false;
-}
-
-void MeasurementConditions::RestoreField::Show(void)
-{
-    ImGui::PushID(this);
-    ImGui::SetNextItemWidth(-FLT_MIN);
-    if (ImGui::InputText("##Line", m_Line, sizeof(m_Line)))
-        m_HasResult = false;
-    ImGui::SetItemTooltip("A line printed by Log, left beside a capture or given by describe.");
-
-    ImGui::BeginDisabled(m_Line[0] == '\0');
-    if (ImGui::Button("Restore"))
-    {
-        m_Result = Restore(Parse(m_Line));
-        m_HasResult = true;
-    }
-    ImGui::EndDisabled();
-    ImGui::SetItemTooltip("Sets every condition in the line, or nothing if the line lacks one or one cannot be set. The resolution is only compared.");
-
-    const ImVec4 kWarningColor(1.0f, 0.75f, 0.2f, 1.0f);
-    if (m_HasResult && !m_Result.unread.empty())
-        ImGui::TextColored(kWarningColor, "Warning: nothing was restored. The line lacks or cannot set %s.", JoinKeys(m_Result.unread).c_str());
-    if (m_HasResult)
-    {
-        for (const std::string& note : m_Result.notes)
-            ImGui::TextColored(kWarningColor, "Warning: %s", note.c_str());
-    }
-    ImGui::PopID();
 }

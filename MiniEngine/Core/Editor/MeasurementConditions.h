@@ -6,9 +6,9 @@
 #include <string>
 #include <vector>
 
-// 측정한 값이 어떤 조건에서 나왔는지를 "key=value; key=value" 한 줄로 쓰고 읽는다. Log와 capture가 이 줄을 남기고, Restore가 이 줄로
-// 조건을 되돌린다. 줄 하나가 조건 전체를 담으므로 app을 다시 실행해도 같은 image를 다시 만들거나, 같은 조건에서 다른 것을 잴 수 있다.
-// 조건은 그것을 가진 기능이 group으로 등록한다.
+// 측정한 값이 어떤 조건에서 나왔는지를 "key=value; key=value" 한 줄로 쓰고 읽는다. describe 명령과 capture가 이 줄을
+// 남기고, restore 명령이 이 줄로 조건을 되돌린다. 줄 하나가 조건 전체를 담으므로 app을 다시 실행해도 같은 image를 다시
+// 만들거나, 같은 조건에서 다른 것을 잴 수 있다. 조건은 그것을 가진 기능이 group으로 등록한다.
 namespace MeasurementConditions
 {
     // key와 value에는 '='와 "; "를 쓰지 않는다.
@@ -19,7 +19,7 @@ namespace MeasurementConditions
     // key 순서로 한 줄로 쓴다.
     std::string Format(const Values& values);
 
-    // 줄의 key=value들. Log가 앞에 붙인 "[이름] " 같은 말은 첫 key 앞의 "] "까지 건너뛴다.
+    // 줄의 key=value들. 첫 key 앞에 "[이름] " 같은 말이 있으면 "] "까지 건너뛴다.
     Values Parse(const std::string& line);
 
     // 줄의 value 하나를 읽는다. 앞뒤에 다른 글자가 있으면 false다. ReadFloat는 inf와 nan도 읽는다.
@@ -67,25 +67,9 @@ namespace MeasurementConditions
         std::vector<std::string> notes;
     };
     // 등록한 group의 key 중 하나라도 없거나 받을 수 없으면 아무것도 바꾸지 않는다. 일부만 되돌리면 조건이 다른 image를 같은 조건의
-    // image로 잘못 보게 되기 때문이다. 줄에 있는 다른 key (Log의 수치 등)는 읽지 않는다.
+    // image로 잘못 보게 되기 때문이다. 등록한 group의 key가 아닌 key는 읽지 않는다.
     Result Restore(const Values& values);
 
     // 등록한 group의 statePaths를 모두 모은 것. 여러 group이 같은 path를 가지면 한 번만 담는다.
     std::vector<std::string> GetStatePaths(void);
-
-    // Restore 칸과 button. 붙여 넣은 줄로 Restore하고, 되돌리지 못한 key와 지금과 다른 점을 경고로 보인다.
-    class RestoreField
-    {
-    public:
-        void SetLine(const std::string& line);
-        const char* GetLine(void) const { return m_Line; }
-        // 칸의 줄로 Restore한 뒤 칸을 고치지 않았으면 true
-        bool HasResult(void) const { return m_HasResult; }
-        void Show(void);
-
-    private:
-        char m_Line[4096] = {};
-        bool m_HasResult = false;
-        Result m_Result;
-    };
 }

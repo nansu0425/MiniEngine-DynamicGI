@@ -1,7 +1,5 @@
 """float image 두 장의 차와, 같은 image 의 두 추정이 같은 기대값을 갖는지를 수치로 낸다.
 
-PT 의 확인 script 와, 나중에 PT 와 다른 기능의 결과를 비교하는 script 가 같은 식을 쓰도록 여기에 모은다.
-
   python scripts/imagecompare.py diff <x.dds> <reference.dds>
   python scripts/imagecompare.py agree <a0.dds> <a1.dds> <b0.dds> <b1.dds>
   python scripts/imagecompare.py bias <a0.dds> <a1.dds> <b0.dds> [<b1.dds>]
@@ -20,8 +18,8 @@ pixel 마다 부호가 달라 image 평균에서는 지워지는 bias 도 b^2 �
 작게 만들기 때문이다. 비율에서는 정규화가 지워진다.
 
 r 은 기대값 차가 그 spp 의 noise 에 비해 얼마나 큰지를 나타낸다. noise 는 spp 가 늘수록 작아지므로, 같은 차도 spp 에 따라
-r 이 다르다. 차가 정답 오차의 예산처럼 정해진 비 이하인지 판정할 때는 bias 로 차를 image 의 크기에 대한 비로 내고 그 상한을
-둔다. 아래의 |x| 와 합은 pixel 마다 rgb 에 대한 것이고, Am, Bm 은 Seed 들의 평균이다. pixel 들은 서로 독립이라고 본다. PT 는
+r 이 다르다. 차가 정해진 비 이하인지 판정할 때는 bias 로 차를 image 의 크기에 대한 비로 내고 그 상한을 둔다. 아래의 |x| 와 합은
+pixel 마다 rgb 에 대한 것이고, Am, Bm 은 Seed 들의 평균이다. pixel 들은 서로 독립이라고 본다. Dynamic GI 의 Path Traced 간접광은
 pixel 마다 다른 난수열을 쓴다.
 
   d = mean(Bm - Am 의 rgb 합) / mean(Am 의 rgb 합)            부호 있는 차. 모든 pixel 에서 한쪽으로 생기는 차를 잡는다.
@@ -62,7 +60,7 @@ SELFTEST_BIAS_TO_NOISE = 0.3
 SELFTEST_TOLERANCE = 3e-3
 # bias 는 r 의 분자와 분모의 차의 제곱근이라 r 보다 흔들린다. bias / noise 로 비교한다.
 SELFTEST_BIAS_TOLERANCE = 1e-2
-# 모든 pixel 에서 같은 쪽으로 더하는 차. 작업 12 가 bias 원인 하나에 두는 예산과 같은 크기다.
+# 모든 pixel 에서 같은 쪽으로 더하는 차
 SELFTEST_DIFFERENCE = 2e-3
 # 상한이 표준오차를 맞게 쓰는지는 작은 image 를 여러 번 만들어, 차가 없을 때 추정이 floor 안에 드는 비율로 본다. d 는 양쪽으로 95.4%,
 # b 는 한쪽으로 97.7% 가 기대값이고, SELFTEST_COVERAGE_RUNS 번의 비율이 흔들리는 폭 (표준편차 약 0.01) 의 3 배를 둔다. 표준오차를 두 배
@@ -163,7 +161,7 @@ def command_bias(args):
 
 
 def command_selftest(args):
-    """r 과 bias 의 식이 틀리면 차가 있어도 확인 script 의 기준을 통과할 수 있으므로, 답을 아는 합성 image 로 확인한다."""
+    """r 과 bias 의 식이 틀리면 차가 있어도 기준을 통과할 수 있으므로, 답을 아는 합성 image 로 확인한다."""
     rng = np.random.default_rng(0)
     signal = rng.uniform(0.0, 1.0, SELFTEST_SHAPE).astype(np.float32)
 

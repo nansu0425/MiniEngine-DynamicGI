@@ -29,8 +29,6 @@ harness 는 ModelViewer 의 test 와 측정을 자동화하는 도구다. app �
 - display: UI 흐름과 panel 내용을 볼 때 쓴다.
 - scene: 수치는 원본 DDS 로 비교한다. view PNG 는 고정 exposure 로 만든 보기용이다.
 - overlay: debug view 만 볼 때 쓴다.
-- pt: path tracer 의 값은 scene 이 아니라 pt 로 비교한다. scene 은 R11G11B10 으로 양자화한 값이다. 비교의 식은 `scripts/imagecompare.py` 에 있다.
-- pt-truncated: pt 의 값을 답과 비교할 때 Max Bounces 에서 끊긴 sample 이 답을 바꾸면 함께 찍는다. 값의 뜻은 `PathTracerCS.hlsl` 의 `TruncatedSamples` 에, view PNG 가 그리는 것은 `viewer.py` 의 `make_view` 에 있다.
 - 수치를 재는 shot 은 `ui hide` 뒤에 찍는다. UI 가 보이면 scene 크기가 dock 배치를 따른다.
 - 일부만 보면 되면 `--crop X,Y,W,H` (원본 pixel) 를, 구도만 보면 `--max-width 640` 을 쓴다.
 
@@ -58,14 +56,14 @@ harness 는 ModelViewer 의 test 와 측정을 자동화하는 도구다. app �
 
 ## 측정 script 와 selftest
 
-- `scripts/measure-*.py` 는 harness 로 app 을 띄워 수치를 잰다. `--record` 를 주면 잰 값을 그 script 가 정한 측정 기록 ([Reference Path Tracer](reference-path-tracer-measurements.md), [Probe visibility](probe-visibility-measurements.md)) 에 덧붙인다. 무엇을 어떻게 재는지는 각 script 의 docstring 에 있다.
+- `scripts/measure-*.py` 는 harness 로 app 을 띄워 수치를 잰다. `--record` 를 주면 잰 값을 그 script 가 정한 측정 기록 ([Probe visibility](probe-visibility-measurements.md)) 에 덧붙인다. 무엇을 어떻게 재는지는 각 script 의 docstring 에 있다.
 - `selftest` 는 harness 자체를 확인한다. app 을 여러 번 띄우고 끈다. harness 가 의심될 때 돌리고, rendering 의 회귀 기준으로는 쓰지 않는다.
 
 ## 변경 전후 비교
 
-- `snapshot` 은 code 를 바꾸기 전과 바꾼 뒤의 화면을 비교한다. 바꾸기 전 commit 으로 build 한 app 에서 `snapshot save <이름>` 으로 고정 시점과 측정 scene 의 scene, display, 고정 시점의 path tracer 의 export 를 남기고, 바꾼 뒤 commit 으로 build 한 app 에서 `snapshot compare <이름>` 으로 같은 shot 을 찍어 비교한다. 측정 scene 의 shot 은 scene file 의 camera 와 light 로 찍는다. scene 과 display 는 harness baseline 과 app 의 기본 효과 (TAA, motion blur, adaptive exposure) 두 설정에서 찍는다. PT 의 shot 은 Shading 과 Output 의 조합마다 쌓는다. 시점과 설정은 `viewer.py` 의 `SNAPSHOT_POSES`, `SNAPSHOT_SETTINGS`, `SNAPSHOT_PT_` 로 시작하는 상수와 `measurement_scenes` 에 있다.
+- `snapshot` 은 code 를 바꾸기 전과 바꾼 뒤의 화면을 비교한다. 바꾸기 전 commit 으로 build 한 app 에서 `snapshot save <이름>` 으로 고정 시점과 측정 scene 의 scene, display 를 남기고, 바꾼 뒤 commit 으로 build 한 app 에서 `snapshot compare <이름>` 으로 같은 shot 을 찍어 비교한다. 측정 scene 의 shot 은 scene file 의 camera 와 light 로 찍는다. scene 과 display 는 harness baseline 과 app 의 기본 효과 (TAA, motion blur, adaptive exposure) 두 설정에서 찍는다. 시점과 설정은 `viewer.py` 의 `SNAPSHOT_POSES`, `SNAPSHOT_SETTINGS` 와 `measurement_scenes` 에 있다.
 - `CHANGED` 인 shot 은 sheet (`<shot>-sheet.png`) 에서 어디가 바뀌었는지 보고, 바뀐 정도는 report 의 수치로 본다.
-- app 의 기본 효과와 PT 의 Shading Lambert, DDGI Probe Hit 는 같은 code 에서도 실행마다 결과를 바꾼다. `save` 가 app 을 두 번 띄워 같은 code 의 실행 사이 차이를 재 두고, `compare` 는 그보다 크게 바뀐 shot 만 `CHANGED` 로 표시한다. PT 의 차이는 두 실행으로 다 잴 수 없어서, Shading 마다 같은 code 의 차이로 보는 ulp 의 하한 (`SNAPSHOT_PT_RUN_ULPS`) 도 둔다. 그래서 `same` 은 같은 code 의 차이 안에서 바뀌었다는 뜻이다. `save` 가 찍는 `same code` 줄에서 바뀐 pixel 이 없는 raster 의 shot 과 PT 의 glTF shot 은, `compare` 에서 한 pixel 만 바뀌어도 `CHANGED` 다.
+- app 의 기본 효과는 같은 code 에서도 실행마다 결과를 바꾼다. `save` 가 app 을 두 번 띄워 같은 code 의 실행 사이 차이를 재 두고, `compare` 는 그보다 크게 바뀐 shot 만 `CHANGED` 로 표시한다. 그래서 `same` 은 같은 code 의 차이 안에서 바뀌었다는 뜻이다. `save` 가 찍는 `same code` 줄에서 바뀐 pixel 이 없는 shot 은, `compare` 에서 한 pixel 만 바뀌어도 `CHANGED` 다.
 - `compare` 는 app 이 정상으로 끝나지 않거나 D3D12 CORRUPTION, ERROR, WARNING 이 있거나 NaN, Inf 를 그리면 exit 1 이다.
 - camera 가 멈춘 shot 만 찍으므로 camera 가 움직일 때의 TAA 와 motion blur 는 보지 못한다.
 

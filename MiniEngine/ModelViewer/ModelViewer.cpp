@@ -30,8 +30,6 @@
 #include "Model/Raytracing/RaytracingScene.h"
 #include "Model/Raytracing/RaytracingView.h"
 #include "Model/Raytracing/RayPick.h"
-#include "Model/PathTracer/PathTracer.h"
-#include "Model/PathTracer/PathTracerTuning.h"
 #include "Model/DynamicGI/DynamicGI.h"
 #include "Model/DynamicGI/DynamicGIVolume.h"
 #include "Model/Loader/glTF.h"
@@ -69,7 +67,7 @@ using namespace std;
 using Renderer::MeshSorter;
 
 // ray가 아무 면도 만나지 않을 때 받는 빛. 무한히 먼 sky가 모든 방향에서 같은 radiance를 낸다.
-// ray tracing으로 간접광을 구하는 곳 (path tracer, 앞으로의 DDGI)이 miss에서 이 radiance를 쓴다. raster는 이 빛으로 surface를 비추지
+// Dynamic GI가 ray tracing으로 간접광을 구할 때 miss에서 이 radiance를 쓴다. raster는 이 빛으로 surface를 비추지
 // 않고 camera에서 바로 보이는 배경으로만 그린다. raster에는 sky의 visibility가 없어서 surface에 더하면 sky가 가려진 실내까지 밝아지고,
 // 그 빛은 DDGI가 구한다. 무한히 멀어 icon을 둘 자리가 없으므로 Scene Hierarchy로만 고른다.
 class SkyComponent : public Scene::Component
@@ -174,7 +172,7 @@ private:
     bool OpenScene(const std::wstring& path, std::string& error);
     // scene 을 바꾸지 않고 path의 scene file을 열 수 있는지 본다. 그 model을 처음 열면 load해서 m_Models에 남긴다.
     bool PrepareScene(const std::wstring& path, PreparedScene& scene, std::string& error);
-    // PrepareScene이 준비한 scene 으로 바꾼다. camera와 light 같은 object는 scene file의 설정을 받고, path tracer는 처음부터 다시 쌓는다.
+    // PrepareScene이 준비한 scene 으로 바꾼다. camera와 light 같은 object는 scene file의 설정을 받는다.
     void ShowScene(const PreparedScene& scene);
     // object의 설정을 지금 scene file에 쓴다. camera도 object이므로 지금 pose를 함께 쓴다. 쓸 수 없으면 error에 이유를 쓰고 false를
     // 돌려준다.
@@ -258,7 +256,7 @@ void SkyComponent::SaveSettings(IniFile::Values& values) const
     values["Intensity"] = text;
 }
 
-// directional light와 달리 intensity의 inf는 받는다. path tracer가 NaN과 Inf인 sample을 버리는지 볼 때 inf로 둔다.
+// directional light와 달리 intensity의 inf는 받는다. Dynamic GI의 Path Traced 간접광이 NaN과 Inf인 sample을 버리는지 볼 때 inf로 둔다.
 void SkyComponent::LoadSettings(const IniFile::Values& values)
 {
     Properties properties = GetDefaultProperties();
@@ -423,8 +421,7 @@ void ReadSkyConditions(SkyComponent& sky, const MeasurementConditions::Values& v
     reading.applies.push_back([&sky, properties] { sky.SetProperties(properties); });
 }
 
-// raster와 path tracer가 그리는 조건을 Log와 capture의 줄에 담고 Restore로 되돌리게 한다. scene 은 ModelViewer::RegisterSceneConditions가,
-// path tracer의 설정은 PathTracerTuning이 더한다.
+// raster가 그리는 조건을 describe와 capture의 줄에 담고 restore로 되돌리게 한다. scene 은 ModelViewer::RegisterSceneConditions가 담는다.
 void RegisterMeasurementConditions(CameraComponent& camera, LightComponent& light, SkyComponent& sky)
 {
     MeasurementConditions::Register("camera", {
@@ -743,7 +740,6 @@ void ModelViewer::ShowScene(const PreparedScene& scene)
     m_ModelComponent.SetPath(Utility::ToUTF8(scene.file.gltfPath));
     m_SceneName = scene.name;
     Scene::LoadObjectSettings(scene.file.sections);
-    PathTracer::Reset();
     DynamicGI::Reset();
 }
 
@@ -852,7 +848,7 @@ void ModelViewer::RegisterSceneCommand(void)
 {
     ControlChannel::Register("scene", "scene open <scene file> | scene save: open opens the scene file, relative to the ModelViewer folder "
         "as -scene takes it, as the Scene menu does. The model changes, the objects take their settings in the scene file, so the camera "
-        "takes the pose and vertical field of view of the scene file and the lights change, and the path tracer starts over. Changes to the objects not saved, "
+        "takes the pose and vertical field of view of the scene file and the lights change. Changes to the objects not saved, "
         "such as a camera moved since, are lost. The settings, camera move speed, window and UI stay. "
         "Fails and changes nothing if the scene file cannot be opened. "
         "save writes the settings of the objects to the scene file open, as Save in the Scene menu does, and leaves its other lines. "
@@ -910,7 +906,6 @@ void ModelViewer::Startup( void )
     RayQuerySmokeTest::Run();
     RaytracingView::Initialize();
     RayPick::Initialize();
-    PathTracerTuning::Initialize();
     DynamicGI::Initialize();
 
     uint32_t rebuildValue;
@@ -976,7 +971,6 @@ void ModelViewer::Cleanup( void )
     Scene::RemoveObject(m_CameraObject);
     Scene::RemoveObject(m_ModelObject);
     DynamicGI::Shutdown();
-    PathTracerTuning::Shutdown();
     RayPick::Shutdown();
     m_RaytracingScene.Destroy();
     m_ModelInst = nullptr;
@@ -1012,7 +1006,6 @@ void ModelViewer::Update( float deltaT )
     SceneEditor::Update(m_Camera);
     m_SunPath.Update(Graphics::GetMeasuredFrameTime());
     DynamicGI::UpdateEditor(m_Camera);
-    PathTracerTuning::Update();
 
     GraphicsContext& gfxContext = GraphicsContext::Begin(L"Scene Update");
 
@@ -1157,12 +1150,6 @@ void ModelViewer::RenderScene( void )
         DepthOfField::Render(gfxContext, m_Camera.GetNearClip(), m_Camera.GetFarClip());
     else
         MotionBlur::RenderObjectBlur(gfxContext, g_VelocityBuffer);
-
-    // scene color의 마지막 pass 뒤에 덮어써서, PT가 raster와 같은 bloom, exposure, tone mapping을 거쳐 두 화면을 같은 조건으로 견주게 한다.
-    // raster는 그대로 그린다. PT의 Shading DDGI Probe Hit는 이 frame의 shadow
-    // pass가 그린 shadow map을 읽는다.
-    PathTracerTuning::Render(gfxContext.GetComputeContext(), m_Camera, m_MainViewport, m_RaytracingScene, m_Light.GetDirection(), m_Light.GetIlluminance(),
-        m_Sky.GetRadiance(), g_ShadowBuffer, m_ShadowCamera.GetShadowMatrix(), g_SceneColorBuffer);
 
     gfxContext.Finish();
 

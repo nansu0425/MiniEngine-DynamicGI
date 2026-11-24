@@ -361,7 +361,7 @@ namespace
         AfterFrames(kFramesToSettleLayout, [reply] { reply.Ok(Fields().Object("state", GetState("ui"))); });
     }
 
-    // 예전 Log 줄과 같은 해상도로 재려고 client 크기를 맞춘다. 실제 창 크기 변경과 같은 WM_SIZE 경로를 지난다.
+    // 예전 측정 조건의 줄과 같은 해상도로 재려고 client 크기를 맞춘다. 실제 창 크기 변경과 같은 WM_SIZE 경로를 지난다.
     void ResizeWindow(const std::string& arguments, const Reply& reply)
     {
         uint32_t width = 0, height = 0;
@@ -395,7 +395,7 @@ namespace
         FrameCapture::Target target;
         if (!FrameCapture::FindTarget(arguments.substr(0, targetEnd), target) || path.empty())
         {
-            reply.Error("usage: capture scene|overlay|display|pt|pt-truncated <path without extension>");
+            reply.Error("usage: capture scene|overlay|display <path without extension>");
             return;
         }
         FrameCapture::Request(target, path, reply);
@@ -558,22 +558,19 @@ namespace ControlChannel
             "(sections and values as in user.ini). set changes nothing and fails if a value does not read back as given. "
             "reset sets the setting at path, or every setting under the group at path, to its default as Reset to Default in Engine Tuning does, "
             "and an empty path resets all as Reset All does. The default is what the app has when user.ini does not have the setting", HandleSettings);
-        Register("describe", "describe: the conditions the scene and the path tracer are drawn in now, as a line that restore takes. "
-            "It has the scene file, camera, resolution, TAA, directional light, Sky, path tracer settings and the samples the path tracer has added", DescribeConditions);
-        Register("restore", "restore <line>: sets every condition in a line printed by Log, left beside a capture or given by describe, as Restore does. "
+        Register("describe", "describe: the conditions the scene is drawn in now, as a line that restore takes. "
+            "It has the scene file, camera, resolution, TAA, directional light and Sky", DescribeConditions);
+        Register("restore", "restore <line>: sets every condition in a line left beside a capture or given by describe. "
             "Fails and sets nothing if the line lacks a condition or one cannot be set, and unread names them. "
             "A line of another scene file opens that scene file as scene open does, keeping the camera of the line, "
             "and a scene file that cannot be opened is a condition that cannot be set, which note explains. "
-            "The resolution is only compared and note says how it differs. pt samples becomes the Target Samples and the path tracer starts over",
+            "The resolution is only compared and note says how it differs",
             RestoreConditions);
         Register("ui", "ui show|hide: same as F1. Hidden, the scene fills the client", SetUIVisible);
         Register("panel", "panel <name> open|close: same as the View menu", SetPanelOpen);
         Register("window", "window client <W>x<H>", ResizeWindow);
-        Register("capture", "capture scene|overlay|display|pt|pt-truncated <path without extension>: scene is the HDR before post effects as "
-            "float32 .dds, overlay is the debug view layer as .png with premultiplied alpha, display is the presented image with UI as .png, "
-            "pt is the path tracer's accumulation as float32 .dds with the mean in rgb and the samples it added in a, "
-            "pt-truncated is how many of those added samples ended at Max Bounces, per pixel as single-channel float32 .dds. "
-            "pt and pt-truncated reply on the next frame even while Show is off, and fail if the path tracer has not been shown. "
+        Register("capture", "capture scene|overlay|display <path without extension>: scene is the HDR before post effects as "
+            "float32 .dds, overlay is the debug view layer as .png with premultiplied alpha, display is the presented image with UI as .png. "
             "Beside the image it writes the state of that frame as <path>.state.json and "
             "the line of its conditions as <path>.conditions.txt, which line in the reply also has", CaptureFrame);
         Register("profile", "profile <scope> frames=<n>: the GPU time in ms of the Profiler scope named <scope> (as in its Scope column) "

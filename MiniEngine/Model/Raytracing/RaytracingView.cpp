@@ -107,7 +107,7 @@ namespace
     }
 
     // ray tracing의 기능인 AS, closest hit, visibility query를 보는 view의 설정이다.
-    // PT, DDGI처럼 ray tracing을 쓰는 rendering 기법은 ray tracing의 기능이 아니므로 그 설정은 여기에 두지 않는다.
+    // DDGI처럼 ray tracing을 쓰는 rendering 기법은 ray tracing의 기능이 아니므로 그 설정은 여기에 두지 않는다.
     TuningSection s_Section("Ray Tracing", ShowSettings, SaveSettings, LoadSettings);
 }
 
