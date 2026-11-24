@@ -12,6 +12,7 @@
 //
 
 #include "Model/Renderer/Common.hlsli"
+#include "Core/Shaders/SceneLights.hlsli"
 
 #ifdef ENABLE_SKINNING
 //#undef ENABLE_SKINNING
@@ -28,8 +29,7 @@ cbuffer GlobalConstants : register(b1)
     float4x4 ViewProjMatrix;
     float4x4 ShadowMatrix;
     float3 ViewerPos;
-    float3 LightDirection;
-    float3 LightIlluminance;
+    SceneLights Lights;
 }
 
 #ifdef ENABLE_SKINNING

@@ -117,11 +117,11 @@ void RaytracingView::Initialize(void)
 }
 
 void RaytracingView::Render(ComputeContext& context, const Math::Camera& camera, const D3D12_VIEWPORT& rasterViewport,
-    const RaytracingScene& scene, const Math::Vector3& lightDirection, ColorBuffer& target)
+    const RaytracingScene& scene, const SceneLights& lights, ColorBuffer& target)
 {
     if (s_Selection.group == kDebug)
     {
         RaytracingDebugView::Render(context, (RaytracingDebugView::View)s_Selection.view, !s_ShowSingleSidedBackFaces,
-            camera, rasterViewport, scene, lightDirection, target);
+            camera, rasterViewport, scene, lights, target);
     }
 }

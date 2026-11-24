@@ -26,12 +26,12 @@ static const uint kFirstRussianRouletteHit = 3;
 
 float3 ReflectDirectionalLight(HitSurface surface, GltfBrdfInput brdf)
 {
-    if (all(Lights.lightIlluminance == 0.0))
+    if (all(Lights.sceneLights.lightIlluminance == 0.0))
         return 0.0;
     RayDesc ray;
-    if (!DescribeSurfaceRay(surface.position, surface.geometryNormal, Lights.lightDirection, ray) || IsOccluded(ray, kCullSingleSidedBackFaces))
+    if (!DescribeSurfaceRay(surface.position, surface.geometryNormal, Lights.sceneLights.lightDirection, ray) || IsOccluded(ray, kCullSingleSidedBackFaces))
         return 0.0;
-    return EvaluateGltfBrdf(brdf, Lights.lightDirection) * Lights.lightIlluminance * max(0.0, dot(surface.shadingNormal, Lights.lightDirection));
+    return EvaluateGltfBrdf(brdf, Lights.sceneLights.lightDirection) * Lights.sceneLights.lightIlluminance * max(0.0, dot(surface.shadingNormal, Lights.sceneLights.lightDirection));
 }
 
 float3 TraceIncomingRadiance(RayDesc ray, inout Random random)
@@ -42,7 +42,7 @@ float3 TraceIncomingRadiance(RayDesc ray, inout Random random)
     {
         RayHit rayHit;
         if (!TraceClosestHit(ray, kCullSingleSidedBackFaces, rayHit))
-            return radiance + throughput * Lights.skyRadiance;
+            return radiance + throughput * Lights.sceneLights.skyRadiance;
 
         const HitSurface surface = GetHitSurface(rayHit, kSharpestTextureLod);
         const GltfBrdfInput brdf = MakeGltfBrdfInput(surface.baseColor.rgb, surface.metallic, surface.roughness, surface.shadingNormal, -ray.Direction);

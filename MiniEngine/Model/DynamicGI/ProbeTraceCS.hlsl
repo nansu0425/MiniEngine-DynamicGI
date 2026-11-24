@@ -39,7 +39,7 @@ ProbeRaySample TraceProbeRay(ProbePositions positions, float3 origin, float3 dir
     RayHit rayHit;
     if (!TraceUnclampedProbeRayHit(origin, direction, rayHit, sample.hitDistance))
     {
-        sample.radiance = Lights.skyRadiance;
+        sample.radiance = Lights.sceneLights.skyRadiance;
         return sample;
     }
     if (HitsSingleSidedBackFace(rayHit))

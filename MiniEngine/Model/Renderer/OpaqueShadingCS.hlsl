@@ -1,17 +1,17 @@
 #include "Model/Renderer/GBufferTextures.hlsli"
 #include "Model/Renderer/SurfaceRadiance.hlsli"
 #include "Core/Shaders/IrradianceProbes.hlsli"
+#include "Core/Shaders/SceneLights.hlsli"
 
 cbuffer Constants : register(b0)
 {
     float4x4 ShadowMatrix;
     float3 ViewerPos;
     uint Width;
-    float3 LightDirection;
     uint Height;
-    float3 LightIlluminance;
     uint IndirectIrradianceSource;
     uint ShadingOutput;
+    SceneLights Lights;
     IrradianceProbeGrid Probes;
 }
 
@@ -60,7 +60,7 @@ float3 GetSceneColor(RasterSurface surface, uint2 pixel)
         return indirectRadiance;
 
     const float3 shadowCoord = mul(ShadowMatrix, float4(surface.position, 1.0)).xyz;
-    return GetOutgoingRadiance(surface, view, shadowCoord, ShadowMap, ShadowMapSampler, LightDirection, LightIlluminance, indirectRadiance);
+    return GetOutgoingRadiance(surface, view, shadowCoord, ShadowMap, ShadowMapSampler, Lights, indirectRadiance);
 }
 
 [numthreads(8, 8, 1)]

@@ -1,14 +1,14 @@
 #include "Model/Renderer/Common.hlsli"
 #include "Model/Renderer/RasterMaterial.hlsli"
 #include "Model/Renderer/GBuffer.hlsli"
+#include "Core/Shaders/SceneLights.hlsli"
 
 cbuffer GlobalConstants : register(b1)
 {
     float4x4 ViewProj;
     float4x4 ShadowMatrix;
     float3 ViewerPos;
-    float3 LightDirection;
-    float3 LightIlluminance;
+    SceneLights Lights;
 }
 
 [RootSignature(Renderer_RootSig)]

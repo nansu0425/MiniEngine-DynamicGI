@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/pch.h"
+#include "Model/Lights/SceneLights.h"
 
 class RaytracingScene;
 class ShadowBuffer;
@@ -15,9 +16,7 @@ struct GIFrameInputs
     const Math::Camera& camera;
     const D3D12_VIEWPORT& rasterViewport;
     const RaytracingScene& scene;
-    Math::Vector3 lightDirection;
-    Math::Vector3 lightIlluminance;
-    Math::Vector3 skyRadiance;
+    SceneLights lights;
     ShadowBuffer& shadowMap;
     Math::Matrix4 shadowMatrix;
 };

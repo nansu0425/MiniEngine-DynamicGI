@@ -32,6 +32,7 @@
 #include "Model/Raytracing/RayPick.h"
 #include "Model/DynamicGI/DynamicGI.h"
 #include "Model/DynamicGI/DynamicGIVolume.h"
+#include "Model/Lights/SceneLights.h"
 #include "Model/Loader/glTF.h"
 #include "Model/Renderer/Renderer.h"
 #include "Model/Model.h"
@@ -182,6 +183,7 @@ private:
     // 측정 조건의 줄에 지금 scene 을 담고, 다른 scene 의 줄을 Restore하면 그 scene 을 연다.
     void RegisterSceneConditions(void);
     void ReadSceneConditions(const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading);
+    SceneLights DescribeSceneLights(void) const;
 
     // 한 번 연 model을 glTF 경로마다 남겨 다시 쓴다. Renderer::LoadModel은 load할 때마다 scene texture descriptor heap에서
     // descriptor를 할당하고 풀지 않으므로, scene 을 오갈 때마다 load하면 heap이 찬다.
@@ -1036,6 +1038,11 @@ void ModelViewer::Update( float deltaT )
     m_MainScissor.bottom = (LONG)g_SceneColorBuffer.GetHeight();
 }
 
+SceneLights ModelViewer::DescribeSceneLights(void) const
+{
+    return { m_Light.GetDirection(), m_Light.GetIlluminance(), m_Sky.GetRadiance() };
+}
+
 void ModelViewer::RenderScene( void )
 {
     GraphicsContext& gfxContext = GraphicsContext::Begin(L"Scene Render");
@@ -1055,17 +1062,16 @@ void ModelViewer::RenderScene( void )
     else
     {
         // Update global constants
-        Vector3 LightDirection = m_Light.GetDirection();
+        const SceneLights lights = DescribeSceneLights();
         // directional light가 어느 방향에 있어도 shadow map이 model 전체를 덮게 light 방향에서 본 model의 AABB를 감싼다.
-        m_ShadowCamera.UpdateMatrixToEnclose(-LightDirection, m_ModelInst.GetAxisAlignedBox(),
+        m_ShadowCamera.UpdateMatrixToEnclose(-lights.lightDirection, m_ModelInst.GetAxisAlignedBox(),
             (uint32_t)g_ShadowBuffer.GetWidth(), (uint32_t)g_ShadowBuffer.GetHeight(), 16);
 
         GlobalConstants globals;
         globals.ViewProjMatrix = m_Camera.GetViewProjMatrix();
         globals.ShadowMatrix = m_ShadowCamera.GetShadowMatrix();
         globals.CameraPos = m_Camera.GetPosition();
-        globals.LightDirection = LightDirection;
-        globals.LightIlluminance = m_Light.GetIlluminance();
+        globals.Lights = lights;
 
         // Begin rendering depth
         gfxContext.TransitionResource(g_SceneDepthBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, true);
@@ -1115,9 +1121,7 @@ void ModelViewer::RenderScene( void )
                 .camera = m_Camera,
                 .rasterViewport = viewport,
                 .scene = m_RaytracingScene,
-                .lightDirection = LightDirection,
-                .lightIlluminance = m_Light.GetIlluminance(),
-                .skyRadiance = m_Sky.GetRadiance(),
+                .lights = lights,
                 .shadowMap = g_ShadowBuffer,
                 .shadowMatrix = m_ShadowCamera.GetShadowMatrix(),
             };
@@ -1128,7 +1132,7 @@ void ModelViewer::RenderScene( void )
 
             Renderer::ShadeOpaqueSurfaces(gfxContext.GetComputeContext(), m_Camera, globals, g_SceneColorBuffer);
 
-            Renderer::DrawSkyBackground(gfxContext, viewport, scissor, m_Sky.GetRadiance());
+            Renderer::DrawSkyBackground(gfxContext, viewport, scissor, lights);
 
             DynamicGI::DrawProbes(gfxContext, m_Camera, viewport, scissor);
 
@@ -1159,6 +1163,6 @@ void ModelViewer::RenderScene( void )
 
 void ModelViewer::RenderSceneOverlay( GraphicsContext& gfxContext )
 {
-    RaytracingView::Render(gfxContext.GetComputeContext(), m_Camera, m_MainViewport, m_RaytracingScene, m_Light.GetDirection(), g_SceneOverlayBuffer);
+    RaytracingView::Render(gfxContext.GetComputeContext(), m_Camera, m_MainViewport, m_RaytracingScene, DescribeSceneLights(), g_SceneOverlayBuffer);
     DynamicGI::DrawOverlay(gfxContext, m_Camera);
 }

@@ -15,6 +15,7 @@
 #include "Model/Model.h"
 #include "Core/Graphics/Texture/TextureManager.h"
 #include "Model/ConstantBuffers.h"
+#include "Model/Lights/SceneLights.h"
 #include "Model/Renderer/LightManager.h"
 #include "Core/Graphics/Pipeline/RootSignature.h"
 #include "Core/Graphics/Pipeline/PipelineState.h"
@@ -114,11 +115,10 @@ namespace
         Matrix4 ShadowMatrix;
         XMFLOAT3 ViewerPos;
         uint32_t Width;
-        XMFLOAT3 LightDirection;
         uint32_t Height;
-        XMFLOAT3 LightIlluminance;
         uint32_t IndirectIrradianceSource;
         uint32_t ShadingOutput;
+        SceneLights Lights;
         IrradianceProbeGrid Probes;
     };
 }
@@ -505,14 +505,9 @@ uint8_t Renderer::GetPSO(uint16_t psoFlags)
     return (uint8_t)sm_PSOs.size() - 2;
 }
 
-void Renderer::DrawSkyBackground(GraphicsContext& gfxContext, const D3D12_VIEWPORT& viewport, const D3D12_RECT& scissor, const Vector3& skyRadiance)
+void Renderer::DrawSkyBackground(GraphicsContext& gfxContext, const D3D12_VIEWPORT& viewport, const D3D12_RECT& scissor, const SceneLights& lights)
 {
     ScopedTimer _prof(L"Sky Background", gfxContext);
-
-    __declspec(align(16)) struct
-    {
-        Vector3 SkyRadiance;
-    } constants = { skyRadiance };
 
     gfxContext.SetRootSignature(m_RootSig);
     gfxContext.SetPipelineState(m_SkyBackgroundPSO);
@@ -524,7 +519,7 @@ void Renderer::DrawSkyBackground(GraphicsContext& gfxContext, const D3D12_VIEWPO
     gfxContext.SetRenderTarget(g_SceneColorBuffer.GetRTV(), g_SceneDepthBuffer.GetDSV_DepthReadOnly());
     gfxContext.SetViewportAndScissor(viewport, scissor);
 
-    gfxContext.SetDynamicConstantBufferView(kMaterialConstants, sizeof(constants), &constants);
+    gfxContext.SetDynamicConstantBufferView(kMaterialConstants, sizeof(lights), &lights);
     gfxContext.Draw(3);
 }
 
@@ -535,8 +530,7 @@ void Renderer::ShadeOpaqueSurfaces(ComputeContext& context, const BaseCamera& ca
     OpaqueShadingConstants constants;
     constants.ShadowMatrix = globals.ShadowMatrix;
     XMStoreFloat3(&constants.ViewerPos, camera.GetPosition());
-    XMStoreFloat3(&constants.LightDirection, globals.LightDirection);
-    XMStoreFloat3(&constants.LightIlluminance, globals.LightIlluminance);
+    constants.Lights = globals.Lights;
     constants.Width = sceneColor.GetWidth();
     constants.Height = sceneColor.GetHeight();
     constants.IndirectIrradianceSource = GetIndirectIrradianceSource();

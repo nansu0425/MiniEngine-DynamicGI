@@ -2,6 +2,7 @@
 #include "Model/Raytracing/HitSurface.hlsli"
 #include "Model/Raytracing/SurfaceRay.hlsli"
 #include "Core/Shaders/ShaderUtility.hlsli"
+#include "Core/Shaders/SceneLights.hlsli"
 
 // RaytracingDebugView.h의 View와 같은 값이다.
 static const uint kHitT = 0;
@@ -24,7 +25,7 @@ cbuffer Constants : register(b0)
     float NearZ;
     float FarZ;
     uint CullSingleSidedBackFaces;
-    float3 LightDirection;
+    SceneLights Lights;
 };
 
 RWTexture2D<float4> Output : register(u0);
@@ -91,7 +92,7 @@ uint DebugViewRayFlags()
 // 면이 directional light를 가리면 false를 돌려준다 (DescribeSurfaceRay).
 bool DescribeLightRay(HitSurface surface, out RayDesc ray)
 {
-    return DescribeSurfaceRay(surface.position, surface.geometryNormal, LightDirection, ray);
+    return DescribeSurfaceRay(surface.position, surface.geometryNormal, Lights.lightDirection, ray);
 }
 
 // directional light가 보이면 흰색, 가려지면 검정이다.

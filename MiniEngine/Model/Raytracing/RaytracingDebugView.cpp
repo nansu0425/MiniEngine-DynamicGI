@@ -2,6 +2,7 @@
 #include "Model/Raytracing/CameraRays.h"
 #include "Model/Raytracing/RaytracingScene.h"
 #include "Model/Raytracing/SceneHeapTable.h"
+#include "Model/Lights/SceneLights.h"
 #include "Core/Camera/Camera.h"
 #include "Core/Graphics/GraphicsCore.h"
 #include "Core/Graphics/Command/CommandContext.h"
@@ -35,7 +36,7 @@ namespace
         float NearZ;
         float FarZ;
         uint32_t CullSingleSidedBackFaces;
-        XMFLOAT3 LightDirection;
+        SceneLights Lights;
     };
 }
 
@@ -60,7 +61,7 @@ const char* RaytracingDebugView::GetViewLabel(View view)
 }
 
 void RaytracingDebugView::Render(ComputeContext& context, View view, bool cullSingleSidedBackFaces, const Camera& camera, const D3D12_VIEWPORT& rasterViewport,
-    const RaytracingScene& scene, const Vector3& lightDirection, ColorBuffer& target)
+    const RaytracingScene& scene, const SceneLights& lights, ColorBuffer& target)
 {
     ScopedTimer _prof(L"Raytracing Debug View", context);
 
@@ -70,7 +71,7 @@ void RaytracingDebugView::Render(ComputeContext& context, View view, bool cullSi
     constants.NearZ = camera.GetNearClip();
     constants.FarZ = camera.GetFarClip();
     constants.CullSingleSidedBackFaces = cullSingleSidedBackFaces;
-    XMStoreFloat3(&constants.LightDirection, lightDirection);
+    constants.Lights = lights;
 
     s_OutputUAV.PointTo(0, target, target.GetUAV());
 

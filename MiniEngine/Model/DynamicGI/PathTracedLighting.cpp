@@ -31,9 +31,7 @@ namespace
     {
         CameraRays rays;
         PathTracedLighting::Settings settings;
-        Vector3 lightDirection;
-        Vector3 lightIlluminance;
-        Vector3 skyRadiance;
+        SceneLights lights;
     };
 
     // samplesPerFrame과 targetSamples는 쌓는 속도와 양만 정하므로 비교하지 않는다.
@@ -42,14 +40,19 @@ namespace
         return a.seed == b.seed && a.maxHits == b.maxHits && a.russianRoulette == b.russianRoulette;
     }
 
+    bool CanKeepAccumulating(const SceneLights& a, const SceneLights& b)
+    {
+        return XMVector3Equal(a.lightDirection, b.lightDirection) && XMVector3Equal(a.lightIlluminance, b.lightIlluminance) &&
+            XMVector3Equal(a.skyRadiance, b.skyRadiance);
+    }
+
     bool CanKeepAccumulating(const AccumulationConditions& a, const AccumulationConditions& b)
     {
         return XMVector3Equal(a.rays.origin, b.rays.origin) &&
             XMVector3Equal(a.rays.viewportCornerDirection, b.rays.viewportCornerDirection) &&
             XMVector3Equal(a.rays.pixelStepRight, b.rays.pixelStepRight) &&
             XMVector3Equal(a.rays.pixelStepDown, b.rays.pixelStepDown) &&
-            XMVector3Equal(a.lightDirection, b.lightDirection) && XMVector3Equal(a.lightIlluminance, b.lightIlluminance) &&
-            XMVector3Equal(a.skyRadiance, b.skyRadiance) && CanKeepAccumulating(a.settings, b.settings);
+            CanKeepAccumulating(a.lights, b.lights) && CanKeepAccumulating(a.settings, b.settings);
     }
 
     bool s_ResetRequested = true;
@@ -123,9 +126,7 @@ void PathTracedLighting::Accumulate(ComputeContext& context, const Settings& set
     const AccumulationConditions conditions = {
         .rays = DescribeCameraRays(inputs.camera, inputs.rasterViewport),
         .settings = settings,
-        .lightDirection = inputs.lightDirection,
-        .lightIlluminance = inputs.lightIlluminance,
-        .skyRadiance = inputs.skyRadiance,
+        .lights = inputs.lights,
     };
     if (s_ResetRequested || !CanKeepAccumulating(conditions, s_CurrentAccumConditions))
     {

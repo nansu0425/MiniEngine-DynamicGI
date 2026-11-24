@@ -32,6 +32,7 @@ class ColorBuffer;
 class ShadowCamera;
 class ShadowBuffer;
 struct GlobalConstants;
+struct SceneLights;
 struct Mesh;
 struct Joint;
 
@@ -74,7 +75,7 @@ namespace Renderer
     void ShadeOpaqueSurfaces(ComputeContext& context, const Math::BaseCamera& camera, const GlobalConstants& globals, ColorBuffer& sceneColor);
     // 불투명한 면을 다 그린 뒤, 아무 면도 그리지 않은 scene color의 pixel에 camera에서 바로 보이는 sky의 radiance (cd/m²)를 쓴다.
     // raster는 sky로 surface를 비추지 않으므로 이것이 raster가 sky를 쓰는 전부다.
-    void DrawSkyBackground(GraphicsContext& gfxContext, const D3D12_VIEWPORT& viewport, const D3D12_RECT& scissor, const Math::Vector3& skyRadiance);
+    void DrawSkyBackground(GraphicsContext& gfxContext, const D3D12_VIEWPORT& viewport, const D3D12_RECT& scissor, const SceneLights& lights);
 
     class MeshSorter
     {

@@ -1,13 +1,13 @@
 #include "Model/Renderer/Common.hlsli"
+#include "Core/Shaders/SceneLights.hlsli"
 
 cbuffer PSConstants : register(b0)
 {
-    // sky의 radiance (cd/m²). 모든 방향에서 같다.
-    float3 SkyRadiance;
+    SceneLights Lights;
 };
 
 [RootSignature(Renderer_RootSig)]
 float4 main() : SV_Target0
 {
-    return float4(SkyRadiance, 1);
+    return float4(Lights.skyRadiance, 1);
 }

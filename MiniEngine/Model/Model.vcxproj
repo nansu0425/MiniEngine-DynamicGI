@@ -104,6 +104,7 @@
     <ClInclude Include="DynamicGI\ProbeWeighting.h" />
     <ClInclude Include="DynamicGI\ProbeVisualization.h" />
     <ClInclude Include="Renderer\IrradianceProbeGrid.h" />
+    <ClInclude Include="Lights\SceneLights.h" />
     <ClInclude Include="DynamicGI\PathTracedLighting.h" />
     <ClInclude Include="Renderer\Renderer.h" />
     <ClInclude Include="Sponza\SponzaRenderer.h" />
