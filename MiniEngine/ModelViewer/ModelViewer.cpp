@@ -32,7 +32,6 @@
 #include "Model/Raytracing/RayPick.h"
 #include "Model/PathTracer/PathTracer.h"
 #include "Model/PathTracer/PathTracerTuning.h"
-#include "Model/PathTracer/BrdfTest.h"
 #include "Model/DynamicGI/DynamicGI.h"
 #include "Model/DynamicGI/DynamicGIVolume.h"
 #include "Model/Loader/glTF.h"
@@ -913,7 +912,6 @@ void ModelViewer::Startup( void )
     RayPick::Initialize();
     PathTracerTuning::Initialize();
     DynamicGI::Initialize();
-    BrdfTest::Initialize();
 
     uint32_t rebuildValue;
     if (CommandLineArgs::GetInteger(L"rebuild", rebuildValue))

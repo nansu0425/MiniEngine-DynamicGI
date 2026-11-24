@@ -94,7 +94,6 @@
     <ClInclude Include="Raytracing\EmissiveTriangles.h" />
     <ClInclude Include="PathTracer\PathTracer.h" />
     <ClInclude Include="PathTracer\PathTracerTuning.h" />
-    <ClInclude Include="PathTracer\BrdfTest.h" />
     <ClInclude Include="DynamicGI\DynamicGI.h" />
     <ClInclude Include="DynamicGI\DynamicGIVolume.h" />
     <ClInclude Include="DynamicGI\DynamicGIVolumeBox.h" />
@@ -135,7 +134,6 @@
     <ClCompile Include="Raytracing\EmissiveTriangles.cpp" />
     <ClCompile Include="PathTracer\PathTracer.cpp" />
     <ClCompile Include="PathTracer\PathTracerTuning.cpp" />
-    <ClCompile Include="PathTracer\BrdfTest.cpp" />
     <ClCompile Include="DynamicGI\DynamicGI.cpp" />
     <ClCompile Include="DynamicGI\DynamicGIVolume.cpp" />
     <ClCompile Include="DynamicGI\DynamicGIVolumeBox.cpp" />
@@ -298,7 +296,6 @@
     <FxCompile Include="PathTracer\PathTracerProbeHitIrradianceCS.hlsl">
       <ShaderModel>6.5</ShaderModel>
     </FxCompile>
-    <FxCompile Include="PathTracer\BrdfTestCS.hlsl" />
     <FxCompile Include="DynamicGI\PathTracedIndirectCS.hlsl">
       <ShaderModel>6.5</ShaderModel>
     </FxCompile>
