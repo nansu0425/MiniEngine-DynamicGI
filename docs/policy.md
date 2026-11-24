@@ -46,6 +46,7 @@ spec 의 doubleSided 는 camera 에서 그릴 때의 결과만 정하고, shadow
 - shading 하는 점이 놓인 면이 geometric normal 로 상대 점을 등지면 가려진 것으로 친다. 그 점에서 출발한 ray 는 바로 그 면을 앞에서 지나기 때문이다. normal map 을 적용한 shading normal 이 상대 점을 향해도 같다.
 - closest hit 와 visibility 가 같은 규칙을 따르므로 같은 ray 에서 둘이 보는 면이 같다. path tracing 의 MIS 처럼 두 query 의 결과를 섞는 곳은 두 query 가 같은 면을 본다는 것을 전제한다.
 - raster 의 shadow map 은 light 에서 보므로, shading 하는 점에서 본 결과와 같도록 single-sided material 의 앞면을 cull 한다.
+- shadow map 으로 구하는 directional light 의 visibility 는 shading 하는 점이 light 를 등지는지를 geometric normal 이 아니라 보간한 vertex normal 로 판정한다. geometric normal 로 판정하면 smooth shading 을 쓰는 곡면에서 light 를 등지는 triangle 만 어두워져 삼각형 무늬가 생긴다. vertex normal 에는 normal map 을 적용하지 않는다. ray 로 구하는 visibility 는 geometric normal 로 판정하므로, geometric normal 만 light 를 등지는 triangle 에서는 두 visibility 가 다르다.
 - 뒷면에 맞았는지를 알려는 query 는 cull 하지 않는다. DDGI probe 가 벽 안에 있는지 보는 ray 와, debug view 가 culling 을 끄고 보는 view 가 그렇다.
 - 모든 ray 를 양면으로 두고 camera 에서만 cull 하는 방식은 고르지 않았다. ray 가 single-sided 의 뒷면에 맞으면 그 면을 shading 해야 하는데, spec 은 그 뒷면이 어떻게 보이는지 정하지 않는다.
 

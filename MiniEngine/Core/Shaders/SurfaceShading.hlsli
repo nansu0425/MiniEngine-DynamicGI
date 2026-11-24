@@ -7,13 +7,13 @@
 #include "Core/Shaders/GltfBrdf.hlsli"
 
 // directional light가 shading하는 점에 닿는 비율. 면이 light를 가리는지는 docs/policy.md의 "camera 밖에서 본 doubleSided"가 정한다.
-// shadowCoord는 shadow map의 uv와 비교할 depth다. geometryNormal은 shading하는 점이 놓인 면의 normal이고, 점을 보는 쪽을 향한다.
-// geometryNormal은 방향만 쓰므로 길이가 1이 아니어도 된다.
+// shadowCoord는 shadow map의 uv와 비교할 depth다. vertexNormal은 shading하는 점에서 보간한 vertex normal이고, 점을 보는 쪽을 향한다.
+// vertexNormal은 방향만 쓰므로 길이가 1이 아니어도 된다.
 float GetDirectionalLightVisibility(Texture2D<float> shadowMap, SamplerComparisonState shadowMapSampler, float3 shadowCoord,
-    float3 geometryNormal, float3 lightDirection)
+    float3 vertexNormal, float3 lightDirection)
 {
     float visibility = shadowMap.SampleCmpLevelZero(shadowMapSampler, shadowCoord.xy, shadowCoord.z);
-    if (dot(geometryNormal, lightDirection) <= 0.0)
+    if (dot(vertexNormal, lightDirection) <= 0.0)
         visibility = 0.0;
     return visibility;
 }

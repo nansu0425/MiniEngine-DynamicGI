@@ -74,6 +74,7 @@ struct PathVertex
 {
     float3 position;
     float3 geometryNormal;
+    float3 vertexNormal;
     // 반사 방향을 고르는 normal
     float3 normal;
 #if LAMBERT_SHADING
@@ -96,6 +97,7 @@ PathVertex GetPathVertex(RayHit hit, float3 view)
     PathVertex vertex;
     vertex.position = surface.position;
     vertex.geometryNormal = surface.geometryNormal;
+    vertex.vertexNormal = GeometricNormals != 0 ? surface.geometryNormal : surface.vertexNormal;
     vertex.normal = GeometricNormals != 0 ? surface.geometryNormal : surface.shadingNormal;
 #if LAMBERT_SHADING
     // glTF spec과 다르다: Shading Lambert는 glTF의 metallic-roughness BRDF 대신 albedo가 baseColor x (1 - metallic)인 Lambert로
@@ -123,7 +125,7 @@ float3 GetIndirectHitRadianceWithoutIrradiance(PathVertex vertex)
     const bool lit = Furnace == 0 && any(LightIlluminance != 0.0);
     const float3 shadowCoord = mul(ShadowMatrix, float4(vertex.position, 1.0)).xyz;
     const float visibility = lit ?
-        GetDirectionalLightVisibility(ShadowMap, ShadowMapSampler, shadowCoord, vertex.geometryNormal, LightDirection) : 0.0;
+        GetDirectionalLightVisibility(ShadowMap, ShadowMapSampler, shadowCoord, vertex.vertexNormal, LightDirection) : 0.0;
     const float3 lightIlluminance = lit ? LightIlluminance : 0.0;
     return vertex.emission + EvaluateGltfBrdf(vertex.brdf, LightDirection) * vertex.brdfScale * lightIlluminance *
         (max(0.0, dot(vertex.normal, LightDirection)) * visibility);
