@@ -1,5 +1,6 @@
 #include "Model/DynamicGI/ProbeLighting.h"
 #include "Model/DynamicGI/GILights.h"
+#include "Model/DynamicGI/ProbeGuide.h"
 #include "Model/Raytracing/RaytracingScene.h"
 #include "Model/Raytracing/SceneHeapTable.h"
 #include "Core/Graphics/GraphicsCore.h"
@@ -31,7 +32,6 @@ using namespace Graphics;
 namespace
 {
     constexpr uint32_t kProbeIrradianceTexelsPerSide = 8;
-    constexpr uint32_t kProbeGuideTexelsPerSide = 16;
     constexpr uint32_t kProbeTileBorderTexels = 1;
     constexpr uint32_t kProbeAtlasGroupSize = 8;
 
@@ -262,7 +262,7 @@ namespace
         s_RayBackFaces.Create(L"Probe Ray Back Faces", GetRaysPerProbe(), GetProbeCount(grid), 1, DXGI_FORMAT_R8_UNORM);
         s_ProbesBackFaceRatio.Create(L"Probes Back Face Ratio", GetProbeCount(grid), 1, 1, DXGI_FORMAT_R32_FLOAT);
         s_ProbesOffset.Create(L"Probes Offset", GetProbeCount(grid), 1, 1, DXGI_FORMAT_R32G32B32A32_FLOAT);
-        s_ProbesGuide.Create(L"Probes Guide", kProbeGuideTexelsPerSide * kProbeGuideTexelsPerSide, GetProbeCount(grid), 1, DXGI_FORMAT_R32G32_FLOAT);
+        s_ProbesGuide.Create(L"Probes Guide", kProbeGuideTexelCount, GetProbeCount(grid), 1, DXGI_FORMAT_R32G32_FLOAT);
         s_ResetRequested = true;
     }
 

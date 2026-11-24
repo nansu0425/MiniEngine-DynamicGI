@@ -35,10 +35,24 @@ float GetProbeGuideTotalFlux(Texture2D<float2> guide, uint probe)
     return GetProbeGuideTexel(guide, probe, kProbeGuideTexelCount - 1).cumulativeFlux;
 }
 
+uint GetProbeGuideTexelIndexAt(uint2 coordinate)
+{
+    return coordinate.x + coordinate.y * kProbeGuideTexelsPerSide;
+}
+
+uint2 GetProbeGuideTexelCoordinate(uint texel)
+{
+    return uint2(texel % kProbeGuideTexelsPerSide, texel / kProbeGuideTexelsPerSide);
+}
+
+float2 GetProbeGuideOctahedralTexelPosition(float3 direction)
+{
+    return EncodeOctahedral(direction) * kProbeGuideTexelsPerSide;
+}
+
 uint GetProbeGuideTexelIndex(float3 direction)
 {
-    const uint2 coordinate = min(uint2(EncodeOctahedral(direction) * kProbeGuideTexelsPerSide), kProbeGuideTexelsPerSide - 1);
-    return coordinate.x + coordinate.y * kProbeGuideTexelsPerSide;
+    return GetProbeGuideTexelIndexAt(min(uint2(GetProbeGuideOctahedralTexelPosition(direction)), kProbeGuideTexelsPerSide - 1));
 }
 
 float GetProbeGuideTexelProbability(Texture2D<float2> guide, uint probe, uint texel)
@@ -86,8 +100,7 @@ float3 SampleProbeGuideDirection(Texture2D<float2> guide, ProbeRays rays, uint p
 
     // texel 내의 점을 고르기
     Random jitterRandom = MakeRandom(rays.update, uint2(guidedRay, probe), kGuidedRayJitterRandomSequence);
-    const float2 texelCoordinate = float2(texel % kProbeGuideTexelsPerSide, texel / kProbeGuideTexelsPerSide);
-    return DecodeOctahedral((texelCoordinate + jitterRandom.rand2()) / kProbeGuideTexelsPerSide);
+    return DecodeOctahedral((float2(GetProbeGuideTexelCoordinate(texel)) + jitterRandom.rand2()) / kProbeGuideTexelsPerSide);
 }
 
 #endif
