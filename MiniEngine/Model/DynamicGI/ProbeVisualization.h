@@ -28,6 +28,7 @@ namespace ProbeVisualization
         RaySampleColor raySampleColor = RaySampleColor::kDistance;
         bool showOffsets = false;
         bool showGuideTexels = false;
+        bool showGuideTexelBorders = false;
     };
 
     struct GuideTexelOfProbe
@@ -45,7 +46,8 @@ namespace ProbeVisualization
     void Initialize(void);
 
     void DrawSpheres(GraphicsContext& context, const Math::Camera& camera, const D3D12_VIEWPORT& viewport, const D3D12_RECT& scissor,
-        const ProbeLighting::Probes& probes, const ProbeWeighting::Settings& weighting, float radiusPerSpacing);
+        const ProbeLighting::Probes& probes, const ProbeWeighting::Settings& weighting, const Settings& settings,
+        std::optional<GuideTexelOfProbe> highlightedGuideTexel);
 
     std::optional<uint32_t> FindProbeUnderCursor(const Math::Camera& camera, const IrradianceProbeGrid& grid, float radiusPerSpacing);
 

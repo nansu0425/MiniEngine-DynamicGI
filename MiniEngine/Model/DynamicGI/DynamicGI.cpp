@@ -643,6 +643,10 @@ namespace
             "as the radiance of a white diffuse sphere there lit by the indirect light only.");
         ImGui::SliderFloat("Probe Radius", &probeSpheres.radiusPerSpacing, 0.0f, kMaxRadiusPerSpacing);
         ImGui::SetItemTooltip("Radius of the spheres as a fraction of the shortest probe spacing. At 0.5 neighbors touch.");
+        ImGui::Checkbox("Show Guide Texel Borders", &probeSpheres.showGuideTexelBorders);
+        ImGui::SetItemTooltip("Draws the borders of the guide map texels on each probe sphere, so that each region between the borders is the directions of one texel. "
+            "While the Texture Viewer shows Probes Guide with a texel of the selected probe's row inspected, or Selected Probe Guide with a texel inspected, "
+            "the borders of that texel on the selected probe's sphere are orange.");
         ImGui::Text("Selected Probe: %s", FormatSelectedProbe().c_str());
         ImGui::SetItemTooltip("Click a probe sphere to select it. Clicking elsewhere in the scene clears the selection.");
         if (const std::optional<ProbeReadback::ProbeRelocationReadback> relocation = FindSelectedProbeRelocation())
@@ -722,6 +726,7 @@ namespace
         values["Ray Sample Color"] = kRaySampleColorNames[(int)probeSpheres.raySampleColor];
         values["Show Probe Offsets"] = SettingValues::FormatFlag(probeSpheres.showOffsets);
         values["Show Guide Texels"] = SettingValues::FormatFlag(probeSpheres.showGuideTexels);
+        values["Show Guide Texel Borders"] = SettingValues::FormatFlag(probeSpheres.showGuideTexelBorders);
         values["Inspect Pixel"] = SettingValues::FormatFlag(s_Settings.inspectPixel);
         values["Inspect Label Scale"] = MeasurementConditions::FormatFloat(s_Settings.inspectLabelScale);
     }
@@ -749,6 +754,7 @@ namespace
         SettingValues::ReadName(values, "Ray Sample Color", kRaySampleColorNames, probeSpheres.raySampleColor);
         SettingValues::ReadFlag(values, "Show Probe Offsets", probeSpheres.showOffsets);
         SettingValues::ReadFlag(values, "Show Guide Texels", probeSpheres.showGuideTexels);
+        SettingValues::ReadFlag(values, "Show Guide Texel Borders", probeSpheres.showGuideTexelBorders);
         SettingValues::ReadFlag(values, "Inspect Pixel", s_Settings.inspectPixel);
         SettingValues::ReadFloat(values, "Inspect Label Scale", s_Settings.inspectLabelScale);
         ClampSettings();
@@ -1195,7 +1201,7 @@ void DynamicGI::DrawProbes(GraphicsContext& context, const Math::Camera& camera,
         return;
 
     ProbeVisualization::DrawSpheres(context, camera, viewport, scissor, ProbeLighting::GetProbes(), volume->settings.weighting,
-        s_Settings.probeSpheres.radiusPerSpacing);
+        s_Settings.probeSpheres, FindInspectedGuideTexelOfSelectedProbe());
 }
 
 void DynamicGI::DrawOverlay(GraphicsContext& context, const Math::Camera& camera)

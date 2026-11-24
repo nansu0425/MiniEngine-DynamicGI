@@ -69,6 +69,9 @@ namespace
         float radius;
         uint32_t classification;
         float maxBackFaceRatio;
+        uint32_t showGuideTexelBorders;
+        uint32_t highlightedProbe;
+        uint32_t highlightedGuideTexel;
     };
 
     __declspec(align(16)) struct LineConstants
@@ -197,7 +200,8 @@ void ProbeVisualization::Initialize(void)
 }
 
 void ProbeVisualization::DrawSpheres(GraphicsContext& context, const Camera& camera, const D3D12_VIEWPORT& viewport, const D3D12_RECT& scissor,
-    const ProbeLighting::Probes& probes, const ProbeWeighting::Settings& weighting, float radiusPerSpacing)
+    const ProbeLighting::Probes& probes, const ProbeWeighting::Settings& weighting, const Settings& settings,
+    std::optional<GuideTexelOfProbe> highlightedGuideTexel)
 {
     ScopedTimer _prof(L"Probe Spheres", context);
 
@@ -205,9 +209,12 @@ void ProbeVisualization::DrawSpheres(GraphicsContext& context, const Camera& cam
     constants.viewProj = camera.GetViewProjMatrix();
     constants.grid = probes.grid;
     XMStoreFloat3(&constants.cameraPosition, camera.GetPosition());
-    constants.radius = radiusPerSpacing * GetShortestProbeSpacing(probes.grid);
+    constants.radius = settings.radiusPerSpacing * GetShortestProbeSpacing(probes.grid);
     constants.classification = weighting.classification ? 1u : 0u;
     constants.maxBackFaceRatio = weighting.maxBackFaceRatio;
+    constants.showGuideTexelBorders = settings.showGuideTexelBorders ? 1u : 0u;
+    constants.highlightedProbe = highlightedGuideTexel ? highlightedGuideTexel->probe : kNoHighlightedGuideTexel;
+    constants.highlightedGuideTexel = highlightedGuideTexel ? highlightedGuideTexel->texel : kNoHighlightedGuideTexel;
 
     context.SetRootSignature(s_RootSignature);
     context.SetPipelineState(s_PSO);

@@ -11,6 +11,9 @@ cbuffer Constants : register(b0)
     float Radius;
     uint Classification;
     float MaxBackFaceRatio;
+    uint ShowGuideTexelBorders;
+    uint HighlightedProbe;
+    uint HighlightedGuideTexel;
 };
 
 struct ProbeQuadVertex
