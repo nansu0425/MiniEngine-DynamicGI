@@ -57,6 +57,7 @@ namespace SceneEditor
     float GetIconRadius(void);
     // camera 뒤에 있으면 false를 반환한다.
     bool ProjectToScene(const Math::Camera& camera, Math::Vector3 position, ImVec2& screenPosition);
+    bool ProjectSegmentToScene(const Math::Camera& camera, Math::Vector3 from, Math::Vector3 to, ImVec2& screenFrom, ImVec2& screenTo);
     // 화면에서 크기가 일정한 것을 그릴 때 쓰는, position에서 scene 1 pixel에 해당하는 world 길이
     float GetWorldLengthPerPixel(const Math::Camera& camera, Math::Vector3 position);
     bool Manipulate(const Math::Camera& camera, ImGuizmo::OPERATION operation, ImGuizmo::MODE mode, Math::Matrix4& transform);

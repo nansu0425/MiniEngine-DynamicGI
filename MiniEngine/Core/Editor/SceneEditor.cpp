@@ -101,6 +101,14 @@ namespace
         }
     }
 
+    ImVec2 ToScenePixels(const Vector4& clip)
+    {
+        const float x = clip.GetX() / clip.GetW();
+        const float y = clip.GetY() / clip.GetW();
+        const RECT scene = ImGuiLayer::GetSceneViewport();
+        return ImVec2(scene.left + (0.5f + 0.5f * x) * (scene.right - scene.left), scene.top + (0.5f - 0.5f * y) * (scene.bottom - scene.top));
+    }
+
     const char* GetAxesName(ImGuizmo::MODE axes)
     {
         return axes == ImGuizmo::WORLD ? "world" : "local";
@@ -459,6 +467,7 @@ void SceneEditor::RegisterCommands(const Camera& camera)
         "as clicking an object in the Scene Hierarchy panel or its icon, pressing W, E or R and the toolbar at the top right of the scene do. "
         "local turns the object about its own axes and world about the world axes. translate always follows the world axes. "
         "scale resizes the object along its own axes, and an object that cannot be resized ignores it. "
+        "An object that cannot be rotated, such as the Point Light, ignores rotate. "
         "state editor has them, and the objects in the order of the Scene Hierarchy panel, each with its world position and, in front of the camera, "
         "its icon's center in client pixels. on_screen is whether that center is in the scene. An object without an icon, "
         "such as the Camera, the Sky or the Model, has neither and no gizmo. Icons and the gizmo are drawn only while the UI is shown. "
@@ -490,11 +499,26 @@ bool SceneEditor::ProjectToScene(const Camera& camera, Vector3 position, ImVec2&
     if (w < camera.GetNearClip())
         return false;
 
-    const float x = clip.GetX() / clip.GetW();
-    const float y = clip.GetY() / clip.GetW();
-    const RECT scene = ImGuiLayer::GetSceneViewport();
-    screenPosition.x = scene.left + (0.5f + 0.5f * x) * (scene.right - scene.left);
-    screenPosition.y = scene.top + (0.5f - 0.5f * y) * (scene.bottom - scene.top);
+    screenPosition = ToScenePixels(clip);
+    return true;
+}
+
+bool SceneEditor::ProjectSegmentToScene(const Camera& camera, Vector3 from, Vector3 to, ImVec2& screenFrom, ImVec2& screenTo)
+{
+    Vector4 clipFrom = camera.GetViewProjMatrix() * from;
+    Vector4 clipTo = camera.GetViewProjMatrix() * to;
+    const float nearClip = camera.GetNearClip();
+    const float wFrom = clipFrom.GetW();
+    const float wTo = clipTo.GetW();
+    if (wFrom < nearClip && wTo < nearClip)
+        return false;
+
+    if (wFrom < nearClip)
+        clipFrom = Lerp(clipFrom, clipTo, (nearClip - wFrom) / (wTo - wFrom));
+    else if (wTo < nearClip)
+        clipTo = Lerp(clipTo, clipFrom, (nearClip - wTo) / (wFrom - wTo));
+    screenFrom = ToScenePixels(clipFrom);
+    screenTo = ToScenePixels(clipTo);
     return true;
 }
 

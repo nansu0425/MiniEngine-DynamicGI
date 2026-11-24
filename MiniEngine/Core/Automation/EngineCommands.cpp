@@ -549,6 +549,8 @@ namespace ControlChannel
             "<path> joins keys with '.', as in camera or settings.Engine Tuning, and keeps only that part. "
             "Positions are in world units. Camera angles are in radians: heading turns about world up (+y), 0 looking toward -z and growing toward -x, "
             "and pitch is up from the horizon. Light elevation and azimuth are in degrees as light set takes them. "
+            "local_lights has the Point Light and Spot Light the scene has, with intensity in candela, cone angles in radians and "
+            "direction toward the light, the local +Z, as in light. "
             "aspect is width over height. Sizes and left, top are in client pixels from the top left. "
             "settings has every section as settings get reads it. Commands that change the state reply with the changed part as state", ReplyState);
         Register("status", "status", ReplyStatus);
@@ -559,12 +561,13 @@ namespace ControlChannel
             "reset sets the setting at path, or every setting under the group at path, to its default as Reset to Default in Engine Tuning does, "
             "and an empty path resets all as Reset All does. The default is what the app has when user.ini does not have the setting", HandleSettings);
         Register("describe", "describe: the conditions the scene is drawn in now, as a line that restore takes. "
-            "It has the scene file, camera, resolution, TAA, directional light and Sky", DescribeConditions);
+            "It has the scene file, camera, resolution, TAA, directional light, Sky and the Point Light and Spot Light the scene has", DescribeConditions);
         Register("restore", "restore <line>: sets every condition in a line left beside a capture or given by describe. "
             "Fails and sets nothing if the line lacks a condition or one cannot be set, and unread names them. "
             "A line of another scene file opens that scene file as scene open does, keeping the camera of the line, "
             "and a scene file that cannot be opened is a condition that cannot be set, which note explains. "
-            "The resolution is only compared and note says how it differs",
+            "The resolution is only compared and note says how it differs. "
+            "A Point Light or Spot Light with no key in the line is taken out of the scene, and one with keys is put in it",
             RestoreConditions);
         Register("ui", "ui show|hide: same as F1. Hidden, the scene fills the client", SetUIVisible);
         Register("panel", "panel <name> open|close: same as the View menu", SetPanelOpen);

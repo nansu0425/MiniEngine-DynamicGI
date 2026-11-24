@@ -5,10 +5,13 @@
 #include "Core/Math/Matrix3.h"
 #include "Core/Scene/Scene.h"
 
+#include <string>
+#include <vector>
+
 class LightComponent : public Scene::Component
 {
 public:
-    enum class Type { Directional };
+    enum class Type { Directional, Point, Spot };
 
     struct Properties
     {
@@ -17,9 +20,11 @@ public:
         Math::Vector3 position;
         Math::Vector3 color;
         float intensity;
+        float innerConeAngle;
+        float outerConeAngle;
     };
 
-    LightComponent();
+    explicit LightComponent(Type type);
 
     Type GetType() const { return m_Type; }
     const Properties& GetProperties() const { return m_Properties; }
@@ -34,23 +39,30 @@ public:
     virtual void LoadSettings(const IniFile::Values& values) override;
 
 private:
-    static Properties GetDefaultProperties();
+    static std::vector<std::string> ListSettingKeys(Type type);
+    static Properties GetDefaultProperties(Type type);
 
     Type m_Type;
     Properties m_Properties;
 };
 
+constexpr char kPointLightName[] = "Point Light";
+constexpr char kSpotLightName[] = "Spot Light";
+
 // spec의 기본 intensity는 1 lux이지만, 기본 화면과 harness baseline의 Exposure가 맞춰 둔 밝기를 지키도록 4π로 둔다. 그 Exposure를
 // 맞출 때의 raster는 diffuse에 1/π가 없어 intensity 4로 지금의 4π만큼 밝았다.
-constexpr float kDefaultLightIntensity = 4.0f * DirectX::XM_PI;
+constexpr float kDefaultDirectionalLightIntensity = 4.0f * DirectX::XM_PI;
 
 bool IsColor(Math::Vector3 color);
 
-LightComponent& AssembleLight(Scene::Object& object);
+LightComponent& AssembleLight(Scene::Object& object, LightComponent::Type type);
 
-void RegisterLight(LightComponent& light);
+void RegisterDirectionalLight(LightComponent& light);
+void RegisterLocalLights(void);
 void ShowLightDetails(LightComponent& light);
 
-// light의 rotation은 user.ini처럼 +Z와 +Y로 적어, 다시 읽으면 bit 단위로 같은 rotation이 된다. position은 조명에 영향이 없어 적지 않는다.
-void DescribeLightConditions(const LightComponent& light, MeasurementConditions::Values& values);
-void ReadLightConditions(LightComponent& light, const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading);
+// directional light의 rotation은 user.ini처럼 +Z와 +Y로 적어, 다시 읽으면 bit 단위로 같은 rotation이 된다. position은 조명에 영향이 없어 적지 않는다.
+void DescribeDirectionalLightConditions(const LightComponent& light, MeasurementConditions::Values& values);
+void ReadDirectionalLightConditions(LightComponent& light, const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading);
+void DescribeLocalLightConditions(MeasurementConditions::Values& values);
+void ReadLocalLightConditions(const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading);

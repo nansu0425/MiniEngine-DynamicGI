@@ -206,12 +206,14 @@ private:
     ModelComponent& m_ModelComponent = m_ModelObject.AddComponent<ModelComponent>(m_ModelInst);
     RaytracingScene m_RaytracingScene;
     ShadowCamera m_ShadowCamera;
-    Scene::Object m_LightObject{ "Directional Light" };
-    LightComponent& m_Light = AssembleLight(m_LightObject);
-    SunPathComponent& m_SunPath = m_LightObject.AddComponent<SunPathComponent>(m_Light);
+    Scene::Object m_DirectionalLightObject{ "Directional Light" };
+    LightComponent& m_DirectionalLight = AssembleLight(m_DirectionalLightObject, LightComponent::Type::Directional);
+    SunPathComponent& m_SunPath = m_DirectionalLightObject.AddComponent<SunPathComponent>(m_DirectionalLight);
     Scene::Object m_SkyObject{ "Sky" };
     SkyComponent& m_Sky = m_SkyObject.AddComponent<SkyComponent>();
     Scene::Object m_GIVolumeObject{ kDynamicGIVolumeName };
+    Scene::Object m_PointLightObject{ kPointLightName };
+    Scene::Object m_SpotLightObject{ kSpotLightName };
 };
 
 CREATE_APPLICATION( ModelViewer )
@@ -224,8 +226,8 @@ const wchar_t kScenesFolder[] = L"Scenes/";
 // 기본값은 맑은 날 한낮의 두 illuminance의 비로 정한다. 하나는 해가 비추는 면이고, 다른 하나는 해만 가려진 그늘이다.
 // 그늘은 하늘의 빛만 받는다고 본다. 실제로는 그늘을 만든 물체가 하늘 일부를 가리고 빛을 반사하기도 하는데, 이 둘은 무시한다.
 // Wikipedia "Daylight"의 illuminance 표는 앞의 것을 111,000 lux로, 뒤의 것을 20,000 lux로 든다. 표에는 출처 표기가 없고 값도
-// 어림이다. sky의 radiance가 L이면 위를 향한 면은 πL lux를 받는다. 그래서 πL : kDefaultLightIntensity = 20,000 : 111,000이다.
-constexpr float kDefaultSkyIntensity = kDefaultLightIntensity / XM_PI * (20000.0f / 111000.0f);
+// 어림이다. sky의 radiance가 L이면 위를 향한 면은 πL lux를 받는다. 그래서 πL : kDefaultDirectionalLightIntensity = 20,000 : 111,000이다.
+constexpr float kDefaultSkyIntensity = kDefaultDirectionalLightIntensity / XM_PI * (20000.0f / 111000.0f);
 
 // scene file과 측정 조건의 줄에 세로 FOV가 없을 때의 값 (radian). FOV를 scene 마다 정하기 전의 camera는 늘 upstream Camera가 처음 두는
 // XM_PIDIV4 (45°)로 그렸으므로, 그때의 scene file과 줄이 그때와 같은 화면이 된다. scripts/viewer.py가 이 이름과 형식으로 읽는다.
@@ -424,7 +426,7 @@ void ReadSkyConditions(SkyComponent& sky, const MeasurementConditions::Values& v
 }
 
 // raster가 그리는 조건을 describe와 capture의 줄에 담고 restore로 되돌리게 한다. scene 은 ModelViewer::RegisterSceneConditions가 담는다.
-void RegisterMeasurementConditions(CameraComponent& camera, LightComponent& light, SkyComponent& sky)
+void RegisterMeasurementConditions(CameraComponent& camera, LightComponent& directionalLight, SkyComponent& sky)
 {
     MeasurementConditions::Register("camera", {
         [&camera](MeasurementConditions::Values& values) { DescribeCameraConditions(camera, values); },
@@ -433,9 +435,10 @@ void RegisterMeasurementConditions(CameraComponent& camera, LightComponent& ligh
     MeasurementConditions::Register("size", { DescribeSceneSize, ReadSceneSize, {} });
     MeasurementConditions::Register("taa", { DescribeTaa, ReadTaa, { "settings.Engine Tuning" } });
     MeasurementConditions::Register("light", {
-        [&light](MeasurementConditions::Values& values) { DescribeLightConditions(light, values); },
-        [&light](const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading) { ReadLightConditions(light, values, reading); },
+        [&directionalLight](MeasurementConditions::Values& values) { DescribeDirectionalLightConditions(directionalLight, values); },
+        [&directionalLight](const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading) { ReadDirectionalLightConditions(directionalLight, values, reading); },
         { "light" } });
+    MeasurementConditions::Register("local lights", { DescribeLocalLightConditions, ReadLocalLightConditions, { "local_lights" } });
     MeasurementConditions::Register("sky", {
         [&sky](MeasurementConditions::Values& values) { DescribeSkyConditions(sky, values); },
         [&sky](const MeasurementConditions::Values& values, MeasurementConditions::Reading& reading) { ReadSkyConditions(sky, values, reading); },
@@ -444,7 +447,7 @@ void RegisterMeasurementConditions(CameraComponent& camera, LightComponent& ligh
 
 void UnregisterMeasurementConditions(void)
 {
-    for (const char* group : { "scene", "camera", "size", "taa", "light", "sky" })
+    for (const char* group : { "scene", "camera", "size", "taa", "light", "local lights", "sky" })
         MeasurementConditions::Unregister(group);
 }
 
@@ -882,7 +885,7 @@ void ModelViewer::RegisterSceneCommand(void)
             return;
         }
         ControlChannel::Fields state;
-        for (const char* group : { "scene", "model", "camera", "light", "sky" })
+        for (const char* group : { "scene", "model", "camera", "light", "local_lights", "sky" })
             state.Merge(ControlChannel::GetState(group));
         reply.Ok(ControlChannel::Fields().Object("state", state));
     });
@@ -925,10 +928,14 @@ void ModelViewer::Startup( void )
     // scene 을 열 때 object가 scene file의 설정을 받도록 먼저 등록한다.
     Scene::AddObject(m_ModelObject);
     Scene::AddObject(m_CameraObject);
-    Scene::AddObject(m_LightObject);
+    Scene::AddObject(m_DirectionalLightObject);
     Scene::AddObject(m_SkyObject);
     AssembleDynamicGIVolume(m_GIVolumeObject, [this] { return m_ModelInst.GetAxisAlignedBox(); });
     Scene::RegisterOptionalObject(m_GIVolumeObject);
+    AssembleLight(m_PointLightObject, LightComponent::Type::Point);
+    Scene::RegisterOptionalObject(m_PointLightObject);
+    AssembleLight(m_SpotLightObject, LightComponent::Type::Spot);
+    Scene::RegisterOptionalObject(m_SpotLightObject);
 #ifdef LEGACY_RENDERER
     // LEGACY_RENDERER는 scene file을 읽지 않으므로 Sponza::Startup이 정한 camera를 그대로 둔다.
     m_SceneName = GetSceneName(scenePath);
@@ -955,21 +962,26 @@ void ModelViewer::Startup( void )
     SceneEditor::RegisterComponentDetails<SunPathComponent>(ShowSunPathDetails);
     SceneEditor::RegisterComponentDetails<SkyComponent>(ShowSkyDetails);
     SceneEditor::RegisterCommands(m_Camera);
-    RegisterLight(m_Light);
+    RegisterDirectionalLight(m_DirectionalLight);
+    RegisterLocalLights();
     RegisterSunPath(m_SunPath);
     RegisterSky(m_Sky);
     RegisterSceneConditions();
-    RegisterMeasurementConditions(camera, m_Light, m_Sky);
+    RegisterMeasurementConditions(camera, m_DirectionalLight, m_Sky);
 }
 
 void ModelViewer::Cleanup( void )
 {
     UnregisterMeasurementConditions();
     UnregisterSunPath();
+    Scene::RemoveObject(m_SpotLightObject);
+    Scene::UnregisterOptionalObject(m_SpotLightObject);
+    Scene::RemoveObject(m_PointLightObject);
+    Scene::UnregisterOptionalObject(m_PointLightObject);
     Scene::RemoveObject(m_GIVolumeObject);
     Scene::UnregisterOptionalObject(m_GIVolumeObject);
     Scene::RemoveObject(m_SkyObject);
-    Scene::RemoveObject(m_LightObject);
+    Scene::RemoveObject(m_DirectionalLightObject);
     Scene::RemoveObject(m_CameraObject);
     Scene::RemoveObject(m_ModelObject);
     DynamicGI::Shutdown();
@@ -1040,7 +1052,7 @@ void ModelViewer::Update( float deltaT )
 
 SceneLights ModelViewer::DescribeSceneLights(void) const
 {
-    return { m_Light.GetDirection(), m_Light.GetIlluminance(), m_Sky.GetRadiance() };
+    return { m_DirectionalLight.GetDirection(), m_DirectionalLight.GetIlluminance(), m_Sky.GetRadiance() };
 }
 
 void ModelViewer::RenderScene( void )

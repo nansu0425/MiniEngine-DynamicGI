@@ -1547,6 +1547,203 @@ def check_editor(session, check, changes):
     check('editor and camera are back as they were', editor_state() == original and session.ask_ok('state camera')['state']['camera'] == start)
 
 
+LOCAL_LIGHT_SCENE_DIR = HARNESS_DIR / 'selftest-local-lights'
+LOCAL_LIGHT_DEFAULTS = {
+    'Point Light': {'Type': 'Point', 'Position': '0,0,0', 'Color': '1,1,1', 'Intensity': '1'},
+    'Spot Light': {'Type': 'Spot', 'Position': '0,0,0', 'Direction': '0,0,1', 'Up': '0,1,0', 'Color': '1,1,1', 'Intensity': '1',
+                   'Inner Cone Angle': '0', 'Outer Cone Angle': '0.785398185'},
+}
+LOCAL_LIGHT_SETTINGS = {
+    'Point Light': [{'Position': '-400,200,0'}, {'Color': '0.5,1,0.25'}, {'Intensity': '50'}],
+    'Spot Light': [{'Position': '0,300,0'}, {'Direction': '0,1,0', 'Up': '0,0,-1'}, {'Color': '1,0.5,0.25'}, {'Intensity': '200'},
+                   {'Inner Cone Angle': '0.300000012'}, {'Outer Cone Angle': '0.600000024'}],
+}
+LOCAL_LIGHT_REJECTED = [
+    ('Point Light', 'Intensity=-1'), ('Point Light', 'Intensity=nan'), ('Point Light', 'Color=1.5,0,0'), ('Point Light', 'Position=1,2'),
+    ('Point Light', 'Type=Spot'), ('Point Light', 'Direction=0,1,0'), ('Spot Light', 'Inner Cone Angle=0.600000024'),
+    ('Spot Light', 'Inner Cone Angle=0.7'), ('Spot Light', 'Inner Cone Angle=-0.1'), ('Spot Light', 'Outer Cone Angle=1.6'),
+    ('Spot Light', 'Outer Cone Angle=0.2'), ('Spot Light', 'Inner Cone Angle=0.5; Outer Cone Angle=0.5'),
+    ('Spot Light', 'Direction=0,0,0; Up=0,1,0'), ('Spot Light', 'Direction=0,0.6,-0.8'), ('Spot Light', 'Type=Point'),
+]
+
+
+def copy_scene_file(scene, folder):
+    folder.mkdir(parents=True, exist_ok=True)
+    copied = folder / Path(scene).name
+    gltf = Path(os.path.relpath(VIEWER_DIR / scene_gltf(scene), folder)).as_posix()
+    text = (VIEWER_DIR / scene).read_text(encoding='utf-8')
+    copied.write_text(re.sub(r'^glTF=.*$', lambda _: f'glTF={gltf}', text, count=1, flags=re.M), encoding='utf-8')
+    return copied.relative_to(VIEWER_DIR).as_posix()
+
+
+def as_saved_local_light(light):
+    saved = {'Type': light['type'], 'Position': ','.join(str(light['position'][axis]) for axis in 'xyz'),
+             'Color': ','.join(str(light['color'][channel]) for channel in 'rgb'), 'Intensity': str(light['intensity'])}
+    if light['type'] == 'Spot':
+        saved.update({'Direction': ','.join(str(light['direction'][axis]) for axis in 'xyz'),
+                      'Inner Cone Angle': str(light['inner_cone_angle']), 'Outer Cone Angle': str(light['outer_cone_angle'])})
+    return saved
+
+
+def check_local_lights(session, check, changes):
+    import numpy as np
+    from PIL import Image
+
+    def local_lights():
+        return session.ask_ok('state local_lights')['state']['local_lights']
+
+    def saved(name):
+        return session.ask_ok(f'editor get {name}')['values']
+
+    def editor_state():
+        return session.ask_ok('state editor')['state']['editor']
+
+    start_line = session.ask_ok('describe')['line']
+    start_editor = editor_state()
+    scene = copy_scene_file(session.instance['scene'], LOCAL_LIGHT_SCENE_DIR)
+    session.ask_ok(f'scene open {scene}')
+    names = list(LOCAL_LIGHT_DEFAULTS)
+    session.ask_ok(f'frames {SETTLE_FRAMES}')
+    before = read_dds_rgba32f(capture(session, 'scene', 'selftest-local-lights-before'))
+
+    check('state local_lights is empty while the scene has no local light', local_lights() == {} and not any(name in editor_state()['objects'] for name in names),
+          str(local_lights()))
+
+    for name in names:
+        record_change(session, changes, f'editor add {name}', f'editor add {name}', 'editor')
+    editor, lights = editor_state(), local_lights()
+    defaults = {name: saved(name) for name in names}
+    check('editor add puts the Point Light and Spot Light in the scene with their defaults and selects the last, and state local_lights lists them',
+          editor['selected'] == names[-1] and all(name in editor['objects'] for name in names) and defaults == LOCAL_LIGHT_DEFAULTS
+          and list(lights) == names and all(as_saved_local_light(lights[name]) == {key: value for key, value in defaults[name].items() if key != 'Up'} for name in names),
+          f'{editor["selected"]}; {defaults}; {lights}')
+
+    whole = without_time_varying(session.ask_ok('state')['state'])
+    again = session.ask(f'editor add {names[0]}')
+    check('editor add of a local light already in the scene fails and changes nothing',
+          not again['ok'] and without_time_varying(session.ask_ok('state')['state']) == whole, again.get('error'))
+
+    misread = []
+    for name, groups in LOCAL_LIGHT_SETTINGS.items():
+        for group in groups:
+            reply = session.ask(f'editor set {name}: ' + '; '.join(f'{key}={value}' for key, value in group.items()))
+            values = saved(name)
+            if not reply['ok'] or any(values[key] != value for key, value in group.items()):
+                misread.append(f'{name} {group}: {reply.get("error") or values}')
+    lights = local_lights()
+    spot = lights['Spot Light']
+    expected = {name: {**LOCAL_LIGHT_DEFAULTS[name], **{key: value for group in groups for key, value in group.items()}} for name, groups in LOCAL_LIGHT_SETTINGS.items()}
+    check('editor set changes each key of the local lights, and state local_lights gives what editor get gives',
+          not misread and all(saved(name) == expected[name] for name in names)
+          and all(as_saved_local_light(lights[name]) == {key: value for key, value in expected[name].items() if key != 'Up'} for name in names)
+          and np.abs(rotate(quaternion_of(spot['rotation']), [0, 1, 0]) - numbers_of(expected['Spot Light']['Up'])).max() <= 1e-6,
+          '; '.join(misread) or str(lights))
+
+    whole = without_time_varying(session.ask_ok('state')['state'])
+    accepted = []
+    for name, assignment in LOCAL_LIGHT_REJECTED:
+        response = session.ask(f'editor set {name}: {assignment}')
+        if response['ok'] or without_time_varying(session.ask_ok('state')['state']) != whole:
+            accepted.append(f'{name}: {assignment}')
+    check('editor set of a local light fails and changes nothing for a value out of range, a cone angle pair the spec does not allow, '
+          'another type or a key of another type', not accepted, ', '.join(accepted))
+
+    session.ask_ok(f'frames {SETTLE_FRAMES}')
+    after = read_dds_rgba32f(capture(session, 'scene', 'selftest-local-lights-after'))
+    check('scene is bit-identical with the local lights in it, as nothing renders them yet', np.array_equal(before.view(np.uint32), after.view(np.uint32)),
+          describe_difference(before, after))
+
+    start_pose = session.ask_ok('state camera')['state']['camera']
+    session.ask_ok('ui show')
+    session.ask_ok('pose look-at 0 250 0')
+
+    def around(name, shot):
+        session.ask_ok('frames 2')
+        icon = editor_state()['objects'][name]['screen']
+        x, y = round(float(icon['x'])), round(float(icon['y']))
+        response = capture_with_state(session, 'display', shot)
+        image = np.asarray(Image.open(response['path']))
+        return image[max(0, y - 150):y + 150, max(0, x - 150):x + 150], response
+
+    session.ask_ok('editor select none')
+    spot_unselected, _ = around('Spot Light', 'selftest-local-lights-spot-unselected')
+    record_change(session, changes, 'editor select Spot Light', 'editor select Spot Light', 'editor')
+    record_change(session, changes, 'editor mode rotate', 'editor mode rotate', 'editor')
+    spot_rotate, shot = around('Spot Light', 'selftest-local-lights-spot-rotate')
+    spot_rotate_again, _ = around('Spot Light', 'selftest-local-lights-spot-rotate-again')
+    session.ask_ok('editor mode translate')
+    spot_translate, _ = around('Spot Light', 'selftest-local-lights-spot-translate')
+    state_file = json.loads(Path(shot['state']).read_text(encoding='utf-8'), parse_float=str)
+    check('editor select and mode pick the Spot Light and the gizmo, the display around it differs with the selection and between the modes '
+          'but not within one, and the state file of the shot has the local lights',
+          editor_state()['selected'] == 'Spot Light' and state_file['editor']['gizmo_mode'] == 'rotate' and state_file['local_lights'] == local_lights()
+          and np.array_equal(spot_rotate, spot_rotate_again) and not np.array_equal(spot_rotate, spot_translate)
+          and not np.array_equal(spot_unselected, spot_rotate),
+          f'{state_file["editor"]["selected"]}, {state_file["editor"]["gizmo_mode"]}')
+
+    session.ask_ok('editor select Point Light')
+    session.ask_ok('editor mode rotate')
+    point_rotate, _ = around('Point Light', 'selftest-local-lights-point-rotate')
+    session.ask_ok('editor mode scale')
+    point_scale, _ = around('Point Light', 'selftest-local-lights-point-scale')
+    session.ask_ok('editor mode translate')
+    point_translate, _ = around('Point Light', 'selftest-local-lights-point-translate')
+    check('the Point Light has no rotate gizmo: the display around it in rotate mode is the one in scale mode, which it ignores too, and differs in translate mode',
+          np.array_equal(point_rotate, point_scale) and not np.array_equal(point_rotate, point_translate))
+    session.ask_ok('editor select none')
+    session.ask_ok('ui hide')
+    session.ask_ok('pose ' + ' '.join(str(start_pose[key]) for key in ['x', 'y', 'z', 'heading', 'pitch']))
+
+    lights = local_lights()
+    session.ask_ok('scene save')
+    sections = read_scene_file(scene)
+    in_file = {name: dict(sections[name]) if sections.has_section(name) else None for name in names}
+    session.ask_ok('editor set Spot Light: Intensity=7')
+    session.ask_ok(f'scene open {scene}')
+    check('scene save writes the local lights to their sections, and scene open of the file brings them back as saved',
+          all(in_file[name] == expected[name] for name in names) and local_lights() == lights, f'{in_file}; {local_lights()}')
+
+    line = session.ask_ok('describe')['line']
+    keys = [key for key, _ in (item.split('=', 1) for item in line.split('; ')) if key.startswith(('point light ', 'spot light '))]
+    session.ask_ok('editor set Spot Light: Intensity=7')
+    session.ask_ok(f'editor remove {names[0]}')
+    restored = session.ask_ok(f'restore {line}')
+    check('describe has the keys of the local lights, and restore of its line brings back a removed light and the values of the other',
+          sorted(keys) == sorted([f'point light {key}' for key in ['position', 'color', 'intensity']]
+                                 + [f'spot light {key}' for key in ['position', 'direction', 'up', 'color', 'intensity', 'inner cone angle', 'outer cone angle']])
+          and local_lights() == lights and restored['state']['local_lights'] == lights and restored['line'] == line,
+          f'{keys}; {local_lights()}')
+
+    old_line = '; '.join(item for item in line.split('; ') if not item.startswith(('point light ', 'spot light ')))
+    session.ask_ok(f'restore {old_line}')
+    check('restore of a line without local light keys, as lines from before the local lights are, takes them out of the scene',
+          local_lights() == {} and not any(name in editor_state()['objects'] for name in names), str(local_lights()))
+
+    session.ask_ok(f'restore {line}')
+    whole = without_time_varying(session.ask_ok('state')['state'])
+    wrong = line.replace('spot light inner cone angle=0.300000012', 'spot light inner cone angle=0.7')
+    refused = session.ask(f'restore {wrong}')
+    check('restore of a line with a cone angle pair the spec does not allow fails, names both and changes nothing',
+          not refused['ok'] and 'spot light inner cone angle' in refused.get('unread', '') and 'spot light outer cone angle' in refused.get('unread', '')
+          and without_time_varying(session.ask_ok('state')['state']) == whole, refused.get('error'))
+
+    for name in names:
+        record_change(session, changes, f'editor remove {name}', f'editor remove {name}', 'editor')
+    removed_again = session.ask(f'editor remove {names[0]}')
+    session.ask_ok('scene save')
+    sections = read_scene_file(scene)
+    check('editor remove takes the local lights out, removing one not in the scene fails, and scene save drops their sections',
+          local_lights() == {} and not removed_again['ok'] and not any(sections.has_section(name) for name in names),
+          f'{local_lights()}, {removed_again.get("error")}, {sections.sections()}')
+
+    session.ask_ok(f'restore {start_line}')
+    session.ask_ok('editor select ' + start_editor['selected'])
+    session.ask_ok('editor mode ' + start_editor['gizmo_mode'])
+    session.ask_ok(f'frames {SETTLE_FRAMES}')
+    check('scene, editor and local lights are back as they were after the local light checks',
+          session.ask_ok('state scene')['state']['scene']['path'] == session.instance['scene'] and editor_state() == start_editor and local_lights() == {})
+
+
 def raster_depth_of(z, camera):
     """Camera.cpp 의 reverse Z projection 을 거꾸로 풀어 depth buffer 값을 camera forward 방향의 거리로 되돌린다."""
     near, far = float(camera['near']), float(camera['far'])
@@ -1670,7 +1867,7 @@ def check_rest_of_ui_commands(session, check):
     camera = start['camera']
     session.ask_ok('pose ' + ' '.join(repr(float(camera[key]) + 10) for key in ['x', 'y', 'z']) + f' {camera["heading"]} {camera["pitch"]}')
     session.ask_ok('light set elevation=40')
-    change('restore', f'restore {line}', 'scene', 'model', 'camera', 'light', 'sky', 'sun_path', 'settings.Engine Tuning')
+    change('restore', f'restore {line}', 'scene', 'model', 'camera', 'light', 'local_lights', 'sky', 'sun_path', 'settings.Engine Tuning')
 
     check_changes(check, 'window, settings set Editor Camera and the Ray Tracing of Engine Tuning, and restore '
                          'change the state and reply with the changed part', changes)
@@ -2002,6 +2199,7 @@ def selftest_running_app(args, check):
         check_light(session, check, changes)
         check_look_at(session, check, changes)
         check_editor(session, check, changes)
+        check_local_lights(session, check, changes)
         check_changes(check, 'light set, pose look-at and editor change the state and reply with the changed part', changes)
         check_pick(session, check)
         check_rest_of_ui_commands(session, check)
