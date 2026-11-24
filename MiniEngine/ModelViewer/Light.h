@@ -5,8 +5,11 @@
 #include "Core/Math/Matrix3.h"
 #include "Core/Scene/Scene.h"
 
+#include <optional>
 #include <string>
 #include <vector>
+
+class ModelInstance;
 
 class LightComponent : public Scene::Component
 {
@@ -22,6 +25,7 @@ public:
         float intensity;
         float innerConeAngle;
         float outerConeAngle;
+        std::optional<float> range;
     };
 
     explicit LightComponent(Type type);
@@ -55,7 +59,7 @@ constexpr float kDefaultDirectionalLightIntensity = 4.0f * DirectX::XM_PI;
 
 bool IsColor(Math::Vector3 color);
 
-LightComponent& AssembleLight(Scene::Object& object, LightComponent::Type type);
+LightComponent& AssembleLight(Scene::Object& object, LightComponent::Type type, const ModelInstance& model);
 
 void RegisterDirectionalLight(LightComponent& light);
 void RegisterLocalLights(void);

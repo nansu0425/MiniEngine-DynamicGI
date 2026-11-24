@@ -1549,14 +1549,14 @@ def check_editor(session, check, changes):
 
 LOCAL_LIGHT_SCENE_DIR = HARNESS_DIR / 'selftest-local-lights'
 LOCAL_LIGHT_DEFAULTS = {
-    'Point Light': {'Type': 'Point', 'Position': '0,0,0', 'Color': '1,1,1', 'Intensity': '1'},
-    'Spot Light': {'Type': 'Spot', 'Position': '0,0,0', 'Direction': '0,0,1', 'Up': '0,1,0', 'Color': '1,1,1', 'Intensity': '1',
+    'Point Light': {'Type': 'Point', 'Position': '0,0,0', 'Color': '1,1,1', 'Intensity': '1', 'Range': ''},
+    'Spot Light': {'Type': 'Spot', 'Position': '0,0,0', 'Direction': '0,0,1', 'Up': '0,1,0', 'Color': '1,1,1', 'Intensity': '1', 'Range': '',
                    'Inner Cone Angle': '0', 'Outer Cone Angle': '0.785398185'},
 }
 LOCAL_LIGHT_SETTINGS = {
-    'Point Light': [{'Position': '-400,200,0'}, {'Color': '0.5,1,0.25'}, {'Intensity': '50'}],
+    'Point Light': [{'Position': '-400,200,0'}, {'Color': '0.5,1,0.25'}, {'Intensity': '50'}, {'Range': '1.5'}],
     'Spot Light': [{'Position': '0,300,0'}, {'Direction': '0,1,0', 'Up': '0,0,-1'}, {'Color': '1,0.5,0.25'}, {'Intensity': '200'},
-                   {'Inner Cone Angle': '0.300000012'}, {'Outer Cone Angle': '0.600000024'}],
+                   {'Inner Cone Angle': '0.300000012'}, {'Outer Cone Angle': '0.600000024'}, {'Range': '0.75'}, {'Range': ''}],
 }
 LOCAL_LIGHT_REJECTED = [
     ('Point Light', 'Intensity=-1'), ('Point Light', 'Intensity=nan'), ('Point Light', 'Color=1.5,0,0'), ('Point Light', 'Position=1,2'),
@@ -1564,6 +1564,8 @@ LOCAL_LIGHT_REJECTED = [
     ('Spot Light', 'Inner Cone Angle=0.7'), ('Spot Light', 'Inner Cone Angle=-0.1'), ('Spot Light', 'Outer Cone Angle=1.6'),
     ('Spot Light', 'Outer Cone Angle=0.2'), ('Spot Light', 'Inner Cone Angle=0.5; Outer Cone Angle=0.5'),
     ('Spot Light', 'Direction=0,0,0; Up=0,1,0'), ('Spot Light', 'Direction=0,0.6,-0.8'), ('Spot Light', 'Type=Point'),
+    ('Point Light', 'Range=0'), ('Point Light', 'Range=-1'), ('Point Light', 'Range=far'), ('Point Light', 'Range=inf'),
+    ('Spot Light', 'Range=0'), ('Spot Light', 'Range=-0.5'), ('Spot Light', 'Range=1,2'), ('Directional Light', 'Range=1'),
 ]
 
 
@@ -1578,7 +1580,8 @@ def copy_scene_file(scene, folder):
 
 def as_saved_local_light(light):
     saved = {'Type': light['type'], 'Position': ','.join(str(light['position'][axis]) for axis in 'xyz'),
-             'Color': ','.join(str(light['color'][channel]) for channel in 'rgb'), 'Intensity': str(light['intensity'])}
+             'Color': ','.join(str(light['color'][channel]) for channel in 'rgb'), 'Intensity': str(light['intensity']),
+             'Range': str(light['range']) if light['limit_range'] else str(light.get('range', ''))}
     if light['type'] == 'Spot':
         saved.update({'Direction': ','.join(str(light['direction'][axis]) for axis in 'xyz'),
                       'Inner Cone Angle': str(light['inner_cone_angle']), 'Outer Cone Angle': str(light['outer_cone_angle'])})
@@ -1645,8 +1648,8 @@ def check_local_lights(session, check, changes):
         response = session.ask(f'editor set {name}: {assignment}')
         if response['ok'] or without_time_varying(session.ask_ok('state')['state']) != whole:
             accepted.append(f'{name}: {assignment}')
-    check('editor set of a local light fails and changes nothing for a value out of range, a cone angle pair the spec does not allow, '
-          'another type or a key of another type', not accepted, ', '.join(accepted))
+    check('editor set of a local light fails and changes nothing for a value out of range, a range that is not a number above 0, '
+          'a cone angle pair the spec does not allow, another type or a key of another type', not accepted, ', '.join(accepted))
 
     session.ask_ok(f'frames {SETTLE_FRAMES}')
     after = read_dds_rgba32f(capture(session, 'scene', 'selftest-local-lights-after'))
@@ -1690,6 +1693,17 @@ def check_local_lights(session, check, changes):
     point_translate, _ = around('Point Light', 'selftest-local-lights-point-translate')
     check('the Point Light has no rotate gizmo: the display around it in rotate mode is the one in scale mode, which it ignores too, and differs in translate mode',
           np.array_equal(point_rotate, point_scale) and not np.array_equal(point_rotate, point_translate))
+
+    session.ask_ok('editor set Point Light: Range=')
+    point_unranged, _ = around('Point Light', 'selftest-local-lights-point-unranged')
+    session.ask_ok('editor set Point Light: Range=' + expected['Point Light']['Range'])
+    session.ask_ok('editor select Spot Light')
+    session.ask_ok('editor set Spot Light: Range=0.5')
+    spot_ranged, _ = around('Spot Light', 'selftest-local-lights-spot-ranged')
+    session.ask_ok('editor set Spot Light: Range=')
+    check('the display around a selected light with a range, which draws the range, differs from the one without a range',
+          not np.array_equal(point_translate, point_unranged) and not np.array_equal(spot_translate, spot_ranged)
+          and local_lights() == lights)
     session.ask_ok('editor select none')
     session.ask_ok('ui hide')
     session.ask_ok('pose ' + ' '.join(str(start_pose[key]) for key in ['x', 'y', 'z', 'heading', 'pitch']))
@@ -1698,21 +1712,41 @@ def check_local_lights(session, check, changes):
     session.ask_ok('scene save')
     sections = read_scene_file(scene)
     in_file = {name: dict(sections[name]) if sections.has_section(name) else None for name in names}
-    session.ask_ok('editor set Spot Light: Intensity=7')
+    session.ask_ok('editor set Spot Light: Intensity=7; Range=2')
+    session.ask_ok('editor set Point Light: Range=4')
     session.ask_ok(f'scene open {scene}')
-    check('scene save writes the local lights to their sections, and scene open of the file brings them back as saved',
-          all(in_file[name] == expected[name] for name in names) and local_lights() == lights, f'{in_file}; {local_lights()}')
+    check('scene save writes the local lights to their sections, with Range only for the light that has one, '
+          'and scene open of the file brings them back as saved, the light without Range back to no range',
+          all(in_file[name] == {key: value for key, value in expected[name].items() if value != ''} for name in names)
+          and 'Range' in in_file['Point Light'] and 'Range' not in in_file['Spot Light'] and local_lights() == lights,
+          f'{in_file}; {local_lights()}')
 
     line = session.ask_ok('describe')['line']
     keys = [key for key, _ in (item.split('=', 1) for item in line.split('; ')) if key.startswith(('point light ', 'spot light '))]
-    session.ask_ok('editor set Spot Light: Intensity=7')
+    session.ask_ok('editor set Spot Light: Intensity=7; Range=2')
     session.ask_ok(f'editor remove {names[0]}')
     restored = session.ask_ok(f'restore {line}')
-    check('describe has the keys of the local lights, and restore of its line brings back a removed light and the values of the other',
-          sorted(keys) == sorted([f'point light {key}' for key in ['position', 'color', 'intensity']]
+    check('describe has the keys of the local lights, with range only for the light that has one, and restore of its line brings back '
+          'a removed light and the values of the other, the one without range back to no range',
+          sorted(keys) == sorted([f'point light {key}' for key in ['position', 'color', 'intensity', 'range']]
                                  + [f'spot light {key}' for key in ['position', 'direction', 'up', 'color', 'intensity', 'inner cone angle', 'outer cone angle']])
           and local_lights() == lights and restored['state']['local_lights'] == lights and restored['line'] == line,
           f'{keys}; {local_lights()}')
+
+    line_without_range = '; '.join(item for item in line.split('; ') if not item.startswith('point light range='))
+    session.ask_ok(f'restore {line_without_range}')
+    point = local_lights()['Point Light']
+    check('restore of a line with local light keys but no range key, as lines from before the range are, gives that light no range and keeps the rest',
+          not point['limit_range'] and 'range' not in point and {key: value for key, value in point.items() if key != 'limit_range'}
+          == {key: value for key, value in lights['Point Light'].items() if key not in ('limit_range', 'range')}
+          and local_lights()['Spot Light'] == lights['Spot Light'], str(local_lights()))
+
+    session.ask_ok(f'restore {line}')
+    whole = without_time_varying(session.ask_ok('state')['state'])
+    refused = [value for value in ['0', '-1', 'inf', 'far'] if session.ask('restore ' + line.replace(
+        f'point light range={expected["Point Light"]["Range"]}', f'point light range={value}')).get('unread', '') != 'point light range']
+    check('restore of a line with a range that is not a number above 0 fails, names it and changes nothing',
+          not refused and without_time_varying(session.ask_ok('state')['state']) == whole, ', '.join(refused))
 
     old_line = '; '.join(item for item in line.split('; ') if not item.startswith(('point light ', 'spot light ')))
     session.ask_ok(f'restore {old_line}')

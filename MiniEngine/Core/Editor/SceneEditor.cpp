@@ -473,7 +473,8 @@ void SceneEditor::RegisterCommands(const Camera& camera)
         "such as the Camera, the Sky or the Model, has neither and no gizmo. Icons and the gizmo are drawn only while the UI is shown. "
         "get gives the settings of an object as its Details panel changes them, which the scene file keeps in the section of the object's name. "
         "set changes them as the Details panel does, and changes nothing and fails if a value does not read back as given. "
-        "scene save writes them to the scene file. An object without settings, such as the Model, gives none. "
+        "scene save writes them to the scene file. An empty value is a key the object does not have, such as the Range of a light without one, "
+        "and scene save leaves it out of the scene file. An object without settings, such as the Model, gives none. "
         "add puts an optional object that is not in the scene into it with its default settings and selects it, "
         "as its Add button in the Scene Hierarchy panel does, and remove takes it out as the Remove button in its Details panel does. "
         "An optional object is in the scene only while the scene file has its section, which scene save writes or removes",

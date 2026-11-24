@@ -550,7 +550,8 @@ namespace ControlChannel
             "Positions are in world units. Camera angles are in radians: heading turns about world up (+y), 0 looking toward -z and growing toward -x, "
             "and pitch is up from the horizon. Light elevation and azimuth are in degrees as light set takes them. "
             "local_lights has the Point Light and Spot Light the scene has, with intensity in candela, cone angles in radians and "
-            "direction toward the light, the local +Z, as in light. "
+            "direction toward the light, the local +Z, as in light. limit_range is whether a light has a range, and only then range has it in metres, "
+            "not world units. "
             "aspect is width over height. Sizes and left, top are in client pixels from the top left. "
             "settings has every section as settings get reads it. Commands that change the state reply with the changed part as state", ReplyState);
         Register("status", "status", ReplyStatus);
@@ -567,7 +568,8 @@ namespace ControlChannel
             "A line of another scene file opens that scene file as scene open does, keeping the camera of the line, "
             "and a scene file that cannot be opened is a condition that cannot be set, which note explains. "
             "The resolution is only compared and note says how it differs. "
-            "A Point Light or Spot Light with no key in the line is taken out of the scene, and one with keys is put in it",
+            "A Point Light or Spot Light with no key in the line is taken out of the scene, and one with keys is put in it. "
+            "One with keys but no range key, as lines from before the range are, reaches infinitely far",
             RestoreConditions);
         Register("ui", "ui show|hide: same as F1. Hidden, the scene fills the client", SetUIVisible);
         Register("panel", "panel <name> open|close: same as the View menu", SetPanelOpen);

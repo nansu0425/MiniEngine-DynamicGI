@@ -4,6 +4,7 @@
 #include "Core/Editor/SceneEditor.h"
 #include "Core/Math/Rotation.h"
 #include "Core/Scene/SettingValues.h"
+#include "Model/Model.h"
 
 #include <algorithm>
 #include <map>
@@ -14,7 +15,7 @@ using namespace Math;
 class LightIconComponent : public SceneEditor::IconComponent
 {
 public:
-    explicit LightIconComponent(LightComponent& light) : m_Light(light) {}
+    LightIconComponent(LightComponent& light, const ModelInstance& model) : m_Light(light), m_Model(model) {}
 
     virtual Vector3 GetPosition() const override { return m_Light.GetProperties().position; }
     virtual void SetPosition(Vector3 position) override;
@@ -23,7 +24,10 @@ public:
     virtual void Scale(const Camera&) override {}
 
 private:
+    void DrawRange(const Camera& camera) const;
+
     LightComponent& m_Light;
+    const ModelInstance& m_Model;
 };
 
 // 예전에 방위 -0.5 rad와 고도 0.75 x 90°로 정하던 기본 방향을 bit 단위로 옮겨서, 기본 화면이 그때와 같다.
@@ -31,17 +35,36 @@ const Vector3 kDefaultDirectionalLightDirection(0.335837096f, 0.923879147f, -0.1
 constexpr float kDefaultLocalLightIntensity = 1.0f;
 constexpr float kDefaultInnerConeAngle = 0.0f;
 constexpr float kDefaultOuterConeAngle = XM_PIDIV4;
+constexpr float kRangeWhenLimited = 1.0f;
 constexpr float kSpotConeLengthInIconRadii = 8.0f;
-constexpr int kSpotConeCircleSegments = 48;
+constexpr int kWireframeCircleSegments = 48;
+const ImU32 kLightColor = IM_COL32(255, 200, 0, 255);
+const ImU32 kInnerConeColor = IM_COL32(255, 200, 0, 140);
+const ImU32 kSelectedColor = IM_COL32(255, 128, 16, 255);
 
 bool HasRotation(LightComponent::Type type)
 {
     return type != LightComponent::Type::Point;
 }
 
+bool TakesRange(LightComponent::Type type)
+{
+    return type != LightComponent::Type::Directional;
+}
+
 bool IsSpotConeAngles(float innerConeAngle, float outerConeAngle)
 {
     return innerConeAngle >= 0.0f && innerConeAngle < outerConeAngle && outerConeAngle <= XM_PIDIV2;
+}
+
+bool IsRange(float range)
+{
+    return range > 0.0f;
+}
+
+std::string FormatRange(const std::optional<float>& range)
+{
+    return range ? MeasurementConditions::FormatFloat(*range) : std::string();
 }
 
 Matrix3 MakeRotationToward(Vector3 direction)
@@ -65,8 +88,8 @@ std::vector<std::string> LightComponent::ListSettingKeys(Type type)
 {
     switch (type)
     {
-    case Type::Point: return { "Type", "Position", "Color", "Intensity" };
-    case Type::Spot: return { "Type", "Direction", "Up", "Position", "Color", "Intensity", "Inner Cone Angle", "Outer Cone Angle" };
+    case Type::Point: return { "Type", "Position", "Color", "Intensity", "Range" };
+    case Type::Spot: return { "Type", "Direction", "Up", "Position", "Color", "Intensity", "Range", "Inner Cone Angle", "Outer Cone Angle" };
     default: return { "Type", "Direction", "Up", "Position", "Color", "Intensity" };
     }
 }
@@ -81,6 +104,7 @@ LightComponent::Properties LightComponent::GetDefaultProperties(Type type)
     properties.intensity = directional ? kDefaultDirectionalLightIntensity : kDefaultLocalLightIntensity;
     properties.innerConeAngle = kDefaultInnerConeAngle;
     properties.outerConeAngle = kDefaultOuterConeAngle;
+    properties.range = std::nullopt;
     return properties;
 }
 
@@ -128,6 +152,8 @@ void LightComponent::SaveSettings(IniFile::Values& values) const
     char text[32];
     sprintf_s(text, "%.9g", m_Properties.intensity);
     values["Intensity"] = text;
+    if (TakesRange(m_Type))
+        values["Range"] = FormatRange(m_Properties.range);
     if (m_Type == Type::Spot)
     {
         values["Inner Cone Angle"] = MeasurementConditions::FormatFloat(m_Properties.innerConeAngle);
@@ -163,6 +189,9 @@ void LightComponent::LoadSettings(const IniFile::Values& values)
     float intensity = 0.0f;
     if (readNumber("Intensity", intensity) && intensity >= 0.0f)
         properties.intensity = intensity;
+    float range = 0.0f;
+    if (readNumber("Range", range) && IsRange(range))
+        properties.range = range;
     float innerConeAngle = properties.innerConeAngle;
     float outerConeAngle = properties.outerConeAngle;
     readNumber("Inner Cone Angle", innerConeAngle);
@@ -239,6 +268,8 @@ void DescribeLocalLightConditions(MeasurementConditions::Values& values)
         values[prefix + "position"] = SettingValues::FormatVector(properties.position);
         values[prefix + "color"] = SettingValues::FormatVector(properties.color);
         values[prefix + "intensity"] = MeasurementConditions::FormatFloat(properties.intensity);
+        if (properties.range)
+            values[prefix + "range"] = FormatRange(properties.range);
         if (light->GetType() != LightComponent::Type::Spot)
             continue;
         values[prefix + "direction"] = SettingValues::FormatVector(properties.rotation.GetZ());
@@ -267,6 +298,18 @@ void ReadLocalLightConditions(const MeasurementConditions::Values& values, Measu
         LightComponent::Properties properties = light->GetProperties();
         MeasurementConditions::ReadValue(values, prefix + "position", reading, [&properties](const std::string& text) { return SettingValues::ReadVector(text, properties.position); });
         ReadColorAndIntensityConditions(values, prefix, reading, properties);
+        properties.range = std::nullopt;
+        if (values.count(prefix + "range") != 0)
+        {
+            MeasurementConditions::ReadValue(values, prefix + "range", reading, [&properties](const std::string& text)
+            {
+                float range = 0.0f;
+                if (!SettingValues::ReadNumbers(text, &range, 1) || !IsRange(range))
+                    return false;
+                properties.range = range;
+                return true;
+            });
+        }
         if (light->GetType() == LightComponent::Type::Spot)
         {
             ReadRotationConditions(values, prefix, reading, properties.rotation);
@@ -367,7 +410,10 @@ ControlChannel::Fields DescribeLocalLight(const LightComponent& light)
             .Float("inner_cone_angle", properties.innerConeAngle)
             .Float("outer_cone_angle", properties.outerConeAngle);
     }
-    return fields.Object("color", DescribeColor(properties.color)).Float("intensity", properties.intensity);
+    fields.Object("color", DescribeColor(properties.color)).Float("intensity", properties.intensity).Flag("limit_range", properties.range.has_value());
+    if (properties.range)
+        fields.Float("range", *properties.range);
+    return fields;
 }
 
 ControlChannel::Fields DescribeLocalLights(void)
@@ -616,16 +662,43 @@ void DrawSpotCone(ImDrawList& drawList, const Camera& camera, const LightCompone
 
     for (const auto& cone : { std::make_pair(properties.outerConeAngle, outerColor), std::make_pair(properties.innerConeAngle, innerColor) })
     {
-        for (int i = 0; i < kSpotConeCircleSegments; ++i)
+        for (int i = 0; i < kWireframeCircleSegments; ++i)
         {
-            const float start = XM_2PI * i / kSpotConeCircleSegments;
-            const float end = XM_2PI * (i + 1) / kSpotConeCircleSegments;
+            const float start = XM_2PI * i / kWireframeCircleSegments;
+            const float end = XM_2PI * (i + 1) / kWireframeCircleSegments;
             DrawWorldLine(drawList, camera, pointOnCone(cone.first, start), pointOnCone(cone.first, end), cone.second, thickness);
         }
     }
     const int kSideLineCount = 4;
     for (int i = 0; i < kSideLineCount; ++i)
         DrawWorldLine(drawList, camera, apex, pointOnCone(properties.outerConeAngle, XM_2PI * i / kSideLineCount), outerColor, thickness);
+}
+
+void DrawSphere(ImDrawList& drawList, const Camera& camera, Vector3 center, float radius, ImU32 color, float thickness)
+{
+    const Vector3 axes[] = { Vector3(kXUnitVector), Vector3(kYUnitVector), Vector3(kZUnitVector) };
+    for (int plane = 0; plane < 3; ++plane)
+    {
+        const Vector3 x = axes[plane];
+        const Vector3 y = axes[(plane + 1) % 3];
+        const auto pointOnCircle = [&](float around) { return center + (x * cosf(around) + y * sinf(around)) * radius; };
+        for (int i = 0; i < kWireframeCircleSegments; ++i)
+        {
+            const float start = XM_2PI * i / kWireframeCircleSegments;
+            const float end = XM_2PI * (i + 1) / kWireframeCircleSegments;
+            DrawWorldLine(drawList, camera, pointOnCircle(start), pointOnCircle(end), color, thickness);
+        }
+    }
+}
+
+float GetIconThickness(void)
+{
+    return SceneEditor::GetIconRadius() * 0.15f;
+}
+
+float GetWireframeThickness(void)
+{
+    return GetIconThickness() * 0.6f;
 }
 
 void LightIconComponent::SetPosition(Vector3 position)
@@ -635,42 +708,54 @@ void LightIconComponent::SetPosition(Vector3 position)
     m_Light.SetProperties(properties);
 }
 
+void LightIconComponent::DrawRange(const Camera& camera) const
+{
+    const LightComponent::Properties& properties = m_Light.GetProperties();
+    const float worldRange = *properties.range * m_Model.GetScale();
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+    if (m_Light.GetType() == LightComponent::Type::Spot)
+        DrawSpotCone(*drawList, camera, m_Light, worldRange, kLightColor, kInnerConeColor, GetWireframeThickness());
+    else
+        DrawSphere(*drawList, camera, properties.position, worldRange, kLightColor, GetWireframeThickness());
+}
+
 void LightIconComponent::Draw(const Camera& camera, bool selected) const
 {
+    const bool hasRange = m_Light.GetProperties().range.has_value();
+    if (selected && hasRange)
+        DrawRange(camera);
+
     const Vector3 position = GetPosition();
     ImVec2 icon;
     if (!SceneEditor::ProjectToScene(camera, position, icon))
         return;
 
-    const ImU32 lightColor = IM_COL32(255, 200, 0, 255);
-    const ImU32 innerConeColor = IM_COL32(255, 200, 0, 140);
-    const ImU32 selectedColor = IM_COL32(255, 128, 16, 255);
     const float radius = SceneEditor::GetIconRadius();
-    const float thickness = radius * 0.15f;
+    const float thickness = GetIconThickness();
     const float worldLengthPerPixel = SceneEditor::GetWorldLengthPerPixel(camera, position);
     const LightComponent::Type type = m_Light.GetType();
     ImDrawList* drawList = ImGui::GetWindowDrawList();
 
-    if (type == LightComponent::Type::Spot && selected)
-        DrawSpotCone(*drawList, camera, m_Light, radius * kSpotConeLengthInIconRadii * worldLengthPerPixel, lightColor, innerConeColor, thickness * 0.6f);
+    if (type == LightComponent::Type::Spot && selected && !hasRange)
+        DrawSpotCone(*drawList, camera, m_Light, radius * kSpotConeLengthInIconRadii * worldLengthPerPixel, kLightColor, kInnerConeColor, GetWireframeThickness());
 
     if (HasRotation(type))
     {
         const float arrowLength = radius * 4.0f * worldLengthPerPixel;
         ImVec2 arrowTip;
         if (SceneEditor::ProjectToScene(camera, position - m_Light.GetDirection() * arrowLength, arrowTip))
-            DrawArrow(*drawList, icon, arrowTip, lightColor, thickness);
+            DrawArrow(*drawList, icon, arrowTip, kLightColor, thickness);
     }
 
     switch (type)
     {
-    case LightComponent::Type::Point: DrawBulbIcon(*drawList, icon, radius, lightColor); break;
-    case LightComponent::Type::Spot: DrawSpotIcon(*drawList, icon, radius, lightColor, thickness); break;
-    default: DrawSunIcon(*drawList, icon, radius, lightColor, thickness); break;
+    case LightComponent::Type::Point: DrawBulbIcon(*drawList, icon, radius, kLightColor); break;
+    case LightComponent::Type::Spot: DrawSpotIcon(*drawList, icon, radius, kLightColor, thickness); break;
+    default: DrawSunIcon(*drawList, icon, radius, kLightColor, thickness); break;
     }
 
     if (selected)
-        drawList->AddCircle(icon, radius * 1.2f, selectedColor, 0, thickness);
+        drawList->AddCircle(icon, radius * 1.2f, kSelectedColor, 0, thickness);
 }
 
 void LightIconComponent::Rotate(const Camera& camera, ImGuizmo::MODE axes)
@@ -700,6 +785,23 @@ void ShowIntensity(LightComponent::Type type, float& intensity)
     ImGui::SetItemTooltip(type == LightComponent::Type::Spot
         ? "Luminous intensity inside the inner cone, in candela."
         : "Luminous intensity in every direction, in candela.");
+}
+
+void ShowRange(std::optional<float>& range)
+{
+    bool limitRange = range.has_value();
+    if (ImGui::Checkbox("Limit Range", &limitRange))
+        range = limitRange ? std::optional<float>(kRangeWhenLimited) : std::nullopt;
+    ImGui::SetItemTooltip("Off, the light reaches infinitely far, as a KHR_lights_punctual light without range does. "
+        "The scene file keeps a Range only while this is on.");
+    if (!range)
+        return;
+    float limited = *range;
+    if (ImGui::DragFloat("Range", &limited, 0.01f, 0.001f, FLT_MAX, "%.3f m", ImGuiSliderFlags_AlwaysClamp) && IsRange(limited))
+        range = limited;
+    ImGui::SetItemTooltip("Distance from the light, in metres, beyond which it lights nothing. It is in the metres of the glTF model, "
+        "while Position is in world units, which are those metres times the scale the scene file gives the model. "
+        "While the light is selected, the scene shows the range.");
 }
 
 void ShowConeAngles(LightComponent::Properties& properties)
@@ -732,6 +834,8 @@ void ShowLightDetails(LightComponent& light)
         properties.color = Min(Max(Vector3(color[0], color[1], color[2]), Vector3(kZero)), Vector3(1.0f, 1.0f, 1.0f));
     ImGui::SetItemTooltip("Linear RGB, each 0 to 1.");
     ShowIntensity(type, properties.intensity);
+    if (TakesRange(type))
+        ShowRange(properties.range);
     if (type == LightComponent::Type::Spot)
         ShowConeAngles(properties);
 
@@ -761,9 +865,9 @@ void ShowLightDetails(LightComponent& light)
     ImGui::TextDisabled("Rotate the light with the gizmo (E). The toolbar on the scene picks local or world rings.");
 }
 
-LightComponent& AssembleLight(Scene::Object& object, LightComponent::Type type)
+LightComponent& AssembleLight(Scene::Object& object, LightComponent::Type type, const ModelInstance& model)
 {
     LightComponent& light = object.AddComponent<LightComponent>(type);
-    object.AddComponent<LightIconComponent>(light);
+    object.AddComponent<LightIconComponent>(light, model);
     return light;
 }

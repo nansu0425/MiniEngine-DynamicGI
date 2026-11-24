@@ -133,6 +133,7 @@ IniFile::Sections Scene::SaveObjectSettings(void)
     {
         IniFile::Values values;
         object->SaveSettings(values);
+        std::erase_if(values, [](const IniFile::Values::value_type& value) { return value.second.empty(); });
         if (!values.empty())
             sections[object->GetName()] = values;
     }

@@ -207,7 +207,7 @@ private:
     RaytracingScene m_RaytracingScene;
     ShadowCamera m_ShadowCamera;
     Scene::Object m_DirectionalLightObject{ "Directional Light" };
-    LightComponent& m_DirectionalLight = AssembleLight(m_DirectionalLightObject, LightComponent::Type::Directional);
+    LightComponent& m_DirectionalLight = AssembleLight(m_DirectionalLightObject, LightComponent::Type::Directional, m_ModelInst);
     SunPathComponent& m_SunPath = m_DirectionalLightObject.AddComponent<SunPathComponent>(m_DirectionalLight);
     Scene::Object m_SkyObject{ "Sky" };
     SkyComponent& m_Sky = m_SkyObject.AddComponent<SkyComponent>();
@@ -916,9 +916,9 @@ void ModelViewer::Startup( void )
     Scene::AddObject(m_SkyObject);
     AssembleDynamicGIVolume(m_GIVolumeObject, [this] { return m_ModelInst.GetAxisAlignedBox(); });
     Scene::RegisterOptionalObject(m_GIVolumeObject);
-    AssembleLight(m_PointLightObject, LightComponent::Type::Point);
+    AssembleLight(m_PointLightObject, LightComponent::Type::Point, m_ModelInst);
     Scene::RegisterOptionalObject(m_PointLightObject);
-    AssembleLight(m_SpotLightObject, LightComponent::Type::Spot);
+    AssembleLight(m_SpotLightObject, LightComponent::Type::Spot, m_ModelInst);
     Scene::RegisterOptionalObject(m_SpotLightObject);
 #ifdef LEGACY_RENDERER
     // LEGACY_RENDERER는 scene file을 읽지 않으므로 Sponza::Startup이 정한 camera를 그대로 둔다.
