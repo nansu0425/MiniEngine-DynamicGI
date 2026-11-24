@@ -1670,7 +1670,7 @@ def check_rest_of_ui_commands(session, check):
     camera = start['camera']
     session.ask_ok('pose ' + ' '.join(repr(float(camera[key]) + 10) for key in ['x', 'y', 'z']) + f' {camera["heading"]} {camera["pitch"]}')
     session.ask_ok('light set elevation=40')
-    change('restore', f'restore {line}', 'scene', 'model', 'camera', 'light', 'sky', 'settings.Engine Tuning')
+    change('restore', f'restore {line}', 'scene', 'model', 'camera', 'light', 'sky', 'sun_path', 'settings.Engine Tuning')
 
     check_changes(check, 'window, settings set Editor Camera and the Ray Tracing of Engine Tuning, and restore '
                          'change the state and reply with the changed part', changes)
