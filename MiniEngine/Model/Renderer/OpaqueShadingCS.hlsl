@@ -2,9 +2,7 @@
 #include "Model/Renderer/SurfaceRadiance.hlsli"
 #include "Core/Shaders/IrradianceProbes.hlsli"
 #include "Core/Shaders/SceneLights.hlsli"
-#include "Model/Raytracing/RaytracingScene.hlsli"
-#include "Model/Raytracing/SurfaceRay.hlsli"
-#include "Core/Shaders/LocalLight.hlsli"
+#include "Model/Raytracing/LocalLightReflection.hlsli"
 
 cbuffer Constants : register(b0)
 {
@@ -55,20 +53,7 @@ float3 GetIndirectRadiance(RasterSurface surface, float3 view, uint2 pixel)
 float3 GetLocalLightsRadiance(RasterSurface surface, float3 view)
 {
     const GltfBrdfInput brdf = MakeGltfBrdfInput(surface.baseColor.rgb, surface.metallic, surface.roughness, surface.shadingNormal, view);
-    float3 radiance = 0.0;
-    for (uint i = 0; i < Lights.localLightCount; ++i)
-    {
-        const LocalLight light = Lights.localLights[i];
-        const LocalLightIncidence incidence = GetLocalLightIncidence(light, surface.position);
-        const float cosine = dot(surface.shadingNormal, incidence.direction);
-        if (cosine <= 0.0 || all(incidence.illuminance == 0.0))
-            continue;
-        RayDesc ray;
-        if (!DescribeSurfaceRayToPoint(surface.position, surface.geometryNormal, light.position, ray) || IsOccluded(ray, kCullSingleSidedBackFaces))
-            continue;
-        radiance += EvaluateGltfBrdf(brdf, incidence.direction) * incidence.illuminance * cosine;
-    }
-    return radiance;
+    return ReflectLocalLights(surface, brdf, Lights);
 }
 
 float3 GetSceneColor(RasterSurface surface, uint2 pixel)

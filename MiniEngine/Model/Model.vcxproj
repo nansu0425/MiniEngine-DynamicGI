@@ -156,6 +156,7 @@
     <None Include="Raytracing\HitSurface.hlsli" />
     <None Include="Raytracing\SurfaceRayOrigin.hlsli" />
     <None Include="Raytracing\SurfaceRay.hlsli" />
+    <None Include="Raytracing\LocalLightReflection.hlsli" />
     <None Include="Raytracing\CameraRays.hlsli" />
     <None Include="Raytracing\EmissiveTriangles.hlsli" />
     <None Include="DynamicGI\ProbeEmissiveSamples.hlsli" />
