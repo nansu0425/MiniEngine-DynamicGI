@@ -151,6 +151,20 @@ namespace
         return "probe " + FormatSelectedProbe() + ", " + DescribeGuideTexel(GetProbeGuideTexelIndexAt(texel));
     }
 
+    std::optional<ProbeVisualization::GuideTexelOfProbe> FindInspectedGuideTexelOfSelectedProbe(void)
+    {
+        const std::optional<uint32_t> probe = GetSelectedProbe();
+        if (!probe)
+            return std::nullopt;
+        const std::optional<DirectX::XMUINT2> probesGuideTexel = TextureViewer::GetInspectedTexel(ProbeLighting::GetProbes().guide);
+        if (probesGuideTexel && probesGuideTexel->y == *probe)
+            return ProbeVisualization::GuideTexelOfProbe{ *probe, probesGuideTexel->x };
+        const std::optional<DirectX::XMUINT2> selectedProbeGuideTexel = TextureViewer::GetInspectedTexel(SelectedProbeGuide::GetTexture());
+        if (selectedProbeGuideTexel)
+            return ProbeVisualization::GuideTexelOfProbe{ *probe, GetProbeGuideTexelIndexAt(*selectedProbeGuideTexel) };
+        return std::nullopt;
+    }
+
     std::optional<uint32_t> FindInspectedRayOfSelectedProbe(void)
     {
         const std::optional<uint32_t> probe = GetSelectedProbe();
@@ -655,6 +669,10 @@ namespace
             "Click a row to select its ray and click it again to clear the selection. The selection lasts until the probe updates. "
             "The table lists the rays of the selected probe with the largest flux, the weight times the luminance of the radiance. "
             "Guided per Uniform is how many guided rays the guide map sent around the ray for each uniform ray.");
+        ImGui::Checkbox("Show Guide Texels", &probeSpheres.showGuideTexels);
+        ImGui::SetItemTooltip("Draws a green line from the selected probe along the center direction of each texel of its guide map. "
+            "While the Texture Viewer shows Probes Guide with a texel of the selected probe's row inspected, or Selected Probe Guide with a texel inspected, "
+            "the line of that texel is white and the other lines are faint.");
         int raySampleColor = (int)probeSpheres.raySampleColor;
         if (ImGui::Combo("Ray Sample Color", &raySampleColor, kRaySampleColorNames, IM_ARRAYSIZE(kRaySampleColorNames)))
             probeSpheres.raySampleColor = (ProbeVisualization::RaySampleColor)raySampleColor;
@@ -703,6 +721,7 @@ namespace
         values["Show Ray Samples"] = SettingValues::FormatFlag(probeSpheres.showRaySamples);
         values["Ray Sample Color"] = kRaySampleColorNames[(int)probeSpheres.raySampleColor];
         values["Show Probe Offsets"] = SettingValues::FormatFlag(probeSpheres.showOffsets);
+        values["Show Guide Texels"] = SettingValues::FormatFlag(probeSpheres.showGuideTexels);
         values["Inspect Pixel"] = SettingValues::FormatFlag(s_Settings.inspectPixel);
         values["Inspect Label Scale"] = MeasurementConditions::FormatFloat(s_Settings.inspectLabelScale);
     }
@@ -729,6 +748,7 @@ namespace
         SettingValues::ReadFlag(values, "Show Ray Samples", probeSpheres.showRaySamples);
         SettingValues::ReadName(values, "Ray Sample Color", kRaySampleColorNames, probeSpheres.raySampleColor);
         SettingValues::ReadFlag(values, "Show Probe Offsets", probeSpheres.showOffsets);
+        SettingValues::ReadFlag(values, "Show Guide Texels", probeSpheres.showGuideTexels);
         SettingValues::ReadFlag(values, "Inspect Pixel", s_Settings.inspectPixel);
         SettingValues::ReadFloat(values, "Inspect Label Scale", s_Settings.inspectLabelScale);
         ClampSettings();
@@ -1188,6 +1208,8 @@ void DynamicGI::DrawOverlay(GraphicsContext& context, const Math::Camera& camera
     const std::optional<uint32_t> probe = GetSelectedProbe();
     if (FindProbeVolume() != nullptr && s_Settings.probeSpheres.show && probe)
         ProbeVisualization::DrawDistanceLines(context, camera, ProbeLighting::GetProbes(), *probe, s_Settings.probeSpheres, FindHighlightedRayOfSelectedProbe());
+    if (FindProbeVolume() != nullptr && s_Settings.probeSpheres.show && s_Settings.probeSpheres.showGuideTexels && probe)
+        ProbeVisualization::DrawGuideTexelLines(context, camera, ProbeLighting::GetProbes(), *probe, FindInspectedGuideTexelOfSelectedProbe());
 
     const ProbeContribution::Surface* contribution = GetInspectedContribution();
     if (contribution != nullptr && contribution->hasSurface != 0)

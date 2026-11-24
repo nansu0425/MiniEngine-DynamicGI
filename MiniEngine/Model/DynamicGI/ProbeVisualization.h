@@ -27,6 +27,13 @@ namespace ProbeVisualization
         bool showRaySamples = true;
         RaySampleColor raySampleColor = RaySampleColor::kDistance;
         bool showOffsets = false;
+        bool showGuideTexels = false;
+    };
+
+    struct GuideTexelOfProbe
+    {
+        uint32_t probe;
+        uint32_t texel;
     };
 
     struct ContributionLabels
@@ -44,6 +51,9 @@ namespace ProbeVisualization
 
     void DrawDistanceLines(GraphicsContext& context, const Math::Camera& camera, const ProbeLighting::Probes& probes, uint32_t probe,
         const Settings& settings, std::optional<uint32_t> highlightedRay);
+
+    void DrawGuideTexelLines(GraphicsContext& context, const Math::Camera& camera, const ProbeLighting::Probes& probes, uint32_t probe,
+        std::optional<GuideTexelOfProbe> highlightedGuideTexel);
 
     void DrawOffsetLines(GraphicsContext& context, const Math::Camera& camera, const ProbeLighting::Probes& probes);
 

@@ -1,4 +1,5 @@
 #include "Model/DynamicGI/ProbeVisualization.h"
+#include "Model/DynamicGI/ProbeGuide.h"
 #include "Model/DynamicGI/ProbeReadback.h"
 #include "Core/Camera/Camera.h"
 #include "Core/Editor/SceneEditor.h"
@@ -15,6 +16,8 @@
 #include "Output/Model/CompiledShaders/ProbeSpherePS.h"
 #include "Output/Model/CompiledShaders/ProbeDistanceLineVS.h"
 #include "Output/Model/CompiledShaders/ProbeDistanceLinePS.h"
+#include "Output/Model/CompiledShaders/ProbeGuideLineVS.h"
+#include "Output/Model/CompiledShaders/ProbeGuideLinePS.h"
 #include "Output/Model/CompiledShaders/ProbeContributionRibbonVS.h"
 #include "Output/Model/CompiledShaders/ProbeContributionRibbonPS.h"
 #include "Output/Model/CompiledShaders/ProbeOffsetLineVS.h"
@@ -36,18 +39,23 @@ namespace
     enum LineRootParameter { kLineConstants, kLineInputs, kNumLineRootParameters };
     enum class DistanceLines : uint32_t { kTexelMeans, kRaySamples, kTexelDistances };
     enum RibbonRootParameter { kRibbonConstants, kRibbonContribution, kNumRibbonRootParameters };
+    enum GuideLineRootParameter { kGuideLineConstants, kGuideLineInputs, kNumGuideLineRootParameters };
     enum OffsetLineRootParameter { kOffsetLineConstants, kOffsetLineInputs, kNumOffsetLineRootParameters };
 
     constexpr uint32_t kNumCellEdges = 12;
     constexpr uint32_t kNumContributionRibbons = ProbeContribution::kNumCorners + kNumCellEdges + 1 + ProbeContribution::kNumCorners + 1;
     constexpr uint32_t kNoHoveredCorner = 0xffffffff;
     constexpr uint32_t kNoHighlightedRay = 0xffffffff;
+    constexpr uint32_t kNoHighlightedGuideTexel = 0xffffffff;
+    constexpr float kGuideLineLengthPerSpacing = 0.5f;
     constexpr float kNormalLengthPerSpacing = 0.5f;
 
     RootSignature s_RootSignature;
     GraphicsPSO s_PSO(L"Probe Spheres");
     RootSignature s_LineRootSignature;
     GraphicsPSO s_LinePSO(L"Probe Distance Lines");
+    RootSignature s_GuideLineRootSignature;
+    GraphicsPSO s_GuideLinePSO(L"Probe Guide Lines");
     RootSignature s_RibbonRootSignature;
     GraphicsPSO s_RibbonPSO(L"Probe Contribution Ribbons");
     RootSignature s_OffsetLineRootSignature;
@@ -73,6 +81,15 @@ namespace
         ProbeVisualization::RaySampleColor raySampleColor;
         uint32_t uniformRaysPerProbe;
         uint32_t raysPerProbe;
+        IrradianceProbeGrid grid;
+    };
+
+    __declspec(align(16)) struct GuideLineConstants
+    {
+        Matrix4 viewProj;
+        uint32_t probe;
+        uint32_t highlightedTexel;
+        float length;
         IrradianceProbeGrid grid;
     };
 
@@ -129,6 +146,22 @@ void ProbeVisualization::Initialize(void)
     s_LinePSO.SetVertexShader(g_pProbeDistanceLineVS, sizeof(g_pProbeDistanceLineVS));
     s_LinePSO.SetPixelShader(g_pProbeDistanceLinePS, sizeof(g_pProbeDistanceLinePS));
     s_LinePSO.Finalize();
+
+    s_GuideLineRootSignature.Reset(kNumGuideLineRootParameters, 0);
+    s_GuideLineRootSignature[kGuideLineConstants].InitAsConstantBuffer(0);
+    s_GuideLineRootSignature[kGuideLineInputs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 1, D3D12_SHADER_VISIBILITY_VERTEX);
+    s_GuideLineRootSignature.Finalize(L"Probe Guide Lines");
+
+    s_GuideLinePSO.SetRootSignature(s_GuideLineRootSignature);
+    s_GuideLinePSO.SetRasterizerState(RasterizerTwoSided);
+    s_GuideLinePSO.SetBlendState(BlendPreMultiplied);
+    s_GuideLinePSO.SetDepthStencilState(DepthStateReadOnly);
+    s_GuideLinePSO.SetInputLayout(0, nullptr);
+    s_GuideLinePSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE);
+    s_GuideLinePSO.SetRenderTargetFormats(1, &overlayFormat, g_SceneDepthBuffer.GetFormat());
+    s_GuideLinePSO.SetVertexShader(g_pProbeGuideLineVS, sizeof(g_pProbeGuideLineVS));
+    s_GuideLinePSO.SetPixelShader(g_pProbeGuideLinePS, sizeof(g_pProbeGuideLinePS));
+    s_GuideLinePSO.Finalize();
 
     s_RibbonRootSignature.Reset(kNumRibbonRootParameters, 0);
     s_RibbonRootSignature[kRibbonConstants].InitAsConstantBuffer(0);
@@ -268,6 +301,33 @@ void ProbeVisualization::DrawDistanceLines(GraphicsContext& context, const Camer
         context.SetDynamicConstantBufferView(kLineConstants, sizeof(constants), &constants);
         context.DrawInstanced(kVerticesPerLine, probes.raysPerProbe);
     }
+}
+
+void ProbeVisualization::DrawGuideTexelLines(GraphicsContext& context, const Camera& camera, const ProbeLighting::Probes& probes, uint32_t probe,
+    std::optional<GuideTexelOfProbe> highlightedGuideTexel)
+{
+    ScopedTimer _prof(L"Probe Guide Lines", context);
+
+    const bool highlightsTexelOfProbe = highlightedGuideTexel && highlightedGuideTexel->probe == probe;
+
+    const GuideLineConstants constants = {
+        .viewProj = camera.GetViewProjMatrix(),
+        .probe = probe,
+        .highlightedTexel = highlightsTexelOfProbe ? highlightedGuideTexel->texel : kNoHighlightedGuideTexel,
+        .length = kGuideLineLengthPerSpacing * GetShortestProbeSpacing(probes.grid),
+        .grid = probes.grid,
+    };
+    context.SetRootSignature(s_GuideLineRootSignature);
+    context.SetPipelineState(s_GuideLinePSO);
+    context.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
+    context.TransitionResource(probes.offset, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+    context.TransitionResource(g_SceneDepthBuffer, D3D12_RESOURCE_STATE_DEPTH_READ);
+    context.TransitionResource(g_SceneOverlayBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
+    context.SetRenderTarget(g_SceneOverlayBuffer.GetRTV(), g_SceneDepthBuffer.GetDSV_DepthReadOnly());
+    context.SetViewportAndScissor(0, 0, g_SceneOverlayBuffer.GetWidth(), g_SceneOverlayBuffer.GetHeight());
+    context.SetDynamicConstantBufferView(kGuideLineConstants, sizeof(constants), &constants);
+    context.SetDynamicDescriptor(kGuideLineInputs, 0, probes.offset.GetSRV());
+    context.DrawInstanced(kVerticesPerLine, kProbeGuideTexelCount);
 }
 
 void ProbeVisualization::DrawOffsetLines(GraphicsContext& context, const Camera& camera, const ProbeLighting::Probes& probes)

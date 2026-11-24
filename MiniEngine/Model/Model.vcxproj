@@ -166,6 +166,7 @@
     <None Include="DynamicGI\HitLighting.hlsli" />
     <None Include="DynamicGI\ProbeRays.hlsli" />
     <None Include="DynamicGI\ProbeGuide.hlsli" />
+    <None Include="DynamicGI\ProbeGuideLine.hlsli" />
     <None Include="DynamicGI\ProbeRayHit.hlsli" />
     <None Include="DynamicGI\ProbePositions.hlsli" />
     <None Include="DynamicGI\ProbeVolume.hlsli" />
@@ -316,6 +317,12 @@
       <ShaderType>Vertex</ShaderType>
     </FxCompile>
     <FxCompile Include="DynamicGI\ProbeDistanceLinePS.hlsl">
+      <ShaderType>Pixel</ShaderType>
+    </FxCompile>
+    <FxCompile Include="DynamicGI\ProbeGuideLineVS.hlsl">
+      <ShaderType>Vertex</ShaderType>
+    </FxCompile>
+    <FxCompile Include="DynamicGI\ProbeGuideLinePS.hlsl">
       <ShaderType>Pixel</ShaderType>
     </FxCompile>
     <FxCompile Include="DynamicGI\ProbeOffsetLineVS.hlsl">
