@@ -25,7 +25,6 @@ glTF 좌표는 Mitsuba 의 world 좌표 그대로이고 축을 바꾸지 않는�
 """
 
 import json
-import os
 import sys
 import xml.etree.ElementTree as ElementTree
 from pathlib import Path
@@ -34,7 +33,7 @@ from types import SimpleNamespace
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from gltfwriter import GLTF_FLOAT, GLTF_UNSIGNED_SHORT, BufferBuilder, flatten
 from pickanswers import parallelogram
-from viewer import VIEWER_DIR, scene_gltf
+from viewer import scene_file_gltf_path
 
 EMISSIVE_STRENGTH = 'KHR_materials_emissive_strength'
 
@@ -230,17 +229,12 @@ def world_faces(scene, scale):
     return faces
 
 
-def written_gltf(scene_file):
-    """scene file (경로) 이 여는 glTF 의 경로"""
-    return VIEWER_DIR / scene_gltf(Path(os.path.relpath(Path(scene_file).resolve(), VIEWER_DIR)).as_posix())
-
-
 def main():
     if len(sys.argv) != 3:
         print(__doc__.splitlines()[2].strip(), file=sys.stderr)
         return 2
     try:
-        gltf_path = written_gltf(sys.argv[2])
+        gltf_path = scene_file_gltf_path(sys.argv[2])
         write(read(sys.argv[1]), gltf_path)
         print(f'glTF: {gltf_path}')
     except (SceneError, ElementTree.ParseError, ValueError) as error:

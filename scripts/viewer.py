@@ -542,6 +542,11 @@ def scene_gltf(scene):
     return posixpath.join(folder, path) if folder else path
 
 
+def scene_file_gltf_path(scene_file):
+    """scene file (파일 시스템 경로) 이 여는 glTF 의 파일 시스템 경로"""
+    return VIEWER_DIR / scene_gltf(Path(os.path.relpath(Path(scene_file).resolve(), VIEWER_DIR)).as_posix())
+
+
 def write_scene_file(gltf):
     """test scene 의 glTF 옆에 scene file 을 쓰고 그 MiniEngine/ModelViewer 기준 경로를 돌려준다.
     model 은 bounding sphere 반지름이 10 이 되게 늘리고, camera 는 그 sphere 를 화면에 담는다.
