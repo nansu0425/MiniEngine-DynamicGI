@@ -8,11 +8,12 @@
 - Windows SDK
 - inline raytracing (DXR Tier 1.1, Shader Model 6.5) 을 지원하는 GPU. WARP 는 지원하지 않는다.
 - Python 3.12 와 [scripts/requirements.txt](scripts/requirements.txt) 의 package (`pip install -r scripts/requirements.txt`). `scripts/` 의 script 가 쓴다.
+- Blender 5.2. `scripts/bistro.py` 가 Bistro 의 FBX 를 glTF 로 바꿀 때 쓴다. 기본 설치 경로가 아니면 환경 변수 `BLENDER` 에 `blender.exe` 의 경로를 둔다.
 - VS Code 로 build 하고 실행하려면 C/C++ extension (`ms-vscode.cpptools`) 1.32.2 이상. Run Without Debugging 을 이 version 부터 지원한다. VS Code 의 build 는 `scripts/viewer.py` 로 하므로 Python 도 필요하다.
 
 ## 빌드와 실행
 
-1. asset 을 받는다. ModelViewer 가 쓰는 Sponza (KhronosGroup glTF-Sample-Assets) 는 용량 때문에 repo 에 두지 않는다. Cornell box (Benedikt Bitterli 의 Mitsuba 3 scene) 도 받아 `scripts/cornellbox.py` 로 glTF 로 바꾼다. scene 은 `MiniEngine/ModelViewer/Scenes/` 의 scene file 로 연다.
+1. asset 을 받는다. ModelViewer 가 쓰는 Sponza (KhronosGroup glTF-Sample-Assets) 는 용량 때문에 repo 에 두지 않는다. Cornell box (Benedikt Bitterli 의 Mitsuba 3 scene) 도 받아 `scripts/cornellbox.py` 로 glTF 로 바꾼다. Amazon Lumberyard Bistro (NVIDIA ORCA) 는 받아서 `scripts/bistro.py` 로 Exterior 를 glTF 로 바꾼다. scene 은 `MiniEngine/ModelViewer/Scenes/` 의 scene file 로 연다.
 
    ```powershell
    .\scripts\fetch-assets.ps1
@@ -45,5 +46,6 @@
 | 다른 project 에서 가져온 코드 | 출처 project 의 license | [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) |
 | Sponza asset | Cryengine Limited License Agreement | `MiniEngine/ModelViewer/glTF-Sample-Assets/Models/Sponza/LICENSE.md` |
 | Cornell box asset | CC0 1.0 | `MiniEngine/ModelViewer/Bitterli/cornell-box/LICENSE.txt` |
+| Bistro asset (Amazon Lumberyard Bistro, Open Research Content Archive (ORCA), http://developer.nvidia.com/orca/amazon-lumberyard-bistro) | CC-BY 4.0 | `MiniEngine/ModelViewer/Bistro/Bistro_v5_2/LICENSE.txt` |
 
 asset 의 license 파일은 `scripts/fetch-assets.ps1` 로 asset 을 받은 뒤에 생긴다.

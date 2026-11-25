@@ -39,6 +39,17 @@ $Archives = @(
             Source = 'cornell-box/scene_v3.xml'
             Scene = 'MiniEngine/ModelViewer/Scenes/CornellBox.ini'
         }
+    },
+    @{
+        Url = 'https://developer.nvidia.com/downloads/bistro'
+        Sha256 = '0d50e3c724c6c5da19f8eb99ad3f53e36fec37ffa2df9621f9ccf0603f3934e1'
+        Root = 'MiniEngine/ModelViewer/Bistro'
+        Paths = @('Bistro_v5_2/LICENSE.txt', 'Bistro_v5_2/README.txt')
+        Convert = @{
+            Script = 'scripts/bistro.py'
+            Source = 'Bistro_v5_2/BistroExterior.fbx'
+            Scene = 'MiniEngine/ModelViewer/Scenes/BistroExterior-Day.ini'
+        }
     }
 )
 
