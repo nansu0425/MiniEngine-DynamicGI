@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -9,13 +10,16 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from viewer import scene_file_gltf_path
 
-USAGE = 'python -I scripts/bistro.py <Bistro FBX> <scene file>'
+USAGE = 'python -I scripts/bistro.py <Bistro folder> <scene file>'
 
 BLENDER_SCRIPT = Path(__file__).resolve().parent / 'bistro_blender.py'
 DEFAULT_BLENDER = Path(r'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe')
+EXTERIOR_FBX = 'BistroExterior.fbx'
+INTERIOR_FBX = 'BistroInterior.fbx'
 SOURCE_TEXTURE_FOLDER = 'Textures'
 WRITTEN_TEXTURE_FOLDER = 'Textures'
 DOUBLE_SIDED_MATERIAL_SUFFIX = '.DoubleSided'
+BLENDER_DUPLICATE_NAME_SUFFIX = re.compile(r'\.\d{3}$')
 OPAQUE_ALPHA = 255
 
 
@@ -30,12 +34,23 @@ def find_blender():
     return blender
 
 
-def export_with_blender(fbx, folder):
+def source_fbx(bistro_folder, name):
+    path = bistro_folder / name
+    if not path.is_file():
+        raise ConversionError(f'cannot find {path}')
+    return path
+
+
+def export_with_blender(bistro_folder, folder):
     gltf, material_json = folder / 'exported.gltf', folder / 'materials.json'
-    completed = subprocess.run([str(find_blender()), '-b', '--factory-startup', '--python', str(BLENDER_SCRIPT), '--', str(fbx), str(gltf), str(material_json)],
+    fbx = [source_fbx(bistro_folder, name) for name in (EXTERIOR_FBX, INTERIOR_FBX)]
+    completed = subprocess.run([str(find_blender()), '-b', '--factory-startup', '--python', str(BLENDER_SCRIPT), '--', *map(str, fbx), str(gltf), str(material_json)],
                                capture_output=True, text=True, encoding='utf-8', errors='replace')
     if completed.returncode != 0 or not gltf.is_file() or not material_json.is_file():
         raise ConversionError(f'Blender failed with exit code {completed.returncode}\n{completed.stdout[-4000:]}\n{completed.stderr[-4000:]}')
+    for line in completed.stdout.splitlines():
+        if line.startswith('removed '):
+            print(line)
     return gltf, json.loads(material_json.read_text(encoding='utf-8'))
 
 
@@ -126,7 +141,7 @@ def bistro_material(name, described, textures):
         material['emissiveFactor'] = [described['emissionStrength']] * 3
     elif any(value > 0.0 for value in described['emissiveValue']):
         material['emissiveFactor'] = [value * described['emissionStrength'] for value in described['emissiveValue']]
-    if name.endswith(DOUBLE_SIDED_MATERIAL_SUFFIX):
+    if BLENDER_DUPLICATE_NAME_SUFFIX.sub('', name).endswith(DOUBLE_SIDED_MATERIAL_SUFFIX):
         material['doubleSided'] = True
     return material
 
@@ -152,12 +167,12 @@ def replace_if_changed(source, destination):
     shutil.copyfile(source, destination)
 
 
-def convert(fbx, gltf_path):
-    fbx = Path(fbx).resolve()
+def convert(bistro_folder, gltf_path):
+    bistro_folder = Path(bistro_folder).resolve()
     with tempfile.TemporaryDirectory(prefix='bistro-') as folder:
-        exported, materials = export_with_blender(fbx, Path(folder))
+        exported, materials = export_with_blender(bistro_folder, Path(folder))
         gltf = json.loads(exported.read_text(encoding='utf-8'))
-        rewrite_materials(gltf, materials, TextureWriter(fbx.parent / SOURCE_TEXTURE_FOLDER, gltf_path.parent))
+        rewrite_materials(gltf, materials, TextureWriter(bistro_folder / SOURCE_TEXTURE_FOLDER, gltf_path.parent))
         bin_name = gltf_path.with_suffix('.bin').name
         exported_bin = exported.parent / gltf['buffers'][0]['uri']
         gltf['buffers'][0]['uri'] = bin_name

@@ -47,8 +47,8 @@ $Archives = @(
         Paths = @('Bistro_v5_2/LICENSE.txt', 'Bistro_v5_2/README.txt')
         Convert = @{
             Script = 'scripts/bistro.py'
-            Source = 'Bistro_v5_2/BistroExterior.fbx'
-            Scene = 'MiniEngine/ModelViewer/Scenes/BistroExterior-Day.ini'
+            Source = 'Bistro_v5_2'
+            Scene = 'MiniEngine/ModelViewer/Scenes/Bistro-Day.ini'
         }
     }
 )

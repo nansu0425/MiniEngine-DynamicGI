@@ -13,7 +13,7 @@
 
 ## 빌드와 실행
 
-1. asset 을 받는다. ModelViewer 가 쓰는 Sponza (KhronosGroup glTF-Sample-Assets) 는 용량 때문에 repo 에 두지 않는다. Cornell box (Benedikt Bitterli 의 Mitsuba 3 scene) 도 받아 `scripts/cornellbox.py` 로 glTF 로 바꾼다. Amazon Lumberyard Bistro (NVIDIA ORCA) 는 받아서 `scripts/bistro.py` 로 Exterior 를 glTF 로 바꾼다. scene 은 `MiniEngine/ModelViewer/Scenes/` 의 scene file 로 연다.
+1. asset 을 받는다. ModelViewer 가 쓰는 Sponza (KhronosGroup glTF-Sample-Assets) 는 용량 때문에 repo 에 두지 않는다. Cornell box (Benedikt Bitterli 의 Mitsuba 3 scene) 도 받아 `scripts/cornellbox.py` 로 glTF 로 바꾼다. Amazon Lumberyard Bistro (NVIDIA ORCA) 는 받아서 `scripts/bistro.py` 로 Exterior 와 Interior 를 glTF 하나로 합친다. scene 은 `MiniEngine/ModelViewer/Scenes/` 의 scene file 로 연다.
 
    ```powershell
    .\scripts\fetch-assets.ps1
