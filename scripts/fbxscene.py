@@ -144,7 +144,6 @@ def gltf_material(name, described, textures):
         pbr['baseColorFactor'] = described['baseColorValue']
     if described.get('specular'):
         pbr['metallicRoughnessTexture'] = textures.color(described['specular'])
-        material['occlusionTexture'] = textures.color(described['specular'])
     else:
         pbr['metallicFactor'] = 0.0
         pbr['roughnessFactor'] = described['roughnessValue']
