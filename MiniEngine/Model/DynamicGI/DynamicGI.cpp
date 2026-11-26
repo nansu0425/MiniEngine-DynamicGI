@@ -870,6 +870,12 @@ namespace
     const char kDebugPanelName[] = "Dynamic GI Debug";
     bool s_ShowDebugPanel = false;
 
+    const wchar_t kPipelineScope[] = L"Dynamic GI";
+    const wchar_t kEditorScope[] = L"Dynamic GI Editor";
+    const wchar_t kProbeViewsScope[] = L"Dynamic GI Probe Views";
+    const wchar_t kOverlayScope[] = L"Dynamic GI Overlay";
+    const wchar_t kMeasureScope[] = L"Dynamic GI Measure";
+
     void ReplyWithStateAfterFrame(const ControlChannel::Reply& reply)
     {
         ControlChannel::AfterFrames(1, [reply] { reply.Ok(ControlChannel::Fields().Object("state", ControlChannel::GetState("gi"))); });
@@ -1135,7 +1141,7 @@ void DynamicGI::Update(ComputeContext& context, const GIFrameInputs& inputs, uin
         ProbeLighting::Reset();
     if (IsIndirectOn())
     {
-        ScopedTimer _prof(L"Dynamic GI", context);
+        ScopedTimer _prof(kPipelineScope, context);
         if (s_Settings.indirect == Source::kPathTraced)
         {
             PathTracedLighting::Accumulate(context, s_Settings.pathTraced, inputs, width, height);
@@ -1160,7 +1166,6 @@ void DynamicGI::Update(ComputeContext& context, const GIFrameInputs& inputs, uin
             context.TransitionResource(ProbeLighting::GetProbes().irradiance, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         }
     }
-    SelectedProbeGuide::Update(context, ProbeLighting::GetProbes().guide, FindProbeVolume() != nullptr ? GetSelectedProbe() : std::nullopt);
     Renderer::SetIndirectRadiance(indirectRadiance);
     Renderer::SetProbesIndirectIrradiance(probesIndirectIrradiance, ProbeLighting::GetProbes().grid);
     Renderer::SetScreenIndirectIrradiance(screenIndirectIrradiance);
@@ -1169,6 +1174,7 @@ void DynamicGI::Update(ComputeContext& context, const GIFrameInputs& inputs, uin
 
 void DynamicGI::UpdateEditor(const Math::Camera& camera)
 {
+    ScopedTimer _prof(kEditorScope);
     ImGuiLayer::ShowPanel(kDebugPanelName, s_ShowDebugPanel, ShowDebugPanelContent);
 
     if (FindProbeVolume() == nullptr)
@@ -1196,6 +1202,9 @@ void DynamicGI::UpdateEditor(const Math::Camera& camera)
 
 void DynamicGI::DrawProbes(GraphicsContext& context, const Math::Camera& camera, const D3D12_VIEWPORT& viewport, const D3D12_RECT& scissor)
 {
+    ScopedTimer _prof(kProbeViewsScope, context);
+    SelectedProbeGuide::Update(context.GetComputeContext(), ProbeLighting::GetProbes().guide, FindProbeVolume() != nullptr ? GetSelectedProbe() : std::nullopt);
+
     const ProbeLighting::Volume* volume = FindProbeVolume();
     if (volume == nullptr || !s_Settings.probeSpheres.show)
         return;
@@ -1206,6 +1215,7 @@ void DynamicGI::DrawProbes(GraphicsContext& context, const Math::Camera& camera,
 
 void DynamicGI::DrawOverlay(GraphicsContext& context, const Math::Camera& camera)
 {
+    ScopedTimer _prof(kOverlayScope, context);
     DrawSelectedDynamicGIVolume(context, camera);
 
     if (FindProbeVolume() != nullptr && s_Settings.probeSpheres.show && s_Settings.probeSpheres.showOffsets)
@@ -1226,6 +1236,7 @@ void DynamicGI::DrawOverlay(GraphicsContext& context, const Math::Camera& camera
 
 void DynamicGI::MeasureProbes(const RaytracingScene& scene)
 {
+    ScopedTimer _prof(kMeasureScope);
     if (IsInspectingPixel() && GetProbeCount(ProbeLighting::GetProbes().grid) != 0)
         ProbeContribution::Measure(FindProbeVolume()->settings.weighting, scene);
     ReplyToMeasuredPixelSelections();

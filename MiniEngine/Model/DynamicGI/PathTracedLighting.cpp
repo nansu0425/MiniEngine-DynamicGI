@@ -21,7 +21,8 @@ namespace
 {
     enum RootParameter { kConstants, kScene, kGBuffer = kScene + RaytracingScene::kNumRootParameters, kOutputs, kNumRootParameters };
     RootSignature s_RootSignature;
-    ComputePSO s_IndirectPSO(L"Path Traced Indirect");
+    const wchar_t kIndirectScope[] = L"Path Traced Indirect";
+    ComputePSO s_IndirectPSO(kIndirectScope);
 
     SceneHeapTable s_GBufferSRVs;
     SceneHeapTable s_OutputUAVs;
@@ -129,7 +130,7 @@ PathTracedLighting::Progress PathTracedLighting::GetProgress(void)
 
 void PathTracedLighting::Accumulate(ComputeContext& context, const Settings& settings, const GIFrameInputs& inputs, uint32_t width, uint32_t height)
 {
-    ScopedTimer _prof(L"Path Traced Indirect", context);
+    ScopedTimer _prof(kIndirectScope, context);
 
     FitAccumulationTo(width, height);
 

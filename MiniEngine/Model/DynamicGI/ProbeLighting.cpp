@@ -35,6 +35,17 @@ namespace
     constexpr uint32_t kProbeTileBorderTexels = 1;
     constexpr uint32_t kProbeAtlasGroupSize = 8;
 
+    const wchar_t kTraceScope[] = L"Probe Trace";
+    const wchar_t kEmissiveTraceScope[] = L"Probe Emissive Trace";
+    const wchar_t kTexelDistanceScope[] = L"Probes Texel Distance";
+    const wchar_t kRelocationScope[] = L"Probe Relocation";
+    const wchar_t kIrradianceUpdateScope[] = L"Probes Irradiance Update";
+    const wchar_t kDistanceUpdateScope[] = L"Probes Distance Update";
+    const wchar_t kGuideUpdateScope[] = L"Probes Guide Update";
+    const wchar_t kBackFaceUpdateScope[] = L"Probes Back Face Update";
+    const wchar_t kBorderCopyScope[] = L"Probe Border Copy";
+    const wchar_t kScreenIrradianceScope[] = L"Probe Screen Irradiance";
+
     enum TraceRootParameter { kTraceConstants, kTraceScene, kTraceInputs = kTraceScene + RaytracingScene::kNumRootParameters, kTraceOutputs, kNumTraceRootParameters };
     enum EmissiveTraceRootParameter { kEmissiveTraceConstants, kEmissiveTraceScene, kEmissiveTraceInputs = kEmissiveTraceScene + RaytracingScene::kNumRootParameters, kEmissiveTraceOutputs,
         kNumEmissiveTraceRootParameters };
@@ -249,6 +260,7 @@ namespace
             return;
         }
 
+        ScopedTimer _prof(L"Probe Layout Create");
         g_CommandManager.IdleGPU();
         CreateProbeAtlas(s_ProbesIrradiance, L"Probes Irradiance", grid, kProbeIrradianceTexelsPerSide, DXGI_FORMAT_R32G32B32A32_FLOAT);
         CreateProbeAtlas(s_ProbesDistance, L"Probes Distance", grid, settings.distanceTexelsPerSide, DXGI_FORMAT_R32G32_FLOAT);
@@ -284,7 +296,7 @@ namespace
     void TraceEmissiveSamples(ComputeContext& context, const ProbeEmissiveSampling& sampling, const RaytracingScene::EmissiveTriangles& emissiveTriangles,
         const GIFrameInputs& inputs)
     {
-        ScopedTimer _prof(L"Probe Emissive Trace", context);
+        ScopedTimer _prof(kEmissiveTraceScope, context);
 
         const EmissiveTraceConstants constants = { .emissiveSampling = sampling, .grid = s_Grid };
         s_EmissiveTraceInputs.PointTo(0, s_ProbesOffset, s_ProbesOffset.GetSRV());
@@ -312,7 +324,7 @@ namespace
 
     void MeasureTexelDistances(ComputeContext& context, const GIFrameInputs& inputs)
     {
-        ScopedTimer _prof(L"Probes Texel Distance", context);
+        ScopedTimer _prof(kTexelDistanceScope, context);
 
         const TexelDistanceConstants constants = { .distanceTexelsPerSide = s_DistanceTexelsPerSide, .grid = s_Grid };
         s_TexelDistanceInputs.PointTo(0, s_ProbesOffset, s_ProbesOffset.GetSRV());
@@ -342,7 +354,7 @@ namespace
 
     void RelocateProbes(ComputeContext& context, const Relocation& relocation, const GIFrameInputs& inputs)
     {
-        ScopedTimer _prof(L"Probe Relocation", context);
+        ScopedTimer _prof(kRelocationScope, context);
 
         const float shortestSpacing = GetShortestProbeSpacing(s_Grid);
         RelocationConstants constants = {
@@ -513,6 +525,7 @@ void ProbeLighting::Update(ComputeContext& context, const Volume& volume, const 
     }
     if (s_ResetRequested)
     {
+        ScopedTimer _resetProf(L"Probes Reset", context);
         context.TransitionResource(s_ProbesIrradiance, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, true);
         context.ClearUAV(s_ProbesIrradiance);
         context.TransitionResource(s_ProbesDistance, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, true);
@@ -549,7 +562,7 @@ void ProbeLighting::Update(ComputeContext& context, const Volume& volume, const 
     };
 
     {
-        ScopedTimer _traceProf(L"Probe Trace", context);
+        ScopedTimer _traceProf(kTraceScope, context);
 
         const TraceConstants constants = {
             .distanceTexelsPerSide = s_DistanceTexelsPerSide,
@@ -613,15 +626,18 @@ void ProbeLighting::Update(ComputeContext& context, const Volume& volume, const 
             .emissiveSampling = emissiveSampling,
             .rays = rays,
         };
-        context.SetPipelineState(s_IrradianceUpdatePSO);
-        context.SetDynamicConstantBufferView(kUpdateConstants, sizeof(irradianceConstants), &irradianceConstants);
-        context.SetDynamicDescriptor(kUpdateInputs, 1, s_EmissiveSamples.GetSRV());
-        if (HasEmissiveSamples(emissiveSampling))
-            context.SetDynamicDescriptor(kUpdateInputs, 2, emissiveTriangles.buffer.GetSRV());
-        context.SetDynamicDescriptor(kUpdateInputs, 3, s_ProbesOffset.GetSRV());
-        context.SetDynamicDescriptor(kUpdateInputs, 4, s_WeightedRayDirections.GetSRV());
-        context.SetDynamicDescriptor(kUpdateOutputs, 0, s_ProbesIrradiance.GetUAV());
-        context.Dispatch(probeCount);
+        {
+            ScopedTimer _prof(kIrradianceUpdateScope, context);
+            context.SetPipelineState(s_IrradianceUpdatePSO);
+            context.SetDynamicConstantBufferView(kUpdateConstants, sizeof(irradianceConstants), &irradianceConstants);
+            context.SetDynamicDescriptor(kUpdateInputs, 1, s_EmissiveSamples.GetSRV());
+            if (HasEmissiveSamples(emissiveSampling))
+                context.SetDynamicDescriptor(kUpdateInputs, 2, emissiveTriangles.buffer.GetSRV());
+            context.SetDynamicDescriptor(kUpdateInputs, 3, s_ProbesOffset.GetSRV());
+            context.SetDynamicDescriptor(kUpdateInputs, 4, s_WeightedRayDirections.GetSRV());
+            context.SetDynamicDescriptor(kUpdateOutputs, 0, s_ProbesIrradiance.GetUAV());
+            context.Dispatch(probeCount);
+        }
 
         const BlendUpdateConstants blendConstants = { .blendWeight = blendWeight, .rays = rays };
 
@@ -632,15 +648,19 @@ void ProbeLighting::Update(ComputeContext& context, const Volume& volume, const 
             .backFaceDistanceScale = settings.backFaceDistanceScale,
             .rays = rays,
         };
-        context.TransitionResource(s_RayBackFaces, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-        context.SetPipelineState(s_DistanceUpdatePSO);
-        context.SetDynamicConstantBufferView(kUpdateConstants, sizeof(distanceConstants), &distanceConstants);
-        context.SetDynamicDescriptor(kUpdateInputs, 1, s_RayBackFaces.GetSRV());
-        context.SetDynamicDescriptor(kUpdateOutputs, 0, s_ProbesDistance.GetUAV());
-        context.Dispatch3D(s_DistanceTexelsPerSide, s_DistanceTexelsPerSide, probeCount, kProbeAtlasGroupSize, kProbeAtlasGroupSize, 1);
+        {
+            ScopedTimer _prof(kDistanceUpdateScope, context);
+            context.TransitionResource(s_RayBackFaces, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+            context.SetPipelineState(s_DistanceUpdatePSO);
+            context.SetDynamicConstantBufferView(kUpdateConstants, sizeof(distanceConstants), &distanceConstants);
+            context.SetDynamicDescriptor(kUpdateInputs, 1, s_RayBackFaces.GetSRV());
+            context.SetDynamicDescriptor(kUpdateOutputs, 0, s_ProbesDistance.GetUAV());
+            context.Dispatch3D(s_DistanceTexelsPerSide, s_DistanceTexelsPerSide, probeCount, kProbeAtlasGroupSize, kProbeAtlasGroupSize, 1);
+        }
 
         if (s_GuidedRaysPerProbe > 0)
         {
+            ScopedTimer _prof(kGuideUpdateScope, context);
             context.TransitionResource(s_ProbesGuide, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
             context.SetPipelineState(s_GuideUpdatePSO);
             context.SetDynamicConstantBufferView(kUpdateConstants, sizeof(blendConstants), &blendConstants);
@@ -648,18 +668,24 @@ void ProbeLighting::Update(ComputeContext& context, const Volume& volume, const 
             context.Dispatch1D(probeCount, 64);
         }
 
-        context.TransitionResource(s_ProbesBackFaceRatio, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-        context.SetPipelineState(s_BackFaceUpdatePSO);
-        context.SetDynamicConstantBufferView(kUpdateConstants, sizeof(blendConstants), &blendConstants);
-        context.SetDynamicDescriptor(kUpdateInputs, 0, s_RayBackFaces.GetSRV());
-        context.SetDynamicDescriptor(kUpdateOutputs, 0, s_ProbesBackFaceRatio.GetUAV());
-        context.Dispatch1D(probeCount, 64);
+        {
+            ScopedTimer _prof(kBackFaceUpdateScope, context);
+            context.TransitionResource(s_ProbesBackFaceRatio, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+            context.SetPipelineState(s_BackFaceUpdatePSO);
+            context.SetDynamicConstantBufferView(kUpdateConstants, sizeof(blendConstants), &blendConstants);
+            context.SetDynamicDescriptor(kUpdateInputs, 0, s_RayBackFaces.GetSRV());
+            context.SetDynamicDescriptor(kUpdateOutputs, 0, s_ProbesBackFaceRatio.GetUAV());
+            context.Dispatch1D(probeCount, 64);
+        }
 
-        context.InsertUAVBarrier(s_ProbesIrradiance);
-        context.InsertUAVBarrier(s_ProbesDistance);
-        context.SetPipelineState(s_BorderPSO);
-        CopyProbeTileBorders(context, s_ProbesIrradiance, kProbeIrradianceTexelsPerSide);
-        CopyProbeTileBorders(context, s_ProbesDistance, s_DistanceTexelsPerSide);
+        {
+            ScopedTimer _prof(kBorderCopyScope, context);
+            context.InsertUAVBarrier(s_ProbesIrradiance);
+            context.InsertUAVBarrier(s_ProbesDistance);
+            context.SetPipelineState(s_BorderPSO);
+            CopyProbeTileBorders(context, s_ProbesIrradiance, kProbeIrradianceTexelsPerSide);
+            CopyProbeTileBorders(context, s_ProbesDistance, s_DistanceTexelsPerSide);
+        }
     }
 
     ++s_Progress.updates;
@@ -668,7 +694,7 @@ void ProbeLighting::Update(ComputeContext& context, const Volume& volume, const 
 void ProbeLighting::EstimateScreenIrradiance(ComputeContext& context, const ProbeWeighting::Settings& weighting, const GIFrameInputs& inputs, uint32_t width,
     uint32_t height)
 {
-    ScopedTimer _prof(L"Probe Screen Irradiance", context);
+    ScopedTimer _prof(kScreenIrradianceScope, context);
 
     FitScreenIrradianceTo(width, height);
 
