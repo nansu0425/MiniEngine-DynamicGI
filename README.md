@@ -12,7 +12,7 @@
 
 ## 빌드와 실행
 
-1. asset 을 받는다. ModelViewer 가 쓰는 Sponza (KhronosGroup glTF-Sample-Assets) 는 용량 때문에 repo 에 두지 않는다. Cornell box (Benedikt Bitterli 의 Mitsuba 3 scene) 도 받아 `scripts/cornellbox.py` 로 glTF 로 바꾼다. Amazon Lumberyard Bistro (NVIDIA ORCA) 는 받아서 `scripts/bistro.py` 로 Exterior 와 Interior 를 glTF 하나로 합친다. `scripts/bistro.py` 는 FBX 를 읽으려고 Blender 를 쓴다. Blender 는 `fetch-assets.ps1` 이 `Tools/Blender/` 에 받는다. 다른 Blender 를 쓰려면 환경 변수 `BLENDER` 에 `blender.exe` 의 경로를 둔다. scene 은 `MiniEngine/ModelViewer/Scenes/` 의 scene file 로 연다.
+1. asset 을 받는다. ModelViewer 가 쓰는 Sponza (KhronosGroup glTF-Sample-Assets) 는 용량 때문에 repo 에 두지 않는다. Cornell box (Benedikt Bitterli 의 Mitsuba 3 scene) 도 받아 `scripts/cornellbox.py` 로 glTF 로 바꾼다. Amazon Lumberyard Bistro (NVIDIA ORCA) 는 받아서 `scripts/bistro.py` 로 Exterior 와 Interior 를 glTF 하나로 합친다. UE4 Sun Temple (NVIDIA ORCA) 은 받아서 `scripts/suntemple.py` 로 glTF 로 바꾼다. 두 script 는 FBX 를 읽으려고 Blender 를 쓴다. Blender 는 `fetch-assets.ps1` 이 `Tools/Blender/` 에 받는다. 다른 Blender 를 쓰려면 환경 변수 `BLENDER` 에 `blender.exe` 의 경로를 둔다. scene 은 `MiniEngine/ModelViewer/Scenes/` 의 scene file 로 연다.
 
    ```powershell
    .\scripts\fetch-assets.ps1
@@ -46,5 +46,6 @@
 | Sponza asset | Cryengine Limited License Agreement | `MiniEngine/ModelViewer/glTF-Sample-Assets/Models/Sponza/LICENSE.md` |
 | Cornell box asset | CC0 1.0 | `MiniEngine/ModelViewer/Bitterli/cornell-box/LICENSE.txt` |
 | Bistro asset (Amazon Lumberyard Bistro, Open Research Content Archive (ORCA), http://developer.nvidia.com/orca/amazon-lumberyard-bistro) | CC-BY 4.0 | `MiniEngine/ModelViewer/Bistro/Bistro_v5_2/LICENSE.txt` |
+| Sun Temple asset (Unreal Engine Sun Temple, Open Research Content Archive (ORCA), http://developer.nvidia.com/orca/epic-games-sun-temple) | CC BY-NC-SA 4.0. 이 프로젝트는 수익을 목적으로 하지 않으므로 비상업 조건 안에서 쓴다. | `MiniEngine/ModelViewer/SunTemple/SunTemple_v4/SunTemple/LICENSE.txt` |
 
 asset 의 license 파일은 `scripts/fetch-assets.ps1` 로 asset 을 받은 뒤에 생긴다.

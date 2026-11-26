@@ -25,6 +25,8 @@ __pycache__/
 /MiniEngine/ModelViewer/BistroScene/
 /MiniEngine/ModelViewer/Bitterli/
 /MiniEngine/ModelViewer/CornellBox/
+/MiniEngine/ModelViewer/SunTemple/
+/MiniEngine/ModelViewer/SunTempleScene/
 /MiniEngine/ModelViewer/*.partial/
 # fetch-assets.ps1 가 예전에 받던 옛 Sponza 와 Environment 의 cubemap. 이제 쓰지 않으므로 지워도 된다.
 /MiniEngine/ModelViewer/Sponza/

@@ -56,6 +56,17 @@ $Archives = @(
             Source = 'Bistro_v5_2'
             Scene = 'MiniEngine/ModelViewer/Scenes/Bistro-Day.ini'
         }
+    },
+    @{
+        Url = 'https://developer.nvidia.com/downloads/sun-temple'
+        Sha256 = '672b2ee05f5c7f3b51b56602d7ffe1cb2ce17a7df4038109dda942872aec16ac'
+        Root = 'MiniEngine/ModelViewer/SunTemple'
+        Paths = @('SunTemple_v4/SunTemple/LICENSE.txt', 'SunTemple_v4/SunTemple/README.txt')
+        Convert = @{
+            Script = 'scripts/suntemple.py'
+            Source = 'SunTemple_v4/SunTemple'
+            Scene = 'MiniEngine/ModelViewer/Scenes/SunTemple.ini'
+        }
     }
 )
 

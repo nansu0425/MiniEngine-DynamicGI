@@ -17,6 +17,7 @@ WRITTEN_TEXTURE_FOLDER = 'Textures'
 DOUBLE_SIDED_MATERIAL_SUFFIX = '.DoubleSided'
 BLENDER_DUPLICATE_NAME_SUFFIX = re.compile(r'\.\d{3}$')
 OPAQUE_ALPHA = 255
+EMISSIVE_STRENGTH = 'KHR_materials_emissive_strength'
 
 
 class ConversionError(Exception):
@@ -29,6 +30,7 @@ class FbxScene:
     fbx_names: list
     generator: str
     temporary_folder_prefix: str
+    emissive_strength: float = 1.0
 
 
 @dataclass
@@ -139,7 +141,7 @@ class TextureWriter:
         return self.add(name, opengl_normal_from_directx_bc5(decode_dds(self.source(name))))
 
 
-def gltf_material(name, described, textures):
+def gltf_material(name, described, textures, emissive_strength):
     pbr = {}
     material = {'name': name, 'pbrMetallicRoughness': pbr}
     if described.get('baseColor'):
@@ -162,23 +164,27 @@ def gltf_material(name, described, textures):
             material['emissiveFactor'] = [described['emissionStrength']] * 3
     elif any(value > 0.0 for value in described['emissiveValue']):
         material['emissiveFactor'] = [value * described['emissionStrength'] for value in described['emissiveValue']]
+    if 'emissiveFactor' in material and emissive_strength != 1.0:
+        material['extensions'] = {EMISSIVE_STRENGTH: {'emissiveStrength': emissive_strength}}
     if BLENDER_DUPLICATE_NAME_SUFFIX.sub('', name).endswith(DOUBLE_SIDED_MATERIAL_SUFFIX):
         material['doubleSided'] = True
     return material
 
 
-def rewrite_materials(gltf, materials, textures, generator):
+def rewrite_materials(gltf, materials, textures, scene):
     rewritten = []
     for material in gltf['materials']:
         if material['name'] not in materials:
             raise ConversionError(f'Blender did not describe the material {material["name"]}')
-        rewritten.append(gltf_material(material['name'], materials[material['name']], textures))
+        rewritten.append(gltf_material(material['name'], materials[material['name']], textures, scene.emissive_strength))
     gltf['materials'] = rewritten
     gltf['images'] = textures.images
     gltf['textures'] = textures.textures
     for unused in ('extensionsUsed', 'extensionsRequired', 'samplers'):
         gltf.pop(unused, None)
-    gltf['asset']['generator'] = generator
+    if any('extensions' in material for material in rewritten):
+        gltf['extensionsUsed'] = [EMISSIVE_STRENGTH]
+    gltf['asset']['generator'] = scene.generator
 
 
 def replace_if_changed(source, destination):
@@ -195,7 +201,7 @@ def convert(scene, source_folder, gltf_path):
         for report in exported.reports:
             print(report)
         gltf = json.loads(exported.gltf.read_text(encoding='utf-8'))
-        rewrite_materials(gltf, exported.materials, TextureWriter(source_folder / SOURCE_TEXTURE_FOLDER, gltf_path.parent), scene.generator)
+        rewrite_materials(gltf, exported.materials, TextureWriter(source_folder / SOURCE_TEXTURE_FOLDER, gltf_path.parent), scene)
         bin_name = gltf_path.with_suffix('.bin').name
         exported_bin = exported.gltf.parent / gltf['buffers'][0]['uri']
         gltf['buffers'][0]['uri'] = bin_name
