@@ -21,6 +21,7 @@
 #include <imgui.h>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 #include <array>
 
 using namespace Graphics;
@@ -47,7 +48,8 @@ public:
 
     void RecordStat( uint32_t FrameIndex, float Value )
     {
-        m_RecentHistory[FrameIndex % kHistorySize] = Value;
+        m_NewestIndex = FrameIndex % kHistorySize;
+        m_RecentHistory[m_NewestIndex] = Value;
         m_Recent = Value;
 
         uint32_t ValidCount = 0;
@@ -77,8 +79,17 @@ public:
     float GetMin(void) const { return m_Minimum; }
     float GetAvg(void) const { return m_Average; }
 
+    EngineProfiling::TimeStats GetTimeStats(void) const
+    {
+        EngineProfiling::TimeStats stats = { .last = m_Recent, .average = m_Average, .minimum = m_Minimum, .maximum = m_Maximum };
+        for (uint32_t i = 0; i < kHistorySize; ++i)
+            stats.oldestToNewest[i] = m_RecentHistory[(m_NewestIndex + 1 + i) % kHistorySize];
+        return stats;
+    }
+
 private:
-    static const uint32_t kHistorySize = 64;
+    static const uint32_t kHistorySize = EngineProfiling::kHistoryFrames;
+    uint32_t m_NewestIndex = 0;
     float m_RecentHistory[kHistorySize];
     float m_Recent;
     float m_Average;
@@ -143,6 +154,7 @@ public:
         if (Context == nullptr)
             return;
 
+        m_TimesGpu = true;
         m_GpuTimer.Start(*Context);
 
         Context->PIXBeginEvent(m_Name.c_str());
@@ -197,6 +209,10 @@ public:
     static float GetCpuBusyTime(void) { return s_CpuBusyTime.GetAvg(); }
     static float GetCpuWaitTime(void) { return s_CpuWaitTime.GetAvg(); }
     static float GetGpuBusyTime(void) { return s_GpuBusyTime.GetAvg(); }
+    static EngineProfiling::FrameTimes GetAverageFrameTimes(void)
+    {
+        return { .frame = GetFrameTime(), .cpuBusy = GetCpuBusyTime(), .cpuWait = GetCpuWaitTime(), .gpuBusy = GetGpuBusyTime() };
+    }
 
     static void ShowTree( void );
 
@@ -204,7 +220,41 @@ public:
     float GetLastCpuTime( void ) const { return m_CpuTime.GetLast(); }
     float GetLastGpuTime( void ) const { return m_GpuTime.GetLast(); }
 
+    EngineProfiling::ScopeTimes GetScopeTimes( void ) const
+    {
+        EngineProfiling::ScopeTimes times = {
+            .name = m_Name,
+            .cpu = m_CpuTime.GetTimeStats(),
+            .gpu = m_GpuTime.GetTimeStats(),
+            .timesGpu = m_TimesGpu,
+        };
+        for (const NestedTimingTree* node : m_Children)
+            times.children.push_back(node->GetScopeTimes());
+        return times;
+    }
+
+    static void NoteResourceUse( const GpuResource& resource )
+    {
+        if (sm_CurrentNode != &sm_RootScope)
+            sm_CurrentNode->m_UsedResources.insert(&resource);
+    }
+
+    static vector<wstring> FindScopesUsing( const GpuResource& resource )
+    {
+        vector<wstring> scopes;
+        sm_RootScope.CollectScopesUsing(resource, scopes);
+        return scopes;
+    }
+
 private:
+
+    void CollectScopesUsing( const GpuResource& resource, vector<wstring>& scopes ) const
+    {
+        if (m_UsedResources.contains(&resource) && std::find(scopes.begin(), scopes.end(), m_Name) == scopes.end())
+            scopes.push_back(m_Name);
+        for (const NestedTimingTree* node : m_Children)
+            node->CollectScopesUsing(resource, scopes);
+    }
 
     const NestedTimingTree* FindBelow( const wstring& name ) const
     {
@@ -235,6 +285,8 @@ private:
     StatHistory m_CpuTime;
     StatHistory m_GpuTime;
     GpuTimer m_GpuTimer;
+    bool m_TimesGpu = false;
+    unordered_set<const GpuResource*> m_UsedResources;
     static StatHistory s_FrameTime;
     static StatHistory s_CpuBusyTime;
     static StatHistory s_CpuWaitTime;
@@ -287,6 +339,34 @@ namespace EngineProfiling
         cpuMilliseconds = node->GetLastCpuTime();
         gpuMilliseconds = node->GetLastGpuTime();
         return true;
+    }
+
+    std::optional<ScopeTimes> FindScopeTimes(const wstring& scope)
+    {
+        const NestedTimingTree* node = NestedTimingTree::Find(scope);
+        if (node == nullptr)
+            return std::nullopt;
+        return node->GetScopeTimes();
+    }
+
+    FrameTimes GetAverageFrameTimes(void)
+    {
+        return NestedTimingTree::GetAverageFrameTimes();
+    }
+
+    void SetPaused(bool paused)
+    {
+        Paused = paused;
+    }
+
+    void NoteResourceUse(const GpuResource& resource)
+    {
+        NestedTimingTree::NoteResourceUse(resource);
+    }
+
+    vector<wstring> FindScopesUsing(const GpuResource& resource)
+    {
+        return NestedTimingTree::FindScopesUsing(resource);
     }
 
     void ShowFrameStats( void )

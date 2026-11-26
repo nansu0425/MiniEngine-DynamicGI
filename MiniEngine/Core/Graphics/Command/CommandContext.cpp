@@ -363,6 +363,8 @@ void GraphicsContext::SetScissor( const D3D12_RECT& rect )
 
 void CommandContext::TransitionResource(GpuResource& Resource, D3D12_RESOURCE_STATES NewState, bool FlushImmediate)
 {
+    EngineProfiling::NoteResourceUse(Resource);
+
     D3D12_RESOURCE_STATES OldState = Resource.m_UsageState;
 
     if (m_Type == D3D12_COMMAND_LIST_TYPE_COMPUTE)
@@ -430,6 +432,8 @@ void CommandContext::BeginResourceTransition(GpuResource& Resource, D3D12_RESOUR
 
 void CommandContext::InsertUAVBarrier(GpuResource& Resource, bool FlushImmediate)
 {
+    EngineProfiling::NoteResourceUse(Resource);
+
     ASSERT(m_NumBarriersToFlush < 16, "Exceeded arbitrary limit on buffered barriers");
     D3D12_RESOURCE_BARRIER& BarrierDesc = m_ResourceBarrierBuffer[m_NumBarriersToFlush++];
 
