@@ -9,6 +9,9 @@ USAGE = 'blender -b --factory-startup --python scripts/bistro_blender.py -- <FBX
 
 FBX_LIGHT_IMPORT_BREAKING_ADDONS = ['cycles']
 
+EXTERIOR_ROOT_NAME = 'BistroExterior'
+CENTIMETRES_TO_METRES = 0.01
+
 PRINCIPLED_TEXTURE_INPUTS = {
     'Base Color': 'baseColor',
     'Specular IOR Level': 'specular',
@@ -54,6 +57,7 @@ def main():
     for addon in FBX_LIGHT_IMPORT_BREAKING_ADDONS:
         addon_utils.disable(addon)
     bpy.ops.import_scene.fbx(filepath=fbx)
+    bpy.data.objects[EXTERIOR_ROOT_NAME].scale = (CENTIMETRES_TO_METRES,) * 3
 
     materials = {material.name: describe_material(material) for material in bpy.data.materials if material.node_tree is not None}
     Path(material_json).write_text(json.dumps(materials, indent=1), encoding='utf-8')
