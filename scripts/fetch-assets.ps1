@@ -26,8 +26,14 @@ $CommitStampName = '.fetched-commit'
 
 # zip 하나로 받는 asset. Sha256 이 받은 zip 과 다르면 아무것도 바꾸지 않고 실패한다. Root 에 zip 을 풀고, Paths 는 Root 에 대한 상대
 # 경로다. Convert 는 다 받은 뒤에 Root 의 Source 를 asset 으로 바꾸는 Script 와 그 asset 을 여는 ModelViewer 의 Scene 이다. Script 는
-# 이미 받았어도 실행하고, asset 을 Scene 이 가리키는 곳에 쓴다.
+# 이미 받았어도 실행하고, asset 을 Scene 이 가리키는 곳에 쓴다. Convert 가 없는 항목은 받기만 한다.
 $Archives = @(
+    @{
+        Url = 'https://download.blender.org/release/Blender5.2/blender-5.2.5-windows-x64.zip'
+        Sha256 = '1fad54a676c3bb08fdcb5a2ae1eaaf02f8c492af02bd5ca292bcdbb28b6bb29a'
+        Root = 'Tools/Blender'
+        Paths = @('blender-5.2.5-windows-x64/blender.exe')
+    },
     @{
         # Benedikt Bitterli 의 Cornell Box 중 Mitsuba 3 판. CC0 이고 license 는 받은 cornell-box/LICENSE.txt 에 있다.
         Url = 'https://benedikt-bitterli.me/resources/mitsuba/cornell-box.zip'
@@ -73,7 +79,9 @@ function Get-AbsentPaths($Source, $Folder) {
 
 # zip 을 다 풀었는지 볼 Root 의 파일에는 Convert 가 읽는 Source 도 든다.
 function Get-AbsentArchivePaths($Archive, $Folder) {
-    return Get-AbsentPaths @{ Paths = @($Archive.Paths) + $Archive.Convert.Source } $Folder
+    $Paths = @($Archive.Paths)
+    if ($Archive.Convert) { $Paths += $Archive.Convert.Source }
+    return Get-AbsentPaths @{ Paths = $Paths } $Folder
 }
 
 function Test-ArchiveFetched($Archive, $Destination) {
@@ -179,8 +187,9 @@ foreach ($Archive in $Archives) {
         }
     }
 
-    # 받은 파일을 읽으므로 -I 로 cwd 와 사용자 site 를 sys.path 에서 뺀다.
     $Convert = $Archive.Convert
+    if (-not $Convert) { continue }
+    # 받은 파일을 읽으므로 -I 로 cwd 와 사용자 site 를 sys.path 에서 뺀다.
     python -I ([System.IO.Path]::Combine($RepoRoot, $Convert.Script)) ([System.IO.Path]::Combine($Destination, $Convert.Source)) `
         ([System.IO.Path]::Combine($RepoRoot, $Convert.Scene))
     if ($LASTEXITCODE -ne 0) { throw "$($Convert.Script) failed with exit code $LASTEXITCODE" }

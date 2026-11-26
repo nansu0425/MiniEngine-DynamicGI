@@ -13,7 +13,7 @@ from viewer import scene_file_gltf_path
 USAGE = 'python -I scripts/bistro.py <Bistro folder> <scene file>'
 
 BLENDER_SCRIPT = Path(__file__).resolve().parent / 'bistro_blender.py'
-DEFAULT_BLENDER = Path(r'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe')
+FETCHED_BLENDER_FOLDER = Path(__file__).resolve().parent.parent / 'Tools' / 'Blender'
 EXTERIOR_FBX = 'BistroExterior.fbx'
 INTERIOR_FBX = 'BistroInterior.fbx'
 SOURCE_TEXTURE_FOLDER = 'Textures'
@@ -28,10 +28,15 @@ class ConversionError(Exception):
 
 
 def find_blender():
-    blender = Path(os.environ.get('BLENDER', DEFAULT_BLENDER))
-    if not blender.is_file():
-        raise ConversionError(f'cannot find Blender at {blender}. Set BLENDER to blender.exe')
-    return blender
+    if 'BLENDER' in os.environ:
+        blender = Path(os.environ['BLENDER'])
+        if not blender.is_file():
+            raise ConversionError(f'cannot find Blender at {blender}, which BLENDER names')
+        return blender
+    fetched = list(FETCHED_BLENDER_FOLDER.glob('*/blender.exe'))
+    if len(fetched) != 1:
+        raise ConversionError(f'cannot find one blender.exe in {FETCHED_BLENDER_FOLDER}. Run scripts/fetch-assets.ps1 or set BLENDER to blender.exe')
+    return fetched[0]
 
 
 def source_fbx(bistro_folder, name):

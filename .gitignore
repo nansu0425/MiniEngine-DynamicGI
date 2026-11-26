@@ -18,7 +18,8 @@ user.ini
 # Python 이 module 을 import 할 때 만드는 bytecode cache
 __pycache__/
 
-# scripts/fetch-assets.ps1 가 받아 오는 asset 과 그 asset 을 바꾼 glTF, 받다가 멈추면 남을 수 있는 폴더
+# scripts/fetch-assets.ps1 가 받아 오는 asset 과 Blender, 그 asset 을 바꾼 glTF, 받다가 멈추면 남을 수 있는 폴더
+/Tools/
 /MiniEngine/ModelViewer/glTF-Sample-Assets/
 /MiniEngine/ModelViewer/Bistro/
 /MiniEngine/ModelViewer/BistroScene/
