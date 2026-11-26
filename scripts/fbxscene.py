@@ -129,6 +129,12 @@ class TextureWriter:
     def color(self, name):
         return self.add(name, decode_dds(self.source(name))[..., :3])
 
+    def emissive(self, name):
+        rgb = decode_dds(self.source(name))[..., :3]
+        if not rgb.any():
+            return None
+        return self.add(name, rgb)
+
     def normal(self, name):
         return self.add(name, opengl_normal_from_directx_bc5(decode_dds(self.source(name))))
 
@@ -150,8 +156,10 @@ def gltf_material(name, described, textures):
     if described.get('normal'):
         material['normalTexture'] = textures.normal(described['normal'])
     if described.get('emissive'):
-        material['emissiveTexture'] = textures.color(described['emissive'])
-        material['emissiveFactor'] = [described['emissionStrength']] * 3
+        emissive_texture = textures.emissive(described['emissive'])
+        if emissive_texture is not None:
+            material['emissiveTexture'] = emissive_texture
+            material['emissiveFactor'] = [described['emissionStrength']] * 3
     elif any(value > 0.0 for value in described['emissiveValue']):
         material['emissiveFactor'] = [value * described['emissionStrength'] for value in described['emissiveValue']]
     if BLENDER_DUPLICATE_NAME_SUFFIX.sub('', name).endswith(DOUBLE_SIDED_MATERIAL_SUFFIX):
