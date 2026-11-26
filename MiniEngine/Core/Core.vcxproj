@@ -102,6 +102,7 @@
     <ClInclude Include="Profiling\GpuTimeManager.h" />
     <ClInclude Include="App\GameCore.h" />
     <ClInclude Include="App\UserSettings.h" />
+    <ClInclude Include="Graphics\FormatName.h" />
     <ClInclude Include="Graphics\GraphicsCommon.h" />
     <ClInclude Include="Graphics\GraphicsCore.h" />
     <ClInclude Include="Utility\Hash.h" />
@@ -202,6 +203,7 @@
     <ClCompile Include="Graphics\Resource\GpuBuffer.cpp" />
     <ClCompile Include="Graphics\Resource\AccelerationStructureBuffer.cpp" />
     <ClCompile Include="Profiling\GpuTimeManager.cpp" />
+    <ClCompile Include="Graphics\FormatName.cpp" />
     <ClCompile Include="Graphics\GraphicsCommon.cpp" />
     <ClCompile Include="Graphics\GraphicsCore.cpp" />
     <ClCompile Include="Display\ImageScaling\ImageScaling.cpp" />
