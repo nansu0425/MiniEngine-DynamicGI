@@ -97,6 +97,8 @@
     <ClInclude Include="DynamicGI\DynamicGIVolumeBox.h" />
     <ClInclude Include="DynamicGI\GIFrameInputs.h" />
     <ClInclude Include="DynamicGI\GILights.h" />
+    <ClInclude Include="DynamicGI\GIProfiler.h" />
+    <ClInclude Include="DynamicGI\GIProfiling.h" />
     <ClInclude Include="DynamicGI\ProbeContribution.h" />
     <ClInclude Include="DynamicGI\ProbeGuide.h" />
     <ClInclude Include="DynamicGI\SelectedProbeGuide.h" />
@@ -136,6 +138,7 @@
     <ClCompile Include="DynamicGI\DynamicGI.cpp" />
     <ClCompile Include="DynamicGI\DynamicGIVolume.cpp" />
     <ClCompile Include="DynamicGI\DynamicGIVolumeBox.cpp" />
+    <ClCompile Include="DynamicGI\GIProfiler.cpp" />
     <ClCompile Include="DynamicGI\PathTracedLighting.cpp" />
     <ClCompile Include="DynamicGI\ProbeContribution.cpp" />
     <ClCompile Include="DynamicGI\SelectedProbeGuide.cpp" />

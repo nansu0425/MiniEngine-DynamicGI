@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Model/DynamicGI/GIProfiling.h"
 #include "Model/DynamicGI/ProbeRelocation.h"
 #include "Model/Renderer/IrradianceProbeGrid.h"
 
@@ -60,4 +61,6 @@ namespace ProbeReadback
 
     const ProbeRaysReadback* FindRaysOfLastUpdate(uint32_t probe);
     const ProbeRaysReadback* FindLastReadRays(uint32_t probe);
+
+    void ListResources(std::vector<GIProfiling::Resource>& resources);
 }

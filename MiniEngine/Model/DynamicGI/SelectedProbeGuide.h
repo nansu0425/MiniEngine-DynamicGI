@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Model/DynamicGI/GIProfiling.h"
+
 #include <cstdint>
 #include <optional>
 
@@ -14,4 +16,6 @@ namespace SelectedProbeGuide
     void Update(ComputeContext& context, ColorBuffer& probesGuide, std::optional<uint32_t> probe);
 
     ColorBuffer& GetTexture(void);
+
+    void ListResources(std::vector<GIProfiling::Resource>& resources);
 }

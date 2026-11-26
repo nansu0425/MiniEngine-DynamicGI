@@ -13,6 +13,7 @@
 #include "Output/Model/CompiledShaders/PathTracedIndirectCS.h"
 
 #include <algorithm>
+#include <format>
 
 using namespace Math;
 using namespace Graphics;
@@ -69,6 +70,7 @@ namespace
     bool s_ResetRequested = true;
     AccumulationConditions s_CurrentAccumConditions;
     PathTracedLighting::Progress s_Progress = {};
+    uint32_t s_SamplesPerPixelOfLastFrame = 0;
 
     __declspec(align(16)) struct Constants
     {
@@ -159,6 +161,7 @@ void PathTracedLighting::Accumulate(ComputeContext& context, const Settings& set
     constants.MaxHits = settings.maxHits;
     constants.RussianRoulette = settings.russianRoulette ? 1 : 0;
 
+    s_SamplesPerPixelOfLastFrame = constants.SamplesThisFrame;
     if (constants.SamplesThisFrame == 0)
         return;
 
@@ -178,6 +181,22 @@ void PathTracedLighting::Accumulate(ComputeContext& context, const Settings& set
     context.Dispatch2D(width, height);
 
     s_Progress.samples += constants.SamplesThisFrame;
+}
+
+void PathTracedLighting::ListResources(std::vector<GIProfiling::Resource>& resources)
+{
+    resources.push_back({ &s_IndirectRadiance, GIProfiling::ResourceRole::kScreen });
+}
+
+void PathTracedLighting::DescribeWorkload(GIProfiling::Workload& workload)
+{
+    const uint64_t pixelCount = (uint64_t)s_IndirectRadiance.GetWidth() * s_IndirectRadiance.GetHeight();
+    workload.passes.push_back({ kIndirectScope, "sample", pixelCount * s_SamplesPerPixelOfLastFrame });
+    workload.conditions.insert(workload.conditions.end(), {
+        { "Resolution", std::format("{} x {}", s_IndirectRadiance.GetWidth(), s_IndirectRadiance.GetHeight()) },
+        { "Samples per Pixel of Last Frame", std::to_string(s_SamplesPerPixelOfLastFrame) },
+        { "Accumulated Samples", std::to_string(s_Progress.samples) },
+    });
 }
 
 ColorBuffer& PathTracedLighting::GetIndirectRadiance(void)

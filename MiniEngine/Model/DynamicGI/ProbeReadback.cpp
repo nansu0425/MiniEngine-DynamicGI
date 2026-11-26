@@ -289,3 +289,11 @@ const ProbeReadback::ProbeRaysReadback* ProbeReadback::FindLastReadRays(uint32_t
 {
     return s_Rays && s_Rays->probe == probe && s_Rays->resets == ProbeLighting::GetProgress().resets ? &*s_Rays : nullptr;
 }
+
+void ProbeReadback::ListResources(std::vector<GIProfiling::Resource>& resources)
+{
+    resources.push_back({ &s_OffsetReadback, GIProfiling::ResourceRole::kDebug });
+    resources.push_back({ &s_RayReadback, GIProfiling::ResourceRole::kDebug });
+    resources.push_back({ &s_Census, GIProfiling::ResourceRole::kDebug });
+    resources.push_back({ &s_CensusReadback, GIProfiling::ResourceRole::kDebug });
+}

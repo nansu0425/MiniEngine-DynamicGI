@@ -23,6 +23,7 @@
 #include "Output/Model/CompiledShaders/ProbeScreenIrradianceCS.h"
 
 #include <algorithm>
+#include <format>
 #include <optional>
 #include <random>
 
@@ -99,6 +100,7 @@ namespace
     uint32_t s_UniformRaysPerProbe = 0;
     uint32_t s_GuidedRaysPerProbe = 0;
     uint32_t s_DistanceTexelsPerSide = 0;
+    uint32_t s_EmissiveSamplesPerProbe = 0;
     bool s_ResetRequested = true;
     ProbeLighting::Progress s_Progress = {};
     std::mt19937 s_Random;
@@ -280,6 +282,7 @@ namespace
 
     void FitEmissiveSamplesTo(uint32_t probeCount, uint32_t samplesPerProbe)
     {
+        s_EmissiveSamplesPerProbe = samplesPerProbe;
         const uint32_t width = std::max(samplesPerProbe, 1u);
         if (s_EmissiveSamples.GetWidth() == width && s_EmissiveSamples.GetHeight() == probeCount)
             return;
@@ -508,6 +511,41 @@ void ProbeLighting::Reset(void)
 ProbeLighting::Progress ProbeLighting::GetProgress(void)
 {
     return s_Progress;
+}
+
+void ProbeLighting::ListResources(std::vector<GIProfiling::Resource>& resources)
+{
+    for (const ColorBuffer* probeData : { &s_ProbesIrradiance, &s_ProbesDistance, &s_ProbesTexelDistance, &s_ProbesBackFaceRatio, &s_ProbesOffset, &s_ProbesGuide })
+        resources.push_back({ probeData, GIProfiling::ResourceRole::kProbeData });
+    for (const ColorBuffer* rayBuffer : { &s_WeightedRayDirections, &s_RaySamples, &s_RayBackFaces, &s_EmissiveSamples })
+        resources.push_back({ rayBuffer, GIProfiling::ResourceRole::kRayBuffer });
+    resources.push_back({ &s_ScreenIrradiance, GIProfiling::ResourceRole::kScreen });
+}
+
+void ProbeLighting::DescribeWorkload(GIProfiling::Workload& workload)
+{
+    const uint64_t probeCount = GetProbeCount(s_Grid);
+    const uint64_t distanceTexelCount = probeCount * s_DistanceTexelsPerSide * s_DistanceTexelsPerSide;
+    const uint64_t screenPixelCount = (uint64_t)s_ScreenIrradiance.GetWidth() * s_ScreenIrradiance.GetHeight();
+    workload.passes.insert(workload.passes.end(), {
+        { kTraceScope, "ray", probeCount * GetRaysPerProbe() },
+        { kEmissiveTraceScope, "sample", probeCount * s_EmissiveSamplesPerProbe },
+        { kRelocationScope, "probe", probeCount },
+        { kTexelDistanceScope, "texel", distanceTexelCount },
+        { kIrradianceUpdateScope, "probe", probeCount },
+        { kDistanceUpdateScope, "texel", distanceTexelCount },
+        { kGuideUpdateScope, "probe", probeCount },
+        { kBackFaceUpdateScope, "probe", probeCount },
+        { kBorderCopyScope, "probe", probeCount },
+        { kScreenIrradianceScope, "pixel", screenPixelCount },
+    });
+    workload.conditions.insert(workload.conditions.end(), {
+        { "Probes", std::format("{} x {} x {} = {}", s_Grid.counts[0], s_Grid.counts[1], s_Grid.counts[2], probeCount) },
+        { "Rays per Probe", std::format("{} uniform + {} guided", s_UniformRaysPerProbe, s_GuidedRaysPerProbe) },
+        { "Emissive Samples per Probe", std::to_string(s_EmissiveSamplesPerProbe) },
+        { "Distance Texels per Side", std::to_string(s_DistanceTexelsPerSide) },
+        { "Screen Irradiance", std::format("{} x {}", s_ScreenIrradiance.GetWidth(), s_ScreenIrradiance.GetHeight()) },
+    });
 }
 
 void ProbeLighting::Update(ComputeContext& context, const Volume& volume, const GIFrameInputs& inputs)

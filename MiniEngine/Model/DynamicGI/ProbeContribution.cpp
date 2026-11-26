@@ -152,3 +152,9 @@ StructuredBuffer& ProbeContribution::GetSurfaceBuffer(void)
 {
     return s_Surface;
 }
+
+void ProbeContribution::ListResources(std::vector<GIProfiling::Resource>& resources)
+{
+    resources.push_back({ &s_Surface, GIProfiling::ResourceRole::kDebug });
+    resources.push_back({ &s_SurfaceReadback, GIProfiling::ResourceRole::kDebug });
+}

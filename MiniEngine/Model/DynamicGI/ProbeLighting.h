@@ -2,6 +2,7 @@
 
 #include "Core/Math/BoundingBox.h"
 #include "Model/DynamicGI/GIFrameInputs.h"
+#include "Model/DynamicGI/GIProfiling.h"
 #include "Model/DynamicGI/ProbeRelocation.h"
 #include "Model/DynamicGI/ProbeWeighting.h"
 #include "Model/Renderer/IrradianceProbeGrid.h"
@@ -74,4 +75,7 @@ namespace ProbeLighting
 
     Probes GetProbes(void);
     ColorBuffer& GetScreenIrradiance(void);
+
+    void ListResources(std::vector<GIProfiling::Resource>& resources);
+    void DescribeWorkload(GIProfiling::Workload& workload);
 }

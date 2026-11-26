@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Model/DynamicGI/GIProfiling.h"
 #include "Model/DynamicGI/ProbeLighting.h"
 
 #include <optional>
@@ -59,4 +60,6 @@ namespace ProbeContribution
 
     const std::optional<Readback>& GetReadback(void);
     StructuredBuffer& GetSurfaceBuffer(void);
+
+    void ListResources(std::vector<GIProfiling::Resource>& resources);
 }

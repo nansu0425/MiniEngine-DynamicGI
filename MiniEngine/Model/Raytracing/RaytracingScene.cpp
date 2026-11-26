@@ -202,6 +202,11 @@ RaytracingScene::EmissiveTriangles RaytracingScene::GetEmissiveTriangles() const
     return { m_EmissiveTriangleBuffer, m_EmissiveTriangleCount };
 }
 
+void RaytracingScene::ListResources(std::vector<const GpuResource*>& resources) const
+{
+    resources.insert(resources.end(), { &m_TLAS, &m_ScratchBuffer, &m_BLASInstanceBuffer, &m_EmissiveTriangleBuffer });
+}
+
 void RaytracingScene::CreateBuffers(const D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS& inputs)
 {
     D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO prebuild;

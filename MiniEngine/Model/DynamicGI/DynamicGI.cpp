@@ -1,6 +1,7 @@
 #include "Model/DynamicGI/DynamicGI.h"
 #include "Model/DynamicGI/DynamicGIVolume.h"
 #include "Model/DynamicGI/DynamicGIVolumeBox.h"
+#include "Model/DynamicGI/GIProfiler.h"
 #include "Model/DynamicGI/PathTracedLighting.h"
 #include "Model/DynamicGI/ProbeContribution.h"
 #include "Model/DynamicGI/ProbeGuide.h"
@@ -14,6 +15,7 @@
 #include "Core/Editor/SceneEditor.h"
 #include "Core/Editor/TextureViewer.h"
 #include "Core/Scene/SettingValues.h"
+#include "Model/Raytracing/RaytracingScene.h"
 #include "Model/Renderer/Renderer.h"
 #include "Core/Graphics/Command/CommandContext.h"
 #include "Core/Graphics/Resource/ColorBuffer.h"
@@ -875,6 +877,33 @@ namespace
     const wchar_t kProbeViewsScope[] = L"Dynamic GI Probe Views";
     const wchar_t kOverlayScope[] = L"Dynamic GI Overlay";
     const wchar_t kMeasureScope[] = L"Dynamic GI Measure";
+    const RaytracingScene* s_Scene = nullptr;
+
+    GIProfiling::Report DescribeProfilingReport(void)
+    {
+        GIProfiling::Report report = {
+            .scopes = { .pipeline = kPipelineScope, .debug = { kEditorScope, kProbeViewsScope, kOverlayScope, kMeasureScope } },
+        };
+        report.workload.conditions.push_back({ "Indirect", kSourceNames[(int)s_Settings.indirect] });
+        if (s_Settings.indirect == Source::kPathTraced)
+            PathTracedLighting::DescribeWorkload(report.workload);
+        else if (FindProbeVolume() != nullptr)
+            ProbeLighting::DescribeWorkload(report.workload);
+
+        ProbeLighting::ListResources(report.resources);
+        PathTracedLighting::ListResources(report.resources);
+        SelectedProbeGuide::ListResources(report.resources);
+        ProbeContribution::ListResources(report.resources);
+        ProbeReadback::ListResources(report.resources);
+        if (s_Scene != nullptr)
+        {
+            std::vector<const GpuResource*> sharedResources;
+            s_Scene->ListResources(sharedResources);
+            for (const GpuResource* resource : sharedResources)
+                report.resources.push_back({ resource, GIProfiling::ResourceRole::kShared });
+        }
+        return report;
+    }
 
     void ReplyWithStateAfterFrame(const ControlChannel::Reply& reply)
     {
@@ -1011,8 +1040,25 @@ namespace
             s_ProbeStepRequested = true;
     }
 
+    void MeasureProfile(const std::string& framesText, const ControlChannel::Reply& reply)
+    {
+        uint32_t frames = 0;
+        if (!MeasurementConditions::ReadUInt(framesText, frames) || frames == 0)
+        {
+            reply.Error("usage: gi profile frames=<n>");
+            return;
+        }
+        GIProfiler::Measure(frames, reply);
+    }
+
     void HandleGICommand(const std::string& arguments, const ControlChannel::Reply& reply)
     {
+        const std::string profilePrefix = "profile frames=";
+        if (arguments.rfind(profilePrefix, 0) == 0)
+        {
+            MeasureProfile(arguments.substr(profilePrefix.size()), reply);
+            return;
+        }
         if (arguments == "probe measure")
         {
             MeasureProbesForReply(reply);
@@ -1094,9 +1140,10 @@ void DynamicGI::Initialize(void)
 
     SceneEditor::RegisterComponentDetails<DynamicGIVolumeComponent>(ShowDynamicGIVolumeDetails);
     UserSettings::Register(kDebugPanelName, SaveSettings, LoadSettings);
+    GIProfiler::Initialize(DescribeProfilingReport);
 
     ControlChannel::RegisterState("gi", DescribeState);
-    ControlChannel::Register("gi", "gi probe step | gi probe select <x> <y> <z>|none | gi probe measure | gi pixel select <x> <y>|none. "
+    ControlChannel::Register("gi", "gi probe step | gi probe select <x> <y> <z>|none | gi probe measure | gi pixel select <x> <y>|none | gi profile frames=<n>. "
         "step updates the probes once on the next frame while Pause Updates is on, as the Step button does, "
         "and fails unless Indirect is Probe, the scene has a Dynamic GI Volume and Pause Updates is on. "
         "probe select selects the probe at a grid coordinate, or clears the selection, as clicking a probe sphere or elsewhere in the scene does. "
@@ -1113,11 +1160,17 @@ void DynamicGI::Initialize(void)
         "the weight the interpolation gives it after the classification, visibility and facing weights, its irradiance toward the shading normal and that irradiance times the weight. "
         "distance_lookup_position is the point Self Shadow Bias moves off the surface while Visibility is Chebyshev, and the surface point otherwise. "
         "irradiance is the sum of those and shading_irradiance what the shading reads there. "
-        "pixel select none clears the pixel and replies after the next frame", HandleGICommand);
+        "pixel select none clears the pixel and replies after the next frame. "
+        "profile reads the Dynamic GI Profiler's scopes on each of the next n frames and replies with their CPU and GPU time in ms (mean, min, max and the frames they ran in) "
+        "under pipeline (the Dynamic GI scope and its passes) and debug (the editor, probe views, overlay and measure scopes), "
+        "with the GPU time per unit of work for passes that have one, conditions such as the probe count and rays per probe, "
+        "and memory: the bytes of each Dynamic GI resource with its role, format, size and the scopes that used it, gi_bytes for the resources Dynamic GI owns "
+        "and shared_bytes for the ray tracing scene's. It fails if the profiler is paused", HandleGICommand);
 }
 
 void DynamicGI::Shutdown(void)
 {
+    GIProfiler::Shutdown();
     UserSettings::Unregister(kDebugPanelName);
     SelectedProbeGuide::Shutdown();
     ProbeReadback::Shutdown();
@@ -1137,6 +1190,7 @@ void DynamicGI::Update(ComputeContext& context, const GIFrameInputs& inputs, uin
     ColorBuffer* indirectRadiance = nullptr;
     ColorBuffer* probesIndirectIrradiance = nullptr;
     ColorBuffer* screenIndirectIrradiance = nullptr;
+    s_Scene = &inputs.scene;
     if (FindDynamicGIVolume() == nullptr)
         ProbeLighting::Reset();
     if (IsIndirectOn())
@@ -1176,6 +1230,7 @@ void DynamicGI::UpdateEditor(const Math::Camera& camera)
 {
     ScopedTimer _prof(kEditorScope);
     ImGuiLayer::ShowPanel(kDebugPanelName, s_ShowDebugPanel, ShowDebugPanelContent);
+    GIProfiler::Update();
 
     if (FindProbeVolume() == nullptr)
         return;

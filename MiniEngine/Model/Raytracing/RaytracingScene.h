@@ -38,6 +38,8 @@ public:
 
     EmissiveTriangles GetEmissiveTriangles() const;
 
+    void ListResources(std::vector<const GpuResource*>& resources) const;
+
 private:
     // RaytracingScene.hlsli의 BLASInstance와 같은 layout이다.
     struct BLASInstance

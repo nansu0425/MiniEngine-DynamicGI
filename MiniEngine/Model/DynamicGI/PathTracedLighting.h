@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Model/DynamicGI/GIFrameInputs.h"
+#include "Model/DynamicGI/GIProfiling.h"
 
 class ColorBuffer;
 class ComputeContext;
@@ -44,4 +45,7 @@ namespace PathTracedLighting
 
     // camera 쪽으로 반사하는 간접광의 radiance (cd/m²). rgb는 평균이고 a는 더한 sample 수다.
     ColorBuffer& GetIndirectRadiance(void);
+
+    void ListResources(std::vector<GIProfiling::Resource>& resources);
+    void DescribeWorkload(GIProfiling::Workload& workload);
 }

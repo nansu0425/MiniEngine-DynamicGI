@@ -99,6 +99,7 @@
     <ClInclude Include="Effects\FXAA\FXAA.h" />
     <ClInclude Include="App\GameInput.h" />
     <ClInclude Include="Graphics\Resource\GpuResource.h" />
+    <ClInclude Include="Profiling\GpuMemory.h" />
     <ClInclude Include="Profiling\GpuTimeManager.h" />
     <ClInclude Include="App\GameCore.h" />
     <ClInclude Include="App\UserSettings.h" />
@@ -202,6 +203,7 @@
     <ClCompile Include="App\UserSettings.cpp" />
     <ClCompile Include="Graphics\Resource\GpuBuffer.cpp" />
     <ClCompile Include="Graphics\Resource\AccelerationStructureBuffer.cpp" />
+    <ClCompile Include="Profiling\GpuMemory.cpp" />
     <ClCompile Include="Profiling\GpuTimeManager.cpp" />
     <ClCompile Include="Graphics\FormatName.cpp" />
     <ClCompile Include="Graphics\GraphicsCommon.cpp" />

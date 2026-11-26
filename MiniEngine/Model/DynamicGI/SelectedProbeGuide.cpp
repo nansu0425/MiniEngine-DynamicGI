@@ -66,3 +66,8 @@ ColorBuffer& SelectedProbeGuide::GetTexture(void)
 {
     return s_SelectedProbeGuide;
 }
+
+void SelectedProbeGuide::ListResources(std::vector<GIProfiling::Resource>& resources)
+{
+    resources.push_back({ &s_SelectedProbeGuide, GIProfiling::ResourceRole::kDebug });
+}
